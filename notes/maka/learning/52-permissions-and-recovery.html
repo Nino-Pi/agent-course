@@ -1,37 +1,44 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 52 章｜设计权限与效果恢复 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 52 / 62</div><article id="main-content"><span class="heading-alias" id="i04权限与恢复谁允许效果谁证明效果" aria-hidden="true"></span><span class="heading-alias" id="i04设计权限与效果恢复" aria-hidden="true"></span><span class="heading-alias" id="第-49-章设计权限与效果恢复" aria-hidden="true"></span><span class="heading-alias" id="第-51-章设计权限与效果恢复" aria-hidden="true"></span><h1 id="第-52-章设计权限与效果恢复">第 52 章｜设计权限与效果恢复</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 52 章｜权限（Permission）与效果（Effect）恢复（Recovery） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 52 / 62</div><article id="main-content"><span class="heading-alias" id="i04权限与恢复谁允许效果谁证明效果" aria-hidden="true"></span><span class="heading-alias" id="i04设计权限与效果恢复" aria-hidden="true"></span><span class="heading-alias" id="第-49-章设计权限与效果恢复" aria-hidden="true"></span><span class="heading-alias" id="第-51-章设计权限与效果恢复" aria-hidden="true"></span><span class="heading-alias" id="第-52-章设计权限与效果恢复" aria-hidden="true"></span><h1 id="第-52-章权限permission与效果effect恢复recovery">第 52 章｜权限（Permission）与效果（Effect）恢复（Recovery）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：怎样分别回答“这次操作是否获准”和“崩溃前它是否已经改变了现实”？</p>
-<p><strong>关键概念</strong>：权限裁决：按可信规则决定动作范围；隔离：限制实际资源访问；T1：可能执行前的持久标记；T2：接受结果后的持久结算；Unknown（未知）：效果尚不能确认；幂等键：按接收方合同识别同一业务动作。</p>
-<p><strong>关系主线</strong>：授权与隔离约束执行，T1/T2 记录调用边界；缺少结果时围绕原操作查询或对账，停止本地等待、取消远端任务和撤销既成效果必须分开。</p>
+<p><strong>核心问题</strong>：怎样分别判断“这次操作是否获准”与“崩溃前是否已改变现实”？</p>
+<p><strong>关键概念</strong>：权限策略（Permission Policy）决定允许范围；隔离（Isolation）约束实际访问；准备边界T1记录从此可能执行，结果结算T2保存已接受的结果（Outcome）；未知效果（Unknown Effect）承认现实尚无法确认；幂等键（Idempotency Key）依接收方合同识别同一业务动作。</p>
+<p><strong>关系主线</strong>：可信授权（Authorization）约束执行，持久记录帮助解释故障位置；缺少回执（Receipt）时先回查记录，再按原身份（Identity）查询或对账（Reconciliation）。</p>
 </blockquote>
-<p>前置：<a href="50-tool-contracts.html">第50章 Tool 合同</a>、<a href="51-file-and-shell-tools.html">第51章 文件与 Shell</a>、<a href="17-permissions-and-sandbox.html">第17章</a> 与 <a href="18-effects-and-recovery.html">第18章</a>。</p>
-<p>本文伪代码、状态和值为教学设计。Maka 普通 Runtime-executed 路径可作为时序对照；Client Capability 和 provider-executed 路径有不同边界，不能直接套图。</p>
-<h2 id="1-原题约束与最小起点">1. 原题、约束与最小起点</h2>
-<blockquote><p>你的 Agent 可以改文件和运行 Bash，怎样防止越权？如果文件已经改了，但 Agent 在保存结果前崩溃，重启后怎样继续？</p>
-</blockquote>
-<p>恢复能力取决于效果由本地受控进程、远端服务还是 provider 执行，以及状态能否持久保存、效果 owner 是否支持查询或幂等提交。本题先做本地工作区，使用持久数据库记录工具调用边界；随后把测试换成远端 job，观察保证怎样变化。</p>
-<p>最小方案有三个不同 owner：可信策略（Policy）裁决权限（Permissions），执行环境落实隔离（Isolation）并限制实际访问，持久 Runtime 记录调用与接受的结果。需要用户决定时，批准（Approval）通过可信链路进入权限裁决。不能让模型用一句“这是安全命令”同时承担这些职责。</p>
-<span class="heading-alias" id="2-两分钟完整主答" aria-hidden="true"></span><h2 id="2-完整参考方案">2. 完整参考方案</h2>
-<blockquote><p>我会把权限判断、执行隔离和结果恢复分开。模型只提出工具意图，工具可见也不代表可以执行。Runtime 用可信的当前边界判断路径、网络和能力，已有授权覆盖的操作直接继续；缺少必要能力时，先判断政策和入口是否允许申请，再提出具体范围，将用户决定通过可信链路保存。显式禁止的动作不能由普通扩边请求覆盖。真正的文件和进程访问还要由执行环境约束，不能只在提示词里写禁止越界。</p>
-<p>恢复上，我会在可能调用实现之前持久记录准备边界 T1，在执行结果被接受后持久记录 T2，再把结果交给下一轮模型。T1 说明从这里起可能执行过，T2 说明 Runtime 接受了某个 outcome，两个都不等于任意外部效果 exactly-once。</p>
-<p>崩溃后，如果协议和日志覆盖可靠，确认尚未跨 T1，才可判断本次实现未执行；有 T1 没有结果时，效果是不确定的。我会先用操作身份和资源 owner 的查询接口对账，能接回原任务就接回，能证明已完成就接受证据；没有可靠证据就保留未知，避免盲目重试写操作。</p>
-<p>如果远端提供业务幂等 key，还要确认 key 对应哪个业务意图、去重范围和期限，以及重复参数的合同。客户端自己多写一个 UUID 不会让远端变成幂等。最后我会在准备、执行、回执和提交前后分别注入故障，检查有无重复效果、越权以及虚假的成功结论。</p>
-</blockquote>
-<span class="heading-alias" id="3-白板一权限-authority-与效果结算的时序" aria-hidden="true"></span><h2 id="3-权限-authority-与效果结算的时序">3. 权限 authority 与效果结算的时序</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="权限 authority 与效果结算的时序：可滚动示意图"><a href="../../../assets/diagrams/52-permissions-and-recovery-1.svg"><img src="../../../assets/diagrams/52-permissions-and-recovery-1.svg" alt="模型提出工具意图后 Runtime 先检查参数和准入，保存 T1，再读取当前权限边界并调用受限执行者；足够范围内执行，否则明确拒绝。接受的结果持久保存为 T2 后才成为模型观察。" width="1348" height="1299" loading="lazy" style="width:1348px;min-width:1146px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>T1、实际效果、T2 是三个不同位置。“边界不足”可以在已 dispatch、尚未产生效果时形成明确拒绝。</p>
-<p>这张图借用 Maka 普通工具的准确顺序：pre-T1 guards → T1 → live boundary → impl → T2。不是所有权限检查都发生在 T1 之前。某些错误可以在参数阶段直接拒绝，Bash 的声明边界不足也可能在 T1 后、实际 spawn 前明确拒绝。不能把“命令没有启动”误写为“Runtime 没有 dispatch”。</p>
-<p>图上的不变量是：T1 未成功不调用实现；结果未可靠结算不交给后续模型继续推理；权限来自可信 authority，不能由模型参数覆盖。更一般的设计可以安排不同的准备阶段，但必须明确每个持久 marker 到底证明什么，不能借同名 T1/T2 继承保证。</p>
-<h3 id="批准怎样接回图中">批准怎样接回图中</h3>
-<p>对本题的普通文件/Bash 方案，范围不足先形成明确结果；只有任务确实需要该能力、且政策和入口允许申请时，模型才提出目的、对象和所需范围。显式 deny 应按拒绝处理，不能靠普通扩边请求绕过。Host 将用户决定与当前 revision 原子核对并保存，后续调用再读取新边界。批准不会把上一条失败变成成功，也不会自动改变已经运行的进程。</p>
-<p>权限收紧后，系统要定义如何处理排队任务与正在运行的工作：后续 admission 使用新边界；运行中任务可能需要停止、重建执行环境或依能力重新检查。一次 live read 不能自动撤销已经发生的访问。revision 变化不能让所有远端效果立即消失。</p>
-<span class="heading-alias" id="4-写接口结果未知是正式状态" aria-hidden="true"></span><h2 id="4-接口结果未知是正式状态">4. 接口：结果未知是正式状态</h2>
-<p>以下为教学伪代码。先定义执行结果的三种状态：成功、效果已知的失败、效果未知。失败中的 <code>partial_known</code> 要保留已知的部分效果；不能把任意异常都转换成“未执行”。<code>result: unknown</code> 中的 <code>unknown</code> 是 TypeScript 类型，表示这里没有限定结果值的结构；<code>status: &quot;unknown&quot;</code> 则是业务标签，表示无法确认效果，两处含义不同。</p>
+<h2 id="前情回顾权限permission执行与已知结果各有负责者owner">前情回顾：权限（Permission）、执行与已知结果各有负责者（Owner）</h2>
+<p><a href="17-permissions-and-sandbox.html">第17章</a>把权限策略（Permission Policy）、批准（Approval）与强制执行（Enforcement）分开：策略（Policy）判断能不能，批准（Approval）在需要时补充授权（Authorization），执行环境限制实际访问。工具可见并不代表能执行，模型（Model）的“安全命令”声明也不等于可信决定。</p>
+<p><a href="51-file-and-shell-tools.html">第51章</a>解释了资源层合同：读取（Read）提供观察版本（Observed Version），条件提交（Conditional Commit）负责检查并写入，进程（Process）收束则汇集退出与输出。这些都不同于<a href="18-effects-and-recovery.html">第18章</a>的持久结果结算：文件可能已改，回执（Receipt）却还没保存。</p>
+<p>本章沿用允许修正 README 测试入口与时长实现的四文件任务，先在本地工作区（Workspace）讨论，再另设远端作业（Job）变体。接口（Interface）、状态（State）与编号是教学设计；Maka 对照限定为配置了持久接收端（Durable Sink）的普通运行时执行（Runtime-Executed）路径。客户端能力（Client Capability）与模型服务代执行（Provider-Executed）另有条件，不能直接套用。</p>
+<span class="heading-alias" id="1-原题约束与最小起点" aria-hidden="true"></span><h2 id="最小方案三种责任不能交给同一句提示词">最小方案：三种责任，不能交给同一句提示词</h2>
+<p>只在提示词写“不要越权”，不能阻止进程（Process）访问文件；只用沙箱（Sandbox），也不能判断允许范围内的一次删除是否符合用户意图。先把责任分给三个对象：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 最小方案：三种责任，不能交给同一句提示词"><table><caption>表 1 / Table 1 · 最小方案：三种责任，不能交给同一句提示词</caption><thead><tr><th scope="col">负责者（Owner）</th><th scope="col">接受什么</th><th scope="col">决定或记录什么</th><th scope="col">无法独自证明什么</th></tr></thead><tbody><tr><td>可信策略裁决者（Policy Authority）</td><td>用户要求、规则、当前允许与拒绝范围</td><td>权限（Permission）决定及允许的申请入口</td><td>进程（Process）已经遵守限制</td></tr>
+<tr><td>执行环境</td><td>当前执行边界（Execution Boundary）和具体操作</td><td>落实隔离（Isolation），执行并收集观察</td><td>业务目标已经达成</td></tr>
+<tr><td>持久运行时（Durable Runtime）</td><td>调用身份（Identity）、参数和执行结果</td><td>准备边界T1、结果结算T2与恢复（Recovery）记录</td><td>任意远端效果（Effect）恰好发生一次</td></tr></tbody></table></div>
+<p>已有授权（Authorization）覆盖的操作可直接继续；确实缺少能力时，先判断策略（Policy）与入口是否允许申请，再提出具体目的和范围。显式禁止不能被一次普通扩边请求覆盖。用户决定经可信链路进入边界，而不是由模型（Model）改一个参数即生效。</p>
+<p>因此设计的核心并非“遇到危险就总问用户”。它是让已有权限（Permission）可用、拒绝可解释、需要的新批准（Approval）能准确约束下一次执行。</p>
+<span class="heading-alias" id="3-白板一权限-authority-与效果结算的时序" aria-hidden="true"></span><span class="heading-alias" id="3-权限-authority-与效果结算的时序" aria-hidden="true"></span><h2 id="一次普通调用t1-之后仍有实时边界检查">一次普通调用：T1 之后仍有实时边界检查</h2>
+<p>先读时序图中的三个位置：准备边界T1成功，之后实现才可能运行；效果（Effect）发生在资源侧；结果结算T2成功后，后续模型（Model）才能使用已接受结果。图展示普通调用且最后保存成功的路径，持久失败稍后单列。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="权限与持久结果 · Permission and Durable Outcome：可滚动示意图"><a href="../../../assets/diagrams/52-permissions-and-recovery-1.svg"><img src="../../../assets/diagrams/52-permissions-and-recovery-1.svg" alt="运行时（Runtime）先准备调用身份，再取得当前权限范围（Permission Scope），受限执行器（Executor）执行或拒绝。已接受结果经T2持久结算后才形成后续可靠观察；未知与持久失败由正文的恢复合同处理。" width="1345" height="1607" loading="lazy" style="width:1345px;min-width:1144px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>在 Maka 的这条普通路径中，顺序是执行前检查（Preflight）→T1→实时执行边界（Live Execution Boundary）→实现→T2。不是所有权限（Permission）检查都发生在T1之前。参数或当前步骤可用性可先拒绝；命令所需声明范围不足，也可能在已分派（Dispatch）、尚未启动进程（Process）时明确拒绝。</p>
+<p>所以“命令没启动”不等于“运行时（Runtime）没有分派（Dispatch）”。T1只标记从这里以后实现可能开始，不证明真实效果（Effect）已经产生，更不证明成功。<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/tool-runtime.ts">普通工具准备与结算</a>。</p>
+<p>当前源码没有持久接收端（Durable Sink）时，<code>prepareDurableToolAttempt</code> 可不创建持久调用；本章的数据库恢复（Recovery）保证因此明确要求该接线存在。更一般的系统可以设计不同准备阶段，但必须逐一解释持久标记（Durable Marker）的意义，不能只借用T1/T2名称。</p>
+<span class="heading-alias" id="批准怎样接回图中" aria-hidden="true"></span><h3 id="批准approval怎样改变下一次调用">批准（Approval）怎样改变下一次调用</h3>
+<p>范围不足先形成明确结果；任务确实需要该能力且策略（Policy）允许时，再申请具体范围。宿主（Host）将决定与当前边界修订（Revision）核对并保存，后续调用读取新边界。这里的修订（Revision）表示权限配置的变化，不是文件内容版本。</p>
+<p>批准（Approval）不会把上一条失败结果变成成功，也不会自动改变已经运行的进程（Process）。权限（Permission）收紧后，后续准入（Admission）应使用新边界；排队或运行中的工作可能要停止、重建执行环境或按能力重新检查。一次实时读取不能追回已发生访问，更不能令远端对象立即消失。</p>
+<span class="heading-alias" id="4-写接口结果未知是正式状态" aria-hidden="true"></span><span class="heading-alias" id="4-接口结果未知是正式状态" aria-hidden="true"></span><h2 id="三种结果outcome与一种必须停止的边界失败">三种结果（Outcome）与一种必须停止的边界失败</h2>
+<p>先把“知道失败”与“不知道效果（Effect）”分开。执行失败可能已经产生已知的部分效果（Effect），因此不能把所有异常都写成“未执行”。下面的联合类型是教学结果合同：</p>
 <pre><code class="language-ts">type Outcome =
   | { status: &quot;succeeded&quot;; result: unknown; receipt?: string }
   | { status: &quot;failed&quot;; code: string; effect: &quot;none&quot; | &quot;partial_known&quot; }
   | { status: &quot;unknown&quot;; reason: string; operationId: string }</code></pre>
-<p>接着沿一次 <code>dispatch</code> 看这些状态怎样进入账本。输入是工具调用和 Runtime；准备成功后才读取当前边界并执行，<code>executeAndClassify</code> 必须根据执行者证据形成上面的结果，随后保存 T2，最后生成模型观察。读代码时注意两个 <code>await</code> 的位置：<code>prepare</code> 之前不能调用实现，<code>acceptOutcome</code> 之前不能交付结果。持久边界失败需要停止当前循环，不当作普通工具错误继续交给模型。</p>
+<p><code>result: unknown</code> 的 <code>unknown</code> 是 TypeScript 类型，表示此处未限定值的结构；<code>status: &quot;unknown&quot;</code> 是业务标签，表示效果（Effect）无法确认。<code>partial_known</code> 则表示部分变化已知，恢复（Recovery）时必须保留它。</p>
+<p>还有第四种问题不在这个普通结果集合里：<strong>持久结算本身失败。</strong> 若结果结算T2未可靠完成，运行时（Runtime）必须停止当前循环，不能先把“成功”或“未知效果（Unknown Effect）”交给模型（Model），再后台补存。下一次恢复（Recovery）先回查数据库；没有收到提交回执（Receipt），不等于数据库一定没有提交。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 三种结果（Outcome）与一种必须停止的边界失败"><table><caption>表 2 / Table 2 · 三种结果（Outcome）与一种必须停止的边界失败</caption><thead><tr><th scope="col">所在层</th><th scope="col">一个例子</th><th scope="col">可继续的前提</th></tr></thead><tbody><tr><td>进程（Process）或资源收束</td><td>进程（Process）状态待查，或文件回复丢失</td><td>形成有依据的结果（Outcome），包括未知效果（Unknown Effect）</td></tr>
+<tr><td>结果结算T2</td><td>接受并持久保存上述结果（Outcome）</td><td>提交成功后才交给后续消费者（Consumer）</td></tr>
+<tr><td>持久边界失败</td><td>T1或T2保存失败、无法确认提交</td><td>停止当前续行，先恢复可靠记录再决定</td></tr></tbody></table></div>
+<p>Maka 文件系统执行者（Filesystem Worker）的回复失联、不可解析等情形，可以被分类为未知效果（Unknown Effect）；这份不确定性还能保存为错误结果T2。在本节普通T1/T2记录分支中，恢复分类的 <code>completed</code> 表示已找到匹配响应（Matching Response），不等于业务成功。<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/filesystem-authority.ts">文件结果分类</a>、<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/recovery-resolver.ts">记录形状与恢复判定</a>。</p>
+<h2 id="分派dispatch函数把异步边界放在正确位置">分派（Dispatch）函数：把异步边界放在正确位置</h2>
+<p>下面保留一份完整控制骨架。输入是工具调用（Tool Call）<code>call</code> 和注入的运行时（Runtime）；<code>prepare</code> 必须持久认领，拒绝重复身份（Identity）或参数冲突。<code>executeAndClassify</code> 依据执行者（Worker）证据形成前述结果（Outcome）；它不能把任何异常都吞成无效果（Effect）。</p>
+<p>阅读顺序是：先拒绝不应分派（Dispatch）的请求；再准备；准备成功才读当前边界并执行；最后保存T2并交付。函数中的各个服务是抽象合同，不是可直接运行的 Maka 接口。</p>
 <pre><code class="language-ts">async function dispatch(call, runtime) {
   const refusal = runtime.validateBeforeDispatch(call)
   if (refusal) {
@@ -52,56 +59,71 @@
   await runtime.ledger.acceptOutcome(claim.operationId, outcome)
   return runtime.toModelObservation(outcome)
 }</code></pre>
-<p><code>operationId</code> 关联本次调用与结果；<code>businessIntentKey</code> 若存在，则表达跨调用仍相同的业务意图。模型用新调用 ID 重发“为这次变更创建测试 job”，不一定是新业务意图；也不能仅因参数相同就强行去重，用户可能明确要运行第二次测试。</p>
-<span class="heading-alias" id="5-白板二用崩溃窗口决定恢复" aria-hidden="true"></span><h2 id="5-用崩溃窗口决定恢复">5. 用崩溃窗口决定恢复</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="用崩溃窗口决定恢复：可滚动示意图"><a href="../../../assets/diagrams/52-permissions-and-recovery-2.svg"><img src="../../../assets/diagrams/52-permissions-and-recovery-2.svg" alt="参数检查、T1 持久准备、可能效果、回执、T2 结算是不同崩溃位置；协议完整时 T1 前可判未执行，T1 后无 T2 保留未知并对账，T2 后读取已接受结果再检查继续条件。" width="846" height="1410" loading="lazy" style="width:846px;min-width:720px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中每个崩溃点对应重启后能够读到的不同记录前缀。“收到回执但没保存”仍连到 unknown，因为进程内知道的内容可能随崩溃丢失。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 5. 用崩溃窗口决定恢复"><table><caption>表 1 / Table 1 · 5. 用崩溃窗口决定恢复</caption><thead><tr><th scope="col">重启后的可靠记录（Recovery）</th><th scope="col">对本题普通工具 lane 的结论</th><th scope="col">下一步</th></tr></thead><tbody><tr><td>可验证的新协议调用，无 dispatch</td><td>本次实现未运行</td><td>仍需重新检查权限、工作区和输入条件后安排执行</td></tr>
-<tr><td>T1，有匹配 T2 success</td><td>Runtime 已接受成功结果</td><td>读取结果并判断任务还缺什么验证</td></tr>
-<tr><td>T1，有匹配 T2 failed/no-effect</td><td>已接受明确失败且本次无效果</td><td>修参数、重读或处理边界，按原因决定</td></tr>
-<tr><td>T1，有匹配 T2 unknown</td><td>不确定性已持久结算</td><td>查询或对账，不能将其当成功</td></tr>
-<tr><td>T1，没有匹配 T2</td><td>效果可能发生，也可能没有</td><td>停止盲目重放，保留调用身份</td></tr>
-<tr><td>日志缺失、冲突或协议不明</td><td>不能可靠套用上述分类</td><td>保留未知或判记录损坏，先恢复可读证据</td></tr></tbody></table></div>
-<p>这张表的“无 dispatch”结论有严格前提：执行必须全部经过本协议、持久 sink 可靠且记录范围完整。provider 内部执行、历史协议或外部服务不受这张表自动覆盖。</p>
-<h2 id="6-正常走读已有授权内完成文件修改与测试">6. 正常走读：已有授权内完成文件修改与测试</h2>
-<p>初始 boundary revision 为 b4，允许当前工作区读写和所需本地执行，网络受限。模型读取 package 和 README，提交合法 Edit。Runtime 保存 T1，读取 b4；文件执行者检查目标并修改，结果保存 T2；下一步模型才读取编辑结果。</p>
-<p>模型随后运行 <code>npm test</code>。若该项目的测试只需本地环境，则无需扩权；假设观察到 4 项通过，保存结果后仍检查 diff。最后中文回答区分改了什么、运行了什么、测试范围是什么。这里是教学走读，不是重新运行的记录。</p>
-<p>如果测试确实需要下载依赖，当前调用可能在启动前返回明确网络需求，不能把它解释为函数断言失败。假设此处政策允许申请网络访问，用户批准后 b4 更新为 b5，下一次调用使用 b5；先前未运行的测试仍是未运行。</p>
-<h2 id="7-失败走读readme-已改回执没有落盘">7. 失败走读：README 已改，回执没有落盘</h2>
+<p>两个等待决定了合法次序：<code>prepare</code> 成功返回之前不能调用实现；<code>acceptOutcome</code> 成功之前不能交付结果。<code>storeSyntheticPair</code> 保存的是执行前拒绝的合成调用/响应（Synthetic Call/Response），没有T1。<code>resolveExisting</code> 则按已有记录接回、等待或停放（Park），不能暗中把同一身份（Identity）再执行一次。</p>
+<p><code>operationId</code> 关联本次调用和结果，<code>businessIntentKey</code> 若存在，表达跨调用仍相同的业务意图（Business Intent）。模型（Model）换一个调用编号重发“为这次变更创建测试作业（Job）”，可能仍是原意图；参数相同也不能强行去重，因为用户可能明确要求再运行一次测试。身份（Identity）的语义必须由业务合同定义。</p>
+<span class="heading-alias" id="5-白板二用崩溃窗口决定恢复" aria-hidden="true"></span><span class="heading-alias" id="5-用崩溃窗口决定恢复" aria-hidden="true"></span><h2 id="崩溃以后先判断可靠记录覆盖到哪里">崩溃以后，先判断可靠记录覆盖到哪里</h2>
+<p>图中的崩溃点A–E表示不同位置；重启后先查实际留下的记录，不能用进程（Process）退出位置的猜测代替回查。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="崩溃点与可知事实 · Crash Points and Known Facts：可滚动示意图"><a href="../../../assets/diagrams/52-permissions-and-recovery-2.svg"><img src="../../../assets/diagrams/52-permissions-and-recovery-2.svg" alt="T1之前在协议可靠覆盖前提下可确认本次未执行；T1之后缺少匹配T2时保留未知效果（Unknown Effect），向效果负责者查询。T2已提交则读取已接受结果并核对当前条件，不盲目重做。" width="891" height="1439" loading="lazy" style="width:891px;min-width:758px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>“收到执行回执（Receipt），但尚未保存”仍可能只留下T1：进程内曾经知道的内容随崩溃丢失。反过来，T2可能已经保存，只是确认消息没回来。<strong>先查是否有匹配T2，再根据结果内容判断；缺少客户端回执（Receipt）不是缺少持久记录的证明。</strong></p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 崩溃以后，先判断可靠记录覆盖到哪里"><table><caption>表 3 / Table 3 · 崩溃以后，先判断可靠记录覆盖到哪里</caption><thead><tr><th scope="col">重启后的可靠记录</th><th scope="col">对本题普通路径的结论</th><th scope="col">下一步</th></tr></thead><tbody><tr><td>当前协议覆盖完整、可验证本次调用未分派（Dispatch）</td><td>这次实现未运行</td><td>重新检查权限（Permission）、工作区（Workspace）和输入后安排</td></tr>
+<tr><td>T1与成功T2匹配</td><td>运行时（Runtime）接受了成功结果（Outcome）</td><td>读取结果，判断还缺什么任务验证</td></tr>
+<tr><td>T1与失败T2匹配，标明无效果（Effect）</td><td>已知失败且此次未改资源</td><td>按原因修参数、重读或处理范围</td></tr>
+<tr><td>T1与未知效果（Unknown Effect）的T2匹配</td><td>不确定性已持久结算</td><td>查询或对账（Reconciliation），不能当成功</td></tr>
+<tr><td>有T1，查不到匹配T2</td><td>可能执行，也可能未执行</td><td>保留身份（Identity），停止盲目重放（Replay）</td></tr>
+<tr><td>日志缺失、冲突或协议不明</td><td>无法可靠套用上述分类</td><td>保留未知或判记录损坏，先恢复可读证据</td></tr></tbody></table></div>
+<p>第一行有严格前提：执行全部经过本协议、持久接收端（Durable Sink）可靠且读取范围完整。它不会覆盖历史协议、外部服务或模型服务代执行（Provider-Executed）。第三行也只指明确无效果（Effect）；失败若是 <code>partial_known</code>，还要根据已知变化安排后续处理。</p>
+<span class="heading-alias" id="6-正常走读已有授权内完成文件修改与测试" aria-hidden="true"></span><h2 id="正常走读已有授权authorization内修改与测试">正常走读：已有授权（Authorization）内修改与测试</h2>
+<p>设执行边界（Execution Boundary）修订（Revision）为b4，允许当前工作区（Workspace）读写及所需本地执行，网络受限。模型（Model）读取 <code>package.json</code> 和 README，提出合法编辑（Edit）。运行时（Runtime）保存T1，再读b4；文件系统执行者（Filesystem Worker）核对目标并修改，保存T2后，下一步模型（Model）才读到编辑结果。</p>
+<p>模型（Model）随后选择 <code>npm test</code>。若测试只需要当前本地环境，就不必扩权；假设观察到四项通过，保存结果后仍检查差异（Diff），交付时区分修改内容、实际检查与覆盖范围。这些是教学条件，没有重新运行产品或测试。</p>
+<p>另设需要下载依赖的变体：若当前入口能够在启动前识别未获准的网络需求，可以明确拒绝；不能把它解释成函数断言失败，也不能声称任意命令都能静态预知全部网络行为。假设策略（Policy）允许申请，用户批准（Approval）后b4更新为b5，下一次调用使用b5；先前未运行的测试仍是未运行。</p>
+<span class="heading-alias" id="7-失败走读readme-已改回执没有落盘" aria-hidden="true"></span><h2 id="失败走读readme-已改o9-还没有结果结算t2">失败走读：README 已改，o9 还没有结果结算T2</h2>
+<p>这一段明确给定故障发生在T2提交之前，重启回查也确认只有T1；不是仅凭没收到确认作推断。</p>
 <ol>
-<li>数据库持久记录 operation <code>o9</code> 的 T1，内容绑定到本次参数。</li>
-<li>执行者把 README 测试入口改成 <code>npm test</code>。</li>
-<li>T2 提交前进程崩溃；重启后只能读到 T1。</li>
-<li>恢复器将 <code>o9</code> 保留为 unknown，不再次发送同一个写动作。</li>
-<li>通过已授权的只读动作检查当前文件与 diff；若已有正确入口，先记录当前状态，继续必要验证。</li>
-<li>若没有可归因回执，仍区分“现在内容正确”与“已经证明 o9 成功”；用户可能在间隙中完成或修改过同一文件。</li>
+<li>数据库持久记录操作（Operation）o9的T1，绑定本次参数。</li>
+<li>执行者（Worker）把 README 测试入口改成 <code>npm test</code>。</li>
+<li>T2提交前进程（Process）崩溃，重启只能读到T1。</li>
+<li>恢复器（Recovery Resolver）保留o9的未知效果（Unknown Effect），不原样重发写入。</li>
+<li>通过已授权的只读操作检查当前文件与差异（Diff）。若已有正确入口，记录当前状态（State），继续必要验证。</li>
+<li>没有可归因回执（Receipt）时，仍区分“当前内容正确”与“已证明o9成功”；用户可能在间隙中完成或改变同一文件。</li>
 </ol>
-<p>把编辑换成“创建远端 CI job”，第 5 步必须向真正的远端 owner 查询 job ID 或业务 key。主机上的文件和本地进程都不能证明远端没有创建 job。若远端无查询也无幂等合同，应保留未知并报告能确认的部分，而不是制造第二个可能收费或写入的 job。</p>
-<h2 id="8-递进追问与参考答案">8. 递进追问与参考答案</h2>
-<p><strong>追问一：有 T1/T2，是不是 exactly-once？</strong></p>
-<p>不是。它们把本地“可能执行”和“接受结果”的窗口记录清楚，外部效果与本地 T2 通常不在同一事务。更强保证要落到具体资源 owner 的原子去重或条件提交，并说明跨越哪些故障。对任意 Bash 的多个外部效果，不能统一承诺。</p>
-<p><strong>追问二：我在请求里加 UUID，是否就可无限重试？</strong></p>
-<p>不行。服务端必须按该 key 原子去重，并定义参数冲突、过期、作用域和返回结果。还要在首次发送前持久保存 key，恢复时重复使用；换 key 就可能变成新意图。去重期限结束后也不能继续假设安全。</p>
-<p><strong>追问三：沙箱已经隔离，为什么还要 policy 或 approval？</strong></p>
-<p>沙箱只约束可达范围，不能判断一次允许范围内的删除是否符合用户意图。policy 决定可接受动作，approval 在需要时补充授权，enforcement 限制实际访问。批准也不使一个有 bug 的执行器自动正确。</p>
-<p><strong>追问四：权限撤回后，直接把 ledger 写成 failed 就完成了吗？</strong></p>
-<p>不行。ledger 是事实记录，不能撤销已经发生的效果。要分别处理未开始的调用、正在运行的进程与远端已接受的任务，记录停止或撤销是否得到真实确认；不能改写历史来掩盖未知。</p>
-<p><strong>追问五：MCP、Client Capability 和 provider 工具都走同样恢复吗？</strong></p>
-<p>不能仅凭都是 Tool 就继承合同。Maka 普通 MCP adapter 仍经 ToolRuntime；Client Capability 在 T1 前准备并获取 acceptance/必要 Grant，T1 后实际 admission。provider-executed 在模型请求内部执行，不经过普通 Maka ToolRuntime/T1/T2，generic recovery 仍有独立限制。应按工具真正经过的执行路径判断。</p>
-<h2 id="9-取舍与故障验证">9. 取舍与故障验证</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 9. 取舍与故障验证"><table><caption>表 2 / Table 2 · 9. 取舍与故障验证</caption><thead><tr><th scope="col">方案</th><th scope="col">能得到什么</th><th scope="col">代价与限制</th><th scope="col">适合场景</th></tr></thead><tbody><tr><td>仅保存对话轨迹（Transcript）</td><td>知道最近模型看到什么</td><td>效果后快照前崩溃会脱节</td><td>低风险原型，不能提供强效果恢复</td></tr>
-<tr><td>T1/T2 与保守未知（Unknown）</td><td>持久区分准备和结果</td><td>unknown 需要查询或人工判断</td><td>多种工具共用 Runtime</td></tr>
-<tr><td>业务键与负责者查询（Key · Owner）</td><td>对某类业务安全重提或接回</td><td>依赖服务端合同、key 生命周期</td><td>建 job、提交请求等明确业务</td></tr>
-<tr><td>资源条件提交（Conditional Commit）</td><td>拒绝陈旧 base，明确接受变化</td><td>owner 与事务覆盖范围要求高</td><td>受控文件/资源变更</td></tr></tbody></table></div>
-<p>权限验证选择实际允许与拒绝的路径/网络、symlink 替换、缺失 sandbox backend、批准 revision 冲突和 Client 端真实执行。恢复验证在 T1 前、T1 后、效果后、回执后和 T2 后分别停进程，检查实际资源、重复次数、ledger 和最终报告是否一致。</p>
-<p>必须分别记录正常完成率、重复效果、错误无效果判定、unknown 数量和对账成功率。一个系统如果把未知都写成成功，看起来会“恢复更快”，但它没有满足合同。</p>
-<span class="heading-alias" id="10-评分自测与回读" aria-hidden="true"></span><h2 id="10-client-断线而远端-ci-继续运行">10. Client 断线而远端 CI 继续运行</h2>
-<p>设远端已接受 job <code>j9</code>，本地已保存创建回执，随后 Client 断线。三类操作分别处理：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 10. Client 断线而远端 CI 继续运行"><table><caption>表 3 / Table 3 · 10. Client 断线而远端 CI 继续运行</caption><thead><tr><th scope="col">操作</th><th scope="col">负责者与输入（Owner · Input）</th><th scope="col">能确认的结果</th></tr></thead><tbody><tr><td>取消本地等待（Cancel Wait）</td><td>本地运行控制器取消对 j9 的等待</td><td>当前等待已停止；不证明 j9 被取消</td></tr>
-<tr><td>取消远端任务（Cancel Job）</td><td>有权调用 CI 服务的执行者向 owner 提交 j9 取消请求</td><td>只有 owner 确认 cancelled，才能报告远端已停止；请求超时仍未知</td></tr>
-<tr><td>恢复展示（View Recovery）</td><td>新 Client 查询同一 Run 与 j9 的可靠状态</td><td>重建观察，不重发创建任务</td></tr></tbody></table></div>
-<p>若用户只关闭窗口而没有请求取消，仍存活的 Host 可以继续观察 j9；若用户明确停止，后续创建和无关调用停止，已开始 job 的收尾按原授权与服务合同进行。j9 恰在取消前完成时，保留完成结果及其真实效果，而不是把历史改成从未执行。</p>
-<p>若本地只有创建调用的 T1、没有服务回执，应使用持久业务 key 查询；没有查询能力时保留 unknown。普通 Maka Edit 默认采用 <code>never_auto_retry</code>，也不能从没有回执推出可重做。更强的 <code>managed_mutation_v1</code> 协议没有接成默认 Write/Edit 行为。</p>
-<p>相关机制：<a href="56-tool-scheduling.html">第56章 工具发现与调度</a>、<a href="58-orchestration-and-continuity.html">第58章 编排与连续性</a>。</p>
+<p>这个例子说明：避免重复写入可以是基于现态的正确决策，却不必伪造一份旧操作成功证明。反之，如果回查发现T2已保存，应读取那份结果，而不继续坚持“只有T1”。</p>
+<p>把写文件换成经授权创建远端持续集成（Continuous Integration，CI）作业（Job），现态要向真正负责者（Owner）查询。主机文件和本地进程（Process）不能证明远端未创建；需要原作业（Job）编号或业务键。没有可靠查询和幂等性（Idempotency）合同，就保留未知效果（Unknown Effect），避免制造第二次可能收费或写入的操作。</p>
+<h2 id="幂等键idempotency-key同一意图仍须接收方认领">幂等键（Idempotency Key）：同一意图仍须接收方认领</h2>
+<p>在请求里加入通用唯一标识符（Universally Unique Identifier，UUID），只产生一个标识；它不会自动让接收方去重。真正的幂等性（Idempotency）合同要回答：哪个账户/业务范围内相同、保留多久、同键不同参数怎样拒绝、同键并发怎样原子接受、重复请求返回什么。</p>
+<p>幂等键（Idempotency Key）还应在首次发送前持久保存，恢复（Recovery）时沿用它。每次重试换键，会被当成不同意图；过期后继续复用，也未必仍受原去重保证保护。查询后再创建若没有原子约束，两位执行者（Worker）还可能同时查不到，然后各创建一次。</p>
+<p>T1/T2记录“可能执行”与“接受结果”，并未把远端效果（Effect）纳入同一个事务（Transaction）。因此它们不能独自推出恰好一次（Exactly Once）；更强保证要落到具体资源负责者（Resource Owner）的原子去重或条件提交（Conditional Commit），并说明故障覆盖。任意命令执行（Bash）可能触及多个系统，不能统一承诺。</p>
+<span class="heading-alias" id="10-评分自测与回读" aria-hidden="true"></span><span class="heading-alias" id="10-client-断线而远端-ci-继续运行" aria-hidden="true"></span><h2 id="客户端client断线远端-j9-仍在运行">客户端（Client）断线，远端 j9 仍在运行</h2>
+<p>现在明确改为另一组条件：远端已经接受作业（Job）j9，本地也已保存创建回执（Receipt），随后客户端（Client）断线。它不同于前面只有T1的o9。三类操作分别处理：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 客户端（Client）断线，远端 j9 仍在运行"><table><caption>表 4 / Table 4 · 客户端（Client）断线，远端 j9 仍在运行</caption><thead><tr><th scope="col">操作</th><th scope="col">负责者（Owner）与输入</th><th scope="col">能确认什么</th></tr></thead><tbody><tr><td>取消本地等待（Cancel Wait）</td><td>本地控制器停止对j9的等待</td><td>只证明当前等待结束</td></tr>
+<tr><td>取消远端作业（Cancel Job）</td><td>有权执行者（Worker）向服务提交j9取消（Cancellation）请求</td><td>服务确认 <code>cancelled</code> 才能报告远端停止；超时仍需回查</td></tr>
+<tr><td>恢复展示（View Recovery）</td><td>新客户端（Client）查询同一次执行（Run）与j9的可靠状态</td><td>重建观察，不重发创建</td></tr></tbody></table></div>
+<p>用户只关闭窗口而没有取消（Cancellation）要求时，仍存活的宿主（Host）可以继续观察j9；用户明确停止时，停止后续创建与无关调用，已开始工作的收尾依原授权（Authorization）和服务合同处理。j9若恰在取消（Cancellation）前完成，保留真实完成结果，不能改写成从未执行。</p>
+<p>若改变条件，本地只有创建调用T1而无服务回执（Receipt），则按持久业务键查询；没有查询能力，保留未知效果（Unknown Effect）。本地等待结束、远端工作停止和撤销既成效果（Effect）各是一个动作。撤回权限（Permission）后把账本（Ledger）改成 <code>failed</code>，不能替代这些动作，也不能改变历史。</p>
+<h2 id="换执行路径时哪些保证需要重新核对">换执行路径时，哪些保证需要重新核对</h2>
+<p>模型上下文协议（Model Context Protocol，MCP）描述工具接入方式，不自动决定资源与恢复（Recovery）合同。Maka普通协议适配器仍经过工具运行时（Tool Runtime）；以下几条路径必须分别解释：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 换执行路径时，哪些保证需要重新核对"><table><caption>表 5 / Table 5 · 换执行路径时，哪些保证需要重新核对</caption><thead><tr><th scope="col">执行路径</th><th scope="col">已有边界</th><th scope="col">不能直接继承什么</th></tr></thead><tbody><tr><td>普通运行时执行（Runtime-Executed），包括普通模型上下文协议（MCP）适配器</td><td>当前接线可经T1/T2、执行边界（Execution Boundary）与结果投影（Projection）</td><td>外部服务的幂等性（Idempotency）与本地文件隔离（Isolation）</td></tr>
+<tr><td>客户端能力（Client Capability）</td><td>T1前准备，取得接受证据（Acceptance Evidence）及必要会话级授权记录（Session Grant）；T1后才准入（Admission）</td><td>客户端（Client）的环境不等于宿主（Host）本地沙箱（Sandbox）</td></tr>
+<tr><td>模型服务代执行（Provider-Executed）</td><td>在模型（Model）请求内部执行，记录其活动</td><td>不经过普通工具运行时（Tool Runtime）的T1/T2，通用恢复（Generic Recovery）另有限制</td></tr></tbody></table></div>
+<p>客户端能力（Client Capability）的准备也有模式条件：当前执行边界（Execution Boundary）为 <code>bypass</code>，或会话（Session）的权限模式（Permission Mode）为 <code>ask</code>，才可进入准备路径；对需要会话级授权（Session Authorization）的目标，<code>ask</code> 分支还检查或请求相应的会话级授权记录（Session Grant）。重启处理可以为已分派（Dispatch）但未结算的此类调用保存未知效果（Unknown Effect）的错误结果T2；它结算“不确定”这一事实，不能替远端证明成功。<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/server/client-capability-coordinator.ts">客户端准备</a>、<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/server/client-capability-recovery.ts">重启结算</a>。</p>
+<p>普通Maka <code>Edit</code> 默认按 <code>never_auto_retry</code> 处理，不能由缺回执（Receipt）推出可重做。<code>managed_mutation_v1</code> 托管修改（Managed Mutation）存在更强基础设施，但宿主（Host）默认绑定尚未为普通 <code>Write/Edit</code> 接入相应合同，不能据此升级默认保证。</p>
+<span class="heading-alias" id="2-两分钟完整主答" aria-hidden="true"></span><span class="heading-alias" id="2-完整参考方案" aria-hidden="true"></span><span class="heading-alias" id="8-递进追问与参考答案" aria-hidden="true"></span><span class="heading-alias" id="9-取舍与故障验证" aria-hidden="true"></span><h2 id="取舍验证与完整参考答案">取舍、验证与完整参考答案</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 取舍、验证与完整参考答案"><table><caption>表 6 / Table 6 · 取舍、验证与完整参考答案</caption><thead><tr><th scope="col">方案</th><th scope="col">提供什么</th><th scope="col">仍需承担什么</th></tr></thead><tbody><tr><td>仅保存对话记录（Transcript）</td><td>了解先前输入与输出</td><td>效果（Effect）发生与快照（Snapshot）保存之间可能脱节</td></tr>
+<tr><td>T1/T2与保守未知效果（Unknown Effect）</td><td>持久区分准备与接受结果</td><td>查询、对账（Reconciliation）或有权人工处理</td></tr>
+<tr><td>业务键与负责者（Owner）查询</td><td>在具体合同内重提或接回</td><td>服务端去重、键生命周期与参数冲突</td></tr>
+<tr><td>资源条件提交（Conditional Commit）</td><td>拒绝陈旧前提并接受变化</td><td>原子性（Atomicity）、事务（Transaction）和协作写入范围</td></tr></tbody></table></div>
+<p>完整方案先落实可信权限（Permission）和隔离（Isolation），再记录可能执行之前的T1与接受结果之后的T2。崩溃恢复（Recovery）先核记录，后按原身份（Identity）调查效果（Effect）；记录无误仍需判断业务条件。能接回已有工作就接回，能根据新观察安全继续就继续，证据不足则保留未知效果（Unknown Effect），不靠盲重试制造确定性。</p>
+<p>验证应分别覆盖允许/拒绝的路径与网络、符号链接（Symbolic Link）替换、缺失沙箱（Sandbox）后端、批准（Approval）修订（Revision）冲突，以及客户端（Client）的实际执行边界（Execution Boundary）。故障场景应落在T1前后、效果（Effect）之后、回执（Receipt）之后和T2之后，同时检查资源、重复次数、账本（Ledger）和最终报告。这里是验证方案，没有运行这些实验。</p>
+<p>还要分别记录正常完成率、重复效果（Effect）、错误的无效果（Effect）判定、未知效果（Unknown Effect）数量与对账（Reconciliation）成功率。把未知都改写成成功会让指标好看，却破坏了恢复（Recovery）合同。</p>
+<p><strong>有T1/T2，为什么仍不能保证恰好一次（Exactly Once）？</strong></p>
+<p>本地记录与远端效果（Effect）通常不在同一事务（Transaction）。需要具体接收方的去重或条件提交（Conditional Commit），并说明范围与期限，不能只凭两条标记。</p>
+<p><strong>加一个通用唯一标识符（UUID）能无限重试吗？</strong></p>
+<p>不能。服务必须原子认领同一键，并定义参数、期限和返回合同；调用方还要持久保留原键。标识本身不执行去重。</p>
+<p><strong>已有沙箱（Sandbox），为何还要策略（Policy）与批准（Approval）？</strong></p>
+<p>隔离（Isolation）限制可达范围，策略（Policy）判断某次行为是否符合要求，批准（Approval）按具体需求补授权（Authorization）。批准（Approval）也不能修好有缺陷的执行器（Executor）。</p>
+<p><strong>权限（Permission）撤回后，把账本（Ledger）写成失败就结束了吗？</strong></p>
+<p>没有。需要分别处理未开始、运行中和远端已接受的工作，确认停止或撤销；账本（Ledger）记录事实，不能倒转效果（Effect）。</p>
+<p><strong>模型上下文协议（MCP）、客户端能力（Client Capability）与模型服务代执行（Provider-Executed）能共用同一恢复（Recovery）结论吗？</strong></p>
+<p>不能仅凭都叫工具就继承保证。要追实际准备、准入（Admission）、执行和持久记录；普通模型上下文协议（MCP）适配器可共用外层T1/T2，客户端（Client）另有接受证据（Acceptance Evidence）与会话级授权记录（Session Grant），模型服务代执行（Provider-Executed）另走模型（Model）内部路径。</p>
+<p>更完整的工具发现与协作条件见<a href="56-tool-scheduling.html">第56章</a>、<a href="58-orchestration-and-continuity.html">第58章</a>。</p>
 <hr>
-<p><a href="51-file-and-shell-tools.html">上一章：第 51 章｜设计 Read、Edit 与 Bash</a> · <a href="53-context-composition.html">下一章：第 53 章｜设计模型输入</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="51-file-and-shell-tools.html"><span>← 上一章</span><strong>第 51 章｜设计 Read、Edit 与 Bash</strong></a><a href="53-context-composition.html"><span>下一章 →</span><strong>第 53 章｜设计模型输入</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E7%BA%A6%E6%9D%9F%E4%B8%8E%E6%9C%80%E5%B0%8F%E8%B5%B7%E7%82%B9">1. 原题、约束与最小起点</a></li><li class="toc-level-2"><a href="#2-%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 完整参考方案</a></li><li class="toc-level-2"><a href="#3-%E6%9D%83%E9%99%90-authority-%E4%B8%8E%E6%95%88%E6%9E%9C%E7%BB%93%E7%AE%97%E7%9A%84%E6%97%B6%E5%BA%8F">3. 权限 authority 与效果结算的时序</a></li><li class="toc-level-3"><a href="#%E6%89%B9%E5%87%86%E6%80%8E%E6%A0%B7%E6%8E%A5%E5%9B%9E%E5%9B%BE%E4%B8%AD">批准怎样接回图中</a></li><li class="toc-level-2"><a href="#4-%E6%8E%A5%E5%8F%A3%E7%BB%93%E6%9E%9C%E6%9C%AA%E7%9F%A5%E6%98%AF%E6%AD%A3%E5%BC%8F%E7%8A%B6%E6%80%81">4. 接口：结果未知是正式状态</a></li><li class="toc-level-2"><a href="#5-%E7%94%A8%E5%B4%A9%E6%BA%83%E7%AA%97%E5%8F%A3%E5%86%B3%E5%AE%9A%E6%81%A2%E5%A4%8D">5. 用崩溃窗口决定恢复</a></li><li class="toc-level-2"><a href="#6-%E6%AD%A3%E5%B8%B8%E8%B5%B0%E8%AF%BB%E5%B7%B2%E6%9C%89%E6%8E%88%E6%9D%83%E5%86%85%E5%AE%8C%E6%88%90%E6%96%87%E4%BB%B6%E4%BF%AE%E6%94%B9%E4%B8%8E%E6%B5%8B%E8%AF%95">6. 正常走读：已有授权内完成文件修改与测试</a></li><li class="toc-level-2"><a href="#7-%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BBreadme-%E5%B7%B2%E6%94%B9%E5%9B%9E%E6%89%A7%E6%B2%A1%E6%9C%89%E8%90%BD%E7%9B%98">7. 失败走读：README 已改，回执没有落盘</a></li><li class="toc-level-2"><a href="#8-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE%E4%B8%8E%E5%8F%82%E8%80%83%E7%AD%94%E6%A1%88">8. 递进追问与参考答案</a></li><li class="toc-level-2"><a href="#9-%E5%8F%96%E8%88%8D%E4%B8%8E%E6%95%85%E9%9A%9C%E9%AA%8C%E8%AF%81">9. 取舍与故障验证</a></li><li class="toc-level-2"><a href="#10-client-%E6%96%AD%E7%BA%BF%E8%80%8C%E8%BF%9C%E7%AB%AF-ci-%E7%BB%A7%E7%BB%AD%E8%BF%90%E8%A1%8C">10. Client 断线而远端 CI 继续运行</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="51-file-and-shell-tools.html">上一章：第51章｜读取（Read）、编辑（Edit）与命令执行（Bash）</a> · <a href="53-context-composition.html">下一章：第53章｜设计模型输入（Model Input）</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="51-file-and-shell-tools.html"><span>← 上一章</span><strong>第 51 章｜读取（Read）、编辑（Edit）与命令执行（Bash）的资源合同</strong></a><a href="53-context-composition.html"><span>下一章 →</span><strong>第 53 章｜设计模型输入</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E6%9D%83%E9%99%90permission%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%B7%B2%E7%9F%A5%E7%BB%93%E6%9E%9C%E5%90%84%E6%9C%89%E8%B4%9F%E8%B4%A3%E8%80%85owner">前情回顾：权限（Permission）、执行与已知结果各有负责者（Owner）</a></li><li class="toc-level-2"><a href="#%E6%9C%80%E5%B0%8F%E6%96%B9%E6%A1%88%E4%B8%89%E7%A7%8D%E8%B4%A3%E4%BB%BB%E4%B8%8D%E8%83%BD%E4%BA%A4%E7%BB%99%E5%90%8C%E4%B8%80%E5%8F%A5%E6%8F%90%E7%A4%BA%E8%AF%8D">最小方案：三种责任，不能交给同一句提示词</a></li><li class="toc-level-2"><a href="#%E4%B8%80%E6%AC%A1%E6%99%AE%E9%80%9A%E8%B0%83%E7%94%A8t1-%E4%B9%8B%E5%90%8E%E4%BB%8D%E6%9C%89%E5%AE%9E%E6%97%B6%E8%BE%B9%E7%95%8C%E6%A3%80%E6%9F%A5">一次普通调用：T1 之后仍有实时边界检查</a></li><li class="toc-level-3"><a href="#%E6%89%B9%E5%87%86approval%E6%80%8E%E6%A0%B7%E6%94%B9%E5%8F%98%E4%B8%8B%E4%B8%80%E6%AC%A1%E8%B0%83%E7%94%A8">批准（Approval）怎样改变下一次调用</a></li><li class="toc-level-2"><a href="#%E4%B8%89%E7%A7%8D%E7%BB%93%E6%9E%9Coutcome%E4%B8%8E%E4%B8%80%E7%A7%8D%E5%BF%85%E9%A1%BB%E5%81%9C%E6%AD%A2%E7%9A%84%E8%BE%B9%E7%95%8C%E5%A4%B1%E8%B4%A5">三种结果（Outcome）与一种必须停止的边界失败</a></li><li class="toc-level-2"><a href="#%E5%88%86%E6%B4%BEdispatch%E5%87%BD%E6%95%B0%E6%8A%8A%E5%BC%82%E6%AD%A5%E8%BE%B9%E7%95%8C%E6%94%BE%E5%9C%A8%E6%AD%A3%E7%A1%AE%E4%BD%8D%E7%BD%AE">分派（Dispatch）函数：把异步边界放在正确位置</a></li><li class="toc-level-2"><a href="#%E5%B4%A9%E6%BA%83%E4%BB%A5%E5%90%8E%E5%85%88%E5%88%A4%E6%96%AD%E5%8F%AF%E9%9D%A0%E8%AE%B0%E5%BD%95%E8%A6%86%E7%9B%96%E5%88%B0%E5%93%AA%E9%87%8C">崩溃以后，先判断可靠记录覆盖到哪里</a></li><li class="toc-level-2"><a href="#%E6%AD%A3%E5%B8%B8%E8%B5%B0%E8%AF%BB%E5%B7%B2%E6%9C%89%E6%8E%88%E6%9D%83authorization%E5%86%85%E4%BF%AE%E6%94%B9%E4%B8%8E%E6%B5%8B%E8%AF%95">正常走读：已有授权（Authorization）内修改与测试</a></li><li class="toc-level-2"><a href="#%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BBreadme-%E5%B7%B2%E6%94%B9o9-%E8%BF%98%E6%B2%A1%E6%9C%89%E7%BB%93%E6%9E%9C%E7%BB%93%E7%AE%97t2">失败走读：README 已改，o9 还没有结果结算T2</a></li><li class="toc-level-2"><a href="#%E5%B9%82%E7%AD%89%E9%94%AEidempotency-key%E5%90%8C%E4%B8%80%E6%84%8F%E5%9B%BE%E4%BB%8D%E9%A1%BB%E6%8E%A5%E6%94%B6%E6%96%B9%E8%AE%A4%E9%A2%86">幂等键（Idempotency Key）：同一意图仍须接收方认领</a></li><li class="toc-level-2"><a href="#%E5%AE%A2%E6%88%B7%E7%AB%AFclient%E6%96%AD%E7%BA%BF%E8%BF%9C%E7%AB%AF-j9-%E4%BB%8D%E5%9C%A8%E8%BF%90%E8%A1%8C">客户端（Client）断线，远端 j9 仍在运行</a></li><li class="toc-level-2"><a href="#%E6%8D%A2%E6%89%A7%E8%A1%8C%E8%B7%AF%E5%BE%84%E6%97%B6%E5%93%AA%E4%BA%9B%E4%BF%9D%E8%AF%81%E9%9C%80%E8%A6%81%E9%87%8D%E6%96%B0%E6%A0%B8%E5%AF%B9">换执行路径时，哪些保证需要重新核对</a></li><li class="toc-level-2"><a href="#%E5%8F%96%E8%88%8D%E9%AA%8C%E8%AF%81%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E7%AD%94%E6%A1%88">取舍、验证与完整参考答案</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

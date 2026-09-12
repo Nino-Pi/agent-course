@@ -41,7 +41,7 @@ def reconcile(intent):
         return dispatch_or_reconcile(decision.accepted_run_id)
     return report_admission_problem(decision)  # 冲突或未识别状态不派发</code></pre>
 <p><code>claim_or_observe_atomically</code> 是本题要求实现的原子合同：先核对调用者是否有权提交或观察该控制域，再按控制域、触发身份和作用域查找既有 admission，并核对冻结的 payload 与授权范围。已有绑定不能被新内容覆盖；只对尚未接纳的意图核对当前取消与 revision，再持久创建唯一 admission。该判断与取消/修订写入必须经过同一事务或串行 owner，不能只用 <code>if not exists</code>。原子判定之后的新取消按已接纳 Run 的停止路径处理；停止请求失败要能重试/对账。</p>
-<p>这里的 <code>dispatch_or_reconcile</code> 与<a href="49-agent-architecture.html#4-%E6%9C%80%E5%B0%8F%E7%8A%B6%E6%80%81%E4%B8%8E%E4%B8%BB%E5%BE%AA%E7%8E%AF">第49章主循环</a>使用同一合同。第49章已给出首次、并发重复、运行中、终态后、派发前崩溃和效果未知六种情境的参考表。本章展开恢复者如何作决定：</p>
+<p>这里的 <code>dispatch_or_reconcile</code> 与<a href="49-agent-architecture.html#4-%E8%BA%AB%E4%BB%BDidentity%E6%B4%BE%E5%8F%91dispatch%E4%B8%8E%E4%B8%BB%E5%BE%AA%E7%8E%AF">第49章主循环</a>使用同一合同。第49章已给出首次、并发重复、运行中、终态后、派发前崩溃和效果未知六种情境的参考表。本章展开恢复者如何作决定：</p>
 <pre><code class="language-python">def dispatch_or_reconcile(run_id):
     state = read_authoritative_state(run_id)
     if state.is_terminal:  # 成功、失败、取消、预算耗尽均属于终态
