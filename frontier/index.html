@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent 前沿进阶：能力增长、自主研究与自我改进 · Agent 前沿进阶</title><link rel="stylesheet" href="assets/course.css"><link rel="stylesheet" href="assets/katex.min.css"></head>
+<body><header><a href="index.html">Agent 前沿进阶</a><span>能力增长、自主研究与自我改进</span></header><main><h1 id="agent-前沿进阶能力增长自主研究与自我改进">Agent 前沿进阶：能力增长、自主研究与自我改进</h1>
+<p>本册从“知道Agent怎样执行”走向“有证据地改善Agent”。按问题展开任务评价、经验消费、固定模型策略、数据与训练、程序演化和自主研究。代码、例算与参考答案直接给出，案例中的教学假设和真实运行分别标明。</p>
+<h2 id="怎样选择阅读路线">怎样选择阅读路线</h2>
+<p>基础回读：<a href="../notes/maka/learning/README.html">已有62章入口</a>。本册需要基础Agent/Harness心智模型与代码阅读经验，每章会补充当处理解所需的最短背景；不要求先学完概率、深度学习或强化学习。</p>
+<ul>
+<li><strong>共同入口与固定模型路线：</strong> 01→02→03→04→05共同核心→06。第05章到“核心阅读的出口”即可进入主动取证，无须先读训练深化。</li>
+<li><strong>先补数学：</strong> 01→07→08。两章从公开的三候选数值模型推到更新后的输出，只硬需01。</li>
+<li><strong>准备进入训练：</strong> 共同核心与07–08都读过以后，回读<a href="05-experience-and-consumers.html#训练深化哪一种消费者能接收这条记录">05训练深化</a>。它用完整参考程序解释哪些记录能被不同消费者接受。</li>
+<li><strong>只关心任务评分：</strong> 01→04可以独立阅读；涉及改善幅度、反复选优和归因时再补02–03。</li>
+</ul>
+<p>章末的上一章/下一章便于连续浏览，实际硬前置单独列出。七编是内容组织，读者不必先学完第四编训练才进入固定模型的程序优化或自主研究。</p>
+<h2 id="第一编从执行走向改进">第一编：从执行走向改进</h2>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>正文</th>
+<th>回答的问题</th>
+<th>新册硬前置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="01-what-actually-improves.html">01 一次失败之后，究竟该改什么</a></td>
+<td>区分项目产物、输入、工具与学习对象，选择下一项对照</td>
+<td>无</td>
+</tr>
+<tr>
+<td><a href="02-paired-experiments.html">02 多做了几题，能确定Agent改好了吗</a></td>
+<td>怎样计算任务差值、不确定性与未知结果范围</td>
+<td>01</td>
+</tr>
+<tr>
+<td><a href="03-selection-and-attribution.html">03 挑出了最高分，为什么还不能宣布进步</a></td>
+<td>怎样控制反复选优、组件交互和完整成本</td>
+<td>01、02</td>
+</tr>
+<tr>
+<td><a href="04-environment-and-supervision.html">04 工具返回成功，为什么任务仍可能失败</a></td>
+<td>怎样分开工具状态、任务评分、缺失与独立监督</td>
+<td>01；推荐02–03</td>
+</tr>
+<tr>
+<td><a href="05-experience-and-consumers.html">05 一条轨迹怎样进入下一次改进</a></td>
+<td>诊断、记忆、程序优化和训练怎样实际消费经验</td>
+<td>核心需02–04；训练深化追加07–08</td>
+</tr>
+</tbody></table></div>
+<h2 id="第二编固定模型时的能力提升">第二编：固定模型时的能力提升</h2>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>正文</th>
+<th>回答的问题</th>
+<th>新册硬前置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="06-active-evidence.html">06 下一次读取怎样改变判断</a></td>
+<td>资料冲突时怎样选择观察、整理上下文并按证据和预算停止</td>
+<td>05共同核心</td>
+</tr>
+</tbody></table></div>
+<p>搜索与选择、持续记忆和Skill、界面操作、多Agent协作是本编后续计划主题；它们按各自问题解释固定模型时的收益与限制。</p>
+<h2 id="第三编环境与经验生产">第三编：环境与经验生产</h2>
+<p>后续计划讲真实与合成数据、环境一致性及模拟到真实任务的迁移。来源、用途、评分状态与消费者的共同合同已在05给出。</p>
+<h2 id="第四编agent模型训练">第四编：Agent模型训练</h2>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>正文</th>
+<th>回答的问题</th>
+<th>新册硬前置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="07-probabilities-and-tensors.html">07 概率和张量怎样描述一次预测</a></td>
+<td>logits怎样成为概率，条件、mask和平均单位怎样进入目标</td>
+<td>01</td>
+</tr>
+<tr>
+<td><a href="08-loss-and-update.html">08 损失怎样改变下一次输出</a></td>
+<td>梯度怎样改变权重，动量和LoRA怎样改变更新路径</td>
+<td>07</td>
+</tr>
+</tbody></table></div>
+<p>训练基础之后将按各自目标展开多轮监督、偏好学习与蒸馏、强化学习、训推协同和持续学习；它们不是必须依次升级的一条算法阶梯。</p>
+<h2 id="第五编系统自动演化">第五编：系统自动演化</h2>
+<p>后续计划区分一次程序优化、多代选择与继承、群体及课程演化，闭合候选生成、安装、实际消费和拒绝。</p>
+<h2 id="第六编评价与监督深化">第六编：评价与监督深化</h2>
+<p>后续计划研究难监督任务、评价器可被利用的条件，以及自动改进过程的独立判断。最低评分和权限合同已经在04解释。</p>
+<h2 id="第七编自主研究与rsi">第七编：自主研究与RSI</h2>
+<p>后续计划区分资料研究、可验证的新发现、改进器贡献与长期增长。程序层的研究路线会保留独立入口，不把全部强化学习作为默认前置。</p>
+<footer>Agent 前沿进阶 · 在线阅读</footer></main></body></html>

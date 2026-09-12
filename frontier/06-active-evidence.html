@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 06 章｜下一次读取怎样改变判断 · Agent 前沿进阶</title><link rel="stylesheet" href="assets/course.css"><link rel="stylesheet" href="assets/katex.min.css"></head>
+<body><header><a href="index.html">Agent 前沿进阶</a><span>能力增长、自主研究与自我改进</span></header><main><h1 id="第-06-章下一次读取怎样改变判断">第 06 章｜下一次读取怎样改变判断</h1>
+<blockquote>
+<p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：资料互相矛盾、读取也有成本时，Agent应该先查什么，怎样知道已经足以回答？</p>
+<p><strong>关键概念</strong>：主动取证：根据当前缺口选择下一观察；信息价值：新观察对决策的预期帮助；证据状态：区分已支持、已否定和仍未知；新鲜度：材料是否适用于当前时点；停止规则：根据证据、权限和预算结束查询。</p>
+<p><strong>关系主线</strong>：以同一资料研究任务比较顺着排名读与按缺口取证，追踪查询、回读、上下文和最终回答；再用缓存失效与服务故障说明，读得更多不保证证据更完整。</p>
+</blockquote>
+<h2 id="先把还不知道什么写成能改变行动的问题">先把“还不知道什么”写成能改变行动的问题</h2>
+<p>本章硬前置是<a href="05-experience-and-consumers.html">第05章的共同核心</a>。沿用其中“材料必须被实际消费者读取”的定义，本章只改变单次任务中的查询与输入组织，模型参数和跨任务记忆保持不变。这里的资料研究指查找、核对和综合已有资料；找到了可靠答案，不因此成为原创科研。</p>
+<p>另设K-C的一项独立任务。青岚是虚构的笔记服务，本次查询时点改为<strong>2026年7月2日12:00</strong>，资料与站点副本按下表重新给定；第04章6月15日的当前状态不延用。用户问：“青岚现在给新工作区设置多少天的默认留存？既有工作区会被统一改成这个数吗？我们的河岸工作区目前是多少天？”河岸在5月建立，用户没有提供管理员配置。</p>
+<p>本次授权只允许读公共资料并生成答复草稿，不允许登录管理员页、修改留存或发送公告。两种策略从同一冻结站点副本、同一初始缓存和空的任务工作记录开始；固定同一模型M0、工具接口、输入格式和输出规则。差别只有下一次查询选择，不给主动取证方额外资料。</p>
+<p>每个试次最多6次模型决策、5次工具调用、120秒行动时间。最终报告也算一次模型决策；独立评分最多再用20秒。总费用上限为20个教学费用点，含评分的2点。失败读取和重试照常计数。以下模型决策与网页行为是完整给定的教学过程；本章后面的普通Python程序只运行策略与账本模拟，没有运行模型或访问真实青岚服务。</p>
+<p>判定合同提前固定：答案应给出有当前公共依据的新工作区默认值、既有工作区是否自动改变，并明确河岸当前值的证据缺口。前两项未回答，或把河岸当前值猜成默认值，均为有效F；三项满足则为S。外层评分器持有冻结资料的真值，若它自己无法工作才是评分U。准确报告查询失败仍有价值，但不自动满足完整交付要求。</p>
+<h2 id="资料都在站点里不等于都已进入输入">资料都在站点里，不等于都已进入输入</h2>
+<p>下面给读者列出这个微型环境的全部相关原文。模型初始知道任务、公共读取范围，以及搜索、缓存读取和公共页面刷新的工具合同；<strong>原文在被调用返回之前不会出现在它的输入中</strong>。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>资料身份与来源</th>
+<th>本例原始正文或返回内容</th>
+<th>时间与适用范围</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>B：一篇转述博客</td>
+<td>“青岚进入30天留存时代。切换即将开始，团队可以据此安排资料整理。”</td>
+<td>6月18日发布；没有交代既有工作区规则，不是当前策略页</td>
+</tr>
+<tr>
+<td>N：官方调整公告 <code>/notice</code></td>
+<td>“计划自7月1日启动新工作区默认30天的调整。实际生效情况以当前策略页 <code>/defaults</code> 为准；既有工作区规则见 <code>/faq</code>。”</td>
+<td>6月1日发布；宣布计划，不单独确认7月2日已经生效</td>
+</tr>
+<tr>
+<td>P旧：<code>/defaults</code> 的缓存副本</td>
+<td>“当前新工作区默认留存90天。”</td>
+<td>最后核验于5月15日；正文版本为5月1日版，没有7月2日的重新核验结果</td>
+</tr>
+<tr>
+<td>P新：官方当前策略页 <code>/defaults</code></td>
+<td>“7月1日调整已生效；当前创建的新工作区默认留存30天。”</td>
+<td>本例站点副本核验时点为7月2日12:00；这是刷新后才返回的版本</td>
+</tr>
+<tr>
+<td>FAQ：官方常见问题 <code>/faq</code></td>
+<td>“既有工作区不会随本次调整自动改成30天，继续采用各自当前配置。管理员可以另行调整；某个工作区当前值须查其管理设置。”</td>
+<td>当前站点副本中的有效说明</td>
+</tr>
+<tr>
+<td>初次搜索回执</td>
+<td>按B、N、P旧给出三个候选及上述标题、日期、路径；明确<code>truncated=true</code></td>
+<td>只返回排名前3项，不承诺站点只有3篇材料</td>
+</tr>
+</tbody></table></div>
+<p>搜索返回的P旧是缓存候选。普通缓存读取只取得P旧；显式刷新<code>/defaults</code>才向本例的当前站点副本核验，并返回P新。公告中的<code>/faq</code>路径是新发现的读取入口，不能因为初始搜索没返回FAQ就说它不存在。</p>
+<p>读完搜索回执后，当前问题可以分成三格：<strong>G1：新工作区现在的默认值；G2：既有工作区是否自动变化；G3：河岸的实际配置。</strong> G1需要当前政策，G2需要适用范围，G3需要该工作区的配置观察。这种分解的用处是让每次读取有明确消费者：准备回答哪一格，哪种返回会改变下一动作。</p>
+<p>G3已暴露权限限制：任务没有提供管理员配置，也没有管理员读取权限。此时尚未取得河岸当前值；策略不能搜索十次“河岸30天”就把公共默认值当作私人配置。后续回读还要确认公共政策是否允许对这个既有工作区作进一步判断。</p>
+<h2 id="先跟着排名读会在哪里耗尽机会">先跟着排名读，会在哪里耗尽机会</h2>
+<p>设策略R为“搜索，依排名读取前三个候选，再用同一关键词搜索一次”；遇到时间冲突仍不刷新，最后按实际取得的证据回答。它不是所有排序检索器的代表，只是本题固定的比较策略。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>工具次序</th>
+<th>R实际取得什么</th>
+<th>当时仍缺什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1：搜索“青岚 留存”</td>
+<td>B、N、P旧三个候选</td>
+<td>G1–G3均未闭合</td>
+</tr>
+<tr>
+<td>2：读B</td>
+<td>看到了30天的转述</td>
+<td>不能确认实际生效与既有范围</td>
+</tr>
+<tr>
+<td>3：读N</td>
+<td>看到了计划日期及<code>/defaults</code>、<code>/faq</code>入口</td>
+<td>仍需当前政策和既有规则</td>
+</tr>
+<tr>
+<td>4：读P旧</td>
+<td>取得5月核验的90天正文</td>
+<td>旧观察与新计划并置，不足以确认当前值</td>
+</tr>
+<tr>
+<td>5：重复原搜索</td>
+<td>仍是相同前三项，仍被截断</td>
+<td>没有新增证据；工具预算耗尽</td>
+</tr>
+</tbody></table></div>
+<p>R的诚实答复是：“公告计划改为30天，但当前缓存仍写90天，尚未确认现在的默认值；既有工作区规则和河岸实际配置也未核对。”它正确保留了未知，却没有完成前两项要求，外层给F。若改为按两篇含30天的文字对一篇90天的文字投票，也不能补上生效与适用范围；重复转述不是独立政策证据。</p>
+<p>这个失败没有发生在“资料总量不足”。FAQ由已经读到的N直接指向，P新也有明确刷新入口；真正浪费的是冲突出现以后没有改变读取动作。</p>
+<h2 id="按缺口取证观察会怎样推动下一步">按缺口取证，观察会怎样推动下一步</h2>
+<p>策略Q同样先搜索，但优先回读官方公告，再根据公告指出的缺口行动。以下每行的依据只来自该行之前已经取得的观察。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>工具次序</th>
+<th>下一动作及其依据</th>
+<th>新观察怎样改变状态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1：搜索</td>
+<td>用任务关键词发现候选</td>
+<td>N具有原始公告身份，P旧核验时间较早；决定先读N</td>
+</tr>
+<tr>
+<td>2：读N</td>
+<td>需要区分“计划”与“当前”</td>
+<td>N明确把实际生效交给<code>/defaults</code>，并提供<code>/faq</code>；形成两个具体回读入口</td>
+</tr>
+<tr>
+<td>3：刷新<code>/defaults</code></td>
+<td>P旧不足以回答7月2日的G1</td>
+<td>P新写明已生效、当前30天；G1从未知变成有来源的30天</td>
+</tr>
+<tr>
+<td>4：读<code>/faq</code></td>
+<td>还缺G2的既有范围</td>
+<td>明确“不会自动改”；G2变成有来源的否定，G3仍无配置观察</td>
+</tr>
+<tr>
+<td>最终报告</td>
+<td>G1/G2已有所需证据，G3超出本次可取得的信息范围</td>
+<td>停止查询，给结论、来源和未核项</td>
+</tr>
+</tbody></table></div>
+<p>Q最终草稿为：“截至7月2日12:00，新工作区默认留存30天，当前策略页已确认生效。既有工作区不会因这次调整自动变成30天，仍按各自当前配置。河岸在5月建立，属于既有工作区；我们没有读取它的管理设置，不能据公共默认值判定它当前是多少天。”前两句分别引用P新与FAQ，最后一句依据用户给定的建立时间、FAQ的范围和本次未读取配置这一事实。外层给S。</p>
+<p>本例的候选答案也能直接比较：答“所有工作区都是30天”与FAQ冲突；答“当前仍是90天”只使用了过期观察；上述Q草稿能让每个确定结论落到适用证据。选择器检查的是<strong>主张、时点、对象和出处是否对应</strong>，不是哪份答案更肯定或哪一个数字出现更多次。</p>
+<p>这种观察与行动交替的做法与ReAct原方法相通：新观察参与后续查询和答案组织，查询不再是开头一次性的材料准备。原方法也分析了无用搜索和重复行动的失败，不能把这种循环形式当作可靠性的保证。这里没有复现其模型或基准成绩。<a href="https://arxiv.org/html/2210.03629v3">ReAct原论文</a></p>
+<h2 id="一次读取值得付出多少先算它能改变什么">一次读取值得付出多少：先算它能改变什么</h2>
+<p>只取G1做一个独立数值例子。假设当前30天和90天两个可能状态各占0.5，这是教学给定的不确定性，不是模型置信度测量。答错损失10分，暂不确定损失4分，答对损失0分；这里的损失是为决策设定的代价，不等于前面费用账本的货币。</p>
+<p>直接答30或90的平均损失都是<code>0.5×0+0.5×10=5</code>，暂不确定的损失是4，所以还没取证时选择暂不确定。再假设读取当前策略页成功时能完全区分这两个状态，成功率为0.8；失败时没有新增信息，仍选择暂不确定。读取后的预期答题损失为<code>0.8×0+0.2×4=0.8</code>。</p>
+<p>若时间和费用已按本题预先选择的尺度折成1分，则这次读取的净价值是<code>4−0.8−1=2.2</code>分。再读一份已知只重复旧公告的副本，不改变这两个状态的相对可能性，其净价值为<code>4−4−1=−1</code>。信息价值比较的是<strong>观察之后能否选择更好的动作</strong>，不是新增加了多少文字。</p>
+<p>更一般地，先按当前证据选择预期损失最小的动作；对某个候选查询，把每种可能返回及其概率列出，在每种返回下重新选动作，再求平均，最后加查询成本。不能先假定会得到想要的结果，再决定去查。这个决策顺序对应信息价值的基本推导；概率、损失和观察可靠性必须有适用条件。<a href="https://inst.eecs.berkeley.edu/~cs188/textbook/vpis/vpi.html">信息价值的公式与推导</a></p>
+<p>实际网页会有解析错误、含糊措辞和不可用服务。上述0.8、完全区分和损失权重不是通用常数；如果无法估计，先用“能区分哪两个候选解释、成本多少、失败后怎么办”这三个问题排序，也比把读满预算当目标更明确。一个查询可能只有与另一份材料合起来才有价值，逐篇相关性分数不能自动代表整条证据链的价值。</p>
+<h2 id="让下一请求看见结论的条件而非只剩数字">让下一请求看见结论的条件，而非只剩数字</h2>
+<p>Q在刷新以后可以整理出以下任务内工作记录；它不跨任务存为长期Memory。</p>
+<pre><code class="language-text">任务时点：7月2日12:00；只读公共资料；不得修改或发布。
+G1：当前新工作区30天；来源P新，当前副本核验，已确认生效。
+G2：未核；N指向/faq，下一步读取它。
+G3：河岸当前值未知；未授权读取管理员设置，不可用默认值代填。
+冲突解释：P旧90天是5月观察；N是计划；两者不覆盖P新的当前声明。
+来源仍可回读；已用3次工具；最终报告需保留一次模型决策。
+</code></pre><p>最终组装还要带上原始用户目标、适用权限和必要的原文片段。将这份记录缩成“已确认30天，继续完成”会丢失G2/G3与对象范围，后续模型可能把所有工作区都写成30天。节省了输入字数，任务条件却改变了。</p>
+<p>在这个小例子中，相关原文很短，可以直接保留。若材料变长，可把长文留在外部，仅将问题、证据摘录、出处、冲突和未完成项送入下一请求；有争议的结论再按出处回读。旧36章的RLM例也把原文和中间结果留在程序环境里，但本题没有需要子模型解释的大批片段，不必添加递归调用。按需读取本身有调用与延迟成本，预先读入少量稳定公共材料和后续定向查找可以组合。<a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">上下文检索与按需读取的工程说明</a></p>
+<p>长轨迹采用摘要时，也应保留这些消费条件。ReSum的原方法会保留问题、生成目标相关摘要，再从压缩状态继续；它仍设置实际工具预算。摘要释放窗口空间不会扩大本次读取权限，也不会把已经花掉的查询次数归零。本章没有运行摘要模型，更不把程序整理的一份记录当成ReSum训练效果。<a href="https://arxiv.org/html/2509.13313v3">ReSum的方法说明</a></p>
+<h2 id="缓存的新鲜度不能替代主张的时点核对">缓存的新鲜度，不能替代主张的时点核对</h2>
+<p>P旧的90天未必曾经错误；它是另一个时点的正确观察。问题在于用它回答7月2日的当前值。刷新还可能确认内容没有改变，因此“旧副本”也不能反向等于“内容为假”。</p>
+<p>缓存读取至少要保留资源身份、表示范围、原版本与核验信息，并遵守当前读取权限。同一路径的不同语言、不同账户或不同工作区表示不能因路径相同就互用。HTTP缓存把可直接复用的新鲜响应和需要重新验证的响应区分开；重新验证可以复用未改变的内容，也可能返回新正文。这种协议上的可复用性，不替研究者判断正文中的“计划日期”是否等于“已经生效”。<a href="https://www.rfc-editor.org/rfc/rfc9111.html#name-freshness">HTTP缓存的新鲜度与重新验证</a></p>
+<p>本例冻结了7月2日站点，故一次有效回读后可以在本次任务中复用。如果换成真实会变化的网站，必须另外规定哪些主张需要在答复前重新核验，以及如何保留回答的截至时点。即使刚刷新，也没有锁住随后可能发生的页面变化。</p>
+<h2 id="可执行参考观察进入状态以后才决定下一动作">可执行参考：观察进入状态以后才决定下一动作</h2>
+<p>下面用普通Python模拟两种策略。<code>RESPONSES</code>是上表资料的人工结构化转写，用于检查调度、状态和费用；程序没有从网页自动理解自然语言。字段值是各份资料自己的声明，旧90天与新30天都保留，不能将这套小接口冒充通用网页解析器。</p>
+<p><code>current</code>只有在读取的策略页属于本题当前副本时才被接受。<code>False</code>专门表示FAQ正文明确否定自动改变，<code>None</code>表示尚未得到证据；二者不合并。可选页面由搜索命中或已读公告的链接逐步加入，<code>choose</code>不能从整个资料字典偷看答案。<code>refresh</code>故障可以按固定合同重试一次，并优先完成另一个仍可读取的缺口。</p>
+<p>代码把拟选动作与资源核对放在同一次决策里：<code>choose</code>先给候选，支付不起时，本轮直接选择最终报告，已计的1点和8秒就是报告成本；没有先发出工具请求再免费追加一次模型报告。真实实现若需要另外调用模型解释被拒绝的动作，必须为那次调用另留预算。</p>
+<pre><code class="language-python">SNAPSHOT = &quot;2026-07-02T12:00&quot;
+RESPONSES = {
+    &quot;search&quot;: {&quot;hits&quot;: [&quot;blog&quot;, &quot;notice&quot;, &quot;cached&quot;], &quot;truncated&quot;: True},
+    &quot;blog&quot;: {&quot;statement&quot;: &quot;30天时代&quot;, &quot;source&quot;: &quot;repost&quot;},
+    &quot;notice&quot;: {&quot;planned&quot;: 30, &quot;starts&quot;: &quot;2026-07-01&quot;,
+               &quot;links&quot;: [&quot;refresh&quot;, &quot;faq&quot;]},
+    &quot;cached&quot;: {&quot;current&quot;: 90, &quot;snapshot&quot;: &quot;2026-05-15&quot;, &quot;source&quot;: &quot;defaults&quot;},
+    &quot;refresh&quot;: {&quot;current&quot;: 30, &quot;snapshot&quot;: SNAPSHOT, &quot;source&quot;: &quot;defaults&quot;},
+    &quot;faq&quot;: {&quot;existing_auto&quot;: False, &quot;source&quot;: &quot;faq&quot;, &quot;snapshot&quot;: SNAPSHOT},
+}
+# 教学费用点、给定工具秒数；不是测得的网络延迟。
+COST = {&quot;search&quot;: (2, 8), &quot;blog&quot;: (2, 5), &quot;notice&quot;: (2, 5),
+        &quot;cached&quot;: (1, 1), &quot;refresh&quot;: (3, 8), &quot;faq&quot;: (2, 5)}
+RANKED = [&quot;search&quot;, &quot;blog&quot;, &quot;notice&quot;, &quot;cached&quot;, &quot;search&quot;]
+
+def choose(state):
+    seen = state[&quot;seen&quot;]
+    available = state[&quot;available&quot;]
+    if &quot;search&quot; not in seen:
+        return &quot;search&quot;
+    if &quot;notice&quot; in available and &quot;notice&quot; not in seen:
+        return &quot;notice&quot;
+    if &quot;refresh&quot; in available and state[&quot;current&quot;] is None and state[&quot;refreshes&quot;] == 0:
+        return &quot;refresh&quot;
+    if &quot;faq&quot; in available and &quot;faq&quot; not in seen:
+        return &quot;faq&quot;
+    if &quot;refresh&quot; in available and state[&quot;current&quot;] is None and state[&quot;refreshes&quot;] == 1:
+        return &quot;refresh&quot;       # 最多一次重试；失败也消耗预算
+    return None
+
+def run(active, unavailable=False):
+    state = {&quot;seen&quot;: set(), &quot;current&quot;: None, &quot;existing_auto&quot;: None,
+             &quot;refreshes&quot;: 0, &quot;evidence&quot;: {}, &quot;available&quot;: {&quot;search&quot;}}
+    actions, observations = [], []
+    spent = seconds = decisions = 0
+    for _ in range(6):
+        decisions += 1
+        spent += 1             # 本轮模型决策的给定成本
+        seconds += 8
+        action = choose(state) if active else (
+            RANKED[len(actions)] if len(actions) &lt; len(RANKED) else None)
+        if action is None:
+            break
+        fee, delay = COST[action]
+        # 为最后一次报告决策预留1点/8秒，另为外层评分预留2点。
+        if len(actions) &gt;= 5 or spent + fee + 1 + 2 &gt; 20:
+            break              # 本轮改作最终报告，已计本轮费用
+        if seconds + delay + 8 &gt; 120:
+            break
+        actions.append(action)
+        spent += fee
+        seconds += delay
+        if action == &quot;refresh&quot;:
+            state[&quot;refreshes&quot;] += 1
+        response = ({&quot;error&quot;: &quot;503&quot;} if unavailable and action == &quot;refresh&quot;
+                    else dict(RESPONSES[action]))
+        observations.append((action, response))
+        state[&quot;seen&quot;].add(action)
+        state[&quot;available&quot;].update(response.get(&quot;hits&quot;, []))
+        state[&quot;available&quot;].update(response.get(&quot;links&quot;, []))
+        if response.get(&quot;source&quot;) == &quot;defaults&quot; and response.get(&quot;snapshot&quot;) == SNAPSHOT:
+            state[&quot;current&quot;] = response[&quot;current&quot;]
+            state[&quot;evidence&quot;][&quot;current&quot;] = (action, SNAPSHOT)
+        if response.get(&quot;source&quot;) == &quot;faq&quot; and response.get(&quot;snapshot&quot;) == SNAPSHOT:
+            state[&quot;existing_auto&quot;] = response[&quot;existing_auto&quot;]
+            state[&quot;evidence&quot;][&quot;existing_auto&quot;] = (action, SNAPSHOT)
+    complete = state[&quot;current&quot;] is not None and state[&quot;existing_auto&quot;] is not None
+    return {&quot;actions&quot;: actions, &quot;observations&quot;: observations, &quot;state&quot;: state,
+            &quot;stop&quot;: &quot;enough&quot; if complete else &quot;unresolved&quot;,
+            &quot;workspace_value&quot;: None, &quot;workspace_reason&quot;: &quot;settings_not_observed&quot;,
+            &quot;decisions&quot;: decisions, &quot;cost&quot;: spent + 2, &quot;seconds&quot;: seconds + 20}
+
+for label, active, unavailable in [(&quot;R&quot;, False, False), (&quot;Q&quot;, True, False),
+                                    (&quot;Q_503&quot;, True, True)]:
+    r = run(active, unavailable)
+    s = r[&quot;state&quot;]
+    print(label, s[&quot;current&quot;], s[&quot;existing_auto&quot;], r[&quot;decisions&quot;],
+          len(r[&quot;actions&quot;]), r[&quot;cost&quot;], r[&quot;seconds&quot;], r[&quot;stop&quot;])
+</code></pre><p>本地运行的输出如下。列依次为策略、当前默认值、是否自动改既有配置、决策次数、工具次数、教学总费用、给定总秒数、停止状态；秒数由表内常数相加，<strong>不是实测模型耗时</strong>。</p>
+<pre><code class="language-text">R None None 6 5 17 95 unresolved
+Q 30 False 5 4 16 86 enough
+Q_503 None False 6 5 20 102 unresolved
+</code></pre><p>程序证明这些明确规则会按观察选动作，并在同样上限内得到不同证据覆盖。它没有证明一个真实模型能够正确识别所有缺口，或总会遵循<code>choose</code>策略。将策略交给模型时，仍要保留真实请求、工具观察和最后答案，按第02、03章在独立任务上比较；不能拿这三行模拟结果当性能提升测量。</p>
+<h2 id="失败之后还查不查要看缺的究竟是哪一种证据">失败之后还查不查，要看缺的究竟是哪一种证据</h2>
+<p>Q_503的具体序列是“搜索→公告→刷新失败→FAQ→再次刷新失败→最终报告”。两次失败都保留为503，没有变成空正文，也没有据此说30天政策不存在。G2仍有明确否定，G1未知，河岸当前值仍未观察。它应如实给出已知范围与服务不可用；由于未完成G1，按本题合同是F，不能把读取服务故障自动写成评分U。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>当时的观察</th>
+<th>能支持的判断</th>
+<th>合理的下一步或停止理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>搜索为空，但范围正确性未核对</td>
+<td>此次查询没有命中</td>
+<td>检查关键词、过滤和截断；不能直接写“没有这项政策”</td>
+</tr>
+<tr>
+<td>FAQ明确说“不会自动改”</td>
+<td>对既有工作区自动变化的否定</td>
+<td>记录False与出处，不继续把它当缺失</td>
+</tr>
+<tr>
+<td>刷新503</td>
+<td>当前核验未取得</td>
+<td>在预留额度内重试一次；仍失败就带未知结束</td>
+</tr>
+<tr>
+<td>当前页和FAQ齐全，河岸设置无权限</td>
+<td>公共问题已闭合，私人当前值未观察</td>
+<td>给范围明确的答复；不得用继续搜索替代管理员授权</td>
+</tr>
+<tr>
+<td>两份当前官方正文在同一对象和时点仍冲突</td>
+<td>冲突尚未消解</td>
+<td>若有可用的更高依据且预算足够则回读，否则保留冲突，不按文风投票</td>
+</tr>
+</tbody></table></div>
+<p>“证据已足够”与“预算已耗尽”是不同停止原因。前者可以给有范围的结论；后者必须保留尚未解决的缺口。权限不够则限制可行动范围，即使信息价值看起来很高，也不能越界读取。</p>
+<p>本例允许Q用4次工具便停止，剩余1次不是必须花掉的额度。完整账本中，R为17点、Q为16点，Q_503为20点，均包括失败、最终报告和外层评分。提前停止节省的一点不能单独证明生产收益：这里仅有一个特意构造的任务，没有任务分布、重复试次或真实模型费用。后续对照还应加入公告本身足够、当前页不可用、FAQ与现行页冲突等任务，防止只挑适合Q的样例。</p>
+<h2 id="直接问答多读少读与读错怎样分别判断">直接问答：多读、少读与读错怎样分别判断</h2>
+<p><strong>问题。</strong> 搜索结果没有FAQ，而公告给了FAQ链接，直接回读算不算改变实验输入条件？</p>
+<p><strong>答案。</strong> 两边原本都有同样的链接跟随工具和公共读取权限。Q根据实际取得的N选择了新的动作，这是策略差异；没有凭空给它额外正文。如果只有Q被预先告知FAQ答案或得到额外工具，比较条件才改变了。</p>
+<p><strong>问题。</strong> 两份资料都写30天，为什么仍需要当前策略页？</p>
+<p><strong>答案。</strong> B是转述，N是计划，而且N明确把实际生效交给当前页。两份相同数字没有闭合“现在已经生效”的条件，也没有回答既有工作区范围。资料之间共享同一公告时，数量还会高估独立支持。</p>
+<p><strong>问题。</strong> 刷新成功之后，为什么不能顺便把河岸改成30天？</p>
+<p><strong>答案。</strong> 刷新只取得公共政策证据，没有取得河岸当前配置，更没有新增修改授权。知道某个默认值与有权更改用户设置是两件事；本题的合法产物仍是草稿。</p>
+<p><strong>问题。</strong> 摘要更短、工具调用也更少，就能判定上下文策略更好吗？</p>
+<p><strong>答案。</strong> 还要检查它是否保留了时点、范围、否定与未知，并让下一请求正确消费。若少一次读取恰好遗漏FAQ，成本下降却留下错误的全体30天结论，整项任务仍失败。应连同证据覆盖、最终结果、未知比例和全部成本一起比较。</p>
+<p>本章的硬前置是<a href="05-experience-and-consumers.html">第05章共同核心</a>，不要求训练深化或梯度知识。相关回读：<a href="../notes/maka/learning/36-context-and-memory.html">旧36章的输入选择与外部工作状态</a>、<a href="../notes/maka/learning/37-code-retrieval.html">旧37章的查询改写与当前正文回读</a>。后续计划继续比较串行修订、独立候选与树式搜索的选择质量和预算分配；它们会使用这里已经闭合的证据状态。</p>
+<p><a href="05-experience-and-consumers.html">上一章：一条轨迹怎样进入下一次改进</a> · <a href="07-probabilities-and-tensors.html">下一章：概率和张量怎样描述一次预测</a>。下一章属于可选的训练路线；本章所需的证据与预算概念已在当前位置给出。固定模型路线的搜索、选择与预算深化仍是计划内容。</p>
+<footer>Agent 前沿进阶 · 在线阅读</footer></main></body></html>

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 08 章｜损失怎样改变下一次输出 · Agent 前沿进阶</title><link rel="stylesheet" href="assets/course.css"><link rel="stylesheet" href="assets/katex.min.css"></head>
+<body><header><a href="index.html">Agent 前沿进阶</a><span>能力增长、自主研究与自我改进</span></header><main><h1 id="第-08-章损失怎样改变下一次输出">第 08 章｜损失怎样改变下一次输出</h1>
+<blockquote>
+<p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：一次训练究竟改了哪些数，这些数怎样改变同一输入的预测，又为什么不能直接证明 Agent 更强？</p>
+<p><strong>关键概念</strong>：梯度：损失对参数局部变化的敏感度；学习率：控制更新步长；优化器状态：影响后续更新的历史量；LoRA：用低秩矩阵表达可训练增量；部署消费：推理端实际使用新权重。</p>
+<p><strong>关系主线</strong>：沿用三候选模型，把交叉熵逐项求导，再执行一次权重更新；比较动量保留与重置、完整矩阵与低秩更新，最后用新任务反例区分局部目标下降和系统能力改善。</p>
+</blockquote>
+<p>本章硬前置是<a href="07-probabilities-and-tensors.html">第07章</a>；其所需的改进对象来自<a href="01-what-actually-improves.html">第01章</a>。这条训练基础路线不要求先学强化学习。本章用确定监督计算一次更新，后续不同训练方法会各自定义样本怎样产生、监督从哪里来、哪些位置参与目标。</p>
+<h2 id="1-固定样本先说清什么会变">1. 固定样本，先说清什么会变</h2>
+<p>沿用上一章的教学条件：目标文件已读取并修改，规定测试尚未执行，下一步应为 TEST。没有运行模型或工具；我们实际运行的是一个只有六个权重的数值程序。</p>
+<p>当前输入经固定编码器得到 <code>h=[1,1]</code>；输出词表顺序仍为 READ、TEST、DONE。W 的形状是 <code>[V,D]=[3,2]</code>，全部六个元素可更新，编码器和监督目标固定。这是输出头示范，不是把一个真实大模型只写成六个数。</p>
+<pre><code class="language-text">W0 = [[ 1, 0],      h = [1,1]
+      [ 0, 0],
+      [-1, 0]]
+z0 = W0 h = [1,0,−1]
+p0 = [0.665240956,0.244728471,0.090030573]
+q  = [0,1,0]
+</code></pre><p>q 是课程事先给定的正确目标 TEST，对应编号1。它不是从模型自己的信心产生的奖励，也不是把一次失败自动记成零分。此处监督者就是已经明确了下一步的教学样本，样本只用于展示更新机制。</p>
+<p>定义单位置损失 <code>ℓ(W)=−Σ_v q_v ln p_v</code>；在这个 one-hot 目标下，<code>ℓ(W0)=−ln p0_TEST=1.407605964</code> nat。我们要改变 W，使当前目标获得更高概率。一次<strong>优化步</strong>指“根据当前 W 算损失与梯度，再更新一次 W”，不等于一次任务尝试或一次模型调用。</p>
+<h2 id="2-从一个负对数推到六个权重的导数">2. 从一个负对数，推到六个权重的导数</h2>
+<p>梯度描述的是局部敏感度。若只将某个参数增加一个很小的量，正导数表示损失局部上升，负导数表示损失局部下降；因此梯度下降沿负梯度移动。它是当前位置的方向信息，不是任意远处的保证。</p>
+<p>先对 logits 求导，再连接到 W。把上一章的 softmax 代入交叉熵：</p>
+<pre><code class="language-text">ℓ = −Σ_v q_v ln [exp(z_v) / Σ_j exp(z_j)]
+  = −Σ_v q_v z_v + ln Σ_j exp(z_j)
+</code></pre><p>第二行使用了 <code>Σ_v q_v=1</code>。v、j 都沿词表取0、1、2；q 固定，不参与更新。对第 k 个 logit 求导时，第一项只有 <code>−q_k z_k</code> 随它变化，导数为 <code>−q_k</code>；第二项先对对数求导，再对指数求导：</p>
+<pre><code class="language-text">∂ℓ/∂z_k = −q_k + exp(z_k) / Σ_j exp(z_j)
+         = p_k − q_k
+</code></pre><p>所以本例的 logit 梯度为：</p>
+<pre><code class="language-text">p0−q = [+0.665240956,−0.755271529,+0.090030573]
+</code></pre><p>TEST 分数增加一点，会使损失下降；READ、DONE 分数增加一点则会使损失上升。候选之间通过归一化相互关联，不能把提高目标概率理解成只改目标一项而完全不影响其余候选。</p>
+<p>接着看权重。第 k 行的输出为 <code>z_k=Σ_j W_kj h_j</code>，这里 j 改为特征维编号0、1。因此 <code>∂z_k/∂W_kj=h_j</code>。链式法则把“损失对分数的变化”乘上“分数对权重的变化”：</p>
+<pre><code class="language-text">G_kj = ∂ℓ/∂W_kj = (p_k−q_k) h_j
+G = (p−q) hᵀ
+</code></pre><p>hᵀ 是 h 的转置；<code>[V,1]×[1,D]</code> 得 <code>[V,D]</code>，正好与 W 形状相同。这里 h 的两项都为1，所以两个梯度列相等：</p>
+<pre><code class="language-text">G0 = [[ 0.665240956, 0.665240956],
+      [-0.755271529,-0.755271529],
+      [ 0.090030573, 0.090030573]]
+</code></pre><p>这一步没有对 token 编号或贪心选择求导。训练沿可微的分数与概率计算图改变参数，部署时才按指定规则选择输出。若编码器也可训练，还要把 <code>∂ℓ/∂h=Wᵀ(p−q)</code> 继续传回其参数；本例 h 固定，所以计算到 W 就闭合了。</p>
+<h2 id="3-真正更新一次再重新计算输出">3. 真正更新一次，再重新计算输出</h2>
+<p>最简单的更新是 <code>W1=W0−ηG0</code>。η 是正的<strong>学习率</strong>，控制这一步走多远。本例选择 <code>η=0.5</code> 以便看清变化；这是教学步长，不能当作真实大模型的建议配置。</p>
+<p>例如 TEST 行第二个权重原为0，梯度为−0.755271529，因此新值为 <code>0−0.5×(−0.755271529)=0.377635764</code>。六个元素按同一规则更新：</p>
+<pre><code class="language-text">W1 = [[ 0.667379522,−0.332620478],
+      [ 0.377635764, 0.377635764],
+      [−1.045015287,−0.045015287]]
+</code></pre><p>重新把<strong>同一个 h</strong>交给新 W，必须从头做前向计算，不能继续使用缓存的旧概率：</p>
+<pre><code class="language-text">z1 = W1 h = [0.334759044,0.755271529,−1.090030573]
+p1 = [0.361886045,0.551058985,0.087054970]
+ℓ(W1) = 0.595913424
+</code></pre><p>当前 TEST 概率从0.244728471升到0.551058985，损失从1.407605964降到0.595913424；贪心输出也从 READ 改成 TEST。一步没有把 TEST 变成概率1，按分布采样仍可能选其他候选。</p>
+<p>这里用一个固定样本，属于单样本梯度更新。实际随机梯度下降（SGD）常从数据中抽取一个样本或小批计算梯度；本例没有随机抽样，也没有声称当前梯度无偏估计了某个任务总体的目标。上一章按 token、调用或 rollout 的归一化一旦加入，梯度也要带上对应权重。</p>
+<h3 id="可执行参考把核心全部展开">可执行参考把核心全部展开</h3>
+<p>下面程序自包含，用解析梯度更新六个权重。<code>logits</code> 只做已解释的行点积，<code>gradient</code> 直接实现 <code>G_kj=(p_k−q_k)h_j</code>，没有把更新藏在 <code>train()</code> 中。</p>
+<pre><code class="language-python">import math
+
+def log_softmax(z):
+    top = max(z)
+    log_den = top + math.log(sum(math.exp(v - top) for v in z))
+    return [v - log_den for v in z]
+
+def logits(w, h):
+    return [sum(a * x for a, x in zip(row, h)) for row in w]
+
+def probabilities(w, h):
+    return [math.exp(v) for v in log_softmax(logits(w, h))]
+
+def loss(w, h, target):
+    return -log_softmax(logits(w, h))[target]
+
+def gradient(w, h, target):
+    p = probabilities(w, h)
+    return [[(p[k] - int(k == target)) * x for x in h]
+            for k in range(len(w))]
+
+def step(w, g, rate):
+    return [[a - rate * b for a, b in zip(row, grow)]
+            for row, grow in zip(w, g)]
+
+w0 = [[1.0, 0.0], [0.0, 0.0], [-1.0, 0.0]]
+h, target, rate = [1.0, 1.0], 1, 0.5
+g0 = gradient(w0, h, target)
+w1 = step(w0, g0, rate)
+print([round(p, 6) for p in probabilities(w1, h)])
+print(round(loss(w0, h, target), 6), round(loss(w1, h, target), 6))
+</code></pre><p>实际输出为 <code>[0.361886, 0.551059, 0.087055]</code>，以及 <code>1.407606 0.595913</code>。另一次数值核查逐个扰动六个权重，以中心差分 <code>(ℓ(W+εE_kj)−ℓ(W−εE_kj))/(2ε)</code> 检查解析梯度；E_kj 仅在第 k 行第 j 列为1，其余为0，ε取10⁻⁶。最大绝对误差约1.20×10⁻¹⁰。这支持本例的求导和代码一致，不证明训练数据正确或未来任务会改善。</p>
+<h2 id="4-同样的权重续训为什么仍可能不同">4. 同样的权重，续训为什么仍可能不同</h2>
+<p>先区分三类数：W 是模型参数，参与预测；G 是当前样本在当前 W 上算出的梯度；优化器状态则保存影响<strong>后续更新</strong>的历史量。保存一份模型权重，不一定保存了完整训练过程。</p>
+<p>以带动量的 SGD 为例。另设动量系数 <code>μ=0.9</code>，速度矩阵 v 与 W 同形状，初始为0；本例只使用下面的动量规则，不加其他修正项。用 t 标记更新前的权重版本：</p>
+<pre><code class="language-text">G_t = ∇_W ℓ(W_t)
+v_(t+1) = μ v_t + G_t
+W_(t+1) = W_t − η v_(t+1)
+</code></pre><p>符号 <code>∇_W</code> 表示收集所有 W 元素的偏导数，组成与 W 同形状的梯度矩阵。动量把前一步的方向按 μ 保留一部分，再加当前梯度。第一步 <code>v1=G0</code>，所以仍得到刚才的 W1。现在从<strong>同一个 W1</strong>分成两个续训副本，下一步仍用同一个 h、目标和学习率：</p>
+<ul>
+<li>保留方同时恢复 <code>v1=G0</code>，下一速度为 <code>v2=0.9G0+G1</code>。</li>
+<li>重置方只恢复 W1，把速度清零，下一速度为 <code>v2=G1</code>。</li>
+</ul>
+<p>更新前两方预测完全相同；它们都要先按 W1 重新计算 G1，不能复用旧 G0。TEST 行的 G1 两项都是−0.448941015，保留方的下一速度两项都是−1.128685391，重置方仍为−0.448941015。</p>
+<p>以下代码接上前面的完整示范，展开两条续训路径：</p>
+<pre><code class="language-python">g1 = gradient(w1, h, target)
+mu = 0.9
+velocity_kept = [[mu * old + new for old, new in zip(row0, row1)]
+                 for row0, row1 in zip(g0, g1)]
+w2_kept = step(w1, velocity_kept, rate)
+w2_reset = step(w1, g1, rate)
+print(round(probabilities(w2_kept, h)[target], 6))
+print(round(probabilities(w2_reset, h)[target], 6))
+</code></pre><p>实际得到 TEST 概率0.889302与0.722370。它们的差异来自本例的续训状态；不说明保留动量总是效果更好。数据或目标改变时，历史方向也可能不合适，是否重置应成为明确实验条件。</p>
+<p>如果只做推理，两个 W1 副本的输出不会因为一个缺动量而立刻不同，因为前向计算不读取 v。若要精确恢复训练，除了优化器状态，还可能需要学习率调度、步数、数据顺序与随机数状态。本例只隔离动量这一项；Adam 等其他优化器有自己的状态与公式，不能把这里的一个 v 当成所有优化器的完整说明。</p>
+<h2 id="5-lora-改的是更新表达方式">5. LoRA 改的是更新表达方式</h2>
+<p>上面让 W 的六个元素都可变化。对这个极小输出头来说，是更新完整矩阵；真实模型的全参数微调还可能更新编码器、注意力等大量参数，不能把“六个都改了”说成训练了整个 Transformer。</p>
+<p>**低秩适应（LoRA）**选择另一种参数化：冻结原矩阵 W0，使用两个较窄的可训练矩阵产生增量。为免与批大小 B 混淆，这里把上投影矩阵写成 U：</p>
+<pre><code class="language-text">W_eff = W0 + s U A       s = α/r
+z = W0 h + s U(A h)
+</code></pre><p>W0形状 <code>[V,D]</code>；A形状 <code>[r,D]</code>，先把 D 维输入投到 r 维；U形状 <code>[V,r]</code>，再投回 V 维。r 是选定的秩上界，α是缩放常数，s是本式的缩放因子。矩阵的秩可理解为它能表达多少个彼此独立的线性方向。经过 r 维中间表示，乘积 UA 与 W0 同形状，其秩不超过r。对大型矩阵，r常远小于两侧维数；这里取r=1只是为了逐项计算。</p>
+<p>训练时 W0 不更新，U/A 接收梯度；当前交叉熵目标可以保持原样。于是全参数或 LoRA 回答“哪些数可改、怎样表达增量”，SFT、偏好学习或 RL 回答“用什么数据和目标产生更新”。两类选择不是同一层的替代选项。</p>
+<h3 id="同一个样本用低秩增量走一步">同一个样本，用低秩增量走一步</h3>
+<p>重新从原 W0 开始，不能接在已经更新的 W1 上冒充同起点对照。仍固定 h、one-hot目标、损失与学习率；改变的只有可训练参数化。设 <code>r=1</code>、<code>α=1</code>，所以s=1；A=<code>[1,0]</code>，U是三行一列的全0矩阵。</p>
+<p>开始时 <code>UA=0</code>，因此有效模型仍为 W0，预测仍为 p0。A非零、U为零的设定让初始增量为零，同时保留学习路径；原方法常把A随机初始化，我们用固定 <code>[1,0]</code> 得到确定的教学数字。</p>
+<p>令 <code>d=p0−q</code>，它是之前算出的 logit 梯度；<code>a=A h=1</code> 为这次上投影的输入。链式法则给出：</p>
+<pre><code class="language-text">∂ℓ/∂U = s d aᵀ                形状 [V,r]
+∂ℓ/∂A = s (Uᵀd) hᵀ           形状 [r,D]
+</code></pre><p>此时 U=0，所以 A 的第一步梯度为0；U 的梯度却为 d，因为 a=1。它不是“两个矩阵都不动”。使用同一个η=0.5：</p>
+<pre><code class="language-text">U1 = [−0.332620478, 0.377635764, −0.045015287]ᵀ
+A1 = [1,0]
+W_eff1 = [[ 0.667379522,0],
+          [ 0.377635764,0],
+          [−1.045015287,0]]
+</code></pre><p>低秩增量这一步只改了有效 W 的第一列；前面完整 W 更新改了两列。因此不能把“学习率相同”当成两种参数化每一步的有效模型变化相同。</p>
+<p>以下代码同样承接本章第一个程序，但明确从 w0/p0重算：</p>
+<pre><code class="language-python">p0 = probabilities(w0, h)
+d = [p0[k] - int(k == target) for k in range(3)]
+a0, u0 = [1.0, 0.0], [0.0, 0.0, 0.0]
+ah = sum(a * x for a, x in zip(a0, h))
+gu = [value * ah for value in d]       # 本例 s=1、r=1
+ua = sum(u * value for u, value in zip(u0, d))
+ga = [ua * x for x in h]
+u1 = [u - rate * g for u, g in zip(u0, gu)]
+a1 = [a - rate * g for a, g in zip(a0, ga)]
+w_lora = [[base + u * a for base, a in zip(row, a1)]
+          for row, u in zip(w0, u1)]
+print([round(p, 6) for p in probabilities(w_lora, h)])
+</code></pre><p>实际得到 <code>[0.518433,0.388024,0.093543]</code>。TEST 概率确实上升，贪心输出却仍是 READ。这个单步例子说明参数化影响优化路径，没有证明 LoRA 比完整更新差；要比较方法，需要分别合适的优化配置和共同评价条件。</p>
+<p>本例可训练参数数为 <code>r(V+D)=1×(3+2)=5</code>，另保留6个冻结参数。小矩阵只展示形状，不能据此宣称节省某个百分比的真实训练显存。较大模型的中间激活（前向计算中产生的表示）、梯度、优化器状态和具体可训练层都会影响资源消耗。</p>
+<h3 id="两个容易断掉的环节">两个容易断掉的环节</h3>
+<p>如果把A和U都初始化为0，<code>A h=0</code>与<code>Uᵀd=0</code>使两边的一阶梯度都为0。配套数值核查另检查了这个分支：更新后仍是两个零矩阵，损失不会因这条更新路径而改变。仅仅选择了“LoRA训练”这个名字，不能补回被初始化切断的梯度。</p>
+<p>更新后还需要部署端实际使用 <code>W_eff</code>。可以保留基座加低秩分支，或在满足实现条件时把增量合入权重；若只保存U/A，却由推理端继续加载W0，输出依旧是旧分布。不同基座、目标层或编码规则不匹配，也不能将adapter文件存在当作消费成功。本章没有运行生产训练框架，不能泛称所有量化与adapter实现都可按同一种方式合并。</p>
+<h2 id="6-局部目标下降在哪里会变成错误结论">6. 局部目标下降，在哪里会变成错误结论</h2>
+<p>先看监督错误。假设当前还没有测试结果，却把 DONE 标成目标，那么相同推导会提高 DONE 的概率；梯度与代码都可以完全正确。缺的是正确监督。降低这个损失会强化“未经验证就报告完成”，不会自动修复任务合同。</p>
+<p>再看共享参数的反例。另给一个新教学输入，要求下一步仅 READ，禁止运行测试；本例过于简单的编码器却把它也压成 <code>[1,1]</code>，没有保留这项权限区别。它与原输入得到相同分布：更新前贪心选 READ，更新后贪心选 TEST。原样本的目标改善了，这个新输入反而选择错误。</p>
+<p>这不是一次真实 Agent 评价成绩，而是由已公开映射直接推出的数值反例。它指出具体失败位置：新输入需要的区别没有进入表示，同一 W 更新又影响了两个输入。扩大表示可能解决此类冲突，但建议不是本章已经取得的新实验收益。</p>
+<p>还有一个更新规则的边界：梯度仅给局部方向，过大的学习率、相互冲突的批次或不合适的历史动量可能使目标变坏。我们实际核对的是本例η=0.5这一步下降，不能把这个结果扩成“每一步SGD都下降”。</p>
+<p>因此完整的训练到Agent链至少要闭合这些责任：样本生成者保存真实输入；监督者提供符合用途的目标；训练程序使用正确mask与分组，更新允许的参数；部署端加载对应权重与输入处理；Harness依据当前权限执行输出；最终在未用于更新和选优的任务上评价效果、失败与成本。这里的六权重数值验证只覆盖链中局部目标、梯度、更新和相同输入的新预测。</p>
+<h2 id="7-直接判断几种训练说法">7. 直接判断几种训练说法</h2>
+<p><strong>问题。</strong> loss已经下降，为什么还不能说系统更可靠？</p>
+<p><strong>答案。</strong> 当前loss只衡量给定样本与目标。监督可能错，编码器可能漏掉权限区别，部署端可能没加载新参数，工具可能执行失败。要说明系统收益，需要在真实消费者处确认新行为，并对未参与训练和选优的任务按相同条件比较。</p>
+<p><strong>问题。</strong> 模型权重相同，但一个副本没有动量，当前回答会变吗？</p>
+<p><strong>答案。</strong> 本例的前向计算只读W与h，因此更新前相同。再训练一步时，一个使用历史v，一个从0开始，更新路径才分开。推理恢复与训练恢复需要的状态不同。</p>
+<p><strong>问题。</strong> LoRA只训练五个数，能把它归为“无参数学习”吗？</p>
+<p><strong>答案。</strong> 不能。U/A仍是可训练参数，并通过增量改变预测。它只是缩小和限制参数更新的表达方式；外部记忆靠检索进入输入，是另一种消费者与状态变化。</p>
+<p><strong>问题。</strong> 正确动作概率提高了，贪心动作一定改变吗？</p>
+<p><strong>答案。</strong> 不一定。本章LoRA一步把TEST从约0.245提高到0.388，但READ仍为0.518，所以贪心输出不变。概率变化、选择规则和最终任务效果是三个需要分别检查的环节。</p>
+<h2 id="相关阅读与衔接">相关阅读与衔接</h2>
+<p>硬前置与上一章：<a href="07-probabilities-and-tensors.html">第07章：概率、张量与平均单位</a>。改进对象入口：<a href="01-what-actually-improves.html">第01章</a>。可选回读：<a href="../notes/maka/learning/46-trajectories-and-learning.html">旧46章：局部学习目标与未来任务评价</a>。</p>
+<p>这两篇完成训练基础的数学入口。若已具备第02–05章共同核心，现在可回读<a href="05-experience-and-consumers.html#训练深化哪一种消费者能接收这条记录">第05章训练视图</a>，检查数据消费者实际需要的字段。多轮轨迹监督、偏好学习与强化学习仍是计划内容，后续各自说明采样、目标和完整循环，不将本章的一步更新冒充其中任一种完整算法。下一章入口将在对应正文成稿后提供。</p>
+<footer>Agent 前沿进阶 · 在线阅读</footer></main></body></html>

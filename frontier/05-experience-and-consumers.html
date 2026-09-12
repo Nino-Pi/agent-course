@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 05 章｜一条轨迹怎样进入下一次改进 · Agent 前沿进阶</title><link rel="stylesheet" href="assets/course.css"><link rel="stylesheet" href="assets/katex.min.css"></head>
+<body><header><a href="index.html">Agent 前沿进阶</a><span>能力增长、自主研究与自我改进</span></header><main><h1 id="第-05-章一条轨迹怎样进入下一次改进">第 05 章｜一条轨迹怎样进入下一次改进</h1>
+<blockquote>
+<p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：执行记录已经保存以后，诊断、记忆、程序优化和模型训练各需要怎样的材料，怎样确认它被实际使用？</p>
+<p><strong>关键概念</strong>：轨迹：一次任务尝试中的有序观察与动作；来源组：共享原始问题的关联身份；用途划分：开发、选择和最终评价的边界；消费者投影：为具体使用者保留必要字段；消费：后续执行实际读取并据此工作。</p>
+<p><strong>关系主线</strong>：把一次Python项目修复拆成任务、尝试和调用，再构造诊断与记忆等不同视图；用来源泄漏、评分缺失和未读取的反例解释消费；训练路线再核对token、采样概率与mask。</p>
+</blockquote>
+<h2 id="先把一次执行拆成能追踪的对象">先把一次执行拆成能追踪的对象</h2>
+<p>本章共同核心需要<a href="02-paired-experiments.html">第02章的任务与试次</a>、<a href="03-selection-and-attribution.html">第03章的用途与选优</a>以及<a href="04-environment-and-supervision.html">第04章的评分合同</a>。以下先不使用训练概率和梯度；训练路线在具备数学基础后再回读<a href="#训练深化哪一种消费者能接收这条记录">本章训练深化</a>。</p>
+<p>沿用K-A的Python项目P，但另设一次完整教学轨迹：项目初态F1含有空格路径缺陷，配置<code>cfg-v1</code>声明测试入口为<code>python -m pytest</code>，README顶部有用户部署笔记。允许改项目包装函数和README，测试只读；底模M0和Harness H0固定，跨任务记忆初始为空。本例最多6次模型调用、8次工具调用，行动截止120秒，随后按第04章合同取得判定。</p>
+<p>给这项具体任务命名<code>task=P-space-01</code>，共享来源组为<code>group=P-space-template</code>；本次完整试次为<code>trial=1</code>，正常执行尝试为<code>attempt=A1</code>。<strong>轨迹</strong>是A1里有顺序、有身份的动作和观察记录，不是把最终答案复制几遍。若环境启动失败后按预定规则重启，可以另记A0/A1，但仍归原计划试次；若带着失败反馈继续工作，则记录原尝试的接续，不假装回到独立初态。</p>
+<p>表中的C1–C4是模型调用；一次模型调用可以发出多个工具请求。本例C1分别读取三份文件，用3次工具调用；C2提交一份限定补丁，用1次；C3执行测试与读取当前diff，用2次。共4次模型调用、6次工具调用，均在给定预算内；C3的两项观察全部返回后才进入C4。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>模型调用</th>
+<th>当时选入输入的材料</th>
+<th>生成动作</th>
+<th>随后才取得的观察</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td>用户合同、工具说明、项目位置</td>
+<td>读取配置、包装函数及README全文</td>
+<td>cfg-v1配置、旧实现和包含用户笔记的README文本</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>当前合同、C1的真实返回</td>
+<td>提交限定补丁并更正文档入口</td>
+<td>修改被接受，形成F2；未覆盖用户笔记</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>目标、修改回执、当前测试入口</td>
+<td>请求执行测试，并读取当前diff</td>
+<td>用例确实运行且通过；diff展示两份允许文件的变更</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>当前合同、C3结果与diff</td>
+<td>报告改动及受测范围</td>
+<td>一份交付说明</td>
+</tr>
+</tbody></table></div>
+<p>外层判定器另检查提交产物、权限范围和必要验证，给出S。它的隐藏检查细节没有放入C1–C4；C3在发出测试请求时还没看到随后产生的测试结果。这里所有调用与评分均是教学构造，不是模型运行日志。</p>
+<p>一条C3记录至少应回答：属于哪道题、哪次试次与尝试、实际拿到什么输入、请求做什么、哪份工具结果对应它、结果何时产生。调用ID只在所属尝试内唯一时，键必须带上尝试身份，不能把不同任务的<code>C3</code>混成同一次调用。</p>
+<h2 id="保存相同来源按用途生成不同视图">保存相同来源，按用途生成不同视图</h2>
+<p>诊断者想知道为什么失败，记忆系统想知道以后什么时候复用，程序优化器想知道该改哪条流程，训练程序则要知道如何为明确目标构造样本。它们可以引用同一条轨迹，不能假定一份摘要满足所有用途。</p>
+<h3 id="诊断视图不要抹掉当时不知道什么">诊断视图：不要抹掉当时不知道什么</h3>
+<p>另设同任务的第二个计划试次<code>trial=2</code>、尝试<code>A2</code>：从相同F1、cfg-v1、空记忆和相同预算重置开始，不读取A1的反馈。A2修改后立刻报告成功，跳过了A1表中C3所对应的测试与diff步骤。外层正常检查发现缺少任务要求的验证依据，给F。两条轨迹用来解释消费者，不据此估计成功率；A2也不是在A1成功之后追加的免费重试。诊断材料应保留“报告前实际没有测试结果”，不能事后把外层验收结果填进报告的输入。</p>
+<p>它的最小有用记录可以是：</p>
+<pre><code class="language-text">任务与范围：P-space-01，项目P，仅包装函数与README；起点F1/cfg-v1。
+试次与尝试：trial=2 / attempt=A2；用于开发；判定F，缺少本次相关验证依据。
+报告调用：输入含编辑回执，不含测试结果。
+报告内容：声称已验证。
+独立事实：编辑已发生；所需测试没有执行；用户笔记仍在。
+候选原因：把编辑成功当成验证成功。
+尚未知道：若实际运行测试，产物会通过还是失败。
+</code></pre><p>最后一行很关键。有了有效F，也不意味着每个子问题真值都已知。此材料足够定位“证据门缺失”的流程问题，却不能证明补丁本身一定错误。</p>
+<h3 id="记忆视图来源和适用条件一起保存">记忆视图：来源和适用条件一起保存</h3>
+<p>从A1的配置读取可以提取“项目P、配置cfg-v1的测试入口是<code>python -m pytest</code>”。这是项目事实；“所有Python项目都用这条命令”则是未经支持的泛化。记忆条目保存项目身份、配置版本、命令、来源调用及有效状态；来源采用完整键<code>P-space-01/1/A1/C1</code>，依次对应任务、试次、尝试与调用。</p>
+<p>下一任务仍在P，但可能出现新配置。读取方先根据项目选候选，再核对当前配置是否仍是cfg-v1；一致才把命令作为有来源的候选输入。不一致时回查当前配置，不把旧经验当成命令权威。新任务的当前材料即使恰好也写了pytest，额外记忆是否带来收益仍需保留/重置对照。</p>
+<h3 id="程序优化视图让失败分组驱动候选">程序优化视图：让失败分组驱动候选</h3>
+<p>优化器读取开发尝试中的失败原因、实际输入与动作、允许修改的程序位置、现有流程和总成本。例如A2揭示“报告前没有确认验证依据”，可以据此提出完成门候选。它需要看见成功例是否也遵守合同，以及失败例是入口错误、工具执行失败还是判定器不可用；只给一个总失败数会把不同原因合在一起。</p>
+<p>此时被优化的是Agent流程，仍须另取得这一对象的修改范围与安装合同。A1中对用户项目文件的授权不能自动扩大为改Harness。候选经选择后由后续启动器实际装载，才发生程序消费；候选文件留在归档里只支持“产生过”。</p>
+<h3 id="训练视图先问目标需要什么信号">训练视图：先问目标需要什么信号</h3>
+<p>可读的成功轨迹可以被策展为示范材料，但“适合示范”不等于“保留了原始采样概率”。若只存C1–C4的文本摘要，没有实际模型请求编码、采样分布和对应输出信息，某些依赖这些信息的训练目标就无法从中可靠恢复。</p>
+<p>补出一个看起来更完整的输入，可以是一份新的教学示范；应标明由谁重建、依据什么、用于什么监督。它不能再被称为模型当时实际经历的输入。完整训练字段在本章训练深化展开，非参数读者在此只需理解：<strong>数据是否足够，由消费者的目标决定</strong>。</p>
+<h2 id="将存过和用到分开的参考程序">将“存过”和“用到”分开的参考程序</h2>
+<p>下面的可执行参考只模拟条目筛选与输入组装，不调用模型。项目配置版本由可信读取提供，代码中的cfg-v1/cfg-v2只是本例身份，不是通用版本API。真实系统若配置无法读取，应报告不可用，不能把它当作“没有记忆”。</p>
+<pre><code class="language-python">memory = [{
+    &quot;project&quot;: &quot;P&quot;, &quot;config&quot;: &quot;cfg-v1&quot;, &quot;active&quot;: True,
+    &quot;command&quot;: &quot;python -m pytest&quot;, &quot;source&quot;: &quot;P-space-01/1/A1/C1&quot;
+}]
+
+def compose(project, config, use_memory):
+    selected = []
+    if use_memory:
+        selected = [m for m in memory
+                    if m[&quot;active&quot;] and m[&quot;project&quot;] == project
+                    and m[&quot;config&quot;] == config]
+    text = f&quot;当前项目={project}; 当前配置={config}&quot;
+    for m in selected:
+        text += f&quot;\n入口候选={m['command']}; 来源={m['source']}&quot;
+    return text, [m[&quot;source&quot;] for m in selected]
+
+for project, config, enabled in [(&quot;P&quot;, &quot;cfg-v1&quot;, False),
+                                  (&quot;P&quot;, &quot;cfg-v1&quot;, True),
+                                  (&quot;P&quot;, &quot;cfg-v2&quot;, True)]:
+    actual_input, consumed = compose(project, config, enabled)
+    print(config, enabled, consumed)
+    assert (&quot;入口候选=&quot; in actual_input) == bool(consumed)
+</code></pre><p>本地运行输出为：</p>
+<pre><code class="language-text">cfg-v1 False []
+cfg-v1 True ['P-space-01/1/A1/C1']
+cfg-v2 True []
+</code></pre><p>第一行条目存在却没有进入输入；第二行匹配后进入；第三行配置变了，旧命令不再注入。这个程序闭合的是“存储—筛选—实际输入”三步。它未证明模型遵循入口，也未证明后续任务更好；还需要动作与独立结果，不能把<code>consumed</code>列表当成功标签。</p>
+<p>若用户撤回条目，将<code>active</code>改为False会阻止后续新组装读取。若某次请求已捕获旧文本，修改列表不会追溯删除已发送内容。旧62-B的“当前响应服从撤回”与“长期撤回已提交”仍须分开；真实持久存储失败不能被这个内存示意隐藏。</p>
+<h2 id="来源组不能在切片以后丢失">来源组不能在切片以后丢失</h2>
+<p>将A1切成四条调用记录，仍然只有一个任务尝试。把C1/C2放开发集、C3放选择集、C4放最终评价集，会让同一次任务的信息跨过隔离边界。即使每条文本完全不同，来源关系仍存在。</p>
+<p>更隐蔽的情况是从同一原始修复生成三个改写题，分配三个新task ID。按task ID切分看似分离，原模板与答案结构却共享。最低应保留原始任务、变体关系与来源组，并按希望测试的泛化层次划分；若要研究跨仓库迁移，仓库也可能是分组单位。组间不同仍不自动证明统计独立，公共依赖或共享事件也需解释。</p>
+<p>下面给一个明确的错误输入。<code>development</code>为开发、<code>selection</code>为选择，分别承担前章定义的用途；函数发现同源跨用途就拒绝。这是本册为案例选择的保守合同，不是所有研究都必须用同一个group定义。</p>
+<pre><code class="language-python">def check_group_split(rows):
+    groups = {}
+    for row in rows:
+        groups.setdefault(row[&quot;source_group&quot;], set()).add(row[&quot;split&quot;])
+    conflicts = {g: sorted(s) for g, s in groups.items() if len(s) &gt; 1}
+    if conflicts:
+        raise ValueError(f&quot;同源跨用途: {conflicts}&quot;)
+    return groups
+
+rows = [
+    {&quot;task&quot;: &quot;P-space-01&quot;, &quot;call&quot;: &quot;C1&quot;,
+     &quot;source_group&quot;: &quot;P-space-template&quot;, &quot;split&quot;: &quot;development&quot;},
+    {&quot;task&quot;: &quot;P-space-02&quot;, &quot;call&quot;: &quot;C2&quot;,
+     &quot;source_group&quot;: &quot;P-space-template&quot;, &quot;split&quot;: &quot;selection&quot;},
+]
+try:
+    check_group_split(rows)
+except ValueError:
+    print(&quot;拒绝：同源跨用途&quot;)
+</code></pre><p>实际输出为<code>拒绝：同源跨用途</code>。正确处理是回到预先划定的来源组用途，把相关变体一起放入开发，另取未参与开发的来源做选择；不能仅改<code>source_group</code>字段让检查变绿。若研究目的允许某种共享，应重写并说明划分合同，不能装作信息从未流过。</p>
+<h2 id="保留评分状态不替下游发明奖励">保留评分状态，不替下游发明奖励</h2>
+<p>记录中可以同时保存<code>verdict=U</code>、<code>reason=grader_unavailable</code>与<code>score=None</code>。如果训练数据筛选只写“成功存1，其余存0”，评分服务失败就被伪造成模型能力失败；如果直接删除所有U，又可能只保留下容易运行的任务。</p>
+<p>更合理的投影先保持状态，再由明确目标规定消费。诊断者读取U来修基础设施；记忆系统可使用来自可信配置读取的项目事实，但不能因为试次没有总分就把所有已知事实抹掉；研究任务成功率时保留未知及分母；某个训练目标若要求有效终局评分，就拒收U并报告排除范围。按时确认交付可以另定义0/1标签，仍不能覆盖原始未知任务真值。</p>
+<p>每份派生记录应保留“源数据是什么、做过何种变换、哪些字段缺失、用于什么目的”。这不是要求所有消费者获得全部敏感或隐藏材料。独立最终评分可在受控环境完成，候选生成器只读取其获准的开发反馈；为完整归档保存的数据与模型输入可见数据仍是两种权限。</p>
+<h2 id="经验消费的直接问答">经验消费的直接问答</h2>
+<p><strong>问题。</strong> A2有有效F，能否把它所有动作都标为错误示范？</p>
+<p><strong>答案。</strong> 不能。这里的F来自未取得规定验证依据；编辑可能正确，配置读取也可能真实。总评分描述整项合同，不会自动为每一步分配正确性或训练责任。</p>
+<p><strong>问题。</strong> 同一轨迹导出了四个文件，是否有了四份独立经验？</p>
+<p><strong>答案。</strong> 有四个存储片段，原始任务和尝试仍是同一个。保持来源组、调用顺序与用途才能防止误增权重和跨集泄漏；分词或文件名不同不改变这些身份。</p>
+<p><strong>问题。</strong> 新任务输入确实含旧入口，能否宣布Memory有收益？</p>
+<p><strong>答案。</strong> 只确认输入消费已经发生。还需看模型动作、当前配置是否匹配、任务结果和额外成本；没有记忆的基线也可能从当前配置直接找到同一入口。未来任务对照由持续经验路线展开。</p>
+<h2 id="核心阅读的出口">核心阅读的出口</h2>
+<p>本章共同核心的硬前置：<a href="02-paired-experiments.html">第02章</a>、<a href="03-selection-and-attribution.html">第03章</a>、<a href="04-environment-and-supervision.html">第04章</a>；其共同前置为第01章。相关旧课：<a href="../notes/maka/learning/46-trajectories-and-learning.html">旧46章轨迹与学习信号</a>。</p>
+<p>固定模型路线可以接着读<a href="06-active-evidence.html">第06章：主动取证</a>，记忆和程序优化是后续计划内容。训练读者先进入<a href="07-probabilities-and-tensors.html">第07章：概率与张量</a>、<a href="08-loss-and-update.html">第08章：损失与更新</a>，再回到<a href="#训练深化哪一种消费者能接收这条记录">训练视图</a>；共同核心不要求先掌握这些数学。</p>
+<h2 id="训练深化哪一种消费者能接收这条记录">训练深化：哪一种消费者能接收这条记录</h2>
+<p>本节需先读<a href="07-probabilities-and-tensors.html">第07章</a>的条件概率、token移位与mask，以及<a href="08-loss-and-update.html">第08章</a>的局部更新。它增加的是<strong>训练材料的接收合同</strong>，不重复损失求导；非参数路线可以在前面的共同核心出口继续。</p>
+<h3 id="把真实条件与新策展材料分开">把真实条件与新策展材料分开</h3>
+<p>沿用前面的身份：<code>task=P-space-01 / trial=1 / attempt=A1 / call=C3</code>。它的模型输入含当前合同、修改回执和测试入口；核心C3同时请求测试和读取diff，测试结果产生后才可能进入C4。本节toy只为其中的TEST动作建立编码投影，另一工具请求及其token没有纳入，因而不是C3完整输出的重放。如果需要按原采样条件计算概率，就必须保留C3实际发送的token前缀，而不是用最终成功摘要重写C3。</p>
+<p>同一段可读文本经过不同tokenizer（分词编码器）、聊天模板、工具序列化或截断策略，会形成不同前缀。训练投影应关联原请求、实际输入和输出token、生成位置、编码与模板版本、采样模型版本及解码处理。发生摘要后，每次调用使用自己的真实输入；工具返回仍是条件，不能因为它与模型文字排在同一文件里，就一起当作模型生成的目标。</p>
+<p>只有文本摘要时，仍可以由有权策展的人构造新的输入—参考输出对，按当前模板编码，再用于监督微调（SFT）的相应目标。此时保留“由摘要策展、教师和改动是什么”的来源，计算的是模型对<strong>新示范条件</strong>的概率；不需要伪造一个当初采样策略的log probability。接受为新示范与接受为原轨迹重放，是两个不同的决定。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>消费者</th>
+<th>接收什么</th>
+<th>本节的拒收条件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>策展SFT样本构造器</td>
+<td>允许用于开发的来源、经确认的新输入和目标、明确编码与生成位置</td>
+<td>目标没有按策展合同确认、用途不符、输入或目标为空</td>
+</tr>
+<tr>
+<td>带终局评分的行为概率诊断器</td>
+<td>原条件、输出位置、有效S/F、可核对的历史行为分布与版本</td>
+<td>U、重建摘要冒充原输入、概率语义错误、模型或前缀无法对应</td>
+</tr>
+</tbody></table></div>
+<p>第二个消费者选择有效终局评分，是<strong>本节规定的诊断合同</strong>，不是说每一种概率计算都必须先有任务评分。有效F可以提供失败尝试，不能把它的每个动作自动标成错误；U则保留为未知及其原因，不补成能力奖励0。</p>
+<h3 id="模型的raw概率不一定是采样概率">模型的raw概率不一定是采样概率</h3>
+<p>解码器可能先按温度T缩放logits，再限制允许词表、执行top-p截断并重新归一化。温度是改变概率集中程度的参数；top-p只保留累计概率达到指定阈值的高概率候选。本节把<strong>经过实际采样处理后、用于抽取token的分布</strong>记为行为分布b；直接对原logits做softmax的分布另记为p。</p>
+<p>定义一项数据充足性诊断量：对于同一实际前缀c和已选token x，比较 <code>ratio=b_new(x|c)/b_old(x|c)</code>。分母来自原行为分布，分子来自明确的新模型和本例同一套解码规则。它只比较这个位置的概率，不是整条轨迹比率，也不是完整训练目标；没有优势估计、裁剪、优化步或新交互，不能把它命名为已经运行PPO或其他训练算法。</p>
+<p>即使只计算这一项，也必须知道“old”对应哪份实际模型与解码处理。更换权重后用新模型重算，再把结果叫old_logp，会消掉要比较的差别。原logits的softmax、温度处理后的概率和top-p截断后的概率不能混在一个未注明语义的字段里。若top-p排除了某些token，它们的行为概率可以为0；不能随便加小数后声称仍是同一分布。</p>
+<h3 id="一个会接收拒绝并保留分组的完整小程序">一个会接收、拒绝并保留分组的完整小程序</h3>
+<p>下面是独立微型协议的确定性示范。词表<code>toy-v1</code>依次给出七个编号：0为起始符、1为合同材料、2为编辑回执、3为READ、4为TEST、5为DONE、6为测试通过观察。前缀<code>[0,1,2]</code>表示尚未取得测试结果；<code>[0,1,6]</code>另给已经可见的测试通过观察。它们是公开构造的数组，不是前面C3/C4的真实token日志；只有消费者程序被实际运行。</p>
+<p>两个查表策略名为<code>toy-W0/toy-W1</code>，与共同案例的底模M0不是同一个真实模型。程序按版本和完整前缀找到七维logits。旧策略在当前合适动作的logit放<code>ln 2</code>，新策略放<code>ln 3</code>，其余为0；解码规则固定按分布采样、温度2、仅允许3/4/5、top-p=1，因此不做核采样截断，也没有其他概率处理。其他解码配置在本例直接拒收，不假装代码已经实现它们。</p>
+<p>例如编辑后，旧模型raw TEST概率为<code>2/(6+2)=0.25</code>；按允许词表与温度处理后，行为概率为<code>√2/(2+√2)≈0.414214</code>。新行为概率为<code>√3/(2+√3)≈0.464102</code>，二者比约1.120440。分母若误用0.25，比较的对象就变了。</p>
+<p>训练位置按输入加输出后移一位：<code>[0,1,2]+[4]</code>变成模型输入<code>[0,1,2]</code>、目标<code>[1,2,4]</code>、loss mask <code>[0,0,1]</code>。只有生成的TEST参与本项损失。代码把这个过程与接收条件完整展开：</p>
+<pre><code class="language-python">&quot;&quot;&quot;Deterministic consumer-contract demonstration; no model inference or training.&quot;&quot;&quot;
+import copy
+import math
+from collections import Counter
+
+# toy-v1 IDs: BOS, CONTRACT, EDITED, READ, TEST, DONE, TEST_PASSED.
+CFG = {&quot;do_sample&quot;: True, &quot;temperature&quot;: 2.0, &quot;top_p&quot;: 1.0, &quot;allowed&quot;: [3, 4, 5]}
+LOGITS = {}
+for version, boost in [(&quot;toy-W0&quot;, 2.0), (&quot;toy-W1&quot;, 3.0)]:
+    edit, tested = [0.0] * 7, [0.0] * 7
+    edit[4], tested[5] = math.log(boost), math.log(boost)
+    LOGITS[version] = {(0, 1, 2): edit, (0, 1, 6): tested}
+
+def softmax(z):
+    top = max(z)
+    values = [math.exp(v - top) for v in z]
+    return [v / sum(values) for v in values]
+
+def behavior(version, prefix, cfg):
+    if cfg != CFG:
+        raise ValueError(&quot;unsupported_sampler&quot;)
+    if version not in LOGITS or tuple(prefix) not in LOGITS[version]:
+        raise ValueError(&quot;missing_policy_or_prefix&quot;)
+    z = LOGITS[version][tuple(prefix)]
+    allowed = cfg[&quot;allowed&quot;]
+    p = softmax([z[i] / cfg[&quot;temperature&quot;] for i in allowed])
+    return dict(zip(allowed, p))
+
+def example(trial, attempt, call, prefix, token, verdict):
+    return dict(task=&quot;P-space-01&quot;, trial=trial, attempt=attempt, call=call,
+                source_group=&quot;P-space-template&quot;, split=&quot;development&quot;,
+                encoding=&quot;toy-v1&quot;, origin=&quot;exact-fixture&quot;,
+                input=prefix, output=[token], policy=&quot;toy-W0&quot;, sampler=copy.deepcopy(CFG),
+                logp_kind=&quot;behavior&quot;, old_logp=math.log(behavior(&quot;toy-W0&quot;, prefix, CFG)[token]),
+                verdict=verdict, score={&quot;S&quot;: 1, &quot;F&quot;: 0, &quot;U&quot;: None}[verdict])
+
+def key(row):
+    return tuple(row[k] for k in (&quot;task&quot;, &quot;trial&quot;, &quot;attempt&quot;, &quot;call&quot;))
+
+def aligned_view(row):
+    if row[&quot;split&quot;] != &quot;development&quot; or row[&quot;encoding&quot;] != &quot;toy-v1&quot;:
+        raise ValueError(&quot;wrong_purpose_or_encoding&quot;)
+    if not row[&quot;input&quot;] or not row[&quot;output&quot;]:
+        raise ValueError(&quot;empty_input_or_target&quot;)
+    seq = row[&quot;input&quot;] + row[&quot;output&quot;]
+    if any(type(i) is not int or i not in range(7) for i in seq):
+        raise ValueError(&quot;invalid_token&quot;)
+    n = len(row[&quot;input&quot;])
+    return seq[:-1], seq[1:], [int(i &gt;= n) for i in range(1, len(seq))]
+
+def curated_sft(row):
+    if row.get(&quot;curator&quot;) != &quot;teacher-v1&quot;:
+        raise ValueError(&quot;target_not_curated&quot;)
+    return aligned_view(row)  # No original sampling probability is requested.
+
+def scored_ratio_diagnostic(row):
+    aligned_view(row)
+    if row[&quot;origin&quot;] != &quot;exact-fixture&quot;:
+        raise ValueError(&quot;no_original_capture&quot;)
+    if row[&quot;verdict&quot;] not in (&quot;S&quot;, &quot;F&quot;):
+        raise ValueError(&quot;unknown_terminal_score&quot;)
+    if row[&quot;score&quot;] != {&quot;S&quot;: 1, &quot;F&quot;: 0}[row[&quot;verdict&quot;]]:
+        raise ValueError(&quot;inconsistent_terminal_score&quot;)
+    if row[&quot;logp_kind&quot;] != &quot;behavior&quot; or len(row[&quot;output&quot;]) != 1:
+        raise ValueError(&quot;wrong_probability_semantics&quot;)
+    token = row[&quot;output&quot;][0]
+    old = behavior(row[&quot;policy&quot;], row[&quot;input&quot;], row[&quot;sampler&quot;])
+    if token not in old or not math.isclose(row[&quot;old_logp&quot;], math.log(old[token]), abs_tol=1e-10):
+        raise ValueError(&quot;old_logp_mismatch&quot;)
+    new = behavior(&quot;toy-W1&quot;, row[&quot;input&quot;], row[&quot;sampler&quot;])
+    return math.exp(math.log(new[token]) - row[&quot;old_logp&quot;])
+
+good = example(1, &quot;A1&quot;, &quot;C3&quot;, [0, 1, 2], 4, &quot;S&quot;)
+finish = example(1, &quot;A1&quot;, &quot;C4&quot;, [0, 1, 6], 5, &quot;S&quot;)
+failed = example(2, &quot;A2&quot;, &quot;C3&quot;, [0, 1, 2], 5, &quot;F&quot;)
+unknown = example(3, &quot;A3&quot;, &quot;C3&quot;, [0, 1, 2], 4, &quot;U&quot;)
+curated = copy.deepcopy(good)
+curated.update(origin=&quot;curated-from-summary&quot;, curator=&quot;teacher-v1&quot;, old_logp=None)
+raw = copy.deepcopy(good)
+raw.update(logp_kind=&quot;raw-softmax&quot;, old_logp=math.log(softmax(LOGITS[&quot;toy-W0&quot;][(0, 1, 2)])[4]))
+missing = copy.deepcopy(good)
+missing[&quot;policy&quot;] = &quot;M-unknown&quot;
+wrong_prefix = copy.deepcopy(good)
+wrong_prefix[&quot;input&quot;] = [0, 1, 6]
+other_sampler = copy.deepcopy(good)
+other_sampler[&quot;sampler&quot;][&quot;top_p&quot;] = 0.8
+print(&quot;sft&quot;, curated_sft(curated))
+for name, row in [(&quot;S&quot;, good), (&quot;F&quot;, failed), (&quot;U&quot;, unknown),
+                  (&quot;curated&quot;, curated), (&quot;raw&quot;, raw), (&quot;version&quot;, missing),
+                  (&quot;prefix&quot;, wrong_prefix), (&quot;sampler&quot;, other_sampler)]:
+    try:
+        print(name, &quot;accept&quot;, round(scored_ratio_diagnostic(row), 6))
+    except ValueError as error:
+        print(name, &quot;reject&quot;, str(error))
+
+# This batch selects C3/C4 of trial 1 and the report of trial 2.
+selected = [good, finish, failed]
+assert len({key(row) for row in selected}) == len(selected)
+counts = Counter()
+for row in selected:
+    scored_ratio_diagnostic(row)
+    counts[key(row)[:3]] += sum(aligned_view(row)[2])
+weights = [1 / (len(counts) * counts[key(row)[:3]]) for row in selected]
+assert math.isclose(sum(weights), 1.0)
+print(&quot;rollout_token_weights&quot;, weights)
+print(&quot;raw_vs_behavior_TEST&quot;, round(softmax(LOGITS[&quot;toy-W0&quot;][(0, 1, 2)])[4], 6),
+      round(behavior(&quot;toy-W0&quot;, good[&quot;input&quot;], CFG)[4], 6))
+
+</code></pre><p>实际输出为：</p>
+<pre><code class="language-text">sft ([0, 1, 2], [1, 2, 4], [0, 0, 1])
+S accept 1.12044
+F accept 0.914836
+U reject unknown_terminal_score
+curated reject no_original_capture
+raw reject wrong_probability_semantics
+version reject missing_policy_or_prefix
+prefix reject old_logp_mismatch
+sampler reject unsupported_sampler
+rollout_token_weights [0.25, 0.25, 0.5]
+raw_vs_behavior_TEST 0.25 0.414214
+</code></pre><p>第一行接收新策展的SFT条件和目标，没有请求原采样概率；同一派生记录到了行为概率消费者，却因并非原条件记录被拒绝。F行被接收，只表示存在有效终局失败和足够的概率字段，不表示“奖励该失败”；U被保留为未知，不进入本次要求有效评分的集合。后续拒绝分别定位概率语义、策略版本、前缀不一致及本例尚未实现的采样配置，不能用一个笼统的“数据不干净”替代原因。</p>
+<p>这些错误记录是同一夹具的变体，用于检查拒绝分支，不计为新增独立任务。<code>origin</code>和<code>curator</code>在这个小程序中是来自预设夹具与教师的受信元数据。它们只演示合同如何使用来源；把字符串改成允许值不能让伪造记录变真。实际数据流仍需要能够查回原请求、编码过程和被授权的策展依据。</p>
+<p>本批只选A1的C3/C4及第二次试次A2的报告调用作为参与位置，没有把A1的C1/C2也算进去。A2属于<code>trial=2</code>，从相同初态重新开始。本节为A2的报告新给局部调用编号<code>C3</code>，它不是A1的同名测试阶段，也不表示A2执行了被跳过的测试。完整键中的trial/attempt将两个局部C3分开；A2不是A1的接续。三个调用各有一个参与token，仍只归两次完整尝试。按“尝试内参与token平均，再对尝试等权”的当前设计，A1两项各占1/4，A2一项占1/2。系数只指定这批选定位置的权重，尚未把终局score变成逐token奖励；也不把同一道题的两次试次改报成两道独立任务。</p>
+<p>若后续将一个调用再切两段，应保留完整<code>task/trial/attempt/call</code>和位置对应，以同一尝试的参与token总数归一化。不能重新给每段一份完整尝试权重。若数据经筛选丢掉了一部分调用，还要记录本批究竟覆盖了哪些位置，不能把不完整投影称为完整rollout训练。</p>
+<h3 id="对记录充足性作出直接判断">对记录充足性作出直接判断</h3>
+<p><strong>问题。</strong> 只保留了成功摘要，是否必须丢掉，不能用于训练？</p>
+<p><strong>答案。</strong> 不必一概丢弃。它可以成为新策展示范的来源，前提是明确输入、目标、来源用途和策展责任。它不足以证明原模型当时看见什么、按哪种行为分布产生输出；接受为SFT材料不能补齐这个缺口。</p>
+<p><strong>问题。</strong> 有效F的报告是错的，为什么行为诊断器还接收它？</p>
+<p><strong>答案。</strong> 诊断器检查“能否在已知评分状态下比较这个已发生输出的概率”，并非把输出认定为正确监督。失败轨迹可能是需要学习的信号；怎样使用其终局反馈、哪些位置承担责任，须由具体目标另行定义。</p>
+<p><strong>问题。</strong> ratio能够算出来，为什么还不能宣布这份记录可用于任意RL算法？</p>
+<p><strong>答案。</strong> 它只检查当前一项概率比较的数据与语义。不同算法还可能需要采样组、奖励来源、优势或价值估计、参考分布、更新限制以及后续交互。这里既没构造完整目标，也没更新模型，更没有新任务评价。</p>
+<h2 id="相关阅读与衔接">相关阅读与衔接</h2>
+<p><a href="04-environment-and-supervision.html">上一章：环境、反馈与监督</a> · <a href="06-active-evidence.html">下一章：下一次读取怎样改变判断</a>。训练路线的数学入口是<a href="07-probabilities-and-tensors.html">第07章</a>。</p>
+<footer>Agent 前沿进阶 · 在线阅读</footer></main></body></html>
