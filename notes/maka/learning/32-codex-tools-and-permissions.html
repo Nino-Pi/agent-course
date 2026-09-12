@@ -1,85 +1,99 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 32 章｜Codex：工具、执行通道与权限 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 32 / 62</div><article id="main-content"><span class="heading-alias" id="codex-深度二工具如何从声明走到受控效果" aria-hidden="true"></span><span class="heading-alias" id="cx02codex工具执行通道与权限" aria-hidden="true"></span><span class="heading-alias" id="第-30-章codex工具执行通道与权限" aria-hidden="true"></span><h1 id="第-32-章codex工具执行通道与权限">第 32 章｜Codex：工具、执行通道与权限</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 32 章｜Codex：工具（Tool）、执行通道与权限（Permission） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script><link rel="stylesheet" href="../../../assets/katex/katex.min.css"><link rel="stylesheet" href="../../../assets/course-math.css"></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 32 / 62</div><article id="main-content"><span class="heading-alias" id="codex-深度二工具如何从声明走到受控效果" aria-hidden="true"></span><span class="heading-alias" id="cx02codex工具执行通道与权限" aria-hidden="true"></span><span class="heading-alias" id="第-30-章codex工具执行通道与权限" aria-hidden="true"></span><span class="heading-alias" id="第-32-章codex工具执行通道与权限" aria-hidden="true"></span><h1 id="第-32-章codex工具tool执行通道与权限permission">第 32 章｜Codex：工具（Tool）、执行通道与权限（Permission）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：Codex 怎样把模型可见的工具定义绑定到执行端，并在参数变化或失败时保持权限边界？</p>
-<p><strong>关键概念</strong>：ToolRouter（工具路由器）：连接声明与分派；registry（注册表）：按身份查实现；Hook（钩子）：在执行前后介入；approval（批准）：裁决本次动作；sandbox（沙箱）：限制实际资源访问；部分效果：失败前已发生的改动。</p>
-<p><strong>关系主线</strong>：本步工具计划连接定义与处理器，前置处理后的输入接受权限检查；执行后保留效果和反馈，按错误类别决定重试或对账。</p>
+<p><strong>核心问题</strong>：Codex 怎样把模型（Model）可见的工具（Tool）定义绑定（Binding）到执行端，并在参数（Argument）变化或失败时保持权限（Permission）边界？</p>
+<p><strong>关键概念</strong>：工具路由器（ToolRouter）：连接声明与分派；注册表（Registry）：按身份（Identity）查实现；钩子（Hook）：在执行前后介入；批准（Approval）：决定本次行动请求（Action）是否获准；沙箱（Sandbox）：限制实际资源访问；部分效果（Partial Effect）：失败前已发生的改动。</p>
+<p><strong>关系主线</strong>：本步工具计划（Tool Plan）连接定义与处理器（Handler），前置处理后的输入（Input）接受权限（Permission）检查；执行后保留效果（Effect）和反馈（Feedback），按错误类别决定重试（Retry）或对账（Reconciliation）。</p>
 </blockquote>
-<p>所属主题：<a href="31-tool-contracts.html">第31章 工具与执行</a>；同题对照：<a href="33-claude-code-tools-and-safety.html">Claude Code 工具与安全</a>。</p>
-<p>继续使用文档检查器案例。模型需要查找读取文件的工具，修复路径处理，运行测试，并阅读输出。如果环境里同时有本地 shell、MCP 服务、扩展工具和用于组织多个调用的代码执行表面，工具设计就已经超出“定义一个函数”的范围。</p>
-<p>本章沿工具注册到 handler 的调用链理解问题；平台相关 enforcement 需要各自验证。教学伪代码用于推导合同，不表示 Codex 实际类型或完整生产逻辑。</p>
-<h2 id="1-工具系统首先要保证的是身份清楚">1. 工具系统首先要保证的是身份清楚</h2>
-<p>考虑两个来源都注册 <code>search</code>：一个搜索项目文件，一个搜索外部知识库。如果 runtime 只用字符串 <code>search</code> 查字典，后注册者可能覆盖先注册者，模型眼前的描述与真正动作随加载顺序改变。这个问题与模型聪不聪明无关。</p>
-<p>本地 Codex 的工具 registry 维护带 namespace（区分来源的名称空间）的身份、执行 runtime 和当前暴露方式。注册时存在名称冲突处理，某些内建执行工具名字还受保留规则约束。由此得到一个设计原则：<strong>工具名称是调用路由的一部分，工具描述是模型选择的帮助信息；二者不能互相替代。</strong></p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 工具系统首先要保证的是身份清楚"><table><caption>表 1 / Table 1 · 1. 工具系统首先要保证的是身份清楚</caption><thead><tr><th scope="col">层次</th><th scope="col">应回答的问题</th><th scope="col">文档检查器中的例子</th></tr></thead><tbody><tr><td>身份（Identity）</td><td>这个名字解析到哪个操作？</td><td>默认执行工具与远程搜索工具分别归属谁</td></tr>
-<tr><td>描述与参数结构（Description / Schema）</td><td>模型何时用，传什么输入？</td><td>工作目录、命令、超时、输出限制</td></tr>
-<tr><td>暴露方式（Exposure）</td><td>本步是否直接展示，是否可发现？</td><td>常用工具直接提供，其他工具通过搜索发现</td></tr>
-<tr><td>执行环境（Runtime）</td><td>参数如何解析，如何执行？</td><td>命令交给哪个环境</td></tr>
-<tr><td>结果投影（Result projection）</td><td>模型下一步能看到什么？</td><td>exit code、输出、截断或继续读取信息</td></tr>
-<tr><td>效果治理（Effect governance）</td><td>什么条件下可以真的行动？</td><td>文件范围、网络、批准与 sandbox</td></tr></tbody></table></div>
-<p>结果合同还须保留测试实际执行范围和输出；一句“执行成功”不足以支持后续验收。</p>
-<h2 id="2-一份工具计划连接展示和执行">2. 一份工具计划连接“展示”和“执行”</h2>
-<p>Codex 主链从 core、MCP、extension、dynamic tools 等来源构建 registry，再完成本步 ToolRouter。Router 同时保存实际分派所用 registry 与模型可见的 specs。模型请求从本步 router 获取工具表面，回来的调用沿相应执行体系处理。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="一份工具计划连接“展示”和“执行”：可滚动示意图"><a href="../../../assets/diagrams/32-codex-tools-and-permissions-1.svg"><img src="../../../assets/diagrams/32-codex-tools-and-permissions-1.svg" alt="多个工具来源和本步设置形成工具计划，分出模型 specs 与执行 registry 两路，模型调用再汇入 router 分派、handler 执行及结果投影。" width="1135" height="1555" loading="lazy" style="width:1135px;min-width:965px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>本步计划分出两条线：一条提供模型可见定义，一条保留执行 registry；模型生成的调用随后汇入执行线。这张图表达的是“同一处能检查两端是否匹配”，不是宣称所有远程工具都已经被证明没有更新竞争。</p>
-<p>工具暴露还有一个需要保留的细节：工具可以直接展示，也可以通过 namespace、代码模式或延迟发现等方式进入模型的可用范围。“当前 prompt 没有所有 schema”不等于“不存在那些能力”；“发现了名称”也不等于“已经满足执行权限”。这里应区分<strong>可发现、可调用、获准执行</strong>三个问题。</p>
-<p>工程上的取舍来自上下文预算。直接展示全部工具，模型一开始就能选，但付出更大输入成本和选择干扰。延迟发现减小初始工具表面，却多出一次发现请求、额外延迟，以及工具索引过时的可能。对于文档检查器，读取、编辑和测试这些高频能力适合保持容易找到；大量低频业务连接器可以按需发现。</p>
-<h2 id="3-调用回来以后runtime-还要做什么">3. 调用回来以后，runtime 还要做什么</h2>
-<p>模型生成合法 JSON 并不意味着这个调用适合执行。真实系统仍要检查名字、payload 类型、参数含义、当前环境以及允许效果的范围。</p>
-<p>本地 registry 的路径先查工具身份，再检查 payload 类型，运行 pre hook，调用 handler，最后处理 post hook 和结果。未知名称可以形成给模型修正的信息；调用的 payload 类型与工具不匹配，则属于更严重的合同错误。工具自己的具体参数解析仍归相应 handler。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 3. 调用回来以后，runtime 还要做什么"><table><caption>表 2 / Table 2 · 3. 调用回来以后，runtime 还要做什么</caption><thead><tr><th scope="col">阶段</th><th scope="col">输入（Input）</th><th scope="col">可能的结果</th><th scope="col">后续应该如何理解</th></tr></thead><tbody><tr><td>查找（Lookup）</td><td>名称与 namespace</td><td>找到 runtime，或未知工具</td><td>未知工具还没有产生领域效果</td></tr>
-<tr><td>类型检查（Type check）</td><td>Function/Custom 等 payload</td><td>匹配或合同错误</td><td>schema 文档不能替代此检查</td></tr>
-<tr><td>事前钩子（Pre hook）</td><td>原始请求的工具输入</td><td>继续、阻止、返回更新后的输入</td><td>更新后要重新形成可执行请求</td></tr>
-<tr><td>处理器（Handler）</td><td>实际请求与环境</td><td>执行结果或执行错误</td><td>错误未必表示没有效果</td></tr>
-<tr><td>事后钩子（Post hook）</td><td>已完成执行的结果</td><td>接受、增加反馈、阻止结果</td><td>这个阶段已经晚于效果发生</td></tr>
-<tr><td>结果投影（Result projection）</td><td>内部结果对象</td><td>给模型、给日志、给 UI 的表达</td><td>三种成功语义可能不同</td></tr></tbody></table></div>
-<p>为什么要区分给日志与给模型的结果？日志可能需要完整的调用身份和分类；模型需要足够信息作下一步决策；UI 需要简洁状态和可查看产物。若只保留一条字符串，就很难既控制上下文大小，又保留可诊断性。</p>
-<p>本地源码还区分 handler 是否执行与某些生命周期结果，避免“工具流程结束”被误解为“效果成功且任务正确”。领域验收仍需额外判断，例如测试命令 exit 0，但实际只运行了帮助信息；或者改动已写入，但回归测试没有覆盖带空格路径。</p>
-<h2 id="4-hook-的时序决定了它能保护什么">4. Hook 的时序决定了它能保护什么</h2>
-<p>PreToolUse 位于 handler 之前，能够阻止调用或更新输入。PostToolUse 位于 handler 之后，可以治理模型看到的结果和补充反馈，但无法撤销已经完成的执行。</p>
-<p>还有一个控制流条件：本章所述 registry 只在 <code>success_for_logging()</code> 为真且提供 payload 时运行 PostToolUse。图中的 post 箭头据此有条件出现，失败或未知结果不保证走到它；不能把“加个 post hook”当作所有失败的自动取证机制。</p>
-<p>为了单独观察 Hook 时序，另设一个能修改文档的教学辅助命令 <code>python checker.py --write README.md</code>；这里的 <code>checker.py</code> 及 <code>--write</code> 是新设定，不是前章 <code>scan.py</code> 已有的接口。设模型准备运行这条命令。pre hook 检测到最新约束“不改 README”，可以在效果前阻止它。若命令已经写完 README，post hook 再发现不合要求，它只能表示结果不应被接受或需要进一步处理；不能让文件自动回到原状。</p>
-<p>这个区分也影响模型下一步行为。若工具已经修改文件但 post hook 阻止了结果，而反馈只写“失败”，模型可能重复运行命令。因此反馈应尽量帮助区分“执行前被拒”“执行失败”“执行后结果被拒”以及“效果尚待确认”。这是设计建议；本地每条结果投影需要结合其具体实现判断。</p>
-<p>下图限定为使用 <code>ToolOrchestrator</code> 的 handler 路径；其他 handler 依照各自执行合同处理，不能从图中推出所有工具都经过同一个 sandbox。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Hook 的时序决定了它能保护什么：可滚动示意图"><a href="../../../assets/diagrams/32-codex-tools-and-permissions-2.svg"><img src="../../../assets/diagrams/32-codex-tools-and-permissions-2.svg" alt="事前 Hook 可阻止或改输入，适用 handler 的编排器按最终请求处理批准与沙箱；效果后返回结果，仅满足 success_for_logging 与 payload 条件才运行事后 Hook。" width="1580" height="1473" loading="lazy" style="width:1580px;min-width:1343px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p><code>O → E</code> 是效果边界：此前检查身份、参数与允许范围，此后处理结果、验证与可能的补偿。Hook 位于边界哪一侧，决定它能阻止尚未发生的动作，还是只能处理已经产生的结果。</p>
-<h2 id="5-approval-和-sandbox-为什么要同时存在">5. Approval 和 sandbox 为什么要同时存在</h2>
-<p>Approval 回答一个具体动作在当前上下文中是否获准；sandbox 把访问范围约束落实到执行环境。一个批准提示无法持续拦截系统调用；一个文件 sandbox 也不会替用户判断“这次发布是否符合任务意图”。</p>
-<p>本地工具执行编排器读取执行环境的 permission profile，判断请求是 Skip、Forbidden 还是 NeedsApproval，再选择执行尝试。Skip 也不能简单理解为绝无审查：严格自动审查分支仍可能请求审查。Forbidden 表示拒绝执行；NeedsApproval 则会在继续前等待审批结果。</p>
-<p>权限信息来自工具实际使用的环境。有的执行端自行管理进程 sandbox，本地编排器会保留相应执行端语义。因此调用链应区分“请求 → 执行环境权限 → 适用的 enforcement”，而非将所有工具归入同一个本机 sandbox。</p>
-<p>对于文档检查器，审批对象应该包含命令、工作目录、目标范围和申请的权限。若 pre hook 把命令从只读检查改成写文件，审批必须理解改写后的请求；不能复用对原始只读动作的判断。相同命令字符串在不同目录也可能改变完全不同的文件。</p>
+<h2 id="前情回顾工具tool合法还不等于效果effect获准">前情回顾：工具（Tool）合法还不等于效果（Effect）获准</h2>
+<p><a href="31-tool-contracts.html">第31章</a>把工具（Tool）分成声明、执行、结果三层合同：模型（Model）需要知道怎么选，执行层（Execution Layer）要检查此刻能否做，结果还须区分已发生效果（Effect）与尚缺验收（Acceptance）。第29章说明Codex的任务线程（Thread，非操作系统线程）与会话（Session，执行内核对象）各承担什么；本章不再只看循环，而是追同一次行动请求（Action）怎样从模型（Model）可见定义找到真实消费者（Consumer）。</p>
+<p>这里重新交代文档检查器的最小背景：项目包含读取文档的Python程序，路径可能带空格，例如<code>fixtures/input files/sample.md</code>。工作要查明程序与测试入口（Entry Point），修复路径处理，运行相关测试并阅读结果。此处是用于比较工具（Tool）设计的场景，没有新增Codex实跑记录；后文的<code>checker.py --write</code>另设为能修改文档的辅助命令，不能当作已有程序接口。</p>
+<p>本章先看工具计划（Tool Plan）如何同时约束声明与执行，再看输入（Input）改写、批准（Approval）、沙箱（Sandbox）及补丁失败的后置证据。平台资源限制仍按具体执行环境（Execution Environment）判断；类型示意不冒充Codex生产实现。同题的公开产品对照见<a href="33-claude-code-tools-and-safety.html">第33章</a>。</p>
+<span class="heading-alias" id="1-工具系统首先要保证的是身份清楚" aria-hidden="true"></span><h2 id="1-工具tool系统首先要保证的是身份identity清楚">1. 工具（Tool）系统首先要保证的是身份（Identity）清楚</h2>
+<p>考虑两个来源都注册 <code>search</code>：一个搜索项目文件，一个搜索外部知识库。如果运行时（Runtime）只用字符串 <code>search</code> 查字典，后注册者可能覆盖先注册者，模型（Model）眼前的描述与实际执行对象随加载顺序改变。这个问题与模型（Model）聪不聪明无关。</p>
+<p>Codex的工具注册表（Tool Registry）用名称空间（Namespace）区分来源，并记录工具身份（Tool Identity）、执行运行时（Runtime）和暴露方式（Exposure）。注册时存在名称冲突处理，某些内建执行工具（Tool）名字还受保留规则约束。由此得到一个设计原则：<strong>工具（Tool）名称是调用路由的一部分，工具（Tool）描述是模型（Model）选择的帮助信息；二者不能互相替代。</strong></p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 工具（Tool）系统首先要保证的是身份（Identity）清楚"><table><caption>表 1 / Table 1 · 1. 工具（Tool）系统首先要保证的是身份（Identity）清楚</caption><thead><tr><th scope="col">层次</th><th scope="col">应回答的问题</th><th scope="col">文档检查器中的例子</th></tr></thead><tbody><tr><td>身份（Identity）</td><td>这个名字解析到哪个操作？</td><td>默认执行工具（Tool）与远程搜索工具（Tool）分别归属谁</td></tr>
+<tr><td>描述与参数结构（Description / Schema）</td><td>模型（Model）何时用，传什么输入（Input）？</td><td>工作目录、命令、超时、输出限制</td></tr>
+<tr><td>暴露方式（Exposure）</td><td>本步是否直接展示，是否可发现？</td><td>常用工具（Tool）直接提供，其他工具（Tool）通过搜索发现</td></tr>
+<tr><td>执行运行时（Runtime）</td><td>参数（Argument）如何解析，如何执行？</td><td>命令交给哪个环境</td></tr>
+<tr><td>结果投影（Result Projection）</td><td>模型（Model）下一步能看到什么？</td><td>退出码（Exit Code）、输出、截断或继续读取信息</td></tr>
+<tr><td>效果治理（Effect Governance）</td><td>什么条件下可以真的行动？</td><td>文件范围（Scope）、网络、批准（Approval）与沙箱（Sandbox）</td></tr></tbody></table></div>
+<p>结果合同（Result Contract）还须保留测试实际执行范围（Scope）和输出；一句“执行成功”不足以支持后续验收（Acceptance）。</p>
+<span class="heading-alias" id="2-一份工具计划连接展示和执行" aria-hidden="true"></span><h2 id="2-一份工具计划tool-plan连接展示和执行">2. 一份工具计划（Tool Plan）连接“展示”和“执行”</h2>
+<p>Codex 主链从内建核心（Core）、模型上下文协议（Model Context Protocol，MCP）、执行扩展（Extension）、动态工具（Dynamic Tools）等来源构建注册表（Registry），再完成本步工具路由器（ToolRouter）。它同时保存实际分派所用注册表（Registry）与模型（Model）可见的工具定义（Specs）。模型（Model）请求从本步工具路由器（ToolRouter）获取工具（Tool）表面，回来的调用沿相应执行体系处理。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="同一工具计划连接两端 · Tool Plan：可滚动示意图"><a href="../../../assets/diagrams/32-codex-tools-and-permissions-1.svg"><img src="../../../assets/diagrams/32-codex-tools-and-permissions-1.svg" alt="核心、MCP及扩展来源形成本步工具计划；模型定义用于选择，注册表用于分派，两路在实际处理器汇合，结果投影进入后续请求。" width="1080" height="1555" loading="lazy" style="width:1080px;min-width:918px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>本步计划分出两条线：一条提供模型（Model）可见定义，一条保留执行注册表（Registry）；模型（Model）生成的调用随后汇入执行线。这张图表达的是“同一处能检查两端是否匹配”，不是宣称所有远程工具（Tool）都已经被证明没有更新竞争。</p>
+<p>工具（Tool）暴露还有一个需要保留的细节：工具（Tool）可以直接展示，也可以通过名称空间（Namespace）、代码模式（Code Mode）或延迟发现（Deferred Discovery）等方式进入模型（Model）的可用范围（Scope）。“当前提示词（Prompt）没有所有参数模式（Schema）”不等于“不存在那些能力”；“发现了名称”也不等于“已经满足执行权限（Permission）”。这里应区分<strong>可发现、可调用、获准执行</strong>三个问题。</p>
+<p>工程上的取舍来自上下文（Context）预算（Budget）。直接展示全部工具（Tool），模型（Model）一开始就能选，但付出更大输入（Input）成本和选择干扰。延迟发现（Deferred Discovery）减小初始工具（Tool）表面，却多出一次发现请求、额外延迟，以及工具（Tool）索引过时的可能。对于文档检查器，读取、编辑和测试这些高频能力适合保持容易找到；大量低频业务连接器可以按需发现。</p>
+<span class="heading-alias" id="3-调用回来以后runtime-还要做什么" aria-hidden="true"></span><h2 id="3-调用回来以后运行时runtime还要做什么">3. 调用回来以后，运行时（Runtime）还要做什么</h2>
+<p>模型（Model）生成符合JavaScript对象表示法（JavaScript Object Notation，JSON）语法的文本并不意味着这个调用适合执行。真实系统仍要检查名字、载荷（Payload）类型、参数（Argument）含义、当前环境以及允许效果（Effect）的范围（Scope）。</p>
+<p>本地注册表（Registry）的路径先查工具身份（Tool Identity），再检查载荷（Payload）类型，运行前置钩子（Pre Hook），调用处理器（Handler），最后处理后置钩子（Post Hook）和结果。未知名称可以形成给模型（Model）修正的信息；调用的载荷（Payload）类型与工具（Tool）不匹配，则属于更严重的合同错误。工具（Tool）自己的具体参数（Argument）解析仍归相应处理器（Handler）。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 3. 调用回来以后，运行时（Runtime）还要做什么"><table><caption>表 2 / Table 2 · 3. 调用回来以后，运行时（Runtime）还要做什么</caption><thead><tr><th scope="col">阶段</th><th scope="col">输入（Input）</th><th scope="col">可能的结果</th><th scope="col">后续应该如何理解</th></tr></thead><tbody><tr><td>查找（Lookup）</td><td>名称与名称空间（Namespace）</td><td>找到运行时（Runtime），或未知工具（Tool）</td><td>未知工具（Tool）还没有产生领域效果（Effect）</td></tr>
+<tr><td>类型检查（Type Check）</td><td>Function/Custom 等载荷（Payload）</td><td>匹配或合同错误</td><td>参数模式（Schema）文档不能替代此检查</td></tr>
+<tr><td>前置钩子（Pre Hook）</td><td>原始请求的工具（Tool）输入（Input）</td><td>继续、阻止、返回更新后的输入（Input）</td><td>更新后要重新形成可执行请求</td></tr>
+<tr><td>处理器（Handler）</td><td>实际请求与环境</td><td>执行结果或执行错误</td><td>错误未必表示没有效果（Effect）</td></tr>
+<tr><td>后置钩子（Post Hook）</td><td>已完成执行的结果</td><td>接受、增加反馈（Feedback）、阻止结果</td><td>这个阶段已经晚于效果（Effect）发生</td></tr>
+<tr><td>结果投影（Result Projection）</td><td>内部结果对象</td><td>给模型（Model）、给日志（Log）、给用户界面（User Interface，UI）的表达</td><td>三种成功语义可能不同</td></tr></tbody></table></div>
+<p>为什么要区分给日志（Log）与给模型（Model）的结果？日志（Log）可能需要完整的调用身份（Call Identity）和分类；模型（Model）需要足够信息作下一步决策；用户界面（UI）需要简洁状态（State）和可查看产物。若只保留一条字符串，就很难既控制上下文（Context）大小，又保留可诊断性。</p>
+<p>本地源码还区分处理器（Handler）是否执行与某些生命周期结果，避免“工具（Tool）流程结束”被误解为“效果（Effect）成功且任务（Task）正确”。领域验收（Acceptance）仍需额外判断，例如测试命令退出码（Exit Code）为0，但实际只运行了帮助信息；或者改动已写入，但回归测试（Regression Test）没有覆盖带空格路径。</p>
+<span class="heading-alias" id="4-hook-的时序决定了它能保护什么" aria-hidden="true"></span><h2 id="4-钩子hook的时序决定了它能保护什么">4. 钩子（Hook）的时序决定了它能保护什么</h2>
+<p>钩子（Hook）是宿主（Host）在一个已命名阶段调用的扩展处理。名称说明进入时点，不说明它拥有整个任务（Task）的裁决权。先问“工具（Tool）处理器（Handler）是否已执行”，才能判断该钩子（Hook）是在阻止效果（Effect），还是处理效果（Effect）之后的反馈（Feedback）。</p>
+<p>前置工具钩子（<code>PreToolUse</code>）位于处理器（Handler）之前，能够阻止调用或更新输入（Input）。后置工具钩子（<code>PostToolUse</code>）位于处理器（Handler）之后，可以治理模型（Model）看到的结果和补充反馈（Feedback），但无法撤销已经完成的执行。</p>
+<p>还有一个控制流条件：本章所述注册表（Registry）只在 <code>success_for_logging()</code> 为真且提供载荷（Payload）时运行后置工具钩子（<code>PostToolUse</code>）。图中的后置钩子（Post Hook）箭头据此有条件出现，失败或未知结果不保证走到它；不能把“加个后置钩子（Post Hook）”当作所有失败的自动取证机制。</p>
+<p>为了单独看清钩子（Hook）的时序，另设一个能修改文档的教学辅助命令 <code>python checker.py --write README.md</code>；这里的 <code>checker.py</code> 及 <code>--write</code> 是新设定，不是本章开头检查器的既有接口。设模型（Model）准备运行这条命令。前置钩子（Pre Hook）检测到最新约束“不改 README”，可以在效果（Effect）前阻止它。若命令已经写完 README，后置钩子（Post Hook）再发现不合要求，它只能表示结果不应被接受或需要进一步处理；不能让文件自动回到原状。</p>
+<p>这个区分也影响模型（Model）下一步行为。若工具（Tool）已经修改文件但后置钩子（Post Hook）阻止了结果，而反馈（Feedback）只写“失败”，模型（Model）可能重复运行命令。因此反馈（Feedback）应尽量帮助区分“执行前被拒”“执行失败”“执行后结果被拒”以及“效果（Effect）尚待确认”。这是设计建议；本地每条结果投影（Result Projection）需要结合其具体实现判断。</p>
+<p>下图限定为使用 <code>ToolOrchestrator</code> 的处理器（Handler）路径；其他处理器（Handler）依照各自执行合同（Execution Contract）处理，不能从图中推出所有工具（Tool）都经过同一个沙箱（Sandbox）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="钩子与效果的先后关系 · Hooks and Effects：可滚动示意图"><a href="../../../assets/diagrams/32-codex-tools-and-permissions-2.svg"><img src="../../../assets/diagrams/32-codex-tools-and-permissions-2.svg" alt="仅限使用ToolOrchestrator的路径；前置钩子可阻止或修改输入，审批后发生执行尝试；后置钩子还须success_for_logging为真且有payload，不能自动撤销效果或覆盖所有失败取证。" width="1580" height="1869" loading="lazy" style="width:1580px;min-width:1343px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p><code>O → E</code> 是效果（Effect）边界：此前检查身份（Identity）、参数（Argument）与允许范围（Scope），此后处理结果、验证与可能的补偿（Compensation）。钩子（Hook）位于边界哪一侧，决定它能阻止尚未发生的操作，还是只能处理已经产生的结果。</p>
+<span class="heading-alias" id="5-approval-和-sandbox-为什么要同时存在" aria-hidden="true"></span><h2 id="5-批准approval和沙箱sandbox为什么要同时存在">5. 批准（Approval）和沙箱（Sandbox）为什么要同时存在</h2>
+<p>批准（Approval）回答一个具体行动请求（Action）在当前上下文（Context）中是否获准；沙箱（Sandbox）把访问范围（Scope）约束落实到执行环境（Execution Environment）。一个批准（Approval）提示无法持续拦截系统调用（Syscall）；一个文件沙箱（Sandbox）也不会替用户判断“这次发布是否符合任务（Task）意图”。</p>
+<p>本地工具（Tool）执行编排器（Tool Orchestrator）读取执行环境（Execution Environment）的权限配置（Permission Profile），判断请求是 Skip、Forbidden 还是 NeedsApproval，再选择执行尝试（Execution Attempt）。Skip 也不能简单理解为绝无审查：严格自动审查分支仍可能请求审查。Forbidden 表示拒绝执行；NeedsApproval 则会在继续前等待审批结果。</p>
+<p>权限（Permission）信息来自工具（Tool）实际使用的环境。有的执行端自行管理进程沙箱（Sandbox），本地编排器会保留相应执行端语义。因此调用链应区分“请求 → 执行环境（Execution Environment）权限（Permission） → 适用的强制约束（Enforcement）”，而非将所有工具（Tool）归入同一个本机沙箱（Sandbox）。</p>
+<p>对于文档检查器，审批对象应该包含命令、工作目录、目标范围（Scope）和申请的权限（Permission）。若前置钩子（Pre Hook）把命令从只读检查改成写文件，审批必须理解改写后的请求；不能复用对原始只读行动请求（Action）的判断。相同命令字符串在不同目录也可能改变完全不同的文件。</p>
 <h3 id="用一次补丁落实这条链">用一次补丁落实这条链</h3>
-<p>只认识通用编排器还不够，要追到一个真正使用它的工具。本地补丁执行路径先拿到目标环境与 cwd，确定是执行端管理还是本地平台 sandbox，计算有效文件权限，再准备实际 patch。随后构造带变更范围和批准要求的请求，交给编排器执行，并通过事件 emitter 展示开始与结束。</p>
-<p>这里有一个值得借鉴的失败表示：执行成功时返回输出及 delta（已知文件变化）；执行失败时仍可以从 runtime 取得已经提交的 delta，再交给结束处理。这让“失败时是否已经修改了一部分文件”成为可表达的信息。它不证明所有错误都能自动回滚，而是避免用一个错误字符串抹掉已发生的变化。</p>
-<p>delta 还带一个关键字段 <code>exact</code>。若写失败前可能 truncate 或部分写，标志变为 false；<code>ToolEmitter</code> 将其交给 <code>TurnDiffTracker</code>，后者会 invalidate 并清除聚合 diff。这是在拒绝提供不精确的全貌，不能解释成改动为空。这些 denial/rejected 结果也可携带已知前缀，同时显示失败。</p>
-<p>回到检查器案例，如果补丁涉及两个文件，第一个写入后第二个失败，后续决策需要知道哪个文件已经变了。再次套用整个补丁可能失败、覆盖新改动，或重复效果。更合理的动作是先检查实际 delta 和当前文件，再生成针对剩余问题的修复。因此完整结果合同需要同时表达已知 delta、未完成范围和不精确状态。</p>
-<p>批准还带有时间条件。贯穿案例中，自动审查正评估“修改 README”，用户又补充“不改 README”；先前上下文里的 Allow 就不能直接作为新约束下的通行证。当前源码中自动审查器 Guardian 的 <code>ThreadOwned</code> 模式会在完成 Allow 时重查根授权版本与用户消息 revision，变化时取消该结果。reviewer 本身只满足审查关卡，不扩大动作权限；sandbox 和执行编排仍要履行自己的边界。</p>
-<h2 id="6-重试的核心是错误分类不是再试一次">6. 重试的核心是错误分类，不是再试一次</h2>
-<p>第一次执行失败后，先问失败属于哪一类。工具编排器只对符合条件的 sandbox denial 进入特定后续分支，并检查工具是否允许升级、审批策略是否允许请求，以及网络策略等限制。普通程序错误不会自动变成越权重试。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 6. 重试的核心是错误分类，不是再试一次"><table><caption>表 3 / Table 3 · 6. 重试的核心是错误分类，不是再试一次</caption><thead><tr><th scope="col">观察</th><th scope="col">优先判断</th><th scope="col">合理的下一步设计</th></tr></thead><tbody><tr><td>Python 语法错误</td><td>程序有问题</td><td>修正代码或参数</td></tr>
-<tr><td>文件不存在</td><td>路径、工作目录或任务假设错误</td><td>读取目录并修正路径</td></tr>
-<tr><td>sandbox 拒绝写入</td><td>当前效果超出执行范围</td><td>检查任务授权与可用审批路径</td></tr>
+<p>只认识通用编排器还不够，要追到一个真正使用它的工具（Tool）。本地补丁执行路径先拿到目标环境与当前工作目录（Current Working Directory，cwd），确定是执行端管理还是本地平台沙箱（Sandbox），计算有效文件权限（Permission），再准备实际补丁（Patch）。随后构造带变更范围（Scope）和批准（Approval）要求的请求，交给编排器执行，并通过事件发射器（Emitter）展示开始与结束。</p>
+<p>这里有一个值得借鉴的失败表示：执行成功时返回输出及已知变更（Delta）；执行失败时仍可以从运行时（Runtime）取得已经提交的已知变更（Delta），再交给结束处理。这让“失败时是否已经修改了一部分文件”成为可表达的信息。它不证明所有错误都能自动回滚，而是避免用一个错误字符串抹掉已发生的变化。</p>
+<p>先把两个结果维度分开：调用可以失败，同时已经有若干文件改变。<code>delta</code>描述已知的文件变化；<code>exact</code>描述这些变化是否足以精确表示相关修改。失败状态（State）与变化集合不是互相排斥的两种结果。</p>
+<p>已知变更（Delta）还带一个关键字段 <code>exact</code>。若写失败前可能先截断文件或仅写入一部分，标志变为<code>false</code>；<code>ToolEmitter</code> 将其交给 <code>TurnDiffTracker</code>，后者会使跟踪状态失效（Invalidate）并清除聚合差异（Diff）。这是在拒绝提供不精确的全貌，不能解释成改动为空。这些拒绝（Denial / Rejected）结果也可携带已知前缀，同时显示失败。</p>
+<p>回到检查器案例，如果补丁涉及两个文件，第一个写入后第二个失败，后续决策需要知道哪个文件已经变了。再次套用整个补丁可能失败、覆盖新改动，或重复效果（Effect）。更合理的下一步是先检查实际已知变更（Delta）和当前文件，再生成针对剩余问题的修复。因此完整结果合同（Result Contract）需要同时表达已知变更（Delta）、未完成范围（Scope）和不精确状态（State）。</p>
+<p>批准（Approval）还带有时间条件。贯穿案例中，自动审查正评估“修改 README”，用户又补充“不改 README”；先前上下文（Context）里的允许（Allow）判断就不能直接作为新约束下的通行证。当前源码中自动审查器Guardian的<code>ThreadOwned</code>模式（审查绑定拥有该工作的任务线程（Thread））会在完成允许（Allow）判断时重查根授权（Authorization）版本与用户消息（Message）修订（Revision），变化时取消（Cancellation）该结果。审查者（Reviewer）本身只满足审查关卡，不扩大行动请求（Action）的权限（Permission）；沙箱（Sandbox）和执行编排仍要履行自己的边界。</p>
+<span class="heading-alias" id="6-重试的核心是错误分类不是再试一次" aria-hidden="true"></span><h2 id="6-重试retry的核心是错误分类不是再试一次">6. 重试（Retry）的核心是错误分类，不是再试一次</h2>
+<p>需要分开两个判断：政策是否允许另一种执行尝试（Execution Attempt），以及原业务操作能否安全重复。前者成立，不会自动证明后者成立；反过来，操作满足幂等（Idempotency）条件而可重复，也不会扩大当前权限（Permission）。</p>
+<p>第一次执行失败后，先问失败属于哪一类。工具（Tool）编排器只对符合条件的沙箱拒绝（Sandbox Denial）进入特定后续分支，并检查工具（Tool）是否允许升级、审批策略是否允许请求，以及网络策略等限制。普通程序错误不会自动变成越权重试（Retry）。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 6. 重试（Retry）的核心是错误分类，不是再试一次"><table><caption>表 3 / Table 3 · 6. 重试（Retry）的核心是错误分类，不是再试一次</caption><thead><tr><th scope="col">观察结果（Observation）</th><th scope="col">优先判断</th><th scope="col">合理的下一步设计</th></tr></thead><tbody><tr><td>Python 语法错误</td><td>程序有问题</td><td>修正代码或参数（Argument）</td></tr>
+<tr><td>文件不存在</td><td>路径、工作目录或任务（Task）假设错误</td><td>读取目录并修正路径</td></tr>
+<tr><td>沙箱（Sandbox）拒绝写入</td><td>当前效果（Effect）超出执行范围（Scope）</td><td>检查任务（Task）授权（Authorization）与可用审批路径</td></tr>
 <tr><td>明确不可绕过的网络限制</td><td>环境策略禁止该访问</td><td>保留限制，选择可行工作路径</td></tr>
-<tr><td>执行超时，效果不明</td><td>可能已开始或部分完成</td><td>查询效果后再决定重试</td></tr>
-<tr><td>输出缺失但目标文件存在</td><td>效果与结果记录不一致</td><td>核对实际内容，避免盲目重复</td></tr></tbody></table></div>
-<p>这个表比“失败时指数退避”更接近 Agent 工具问题。指数退避能控制请求频率，却无法判断重发一笔转账或再次覆盖文件是否正确。对具有副作用的调用，需要领域的幂等键、条件写入、状态查询或补偿机制。读取到 common orchestrator 和 rollout 记录，并不能证明这些合同已被每一种工具实现。</p>
-<p>也不能把 sandbox denial 直接归为“效果前拒绝”：多文件补丁可能已写完前面的文件才在后面被拒。要按具体尝试解释错误与 delta；是否允许后续尝试和是否能安全重复业务是两项判断。</p>
-<span class="heading-alias" id="7-将问题写成一个教学接口" aria-hidden="true"></span><h2 id="7-执行效果与反馈的参考接口">7. 执行效果与反馈的参考接口</h2>
-<p>下面的接口刻意把“执行效果”与“调用反馈”分开。它是本例的参考抽象，不是 Codex 源码的翻译。先看结果：<code>effect</code> 表示对效果的认识，<code>accepted</code> 表示这份反馈是否被接受，两者不能互相推导。例如文件已改、事后检查拒绝结果，可以同时保留确认的效果和 <code>accepted=false</code>。</p>
+<tr><td>执行超时，效果（Effect）不明</td><td>可能已开始或部分完成</td><td>查询效果（Effect）后再决定重试（Retry）</td></tr>
+<tr><td>输出缺失但目标文件存在</td><td>效果（Effect）与结果记录不一致</td><td>核对实际内容，避免盲目重复</td></tr></tbody></table></div>
+<p>这个表比“失败时指数退避”更接近智能代理（Agent）工具（Tool）问题。指数退避能控制请求频率，却无法判断重发一笔转账或再次覆盖文件是否正确。对具有副作用的调用，需要领域的幂等（Idempotency）键、条件写入、状态（State）查询或补偿（Compensation）机制。读取到共用执行编排器（Common Orchestrator）和过程记录（Rollout），并不能证明这些合同已被每一种工具（Tool）实现。</p>
+<p>也不能把沙箱拒绝（Sandbox Denial）直接归为“效果（Effect）前拒绝”：多文件补丁可能已写完前面的文件才在后面被拒。要按具体尝试解释错误与已知变更（Delta）；是否允许后续尝试和是否能安全重复业务是两项判断。</p>
+<span class="heading-alias" id="7-将问题写成一个教学接口" aria-hidden="true"></span><span class="heading-alias" id="7-执行效果与反馈的参考接口" aria-hidden="true"></span><h2 id="7-执行效果effect与反馈feedback的参考接口interface">7. 执行效果（Effect）与反馈（Feedback）的参考接口（Interface）</h2>
+<p>下面的接口（Interface）刻意把“执行效果（Effect）”与“调用反馈（Feedback）”分开。它是本例的参考抽象，不是 Codex 源码的翻译。先看结果：<code>effect</code> 表示对效果（Effect）的认识，<code>accepted</code> 表示这份反馈（Feedback）是否被接受，两者不能互相推导。例如文件已改、事后检查拒绝结果，可以同时保留确认的效果（Effect）和 <code>accepted=false</code>。</p>
 <pre><code class="language-typescript">type EffectState = &quot;none&quot; | &quot;confirmed&quot; | &quot;unknown&quot;;
 type ToolOutcome = {
   callId: string;
   phase: &quot;precheck&quot; | &quot;execution&quot; | &quot;postcheck&quot;;
-  effect: EffectState; // none 需要无效果证据；无法确认时保留 unknown。
-  accepted: boolean; // 接受反馈不等于用户任务已通过业务验收。
+  effect: EffectState; // 需有无效果证据，否则保留 unknown。
+  accepted: boolean; // 接受反馈不等于通过任务验收。
   observation: string;
   nextAction?: &quot;revise_input&quot; | &quot;query_effect&quot; | &quot;verify_artifact&quot;;
 };</code></pre>
-<p>再看生成这份结果的过程。输入是工具调用和本步冻结计划；先解析、处理 pre hook，再对实际输入作权限判断。只有得到 <code>granted</code> 才到达 <code>runtime.attempt</code>，该行之后的反馈处理必须保留已发生效果。这些辅助函数按前文合同理解，以下不是可独立运行的程序。</p>
-<pre><code class="language-typescript">async function perform(call: ToolCall, step: StepSnapshot): Promise&lt;ToolOutcome&gt; {
+<p>按本例定义，拒绝采纳反馈不推出没有效果：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mtext>accepted</mtext><mo>=</mo><mtext>false</mtext><mtext>  </mtext><mo>⇏</mo><mtext>  </mtext><mtext>effect</mtext><mo>=</mo><mtext>none</mtext><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">\text{accepted}=\text{false}\;\not\Rightarrow\;\text{effect}=\text{none}.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord text"><span class="mord">accepted</span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord text"><span class="mord">false</span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel"><span class="mord vbox"><span class="thinbox"><span class="rlap"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="inner"><span class="mord"><span class="mrel"></span></span></span><span class="fix"></span></span></span></span></span><span class="mspace nobreak"></span><span class="mrel">⇒</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord text"><span class="mord">effect</span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord text"><span class="mord">none</span></span><span class="mord">.</span></span></span></span></span></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 7. 执行效果（Effect）与反馈（Feedback）的参考接口（Interface）"><table><caption>表 4 / Table 4 · 7. 执行效果（Effect）与反馈（Feedback）的参考接口（Interface）</caption><thead><tr><th scope="col">现场</th><th scope="col"><code>effect</code></th><th scope="col"><code>accepted</code></th><th scope="col">为什么成立</th></tr></thead><tbody><tr><td>效果前确认阻止</td><td><code>none</code></td><td><code>false</code></td><td>有证据说明没有提交操作</td></tr>
+<tr><td>文件已写，事后反馈被拒</td><td><code>confirmed</code></td><td><code>false</code></td><td>拒绝的是反馈采纳，已写事实仍在</td></tr>
+<tr><td>是否写入还查不清</td><td><code>unknown</code></td><td>不能只凭未知判断</td><td>可以接纳一份如实描述未知的反馈，继续查询；不能把它改成成功效果</td></tr></tbody></table></div>
+<p>再看生成这份结果的过程，按“最终输入（Input）、许可门槛、实际尝试”三段阅读。输入（Input）是工具（Tool）调用和本步冻结计划；先解析、处理前置钩子（Pre Hook），再对实际输入（Input）作权限（Permission）判断。只有得到 <code>granted</code> 才到达 <code>runtime.attempt</code>，该行之后的反馈（Feedback）处理必须保留已发生效果（Effect）。这些辅助函数按前文合同理解，以下不是可独立运行的程序。</p>
+<pre><code class="language-typescript">async function perform(
+  call: ToolCall,
+  step: StepSnapshot
+): Promise&lt;ToolOutcome&gt; {
+  // 第一段：按身份找实现，形成最终输入。
   const runtime = step.registry.resolve(call.identity);
   const parsed = runtime.parse(call.payload);
   const revised = await hooks.before(parsed);
   if (revised.blocked) return rejectedBeforeExecution(call.id, revised.reason);
   const request = runtime.validate(revised.input);
+  // 第二段：检查改写后请求的许可。
   const grant = await policy.decide(request, step.environment);
   if (grant.kind === &quot;denied&quot;) return rejectedBeforeExecution(call.id, grant.reason);
   const resolved = grant.kind === &quot;needs_approval&quot;
@@ -88,28 +102,29 @@ type ToolOutcome = {
   if (resolved.kind !== &quot;granted&quot;) {
     return rejectedBeforeExecution(call.id, &quot;approval not granted&quot;);
   }
+  // 第三段：执行后保留已经发生的变化。
   const result = await runtime.attempt(request, resolved);
-  return hooks.after(result); // 这里不能把已发生效果改成 none。
+  return hooks.after(result); // 不抹去已发生的效果。
 }</code></pre>
-<p>此处教学权限结果区分 <code>denied</code>、<code>needs_approval</code> 与 <code>granted</code>；待审批不能直接进入执行。等待期间若权限、目标或用户要求变化，还需在实际准入处重新校验。真实 Codex 的分支名称和接线以本章前述源码范围为准。</p>
-<p>带空格路径的验证例子可以是读取 <code>fixtures/input files/sample.md</code>，执行针对该路径的测试，再查看修改 diff。路径引用、命令退出码和测试断言解决不同问题。只证明 Shell 能解析路径，不代表检查器自己的路径处理已经正确。</p>
-<p>如果需要一次提交多个工具调用，先按依赖和冲突分类：两个无副作用读取通常更容易并发；读取刚修改的文件必须等写入完成；两个写同一路径的工具需要序列或合并机制。工具声明“支持并行”只是调度信号，不能替代对这次请求的依赖判断。</p>
+<p>此处教学权限（Permission）结果区分 <code>denied</code>、<code>needs_approval</code> 与 <code>granted</code>；待审批不能直接进入执行。等待期间若权限（Permission）、目标或用户要求变化，还需在实际准入处重新校验。真实 Codex 的分支名称和接线以本章前述源码范围（Scope）为准。</p>
+<p>这里沿用本章开头的带空格路径。验证需要读取 <code>fixtures/input files/sample.md</code>，执行针对该路径的测试，再查看修改差异（Diff）。路径引用、命令退出码（Exit Code）和测试断言解决不同问题。只证明 Shell 能解析路径，不代表检查器自己的路径处理已经正确。</p>
+<p>如果需要一次提交多个工具（Tool）调用，先按依赖（Dependency）和冲突分类：两个无副作用读取通常更容易并发（Concurrency）；读取刚修改的文件必须等写入完成；两个写同一路径的工具（Tool）需要序列或合并机制。工具（Tool）声明“支持并行”只是调度（Scheduling）信号，不能替代对这次请求的依赖（Dependency）判断。</p>
 <span class="heading-alias" id="8-自测与参考答案" aria-hidden="true"></span><h2 id="8-常见场景与参考结论">8. 常见场景与参考结论</h2>
-<p>下面的 <code>pytest</code> 问题假设这个 Python 项目以它作为测试入口；实际入口仍须由项目配置确认。</p>
-<p><strong>题一：为什么 schema 正确还需要 runtime 检查？</strong></p>
-<p>参考答案：schema 帮助约束模型输出形状，但执行时仍要解析真实身份、确认 payload 类型、验证字段含义，并检查当前环境和权限。外部状态也可能在模型生成期间变化。</p>
-<p><strong>题二：PostToolUse 阻止结果，是否说明工具没有执行？</strong></p>
-<p>参考答案：不能。本章读取的路径在 handler 之后运行 post hook，阻止的是结果采纳。已经发生的文件或外部效果要单独确认，不能盲目重复调用。</p>
-<p><strong>题三：<code>pytest</code> 失败应该申请更高权限吗？</strong></p>
-<p>参考答案：先检查错误类别。断言失败、导入失败和 sandbox denial 对应不同修复。只有确为权限限制且任务与策略允许，才讨论适用的审批或执行路径。</p>
-<p><strong>题四：工具可以被模型发现，是否意味着它被允许执行？</strong></p>
-<p>参考答案：发现决定候选能力，路由决定调用解释，权限决定效果可否发生。即使 schema 可见，runtime 仍可能因当前请求和环境拒绝执行。</p>
-<p><strong>题五：怎样判断工具是否具有 exactly-once 保证？</strong></p>
-<p>参考答案：指出效果发生与结果记录之间的崩溃窗口，按工具讨论幂等键、条件写、查询或补偿。单凭通用工具 registry、日志和 sandbox，无法证明任意外部副作用 exactly-once。</p>
-<p><strong>题六：补丁第二个文件写失败，界面 Failed、聚合 diff 消失，可以原样重试吗？</strong></p>
+<p>下面的 <code>pytest</code> 问题假设这个 Python 项目以它作为测试入口（Entry Point）；实际入口（Entry Point）仍须由项目配置确认。</p>
+<p><strong>题一：为什么参数模式（Schema）正确还需要运行时（Runtime）检查？</strong></p>
+<p>参考答案：参数模式（Schema）帮助约束模型（Model）输出形状，但执行时仍要解析真实身份（Identity）、确认载荷（Payload）类型、验证字段含义，并检查当前环境和权限（Permission）。外部状态（State）也可能在模型（Model）生成期间变化。</p>
+<p><strong>题二：后置工具钩子（<code>PostToolUse</code>）阻止结果，是否说明工具（Tool）没有执行？</strong></p>
+<p>参考答案：不能。本章读取的路径在处理器（Handler）之后运行后置钩子（Post Hook），阻止的是结果采纳。已经发生的文件或外部效果（Effect）要单独确认，不能盲目重复调用。</p>
+<p><strong>题三：<code>pytest</code> 失败应该申请更高权限（Permission）吗？</strong></p>
+<p>参考答案：先检查错误类别。断言失败、导入失败和沙箱拒绝（Sandbox Denial）对应不同修复。只有确为权限（Permission）限制且任务（Task）与策略允许，才讨论适用的审批或执行路径。</p>
+<p><strong>题四：工具（Tool）可以被模型（Model）发现，是否意味着它被允许执行？</strong></p>
+<p>参考答案：发现决定候选能力，路由决定调用解释，权限（Permission）决定效果（Effect）可否发生。即使参数模式（Schema）可见，运行时（Runtime）仍可能因当前请求和环境拒绝执行。</p>
+<p><strong>题五：怎样判断工具（Tool）是否具有恰好一次（Exactly-Once）保证？</strong></p>
+<p>参考答案：指出效果（Effect）发生与结果记录之间的崩溃窗口，按工具（Tool）讨论幂等（Idempotency）键、条件写、查询或补偿（Compensation）。单凭通用工具（Tool）注册表（Registry）、日志（Log）和沙箱（Sandbox），无法证明任意外部副作用恰好一次（Exactly-Once）。</p>
+<p><strong>题六：补丁第二个文件写失败，界面显示失败（Failed）、聚合差异（Diff）消失，可以原样重试（Retry）吗？</strong></p>
 <p><strong>参考结论</strong></p>
-<p>不能据此决定。第一个文件可能已改，第二个可能截断；delta 不精确会使 tracker 清空聚合显示，失败不等于零效果。先回读相关文件、检查保留内容与目标，再决定是否需要新的剩余修复，并保留原调用的未知范围。PostToolUse 也不保证在失败分支执行，不能把未收到它的反馈当作没有问题。</p>
-<p>相关机制见<a href="38-codex-context-compaction.html">Codex 上下文与压缩</a>；工具、文件与恢复的参考设计见<a href="50-tool-contracts.html">第50章</a>、<a href="51-file-and-shell-tools.html">第51章</a>和<a href="52-permissions-and-recovery.html">第52章</a>。</p>
+<p>不能据此决定。第一个文件可能已改，第二个可能截断；已知变更（Delta）不精确会使差异跟踪器（Diff Tracker）清空聚合显示，失败不等于零效果（Effect）。先回读相关文件、检查保留内容与目标，再决定是否需要新的剩余修复，并保留原调用的未知范围（Scope）。后置工具钩子（<code>PostToolUse</code>）也不保证在失败分支执行，不能把未收到它的反馈（Feedback）当作没有问题。</p>
+<p>相关机制见<a href="38-codex-context-compaction.html">Codex 上下文（Context）与压缩</a>；工具（Tool）、文件与恢复（Recovery）的参考设计见<a href="50-tool-contracts.html">第50章</a>、<a href="51-file-and-shell-tools.html">第51章</a>和<a href="52-permissions-and-recovery.html">第52章</a>。</p>
 <hr>
-<p><a href="31-tool-contracts.html">上一章：第 31 章｜工具契约、执行与恢复</a> · <a href="33-claude-code-tools-and-safety.html">下一章：第 33 章｜Claude Code：工具、Hooks 与安全</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="31-tool-contracts.html"><span>← 上一章</span><strong>第 31 章｜工具契约、执行与恢复</strong></a><a href="33-claude-code-tools-and-safety.html"><span>下一章 →</span><strong>第 33 章｜Claude Code：工具、Hooks 与安全</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%B7%A5%E5%85%B7%E7%B3%BB%E7%BB%9F%E9%A6%96%E5%85%88%E8%A6%81%E4%BF%9D%E8%AF%81%E7%9A%84%E6%98%AF%E8%BA%AB%E4%BB%BD%E6%B8%85%E6%A5%9A">1. 工具系统首先要保证的是身份清楚</a></li><li class="toc-level-2"><a href="#2-%E4%B8%80%E4%BB%BD%E5%B7%A5%E5%85%B7%E8%AE%A1%E5%88%92%E8%BF%9E%E6%8E%A5%E5%B1%95%E7%A4%BA%E5%92%8C%E6%89%A7%E8%A1%8C">2. 一份工具计划连接“展示”和“执行”</a></li><li class="toc-level-2"><a href="#3-%E8%B0%83%E7%94%A8%E5%9B%9E%E6%9D%A5%E4%BB%A5%E5%90%8Eruntime-%E8%BF%98%E8%A6%81%E5%81%9A%E4%BB%80%E4%B9%88">3. 调用回来以后，runtime 还要做什么</a></li><li class="toc-level-2"><a href="#4-hook-%E7%9A%84%E6%97%B6%E5%BA%8F%E5%86%B3%E5%AE%9A%E4%BA%86%E5%AE%83%E8%83%BD%E4%BF%9D%E6%8A%A4%E4%BB%80%E4%B9%88">4. Hook 的时序决定了它能保护什么</a></li><li class="toc-level-2"><a href="#5-approval-%E5%92%8C-sandbox-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%90%8C%E6%97%B6%E5%AD%98%E5%9C%A8">5. Approval 和 sandbox 为什么要同时存在</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E4%B8%80%E6%AC%A1%E8%A1%A5%E4%B8%81%E8%90%BD%E5%AE%9E%E8%BF%99%E6%9D%A1%E9%93%BE">用一次补丁落实这条链</a></li><li class="toc-level-2"><a href="#6-%E9%87%8D%E8%AF%95%E7%9A%84%E6%A0%B8%E5%BF%83%E6%98%AF%E9%94%99%E8%AF%AF%E5%88%86%E7%B1%BB%E4%B8%8D%E6%98%AF%E5%86%8D%E8%AF%95%E4%B8%80%E6%AC%A1">6. 重试的核心是错误分类，不是再试一次</a></li><li class="toc-level-2"><a href="#7-%E6%89%A7%E8%A1%8C%E6%95%88%E6%9E%9C%E4%B8%8E%E5%8F%8D%E9%A6%88%E7%9A%84%E5%8F%82%E8%80%83%E6%8E%A5%E5%8F%A3">7. 执行效果与反馈的参考接口</a></li><li class="toc-level-2"><a href="#8-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">8. 常见场景与参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="31-tool-contracts.html">上一章：第 31 章｜工具合同（Tool Contract）、执行（Execution）与恢复（Recovery）</a> · <a href="33-claude-code-tools-and-safety.html">下一章：第 33 章｜Claude Code：工具（Tool）、钩子（Hook）与安全</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="31-tool-contracts.html"><span>← 上一章</span><strong>第 31 章｜工具合同（Tool Contract）、执行（Execution）与恢复（Recovery）</strong></a><a href="33-claude-code-tools-and-safety.html"><span>下一章 →</span><strong>第 33 章｜Claude Code：工具（Tool）、钩子（Hook）与安全边界（Security Boundary）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E5%B7%A5%E5%85%B7tool%E5%90%88%E6%B3%95%E8%BF%98%E4%B8%8D%E7%AD%89%E4%BA%8E%E6%95%88%E6%9E%9Ceffect%E8%8E%B7%E5%87%86">前情回顾：工具（Tool）合法还不等于效果（Effect）获准</a></li><li class="toc-level-2"><a href="#1-%E5%B7%A5%E5%85%B7tool%E7%B3%BB%E7%BB%9F%E9%A6%96%E5%85%88%E8%A6%81%E4%BF%9D%E8%AF%81%E7%9A%84%E6%98%AF%E8%BA%AB%E4%BB%BDidentity%E6%B8%85%E6%A5%9A">1. 工具（Tool）系统首先要保证的是身份（Identity）清楚</a></li><li class="toc-level-2"><a href="#2-%E4%B8%80%E4%BB%BD%E5%B7%A5%E5%85%B7%E8%AE%A1%E5%88%92tool-plan%E8%BF%9E%E6%8E%A5%E5%B1%95%E7%A4%BA%E5%92%8C%E6%89%A7%E8%A1%8C">2. 一份工具计划（Tool Plan）连接“展示”和“执行”</a></li><li class="toc-level-2"><a href="#3-%E8%B0%83%E7%94%A8%E5%9B%9E%E6%9D%A5%E4%BB%A5%E5%90%8E%E8%BF%90%E8%A1%8C%E6%97%B6runtime%E8%BF%98%E8%A6%81%E5%81%9A%E4%BB%80%E4%B9%88">3. 调用回来以后，运行时（Runtime）还要做什么</a></li><li class="toc-level-2"><a href="#4-%E9%92%A9%E5%AD%90hook%E7%9A%84%E6%97%B6%E5%BA%8F%E5%86%B3%E5%AE%9A%E4%BA%86%E5%AE%83%E8%83%BD%E4%BF%9D%E6%8A%A4%E4%BB%80%E4%B9%88">4. 钩子（Hook）的时序决定了它能保护什么</a></li><li class="toc-level-2"><a href="#5-%E6%89%B9%E5%87%86approval%E5%92%8C%E6%B2%99%E7%AE%B1sandbox%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%90%8C%E6%97%B6%E5%AD%98%E5%9C%A8">5. 批准（Approval）和沙箱（Sandbox）为什么要同时存在</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E4%B8%80%E6%AC%A1%E8%A1%A5%E4%B8%81%E8%90%BD%E5%AE%9E%E8%BF%99%E6%9D%A1%E9%93%BE">用一次补丁落实这条链</a></li><li class="toc-level-2"><a href="#6-%E9%87%8D%E8%AF%95retry%E7%9A%84%E6%A0%B8%E5%BF%83%E6%98%AF%E9%94%99%E8%AF%AF%E5%88%86%E7%B1%BB%E4%B8%8D%E6%98%AF%E5%86%8D%E8%AF%95%E4%B8%80%E6%AC%A1">6. 重试（Retry）的核心是错误分类，不是再试一次</a></li><li class="toc-level-2"><a href="#7-%E6%89%A7%E8%A1%8C%E6%95%88%E6%9E%9Ceffect%E4%B8%8E%E5%8F%8D%E9%A6%88feedback%E7%9A%84%E5%8F%82%E8%80%83%E6%8E%A5%E5%8F%A3interface">7. 执行效果（Effect）与反馈（Feedback）的参考接口（Interface）</a></li><li class="toc-level-2"><a href="#8-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">8. 常见场景与参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

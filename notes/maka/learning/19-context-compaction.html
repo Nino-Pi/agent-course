@@ -179,7 +179,7 @@ else:
 <span class="heading-alias" id="同一历史换成-pi消费者靠树上切点继续" aria-hidden="true"></span><h3 id="同一历史history换成pi看真正的消费者consumer">同一历史（History）换成Pi：看真正的消费者（Consumer）</h3>
 <p>Pi是另一种开源代码代理（Code Agent）。其默认压缩路径先寻找合法保留点并生成摘要（Summary）；手动路径未被取消时，调用 <code>SessionManager.appendCompaction(summary, firstKeptEntryId, ...)</code>，再用 <code>buildSessionContext()</code>更新 <code>agent.state.messages</code>。</p>
 <p>读取方 <code>buildContextEntries</code>沿当前叶节点（Leaf）的分支路径找到最新压缩条目（Compaction Entry），留下该条目、从 <code>firstKeptEntryId</code>开始的旧尾部（Tail），以及它之后的新条目（Entry）。若本题把H5选为首个保留项，目标同样是摘要（Summary）加H5原文，但树中位置与切点引用参与了重建。</p>
-<p>两个项目都保存摘要（Summary），不意味着它们具有相同持久化（Persistence）方式或原始/有效双来源指纹合同。更细切点见<a href="36-context-and-memory.html#3-%E7%9C%9F%E5%AE%9E%E7%AE%97%E6%B3%95%E4%B8%80pi-%E6%80%8E%E6%A0%B7%E6%8A%8A%E4%B8%80%E4%B8%AA%E9%95%BF-turn-%E5%88%86%E5%BC%80">第36章</a>。跨项目比较应追到各自消费者（Consumer），不能只比一个字段名称。</p>
+<p>两个项目都保存摘要（Summary），不意味着它们具有相同持久化（Persistence）方式或原始/有效双来源指纹合同。更细切点见<a href="36-context-and-memory.html#3-pi-%E7%9A%84%E5%8E%8B%E7%BC%A9%E5%88%87%E7%82%B9compaction-cut-point%E6%95%B0%E9%87%8F%E4%B8%8E%E5%90%88%E6%B3%95%E8%BE%B9%E7%95%8C%E4%B8%80%E8%B5%B7%E7%AE%97">第36章</a>。跨项目比较应追到各自消费者（Consumer），不能只比一个字段名称。</p>
 <span class="heading-alias" id="深化自测与方法比较" aria-hidden="true"></span><h3 id="机制问题与方法比较">机制问题与方法比较</h3>
 <p><strong>问题1。</strong> <code>StoredMessage</code>为什么不能直接替代运行时事件（Runtime Event）？</p>
 <p><strong>参考答案。</strong> 展示视图（Read Model）与正常模型重放（Replay）承担不同职责；后者需要配对、部分内容（Partial）、可见性、终态（Terminal State）和模型服务提供方（Provider）来源语义。当前所述路径不回退到界面转录文本。</p>

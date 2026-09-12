@@ -1,46 +1,59 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 30 章｜Claude Code：循环与上下文 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 30 / 62</div><article id="main-content"><span class="heading-alias" id="claude-code-深度课一从一次请求到长任务循环与上下文" aria-hidden="true"></span><span class="heading-alias" id="cc01claude-code循环与上下文" aria-hidden="true"></span><span class="heading-alias" id="第-28-章claude-code循环与上下文" aria-hidden="true"></span><h1 id="第-30-章claude-code循环与上下文">第 30 章｜Claude Code：循环与上下文</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 30 章｜Claude Code：代理循环（Agent Loop）与上下文（Context） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script><link rel="stylesheet" href="../../../assets/katex/katex.min.css"><link rel="stylesheet" href="../../../assets/course-math.css"></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 30 / 62</div><article id="main-content"><span class="heading-alias" id="claude-code-深度课一从一次请求到长任务循环与上下文" aria-hidden="true"></span><span class="heading-alias" id="cc01claude-code循环与上下文" aria-hidden="true"></span><span class="heading-alias" id="第-28-章claude-code循环与上下文" aria-hidden="true"></span><span class="heading-alias" id="第-30-章claude-code循环与上下文" aria-hidden="true"></span><h1 id="第-30-章claude-code代理循环agent-loop与上下文context">第 30 章｜Claude Code：代理循环（Agent Loop）与上下文（Context）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：Claude Code 怎样用动作反馈推进修复，并在长对话整理后保留继续所需的信息？</p>
-<p><strong>关键概念</strong>：工具观察：实际执行返回的内容；工作输入：本次请求选用的材料；上下文预算：输入与输出可用空间；压缩：整理旧历史的表示；会话分支：从已有对话起点另行推进；验收：核对最终任务条件。</p>
-<p><strong>关系主线</strong>：动作产生观察，观察参与下一步决策；预算促使系统选择和整理输入，恢复出的材料仍要结合当前文件、最新约束和测试结果判断。</p>
+<p><strong>核心问题</strong>：动作反馈怎样推进修复，长对话整理后又怎样保留继续工作所需的信息？</p>
+<p><strong>关键概念</strong>：观察结果（Observation）来自实际执行；模型输入（Model Input）是本次请求使用的材料；上下文预算（Context Budget）限制材料规模；上下文压缩（Context Compaction）改变历史（History）表示；摘要（Summary）保存继续所需的任务状态。</p>
+<p><strong>关系主线</strong>：工具反馈改变下一步判断，预算要求选择和整理材料；恢复（Resume）出的历史（History）仍须结合当前文件、最新约束和检查结果，才能支持下一次行动或交付。</p>
 </blockquote>
-<p>所属主题：第 1–3 节对应 <a href="28-system-design.html">第28章 架构</a>，第 4 节起对应 <a href="36-context-and-memory.html">第36章 上下文</a>。</p>
-<p>前置：<a href="15-model-context.html">第15章 模型实际看到什么</a>、<a href="16-tools-and-execution.html">第16章 工具循环</a>、<a href="19-context-compaction.html">第19章 长上下文</a>。本课用公开产品行为解释机制，图中的职责框和案例数据属于教学抽象。</p>
-<h2 id="1-从-maka-带过来的问题">1. 从 Maka 带过来的问题</h2>
-<p>Claude Code 的工作循环同样由模型提出动作、宿主执行动作，再将结果送回模型。工具结果是否改变下一步，取决于它补充了什么观察，以及当前约束允许什么行动。</p>
-<p>本章及后续 Claude Code 专题沿用一个 Python 文档检查器案例：<code>scan.py</code> 接受目录，检查 Markdown 链接并生成报告。当前路径中带空格时扫描失败，README 又给了错误命令。用户要求修复并验证，但不允许上传仓库或发布任何内容。目录里已有一份用户尚未提交的配置修改。本课题设允许修改扫描器的相关实现、README 和必要的回归测试；配置中的用户改动必须保留。</p>
-<p>这里先调查两个未知：失败来自参数拆分还是文件解析，正确测试入口是什么。同时守住两个已知约束：修改限于题设文件，测试通过后也不发布。Agent 如果直接开始编辑，就把定位假设提前当成结论；如果看到测试通过就发布，则把完成任务错误扩展成了后续操作。</p>
-<p>Claude Code 官方用收集材料、行动、检查结果解释工作循环，并区分模型判断与宿主提供的工具和环境。产品也允许运行中打断或补充指令。课程据此研究可观察的输入与输出，不假定内部存在与 Maka 同名的 Run、checkpoint 或 executor 类型。</p>
-<span class="heading-alias" id="2-第一张图画出每条边传什么" aria-hidden="true"></span><h2 id="2-动作观察与验收之间传递什么">2. 动作、观察与验收之间传递什么</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="动作、观察与验收之间传递什么：可滚动示意图"><a href="../../../assets/diagrams/30-claude-code-loop-and-context-1.svg"><img src="../../../assets/diagrams/30-claude-code-loop-and-context-1.svg" alt="当前任务、项目指令与背景形成工作输入；模型通过工具控制取得执行观察，并通过验收判断交付范围；中途纠正进入后续输入。" width="791" height="1072" loading="lazy" style="width:791px;min-width:673px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中间是动作与观察的循环，项目规则、当前要求和完成条件共同约束它。<code>核对验收条件</code>表达本课希望系统完成的职责，并不声称 Claude Code 使用一个独立且确定性的验收组件。</p>
-<p>回边传递的是可区分的实际结果。<code>Read</code> 返回目标函数，减少了实现未知；测试返回断言，减少了行为未知；权限拒绝减少了可执行方案；网络超时往往没有减少远端效果未知。四种结果都进入后续判断，但含义完全不同。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 2. 动作、观察与验收之间传递什么"><table><caption>表 1 / Table 1 · 2. 动作、观察与验收之间传递什么</caption><thead><tr><th scope="col">环节</th><th scope="col">本题输入</th><th scope="col">应保留的工作状态</th><th scope="col">对后续的有效输出</th></tr></thead><tbody><tr><td>定义任务（Task definition）</td><td>修空格路径与 README；禁止上传</td><td>目标、允许范围、验收条件</td><td>有边界的调查任务</td></tr>
-<tr><td>调查（Investigation）</td><td>文件结构、测试配置、当前 diff</td><td>已观察事实与未验证假设分开</td><td>可复现的失败入口</td></tr>
-<tr><td>修改（Modification）</td><td>当前文件内容与修复假设</td><td>修改对象、理由、待测条件</td><td>真实文件变化</td></tr>
-<tr><td>检查（Verification）</td><td>测试结果与修改后 diff</td><td>通过、失败、未运行分别记录</td><td>是否足以交付</td></tr>
-<tr><td>收口（Delivery）</td><td>目标与全部检查记录</td><td>剩余限制、未覆盖场景</td><td>用户可理解的结论</td></tr></tbody></table></div>
-<p>这张表可以用来审查一次对话：如果某步只有模型的意图，没有真实观察，就不能跨过对应的状态门槛。</p>
-<h2 id="3-正常案例七步如何收敛">3. 正常案例：七步如何收敛</h2>
-<p>下面是完整的教学推演，不是一次真实 Claude Code 运行。</p>
-<p><strong>第一步，建立边界。</strong> 读取任务、相关项目规则和当前修改状态。已有配置 diff 暂时只作为起始事实记录。它既不能自动归到本次改动，也不能为了让检查更干净而被覆盖。</p>
-<p><strong>第二步，找入口。</strong> README 写着 <code>python scan.py docs input</code>，但项目测试使用参数列表调用 <code>main([&quot;docs input&quot;])</code>。现在只能断言文档示例缺少必要的路径表达，不能断言实现一定相同。</p>
-<p><strong>第三步，复现。</strong> 使用包含空格的临时样例得到 <code>FileNotFoundError</code>。读取失败附近代码后发现实现先拼接命令字符串再按空格切分。现在有了从输入到失败的具体链：一个路径变成两个参数。</p>
-<p><strong>第四步，收窄修改。</strong> 若设计合同要求接受参数列表，就保持参数列表穿过调用层。此时 README 的引号示例与实现参数边界是两处相关但独立的修复，不能只修文档就宣布功能已完成。</p>
-<p><strong>第五步，运行检查。</strong> 普通路径和空格路径都验证，确认报告写到题设允许的位置。命令退出码为零还不够，应确认测试实际发现并执行了目标用例。</p>
-<p><strong>第六步，检查 diff。</strong> 核对只触及本次允许的实现、测试与文档，用户原有配置差异仍在。测试证明某些行为，diff 证明修改范围，两者互补。</p>
-<p><strong>第七步，交付。</strong> 说明输入边界如何修复、实际执行了什么检查、哪些场景尚未覆盖。禁止上传的约束仍然生效，因此交付停留在本地结果。</p>
-<p>动作数量并不固定，选择取决于待解决的未知；实际返回也可能重复、无关或仍无法判断。如果测试把假设推翻，流程应回到定位，而不是补一句解释后继续原方案。</p>
-<h2 id="4-当前工作输入与完整历史是两份不同的对象">4. 当前工作输入与完整历史是两份不同的对象</h2>
-<p>完整对话能很长，单次模型请求必须有界。项目规则、当前请求、已读文件片段、工具观察、已装载的 Skill 等可以共同进入工作输入。<code>/context</code> 是查看占用与装载情况的产品入口；官方交互图中的 token 数是演示数据，不能用来估计本仓库真实成本。</p>
-<p>本例使用以下预算关系：</p>
-<pre><code class="language-text">可用输入预算 = 模型窗口 - 输出预留 - 协议及系统开销
-本轮输入 = 必要规则 + 当前任务状态 + 相关观察 + 必要工具定义</code></pre>
-<p>这只是课程预算模型。实际协议、缓存计费和产品内部保留策略需要各自核对。用这条模型思考时，最先问的不是“摘要压缩率多高”，而是“哪些材料常驻、哪些按需、哪些可以回查”。</p>
-<p>假设本题突然产生 20 万字符日志，其中只有 12 行能够证明参数拆分错误。把整份日志反复放进请求会消耗预算；只写“测试失败”又失去定位价值。较好的教学方案是保留失败类型、关键片段、运行条件和原始记录位置，下一步缺什么再取什么。这个选择是在维护任务所需的信息，不是在奖励最短摘要。</p>
-<h2 id="5-第二张图整理工作输入后怎样继续">5. 第二张图：整理工作输入后怎样继续</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第二张图：整理工作输入后怎样继续：可滚动示意图"><a href="../../../assets/diagrams/30-claude-code-loop-and-context-2.svg"><img src="../../../assets/diagrams/30-claude-code-loop-and-context-2.svg" alt="预算不足时整理旧输出或对话，结合按规则装载的项目指令重建输入；事实不足则重读或检查，足够后才继续行动并产生新材料。" width="905" height="1682" loading="lazy" style="width:905px;min-width:770px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>官方描述接近限制时会整理旧工具输出并在需要时概括对话；早期细节可能丢失，也提供 <code>/compact</code> 的关注点入口。图中的“是否足够”是教学验收问题，不代表一个已公开的自动正确性证明器。</p>
-<p>重建后的输入至少要能回答：用户要什么、当前实际改了什么、还缺哪项验收、最近结果能支持什么。现在回到上述第五步的中间：实现已改，普通路径已验证，空格路径尚待复测；假设此时整理输入。这个时点的连续性摘要可表示为：</p>
+<h2 id="前情回顾工具反馈模型输入model-input与历史history">前情回顾：工具反馈、模型输入（Model Input）与历史（History）</h2>
+<p><a href="15-model-context.html">第15章</a>说明，磁盘中保存的材料不一定进入当前模型输入（Model Input）。<a href="16-tools-and-execution.html">第16章</a>把行动请求（Action）、实际执行和工具结果（Tool Result）分开。<a href="19-context-compaction.html">第19章</a>进一步指出，上下文压缩（Context Compaction）重建的是后续输入表示，不能把“已改动”自动提升成“已验证”。</p>
+<p>带着这条关系阅读 Claude Code：模型（Model）决定下一步，运行支撑（Agent Harness）提供工具、环境与输入管理，观察结果（Observation）再影响后续判断。本章依据公开产品行为解释机制，图和案例是教学抽象，不假定闭源内部存在 Maka 同名的执行（Run）、检查点（Checkpoint）或执行器（Executor）。</p>
+<p>本章沿用后续 Claude Code 专题的独立案例：<code>scan.py</code> 接受目录、检查 Markdown 链接并生成报告。带空格的路径会失败，README 命令也有问题；已有一份用户未提交的配置修改。任务允许修改相关实现、README 和必要的回归测试（Regression Test），要求验证，禁止上传和发布，必须保留原配置差异（Diff）。</p>
+<span class="heading-alias" id="2-第一张图画出每条边传什么" aria-hidden="true"></span><span class="heading-alias" id="1-从-maka-带过来的问题" aria-hidden="true"></span><span class="heading-alias" id="2-动作观察与验收之间传递什么" aria-hidden="true"></span><h2 id="1-先让观察结果observation改变一个具体判断">1. 先让观察结果（Observation）改变一个具体判断</h2>
+<p>当前有两个未知：错误来自参数拆分还是文件解析，正确测试入口是什么。因为本题尚无这些依据，立即大改会把假设当成结论；这不表示所有修复必须遵守固定动作顺序。若已经读到足够源码，先提出局部补丁再验证也可能合理，关键是说明依据和待查条件。</p>
+<p>Claude Code 的公开说明以收集材料、行动、检查解释代理循环（Agent Loop），同时区分负责判断的模型（Model）与负责执行的工具（Tool）。运行中可以补充输入，也可以中断；两种入口不能简单等同于撤销全部既有效果（Effect）。<a href="https://code.claude.com/docs/en/how-claude-code-works#the-agentic-loop">公开工作方式</a></p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="行动与反馈 · Action and Feedback：可滚动示意图"><a href="../../../assets/diagrams/30-claude-code-loop-and-context-1.svg"><img src="../../../assets/diagrams/30-claude-code-loop-and-context-1.svg" alt="任务（Task）约束和背景进入模型输入（Model Input），行动请求（Action）经执行取得观察结果（Observation）；验收（Acceptance）框表示教学职责，不能从工具返回直接推出任务完成。" width="755" height="1126" loading="lazy" style="width:755px;min-width:642px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>回边传递的不是一个泛泛的“完成”。<code>Read</code> 返回目标函数，可以减少实现未知；测试（Test）返回断言（Assertion），可以减少行为未知；权限拒绝（Permission Denial）改变可执行方案；网络超时可能仍留下效果未知（Outcome Unknown）。四种结果都参与判断，却不能互相替代。</p>
+<p>图中的验收检查（Acceptance Check）是一项教学职责，<strong>不是本章声称产品存在独立、确定性的自动验收器</strong>。模型（Model）提出结束后，仍要核对原目标、允许范围和检查记录。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 先让观察结果（Observation）改变一个具体判断"><table><caption>表 1 / Table 1 · 1. 先让观察结果（Observation）改变一个具体判断</caption><thead><tr><th scope="col">环节</th><th scope="col">本题材料</th><th scope="col">应留下的区别</th><th scope="col">对后续的作用</th></tr></thead><tbody><tr><td>任务定义（Task Definition）</td><td>修空格路径与README，禁止上传</td><td>目标与允许范围</td><td>约束调查与交付</td></tr>
+<tr><td>调查（Investigation）</td><td>文件、配置、起始差异（Diff）</td><td>已观察事实与假设</td><td>找到可解释的失败入口</td></tr>
+<tr><td>修改（Modification）</td><td>当前内容与修复依据</td><td>改了什么、仍需查什么</td><td>提供真实文件变化</td></tr>
+<tr><td>验证（Verification）</td><td>测试（Test）和最终差异（Diff）</td><td>通过、失败、未运行</td><td>判断能否交付</td></tr>
+<tr><td>交付（Delivery）</td><td>目标与完整检查结果</td><td>成果与剩余限制</td><td>向用户报告有依据的结论</td></tr></tbody></table></div>
+<span class="heading-alias" id="3-正常案例七步如何收敛" aria-hidden="true"></span><h2 id="2-完整案例从一个路径变成两个参数说起">2. 完整案例：从一个路径变成两个参数说起</h2>
+<p>以下七步均为<strong>教学推演，没有启动 Claude Code 或运行完整扫描器</strong>。其中失败和通过是题设中的过程结果，用来解释各步需要什么观察。</p>
+<p><strong>第一步，固定边界。</strong> 读取任务、相关项目规则及当前差异（Diff），记下用户已有配置修改。它属于初态，不能计入本次成果，也不能为了得到干净差异（Diff）而覆盖。</p>
+<p><strong>第二步，寻找入口。</strong> README 写 <code>python scan.py docs input</code>，项目测试（Test）却用 <code>main([&quot;docs input&quot;])</code>。前者在命令解释器（Shell）中可能成为两个参数，后者明确是一个列表元素。文档缺少正确路径表达，与实现是否正确仍是两件事。</p>
+<p><strong>第三步，定位失败链。</strong> 在本题带空格样例中观察到 <code>FileNotFoundError</code>；读取相关实现后，发现它把参数列表拼成字符串，再按空格切开。问题不是“空格天然不能用”，而是调用层丢掉了参数边界。</p>
+<pre><code class="language-python"># 只演示参数边界；不调用命令解释器（Shell），不读取目录。
+args = [&quot;docs input&quot;]
+broken = &quot; &quot;.join(args).split(&quot; &quot;)
+kept = list(args)
+print(broken)
+print(kept)</code></pre>
+<pre><code class="language-text">[&#39;docs&#39;, &#39;input&#39;]
+[&#39;docs input&#39;]</code></pre>
+<p>这段轻量程序的输出可直接核对：一个路径经错误转换变为两个。它不证明完整扫描器已修好；真实调用还须确认参数怎样进入实际消费者（Consumer）。</p>
+<p><strong>第四步，收窄修改。</strong> 若合同要求接受参数列表，就让列表穿过调用层，避免重新拆分；README 同时改为带引号的路径示例，例如 <code>python scan.py &quot;docs input&quot;</code>。仅修文档不能证明实现已正确，反之亦然。</p>
+<p><strong>第五步，验证（Verification）。</strong> 本题参考过程分别检查普通路径和空格路径，并确认报告写到允许位置。退出码（Exit Code）为0之外，还要读取目标用例确实被发现和执行的结果。</p>
+<p><strong>第六步，检查差异（Diff）。</strong> 参考结果只触及允许的实现、回归测试（Regression Test）和README，用户原配置修改仍在。行为与范围各有依据，不能只用测试（Test）变绿代替两项检查。</p>
+<p><strong>第七步，交付（Delivery）。</strong> 报告参数边界的修复、检查结果与未覆盖场景；禁止上传和发布仍生效，成果停留在本地。任务完成不会自动产生新的操作授权（Authorization）。</p>
+<p>七步不是固定算法。若测试（Test）推翻了修复假设，下一步应回到定位；若返回重复或无关材料，也不能仅因工具调用（Tool Call）增加就宣布更接近目标。</p>
+<span class="heading-alias" id="4-当前工作输入与完整历史是两份不同的对象" aria-hidden="true"></span><h2 id="3-上下文预算context-budget怎样约束模型输入model-input">3. 上下文预算（Context Budget）怎样约束模型输入（Model Input）？</h2>
+<p>完整历史（History）可以很长，单次模型请求必须有界。项目规则、当前任务、已读片段、观察结果（Observation）、技能说明包（Skill）和工具定义可能共同占用上下文窗口（Context Window）。<code>/context</code> 是查看实际占用的入口，官方演示里的词元（Token）数不能当成本仓库的费用记录。</p>
+<p>先定义同为词元（Token）的三个量：窗口容量 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>W</mi></mrow><annotation encoding="application/x-tex">W</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span></span></span></span></span>，输出预留 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>R</mi><mrow><mi mathvariant="normal">o</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">t</mi></mrow></msub></mrow><annotation encoding="application/x-tex">R_{\mathrm{out}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0077em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">out</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span>，以及已经单独保留的协议与固定系统开销 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>H</mi></mrow><annotation encoding="application/x-tex">H</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0813em;">H</span></span></span></span></span>。粗略分配给其余材料的预算为：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>B</mi><mo>=</mo><mi>W</mi><mo>−</mo><msub><mi>R</mi><mrow><mi mathvariant="normal">o</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">t</mi></mrow></msub><mo>−</mo><mi>H</mi><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">B=W-R_{\mathrm{out}}-H.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0502em;">B</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0077em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">out</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0813em;">H</span><span class="mord">.</span></span></span></span></span></div>
+<p><span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>H</mi></mrow><annotation encoding="application/x-tex">H</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0813em;">H</span></span></span></span></span> 只能扣一次；已算入这部分的系统材料，不应又从 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi></mrow><annotation encoding="application/x-tex">B</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0502em;">B</span></span></span></span></span> 重复扣除。<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mo>≤</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">B\le0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8193em;vertical-align:-0.136em;"></span><span class="mord mathnormal" style="margin-right:0.0502em;">B</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≤</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span> 时，不能继续塞入可变材料。这个式子用于预算分配，不是 Claude Code 的公开实现公式。</p>
+<p>材料组装还涉及编码边界，不能把几段文本的独立长度当成严格可加。完整请求必须再按实际编码检查：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>N</mi><mrow><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">q</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">s</mi><mi mathvariant="normal">t</mi></mrow></msub><mo>=</mo><mi mathvariant="normal">Tokens</mi><mo>⁡</mo><mtext> ⁣</mtext><mrow><mo fence="true">(</mo><mi mathvariant="normal">Encode</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi mathvariant="normal">Assemble</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi mathvariant="script">M</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mo fence="true">)</mo></mrow><mo>≤</mo><mi>W</mi><mo>−</mo><msub><mi>R</mi><mrow><mi mathvariant="normal">o</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">t</mi></mrow></msub><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">N_{\mathrm{request}}
+=\operatorname{Tokens}\!\left(\operatorname{Encode}(\operatorname{Assemble}(\mathcal M))\right)
+\le W-R_{\mathrm{out}}.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">request</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop"><span class="mord mathrm">Tokens</span></span><span class="mspace" style="margin-right:-0.1667em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;">(</span><span class="mop"><span class="mord mathrm">Encode</span></span><span class="mopen">(</span><span class="mop"><span class="mord mathrm">Assemble</span></span><span class="mopen">(</span><span class="mord mathcal">M</span><span class="mclose">))</span><span class="mclose delimcenter" style="top:0em;">)</span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≤</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0077em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">out</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span></div>
+<p><span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="script">M</mi></mrow><annotation encoding="application/x-tex">\mathcal M</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathcal">M</span></span></span></span></span> 是全部请求材料，包含前面预留的固定部分；<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>N</mi><mrow><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">q</mi><mi mathvariant="normal">u</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">s</mi><mi mathvariant="normal">t</mi></mrow></msub></mrow><annotation encoding="application/x-tex">N_{\mathrm{request}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">request</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span></span></span></span></span> 是完整编码后的输入词元（Token）数。组装（Assemble）与编码（Encode）只是教学记号，不规定产品的固定排列顺序、缓存计费或压缩触发阈值。</p>
+<h3 id="容量足够与事实足够是两个判断">容量足够与事实足够是两个判断</h3>
+<p>假设本题产生20万字符日志，只有12行能说明参数拆分错误。这两个数是教学情境中的字符与行数，不是词元（Token）测量。整份反复放入请求会占空间，只写“测试失败”却丢掉定位依据。</p>
+<p>合理的材料应保留失败类型、关键片段、运行条件和原始位置，缺少什么再读取什么。最短摘要（Summary）不一定最好：若删掉“空格路径未复测”，后续可能错误交付；即使只有一行，也已破坏任务含义。</p>
+<span class="heading-alias" id="5-第二张图整理工作输入后怎样继续" aria-hidden="true"></span><h2 id="4-上下文压缩context-compaction后材料怎样重新进入请求">4. 上下文压缩（Context Compaction）后，材料怎样重新进入请求？</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="容量与事实 · Capacity and Evidence：可滚动示意图"><a href="../../../assets/diagrams/30-claude-code-loop-and-context-2.svg"><img src="../../../assets/diagrams/30-claude-code-loop-and-context-2.svg" alt="先检查上下文预算（Context Budget），再检查下一行动请求（Action）所需事实；缺事实时回读或检查，压缩（Compaction）本身不补造证据。" width="908" height="1824" loading="lazy" style="width:908px;min-width:772px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>公开说明描述了整理旧工具输出、必要时概括对话的处理，早期细节可能丢失；<code>/compact</code> 可提供关注点。图中的事实检查也是教学问题，不是自动正确性证明。某项大输出反复填满窗口时，仍需改变获取策略，不能把整理本身当成进展。<a href="https://code.claude.com/docs/en/how-claude-code-works#when-context-fills-up">输入整理说明</a></p>
+<p>现在回到第五步的中间：实现已改，普通路径已经检查，空格路径还未复测。此时可以留下如下连续性摘要（Summary）：</p>
 <pre><code class="language-yaml">objective: 修复扫描器的空格路径，并修正 README
 constraints:
   - 不上传仓库，不发布结果
@@ -53,31 +66,32 @@ checks:
   - 普通路径通过
   - 空格路径待复测
 next: 运行空格路径用例，再核对最终 diff</code></pre>
-<p>这是自拟内容格式，不是 Claude Code 摘要 schema。<code>changed</code> 与 <code>checks</code> 分开，正是为了防止压缩把“实现已改”提升为“功能已通过”。若摘要缺少 <code>expected/actual</code>，应补取观察，而不是按照记忆猜出错误细节。</p>
-<p>不同材料采用不同的重建规则与装载时机；具体条件和限额可能随配置或版本变化。下表的 <code>CLAUDE.md</code> 是 Claude Code 的项目指令文件，auto memory 是它保存供后续使用的记忆材料；Hook 是宿主在指定事件触发的扩展动作。这里先看它们何时进入输入；工具控制见<a href="33-claude-code-tools-and-safety.html">第33章：Claude Code 工具、Hooks 与安全</a>，长期记忆见<a href="42-claude-code-memory-and-skills.html">第42章：Claude Code 记忆、规则与 Skills</a>。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 5. 第二张图：整理工作输入后怎样继续"><table><caption>表 2 / Table 2 · 5. 第二张图：整理工作输入后怎样继续</caption><thead><tr><th scope="col">材料</th><th scope="col">压缩后的公开处理</th><th scope="col">对后续输入的影响</th></tr></thead><tbody><tr><td>系统提示与输出风格</td><td>不属于要概括的消息历史</td><td>请求不是一整块任意截断的字符串</td></tr>
-<tr><td>根级 CLAUDE.md、无路径范围的规则、auto memory</td><td>从文件重新注入</td><td>持久材料可以独立于聊天摘要恢复</td></tr>
-<tr><td>嵌套 CLAUDE.md、路径规则</td><td>随匹配文件的读取重新装入</td><td>曾经出现过不保证立刻再次出现</td></tr>
-<tr><td>已读或已改文件</td><td>最多重新读取五个，优先最近修改</td><td>自动回填有边界，不能假设全部源码仍在</td></tr>
-<tr><td>较大文件</td><td>超过所述单文件限额时保留路径引用</td><td>有定位信息与有完整内容不同</td></tr>
-<tr><td>已调用 Skill 正文</td><td>按每项及总预算重新注入，过量时截断或丢弃较早项</td><td>方法的关键条件应靠前，必要时再读</td></tr>
-<tr><td>先前 Hook 增加的材料</td><td>随消息概括；匹配 compact 的 SessionStart Hook 可再次运行</td><td>一次性动态材料与可重新生成材料不同</td></tr></tbody></table></div>
-<p>由这些重建规则可以解释一个具体故障：压缩前读过某个子目录规则，压缩后尚未读取匹配文件，模型当前输入就可能还没有那条规则。正确诊断要检查装载时机，而不是仅搜索磁盘上文件是否存在。</p>
-<h2 id="6-三个失败场景信息整理也会引入错误">6. 三个失败场景：信息整理也会引入错误</h2>
-<p><strong>场景一：禁止上传只在很早的聊天里出现。</strong> 压缩后模型准备调用外部分析工具。修复思路分两层：本次继续工作必须重新明确这一任务约束；持续适用的项目要求应放入适当的长期指令；必须强制阻断的数据外传还需要工具权限或执行边界。把所有问题都交给一句“请摘要保留”是不完整设计。</p>
-<p><strong>场景二：同一大日志被反复读入。</strong> 先压缩，再整份重读，再次挤满，形成输入整理的循环。课程方案是改变获取策略：限定测试目标、限制输出、保存完整日志但返回关键片段。只调高窗口可能延后问题，却没有改变每次都获取无关材料的方式。</p>
-<p><strong>场景三：用户中途说“先停下，只做报告”。</strong> 原计划里的 Edit 已不再代表下一步授权。教学上要区分已开始动作、已完成效果和尚未执行计划，记录哪些变化已经发生，再决定报告内容。产品的中断控制不能证明所有先前副作用自动消失；取消与回退见<a href="43-claude-code-subagents-and-recovery.html">第43章</a>。</p>
-<p>三种失败的共同检查点是“当前输入是否仍准确表达现在的任务”。一份摘要语句通顺，并不足以证明它有用。</p>
-<h2 id="7-会话连续性resumebranch-与新会话">7. 会话连续性：resume、branch 与新会话</h2>
-<p>Claude Code 提供恢复既有会话和从既有历史分出新会话的操作；恢复延续原会话身份，分叉创建另一会话。新会话的长期背景则由其加载机制提供。会话入口与文件所在目录还应一起检查。</p>
-<p>恢复也不等于所有启动配置自动重现。标准设置文件会重新读取，某些通过启动参数传入的 MCP、settings、plugin 或附加目录配置需要再次提供；权限模式还与恢复入口有关。因此一个昨天能调用的工具今天不可用，既可能是环境变化，也可能是恢复了历史却没有重建同一配置。“恢复任务材料”和“恢复执行条件”因此是两项不同检查。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 7. 会话连续性：resume、branch 与新会话"><table><caption>表 3 / Table 3 · 7. 会话连续性：resume、branch 与新会话</caption><thead><tr><th scope="col">想解决的问题</th><th scope="col">合适的思考对象</th><th scope="col">操作后必须重新检查</th></tr></thead><tbody><tr><td>昨天任务没做完，今天继续</td><td>原会话的历史与任务状态</td><td>文件、分支和外部环境是否变化</td></tr>
-<tr><td>想尝试另一种修复方案</td><td>一份新分支会话及其背景</td><td>两份会话是否写同一目录</td></tr>
-<tr><td>这次工作与前一任务无关</td><td>新任务输入与相关长期背景</td><td>旧偏好是否适用于新范围</td></tr>
-<tr><td>希望撤销错误修改</td><td>文件状态与可恢复范围</td><td>哪些修改被追踪、哪些是外部效果</td></tr></tbody></table></div>
-<p>从这里可以推导一个工程要求：<strong>保存历史解决信息连续性，重读现场解决事实新鲜度。</strong> 昨天记录“文件未修改”，不能替代今天的文件检查。分叉复制历史，也不会自动给另一份工作目录。</p>
-<span class="heading-alias" id="8-若由我设计明确请求构造的合同" aria-hidden="true"></span><h2 id="8-请求构造的完整参考合同">8. 请求构造的完整参考合同</h2>
-<p>以下参考接口表达本例的请求构造合同，不是 Claude Code API。</p>
+<p>这不是产品的摘要模式（Summary Schema）。<code>objective/constraints</code> 保留目标与限制，<code>observed</code> 记录当时观察，<code>changed</code> 记录改动，<code>checks</code> 区分已查与待查，<code>next</code> 只是后续计划。把最后两行压成“问题已解决”会把计划改写成事实；缺少预期与实际结果时，必须回查。</p>
+<h3 id="重建规则reconstruction-rule取决于材料来源">重建规则（Reconstruction Rule）取决于材料来源</h3>
+<p><code>CLAUDE.md</code> 是项目指令文件，自动记忆（Auto Memory）是 Claude Code 保存供后续使用的材料，钩子（Hook）是在指定事件（Event）触发的扩展动作。它们的装载时机不相同。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 重建规则（Reconstruction Rule）取决于材料来源"><table><caption>表 2 / Table 2 · 重建规则（Reconstruction Rule）取决于材料来源</caption><thead><tr><th scope="col">材料</th><th scope="col">公开的压缩后处理</th><th scope="col">阅读时保留的条件</th></tr></thead><tbody><tr><td>系统提示词（System Prompt）与输出风格（Output Style）</td><td>继续适用</td><td>不等于任意截断全部输入</td></tr>
+<tr><td>根级项目指令、无路径范围的规则、自动记忆（Auto Memory）</td><td>从磁盘重新装入</td><td>不依赖聊天摘要（Summary）保存全文</td></tr>
+<tr><td>嵌套项目指令与路径规则（Path-scoped Rule）</td><td>随匹配文件读取装入</td><td>磁盘存在不等于当前输入包含</td></tr>
+<tr><td>已读或已改文件</td><td>最多回读5个，优先最近修改</td><td>超过5,000词元（Token）的文件仅回填路径引用，相关规则仍重新装入</td></tr>
+<tr><td>已调用技能说明包（Skill）正文</td><td>每项最多5,000词元（Token），合计25,000词元（Token）</td><td>过长截断开头之后的部分，总量超限先丢较早项</td></tr>
+<tr><td>先前钩子（Hook）材料</td><td>随历史（History）概括</td><td>匹配 <code>compact</code> 来源的 <code>SessionStart</code> 钩子（Hook）可再次运行并加入输出</td></tr></tbody></table></div>
+<p>这些是所引公开文档的产品条件，不是各版本不变的通用算法。<a href="https://code.claude.com/docs/en/context-window#what-survives-compaction">材料重建说明</a></p>
+<p>例如，压缩前读过子目录规则，压缩后却尚未回读匹配文件，当前模型输入（Model Input）就可能没有原文。诊断应查实际装载，不能只搜索磁盘。工具控制见<a href="33-claude-code-tools-and-safety.html">第33章</a>，自动记忆（Auto Memory）与技能说明包（Skill）见<a href="42-claude-code-memory-and-skills.html">第42章</a>。</p>
+<span class="heading-alias" id="6-三个失败场景信息整理也会引入错误" aria-hidden="true"></span><h2 id="5-三个失败场景摘要summary流畅也可能不能用">5. 三个失败场景：摘要（Summary）流畅也可能不能用</h2>
+<p><strong>约束丢失。</strong> “禁止上传”只在很早的聊天中出现，整理后模型（Model）准备把文件交给外部服务。本次继续必须重新提供任务约束；持续规则可放在适当项目指令中；必须强制阻断的外传还需要权限（Permission）和实际执行边界。文字保留与操作拦截是不同职责。</p>
+<p><strong>大输出反复回填。</strong> 摘要（Summary）刚生成，又整份读取同一日志，窗口立即填满。应限定测试（Test）目标、限制返回片段、保留完整日志的定位入口。只增大窗口可能延后问题，未改变每次取入无关材料的方式。</p>
+<p><strong>最新要求变成只读。</strong> 用户说“先停下，只做报告”，旧计划里的 <code>Edit</code> 不再代表新授权（Authorization）。应区分已开始动作、已发生效果（Effect）和尚未执行计划，报告当前文件状态。中断控制不会自动撤销外部变化；相关边界见<a href="43-claude-code-subagents-and-recovery.html">第43章</a>。</p>
+<p>三种情况都要求重问：当前材料是否准确表达现在的任务？不能仅凭摘要（Summary）的语气、格式或长度判断。</p>
+<span class="heading-alias" id="7-会话连续性resumebranch-与新会话" aria-hidden="true"></span><h2 id="6-恢复resume分叉fork与重新确认现场">6. 恢复（Resume）、分叉（Fork）与重新确认现场</h2>
+<p>公开会话（Session）管理说明中，恢复（Resume）延续原标识，分叉（Fork）创建另一标识；后者复制对话背景，不自动创建独立文件目录。本节采用命令行界面（Command-Line Interface，CLI）的公开说明，不能将其全部启动细节推及所有桌面或网页入口。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 6. 恢复（Resume）、分叉（Fork）与重新确认现场"><table><caption>表 3 / Table 3 · 6. 恢复（Resume）、分叉（Fork）与重新确认现场</caption><thead><tr><th scope="col">目的</th><th scope="col">使用的对象</th><th scope="col">仍需检查</th></tr></thead><tbody><tr><td>昨天未完成，今天继续</td><td>原会话（Session）的历史（History）</td><td>文件、分支（Branch）和外部状态是否改变</td></tr>
+<tr><td>尝试另一方案</td><td>分叉（Fork）后的会话（Session）</td><td>是否仍写同一目录</td></tr>
+<tr><td>开始无关任务</td><td>新任务及适用长期背景</td><td>旧偏好是否适用于新范围</td></tr>
+<tr><td>撤销错误改动</td><td>文件状态与可恢复范围</td><td>哪些变化被追踪、哪些属于外部效果（Effect）</td></tr></tbody></table></div>
+<p>标准设置文件会在启动时重读；原来经 <code>--mcp-config</code>、<code>--settings</code>、<code>--plugin-dir</code>、<code>--fallback-model</code> 或 <code>--add-dir</code> 提供的配置需要重新提供，运行中 <code>/add-dir</code> 加入的目录也不自动恢复。权限模式（Permission Mode）取决于恢复入口及例外，不能笼统说沿用上次。历史（History）里的未完成工具也不会因为恢复（Resume）就自动补完或重跑。<a href="https://code.claude.com/docs/en/sessions#what-a-resumed-session-restores">会话（Session）恢复说明</a></p>
+<p>因此，保存历史（History）解决信息连续性，重读现场解决事实新鲜度。昨天“文件未改”不能代替今天检查，分叉（Fork）也不能证明两份工作已经隔离。</p>
+<span class="heading-alias" id="8-若由我设计明确请求构造的合同" aria-hidden="true"></span><span class="heading-alias" id="8-请求构造的完整参考合同" aria-hidden="true"></span><h2 id="7-从字段走到消费者consumer接受回读还是拒绝">7. 从字段走到消费者（Consumer）：接受、回读还是拒绝？</h2>
+<p>先声明材料形状，再让消费者（Consumer）作出判断。它们是教学设计，不是 Claude Code 的应用程序编程接口（Application Programming Interface，API）或内部实现。</p>
 <pre><code class="language-ts">type Continuation = {
   objective: string;
   constraints: string[];
@@ -93,22 +107,67 @@ type RequestMaterials = {
   deferredReferences: string[];
   missingRequiredFacts: string[];
 };</code></pre>
-<p>接口的重点在 <code>missingRequiredFacts</code>。系统应当允许诚实地输出“当前信息不足”，再安排读取，而不是为了总能构造请求而编造完整状态。<code>observedAt</code> 标记观察时间，<code>locator</code> 提供补查入口，二者都不保证对应资源永远有效。</p>
-<p>这份接口对四种条件变化给出具体结果：压缩后仍保留原目标；新增禁止修改后不再准入新编辑；目标文件变化后把旧观察标为需更新并重新读取；缺少测试结果时保留 outstanding 检查，不输出已通过。若其中任何一项不成立，请求即使更短，也没有保持任务语义。字符数与 token 数只衡量输入规模。</p>
-<span class="heading-alias" id="9-自测与完整参考答案" aria-hidden="true"></span><h2 id="9-常见场景与完整参考结论">9. 常见场景与完整参考结论</h2>
-<p><strong>题一：Claude Code 为什么能修代码，而普通聊天只能建议？</strong></p>
-<p>参考答案：模型提出行动，宿主把行动连接到真实文件和命令，再把结果作为观察送回。能力来自模型判断和可执行反馈环的组合。还需要权限、输入整理和交付验收；仅把 Shell 暴露给模型并不能保证正确修复。</p>
-<p><strong>题二：已有完整会话记录，为什么仍需压缩？</strong></p>
-<p>参考答案：保存能力与单次请求容量不同。完整记录帮助恢复和回查，工作输入只选择本轮需要的内容。压缩可能有损，因此必须保留关键任务状态，并允许重新获取细节。</p>
-<p><strong>题三：摘要写“代码已修好”，测试记录写“未运行”，以哪个为准？</strong></p>
-<p>参考答案：拆开主张。文件修改可能已完成，功能正确尚未验证。应把摘要改成“修复已实施，检查未运行”，再根据授权和环境补检。自然语言自信程度不会提升证据。</p>
-<p><strong>题四：恢复昨天的会话后可以直接继续 Edit 吗？</strong></p>
-<p>参考答案：先检查本次依赖的文件状态。历史保留的是当时观察；用户、其他会话或分支切换都可能改变目标。重新读取目标片段并核对改动责任，才能继续修改。</p>
-<p><strong>题五：在图中，压缩失败应连到任务完成还是补取材料？</strong></p>
-<p>参考答案：根据缺失内容补取或缩小任务，必要时报告无法继续。不能因窗口耗尽就把未完成目标标成完成；也不能无限重复整份大输出。应改变观察策略。</p>
-<p><strong>换成只读检查十个配置文件时，设计怎样变化？</strong></p>
-<p>参考答案：保留任务—观察—判断—验收的循环，删去修改分支。验收改为覆盖十个对象、记录一致与冲突项、说明不可读文件。日志仍需有界，分叉仍需限定文件范围；没有修改就无需强行加入代码恢复。</p>
-<p>工具控制的完整场景见<a href="33-claude-code-tools-and-safety.html">工具、Hooks 与安全边界</a>；产品机制的参考结论见<a href="61-claude-code.html">第61章</a>。</p>
+<p>类型只声明材料形状，不能自动证明摘要（Summary）真实、权限（Permission）有效或文件未变。<code>observedAt</code> 是观察时间，<code>locator</code> 是回查位置；两者都不自动保证新鲜。示例消费者（Consumer）还要接收当前目标、操作许可，以及外部检查者已经发现的变化位置。</p>
+<pre><code class="language-ts">type CurrentGate = {
+  objective: string;
+  action: &quot;edit&quot; | &quot;report&quot;;
+  allowEdit: boolean;
+  changedLocators: string[];
+};
+
+function decide(m: RequestMaterials, gate: CurrentGate) {
+  // 当前目标来自本次权威输入，不能由旧摘要（Summary）自行授予。
+  if (m.continuation.objective !== gate.objective)
+    return { kind: &quot;read&quot;, reason: &quot;task_changed&quot; };
+  if (gate.action === &quot;edit&quot; &amp;&amp; !gate.allowEdit)
+    return { kind: &quot;reject&quot;, reason: &quot;edit_not_allowed&quot; };
+  const stale = m.continuation.observations.some(o =&gt;
+    gate.changedLocators.includes(o.locator));
+  if (stale || m.missingRequiredFacts.length &gt; 0)
+    return { kind: &quot;read&quot;, reason: &quot;facts_missing_or_stale&quot; };
+  // 待查项目不能变成通过；此处只决定下一步，不代跑测试。
+  if (m.continuation.outstanding.length &gt; 0)
+    return { kind: &quot;check&quot;, reason: &quot;checks_outstanding&quot; };
+  return { kind: &quot;ready&quot;, objective: gate.objective };
+}</code></pre>
+<p>为读清结果，下面单独设定一个基线：两类路径已查，相关观察引用 <code>scan.py</code>，仍禁止上传。随后每次只改一个条件；这些是本地轻量程序输入，不是产品执行轨迹（Trajectory）。</p>
+<pre><code class="language-ts">const materials: RequestMaterials = {
+  instructions: [&quot;保留用户配置，不上传&quot;],
+  continuation: {
+    objective: &quot;修复空格路径&quot;, constraints: [&quot;不上传&quot;],
+    observations: [{ claim: &quot;参数列表已保留&quot;, observedAt: &quot;t1&quot;, locator: &quot;scan.py&quot; }],
+    completed: [&quot;修改&quot;, &quot;两类路径检查&quot;], outstanding: [],
+  },
+  selectedObservations: [&quot;参数检查记录&quot;], deferredReferences: [], missingRequiredFacts: [],
+};
+const gate: CurrentGate = {
+  objective: &quot;修复空格路径&quot;, action: &quot;report&quot;, allowEdit: true, changedLocators: [],
+};
+console.log(JSON.stringify(decide(materials, gate)));
+console.log(JSON.stringify(decide(materials, { ...gate, action: &quot;edit&quot;, allowEdit: false })));
+console.log(JSON.stringify(decide(materials, { ...gate, changedLocators: [&quot;scan.py&quot;] })));
+console.log(JSON.stringify(decide({ ...materials, continuation: {
+  ...materials.continuation, outstanding: [&quot;空格路径待复测&quot;],
+}}, gate)));</code></pre>
+<pre><code class="language-text">{&quot;kind&quot;:&quot;ready&quot;,&quot;objective&quot;:&quot;修复空格路径&quot;}
+{&quot;kind&quot;:&quot;reject&quot;,&quot;reason&quot;:&quot;edit_not_allowed&quot;}
+{&quot;kind&quot;:&quot;read&quot;,&quot;reason&quot;:&quot;facts_missing_or_stale&quot;}
+{&quot;kind&quot;:&quot;check&quot;,&quot;reason&quot;:&quot;checks_outstanding&quot;}</code></pre>
+<p>四个结果分别保留原目标、拒绝新增编辑、要求回读已变文件、保留未完成检查。<code>ready</code> 只表示示例所检查的门槛已满足，<strong>不是功能正确或发布获准</strong>。真正执行仍需权限（Permission）消费者（Consumer）检查完整约束；变化检查者若漏报，或原观察本身失真，这段函数不会神奇发现它们。请求更短与任务含义得到保留，仍是两件事。</p>
+<span class="heading-alias" id="9-自测与完整参考答案" aria-hidden="true"></span><span class="heading-alias" id="9-常见场景与完整参考结论" aria-hidden="true"></span><h2 id="8-常见场景与完整参考结论">8. 常见场景与完整参考结论</h2>
+<p><strong>问题。</strong> Claude Code 为什么能够实际修代码？</p>
+<p><strong>参考答案。</strong> 模型（Model）提出行动请求（Action），运行支撑（Agent Harness）把它连接到文件和命令，再反馈观察结果（Observation）。权限（Permission）、输入管理与验收仍需正确接线；仅暴露命令解释器（Shell）不保证修复成功。</p>
+<p><strong>问题。</strong> 已有完整会话（Session）记录，为什么还需要上下文压缩（Context Compaction）？</p>
+<p><strong>参考答案。</strong> 持久保存容量与一次模型请求容量不同。历史（History）便于恢复（Resume）和回查，当前模型输入（Model Input）只能选取有界材料。整理可能有损，必须保留任务状态并允许补取细节。</p>
+<p><strong>问题。</strong> 摘要（Summary）写“已修好”，测试（Test）记录却是未运行，以哪个为准？</p>
+<p><strong>参考答案。</strong> 拆开主张：文件可能已改，行为尚未验证。应保留“已实施、待检查”，按授权（Authorization）和环境补查；自信语气不提升证据。</p>
+<p><strong>问题。</strong> 恢复（Resume）昨天的会话（Session），可以直接继续 <code>Edit</code> 吗？</p>
+<p><strong>参考答案。</strong> 先核对本次依赖的文件和最新要求。用户、其他会话（Session）或切换分支（Branch）都可能改变现场；历史（History）只能说明当时观察。</p>
+<p><strong>问题。</strong> 整理后仍缺事实，应连到完成还是补取材料？</p>
+<p><strong>参考答案。</strong> 按缺口回读、缩小范围或报告无法继续；不将未完成目标改成成功，也不无限重读整份大输出。</p>
+<p><strong>问题。</strong> 若任务改成只读检查十个配置文件，设计怎样变化？</p>
+<p><strong>参考答案。</strong> 保留任务、观察结果（Observation）、判断与验收的循环，去掉修改分支。验收改为覆盖十个对象、报告一致和冲突项以及不可读文件；输出仍有界，文件范围仍需明确，无须强行加入代码回退。</p>
+<p>工具控制的完整场景见<a href="33-claude-code-tools-and-safety.html">第33章</a>，产品机制参考见<a href="61-claude-code.html">第61章</a>。</p>
 <hr>
-<p><a href="29-codex-runtime-and-lifecycle.html">上一章：第 29 章｜Codex：运行时与任务生命周期</a> · <a href="31-tool-contracts.html">下一章：第 31 章｜工具契约、执行与恢复</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="29-codex-runtime-and-lifecycle.html"><span>← 上一章</span><strong>第 29 章｜Codex：运行时与任务生命周期</strong></a><a href="31-tool-contracts.html"><span>下一章 →</span><strong>第 31 章｜工具契约、执行与恢复</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E4%BB%8E-maka-%E5%B8%A6%E8%BF%87%E6%9D%A5%E7%9A%84%E9%97%AE%E9%A2%98">1. 从 Maka 带过来的问题</a></li><li class="toc-level-2"><a href="#2-%E5%8A%A8%E4%BD%9C%E8%A7%82%E5%AF%9F%E4%B8%8E%E9%AA%8C%E6%94%B6%E4%B9%8B%E9%97%B4%E4%BC%A0%E9%80%92%E4%BB%80%E4%B9%88">2. 动作、观察与验收之间传递什么</a></li><li class="toc-level-2"><a href="#3-%E6%AD%A3%E5%B8%B8%E6%A1%88%E4%BE%8B%E4%B8%83%E6%AD%A5%E5%A6%82%E4%BD%95%E6%94%B6%E6%95%9B">3. 正常案例：七步如何收敛</a></li><li class="toc-level-2"><a href="#4-%E5%BD%93%E5%89%8D%E5%B7%A5%E4%BD%9C%E8%BE%93%E5%85%A5%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8E%86%E5%8F%B2%E6%98%AF%E4%B8%A4%E4%BB%BD%E4%B8%8D%E5%90%8C%E7%9A%84%E5%AF%B9%E8%B1%A1">4. 当前工作输入与完整历史是两份不同的对象</a></li><li class="toc-level-2"><a href="#5-%E7%AC%AC%E4%BA%8C%E5%BC%A0%E5%9B%BE%E6%95%B4%E7%90%86%E5%B7%A5%E4%BD%9C%E8%BE%93%E5%85%A5%E5%90%8E%E6%80%8E%E6%A0%B7%E7%BB%A7%E7%BB%AD">5. 第二张图：整理工作输入后怎样继续</a></li><li class="toc-level-2"><a href="#6-%E4%B8%89%E4%B8%AA%E5%A4%B1%E8%B4%A5%E5%9C%BA%E6%99%AF%E4%BF%A1%E6%81%AF%E6%95%B4%E7%90%86%E4%B9%9F%E4%BC%9A%E5%BC%95%E5%85%A5%E9%94%99%E8%AF%AF">6. 三个失败场景：信息整理也会引入错误</a></li><li class="toc-level-2"><a href="#7-%E4%BC%9A%E8%AF%9D%E8%BF%9E%E7%BB%AD%E6%80%A7resumebranch-%E4%B8%8E%E6%96%B0%E4%BC%9A%E8%AF%9D">7. 会话连续性：resume、branch 与新会话</a></li><li class="toc-level-2"><a href="#8-%E8%AF%B7%E6%B1%82%E6%9E%84%E9%80%A0%E7%9A%84%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E5%90%88%E5%90%8C">8. 请求构造的完整参考合同</a></li><li class="toc-level-2"><a href="#9-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">9. 常见场景与完整参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="29-codex-runtime-and-lifecycle.html">上一章：第29章</a> · <a href="31-tool-contracts.html">下一章：第31章</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="29-codex-runtime-and-lifecycle.html"><span>← 上一章</span><strong>第 29 章｜Codex：运行时（Runtime）与任务生命周期（Task Lifecycle）</strong></a><a href="31-tool-contracts.html"><span>下一章 →</span><strong>第 31 章｜工具合同（Tool Contract）、执行（Execution）与恢复（Recovery）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E5%B7%A5%E5%85%B7%E5%8F%8D%E9%A6%88%E6%A8%A1%E5%9E%8B%E8%BE%93%E5%85%A5model-input%E4%B8%8E%E5%8E%86%E5%8F%B2history">前情回顾：工具反馈、模型输入（Model Input）与历史（History）</a></li><li class="toc-level-2"><a href="#1-%E5%85%88%E8%AE%A9%E8%A7%82%E5%AF%9F%E7%BB%93%E6%9E%9Cobservation%E6%94%B9%E5%8F%98%E4%B8%80%E4%B8%AA%E5%85%B7%E4%BD%93%E5%88%A4%E6%96%AD">1. 先让观察结果（Observation）改变一个具体判断</a></li><li class="toc-level-2"><a href="#2-%E5%AE%8C%E6%95%B4%E6%A1%88%E4%BE%8B%E4%BB%8E%E4%B8%80%E4%B8%AA%E8%B7%AF%E5%BE%84%E5%8F%98%E6%88%90%E4%B8%A4%E4%B8%AA%E5%8F%82%E6%95%B0%E8%AF%B4%E8%B5%B7">2. 完整案例：从一个路径变成两个参数说起</a></li><li class="toc-level-2"><a href="#3-%E4%B8%8A%E4%B8%8B%E6%96%87%E9%A2%84%E7%AE%97context-budget%E6%80%8E%E6%A0%B7%E7%BA%A6%E6%9D%9F%E6%A8%A1%E5%9E%8B%E8%BE%93%E5%85%A5model-input">3. 上下文预算（Context Budget）怎样约束模型输入（Model Input）？</a></li><li class="toc-level-3"><a href="#%E5%AE%B9%E9%87%8F%E8%B6%B3%E5%A4%9F%E4%B8%8E%E4%BA%8B%E5%AE%9E%E8%B6%B3%E5%A4%9F%E6%98%AF%E4%B8%A4%E4%B8%AA%E5%88%A4%E6%96%AD">容量足够与事实足够是两个判断</a></li><li class="toc-level-2"><a href="#4-%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9context-compaction%E5%90%8E%E6%9D%90%E6%96%99%E6%80%8E%E6%A0%B7%E9%87%8D%E6%96%B0%E8%BF%9B%E5%85%A5%E8%AF%B7%E6%B1%82">4. 上下文压缩（Context Compaction）后，材料怎样重新进入请求？</a></li><li class="toc-level-3"><a href="#%E9%87%8D%E5%BB%BA%E8%A7%84%E5%88%99reconstruction-rule%E5%8F%96%E5%86%B3%E4%BA%8E%E6%9D%90%E6%96%99%E6%9D%A5%E6%BA%90">重建规则（Reconstruction Rule）取决于材料来源</a></li><li class="toc-level-2"><a href="#5-%E4%B8%89%E4%B8%AA%E5%A4%B1%E8%B4%A5%E5%9C%BA%E6%99%AF%E6%91%98%E8%A6%81summary%E6%B5%81%E7%95%85%E4%B9%9F%E5%8F%AF%E8%83%BD%E4%B8%8D%E8%83%BD%E7%94%A8">5. 三个失败场景：摘要（Summary）流畅也可能不能用</a></li><li class="toc-level-2"><a href="#6-%E6%81%A2%E5%A4%8Dresume%E5%88%86%E5%8F%89fork%E4%B8%8E%E9%87%8D%E6%96%B0%E7%A1%AE%E8%AE%A4%E7%8E%B0%E5%9C%BA">6. 恢复（Resume）、分叉（Fork）与重新确认现场</a></li><li class="toc-level-2"><a href="#7-%E4%BB%8E%E5%AD%97%E6%AE%B5%E8%B5%B0%E5%88%B0%E6%B6%88%E8%B4%B9%E8%80%85consumer%E6%8E%A5%E5%8F%97%E5%9B%9E%E8%AF%BB%E8%BF%98%E6%98%AF%E6%8B%92%E7%BB%9D">7. 从字段走到消费者（Consumer）：接受、回读还是拒绝？</a></li><li class="toc-level-2"><a href="#8-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">8. 常见场景与完整参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

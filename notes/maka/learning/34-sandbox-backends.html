@@ -1,86 +1,128 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 34 章｜沙箱隔离后端 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 34 / 62</div><article id="main-content"><span class="heading-alias" id="sandbox-深度课命令获准后谁约束它的系统调用" aria-hidden="true"></span><span class="heading-alias" id="d05沙箱隔离后端" aria-hidden="true"></span><span class="heading-alias" id="第-32-章沙箱隔离后端" aria-hidden="true"></span><h1 id="第-34-章沙箱隔离后端">第 34 章｜沙箱隔离后端</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 34 章｜沙箱（Sandbox）隔离后端（Backend）：谁约束实际资源访问？ · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 34 / 62</div><article id="main-content"><span class="heading-alias" id="sandbox-深度课命令获准后谁约束它的系统调用" aria-hidden="true"></span><span class="heading-alias" id="d05沙箱隔离后端" aria-hidden="true"></span><span class="heading-alias" id="第-32-章沙箱隔离后端" aria-hidden="true"></span><span class="heading-alias" id="第-34-章沙箱隔离后端" aria-hidden="true"></span><h1 id="第-34-章沙箱sandbox隔离后端backend谁约束实际资源访问">第 34 章｜沙箱（Sandbox）隔离后端（Backend）：谁约束实际资源访问？</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：不可信脚本无视提示词并直接访问文件或网络时，实际限制在哪一层生效？</p>
-<p><strong>关键概念</strong>：原生沙箱：借宿主内核限制资源；seccomp：过滤系统调用；Sentry：gVisor 的用户态内核实现；microVM（微型虚拟机）：具有独立来宾内核的执行环境；网络代理：按策略转发连接；执行后端：承接 Agent 操作的实现。</p>
-<p><strong>关系主线</strong>：从工具参数追到系统调用和资源访问，比较宿主、用户态内核与虚拟机边界；初始化失败、兼容成本及外部效果恢复分别判断。</p>
+<p><strong>核心问题</strong>：测试脚本已经获准运行，却尝试读取凭据或任意联网时，限制在哪一层生效？</p>
+<p><strong>关键概念</strong>：原生沙箱（Native Sandbox）借宿主内核（Host Kernel）限制资源；系统调用（System Call）是程序请求内核服务的接口；应用内核（Application Kernel）代为实现应用所需接口；微型虚拟机（Micro Virtual Machine，microVM）有独立来宾内核（Guest Kernel）；网络代理（Network Proxy）检查经由它的连接。</p>
+<p><strong>关系主线</strong>：先从任务推导允许访问的对象，再沿一次操作比较三种内核边界；配置、实际执行、兼容成本与外部效果（Effect）恢复（Recovery）分别判断。</p>
 </blockquote>
-<p>前置：<a href="31-tool-contracts.html">第31章工具契约、执行与恢复</a>。</p>
-<p>Codex 与 Pi 提供 Agent 执行入口；Anthropic sandbox-runtime 是可接入宿主的隔离库；gVisor 与 Firecracker 提供不同的底层隔离机制。以下比较它们的作用位置，不表示这些 Agent 都使用了这些后端。</p>
-<h2 id="1-固定任务再决定必须防住什么">1. 固定任务，再决定必须防住什么</h2>
-<p>仍然修复文档检查器。先读取仓库，运行仓库提供的测试脚本；若确需下载依赖，只允许访问已确认的包源。把三个动作拆开，是因为它们需要不同能力：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 固定任务，再决定必须防住什么"><table><caption>表 1 / Table 1 · 1. 固定任务，再决定必须防住什么</caption><thead><tr><th scope="col">动作（Action）</th><th scope="col">正常需要</th><th scope="col">一个具体反例</th><th scope="col">设计必须说明什么</th></tr></thead><tbody><tr><td>读仓库（Read）</td><td>读源码、测试和必要运行库</td><td>工具顺便读取宿主凭据目录</td><td>实际可读对象集合，不能只说 cwd 在仓库</td></tr>
-<tr><td>运行未知脚本（Execution）</td><td>创建临时文件、写指定产物、启动子进程</td><td>安装 hook 修改启动配置，供下一次宿主执行</td><td>子进程继承什么限制；写根内哪些控制文件仍受保护</td></tr>
-<tr><td>下载依赖（Network access）</td><td>访问指定服务</td><td>脚本改用原始 TCP，或把源码上传到获准域名的另一个账户</td><td>绕过代理的路径、目的地粒度与数据用途分别由谁约束</td></tr></tbody></table></div>
-<p>这里的不可信输入既包括模型生成的命令，也包括仓库里已有的脚本。允许执行项目的测试入口，不等于审阅了它递归调用的每段代码。另一方面，若任务只需静态读取，给它启动任意脚本和联网的能力没有帮助。</p>
-<p>这正是最小权限原则的用途：从正常任务推导必要权限，降低错误发生时能波及的范围；完整仲裁原则则要求每次资源访问仍有约束，不能靠一次缓存的批准覆盖以后所有变化。它们帮助选择检查位置，并不承诺某套规则没有漏洞。</p>
-<p>先区分两个威胁：脚本误写了用户文件，可以用文件访问边界限制；脚本刻意利用宿主内核漏洞，则要考虑它直接接触多大内核接口。后一问题引出用户态应用内核（application kernel）与虚拟机（VM）对内核攻击面的不同处理。</p>
-<h2 id="2-从-agent-参数走到-os-约束原生后端做了哪几步">2. 从 Agent 参数走到 OS 约束：原生后端做了哪几步</h2>
-<p>普通程序运行 <code>open</code>、<code>connect</code> 等系统调用（syscall），请内核访问文件、建立连接。原生隔离继续使用宿主内核，同时在它提供的检查点施加限制。各机制的约束对象不同：namespace 改变进程看到的资源视图，只读挂载限制写入，seccomp 筛选系统调用编号和参数，Seatbelt 则对资源操作应用 profile。</p>
-<p>在当前 Codex 的选定本地路径中，<code>SandboxManager::transform</code> 将有效权限转换为真正要启动的 argv。macOS 分支生成 Seatbelt 参数后加上 <code>sandbox-exec</code>；Linux 分支交给专用 helper。Linux helper 的非 legacy 路径先建立 bubblewrap 环境，再进入内部阶段施加 seccomp；源码明确区分显式 legacy Landlock 路径，不能概括成“Linux 永远只有 Landlock”。这解释了为什么一个 <code>SandboxType</code> 名称不足以描述真实边界。</p>
-<p>从权限（Permissions）到隔离（Isolation），需要把可信配置落实为进程无法自行跳过的资源检查。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从 Agent 参数走到 OS 约束：原生后端做了哪几步：可滚动示意图"><a href="../../../assets/diagrams/34-sandbox-backends-1.svg"><img src="../../../assets/diagrams/34-sandbox-backends-1.svg" alt="可信 Host 将权限、工作目录与命令交给原生后端，后端形成 profile、挂载或调用过滤后启动受限进程，实际资源访问由宿主内核限制。" width="720" height="949" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>“可信宿主”是一个实质条件：如果模型能替换实际使用的权限配置或绕过这条启动路径，profile 再精细也无效。Maka 的具体 owner、SBPL 与 worker 链放在 <a href="17-permissions-and-sandbox.html">第17章</a>；Codex 的接线提供另一种执行编排实例。</p>
-<h3 id="为什么-seccomp-不能独自表达只读这个仓库">为什么 seccomp 不能独自表达“只读这个仓库”</h3>
-<p>普通 seccomp 的 BPF 过滤程序由内核执行，可检查 syscall 编号及寄存器参数，不能解引用参数指向的路径字符串。因此可以限制某类 socket 或危险 syscall，却不能靠一个 <code>open(path)</code> 的指针值判断路径是否在仓库。Linux 官方文档也明确将它定位为缩小内核攻击面的构件，需要结合其他权限机制。子进程继承过滤器与“能表达何种文件策略”是两件事。</p>
-<p>对本例，文件视图和可写挂载负责“哪些树可访问”，syscall 过滤负责进一步缩小操作面。二者仍依赖同一个宿主内核正确执行。优点是应用通常继续使用原生系统接口，便于接入本地开发工具；代价是后端必须适配平台，且允许的内核接口仍是攻击面。</p>
-<h3 id="路径字符串批准以后对象还可能改变">路径字符串批准以后，对象还可能改变</h3>
-<p>设只读保护路径经过一个仍可改写的符号链接（symlink）。初始化时解析它并保护当时的目标，之后脚本换掉链接，逻辑路径就可能指向另一对象。这是检查时与使用时不一致的 TOCTOU 问题，单纯做一次 <code>realpath</code> 不能给整个执行期提供保证。</p>
-<p>Codex 的 <code>append_read_only_subpath_args</code> 与 <code>append_unreadable_root_args</code> 对跨越可写 symlink 的相应保护直接报错：它拒绝把不能可靠表达的策略近似成启动时快照。这个例子也说明“限制不支持，停止启动”为什么有时比接受一个看似相同的配置更符合合同。</p>
-<h2 id="3-gvisor把应用的-linux-接口放到-sentry-中实现">3. gVisor：把应用的 Linux 接口放到 Sentry 中实现</h2>
-<p>gVisor 的关键变化不是增加一张 syscall denylist，而是让应用面对一个用户态 application kernel：Sentry 在自己的实现中处理 Linux 接口，必要时才用受限的宿主能力。应用的 syscall 与 Sentry 发给宿主的 syscall 不再是一一转发关系。未实现的接口会形成兼容性边界。</p>
-<p>以 <code>getpid</code> 为例，Sentry 可以从自己的任务表返回结果，无需询问宿主“当前进程 PID”。以读取文件为例，请求先进入 Sentry 文件系统语义，随后才使用授予该沙箱的文件访问路径。这让不可信应用无法直接把它想调用的整套 Linux ABI——程序与内核约定的二进制调用接口——交给宿主内核。</p>
-<h3 id="系统调用究竟如何转交给-sentry">系统调用究竟如何转交给 Sentry</h3>
-<p>信号是操作系统向进程或线程递送事件的一种机制。Systrap 中，当前系统调用触发 seccomp 的 <code>SECCOMP_RET_TRAP</code>，使线程收到 <code>SIGSYS</code>；已安装的处理程序接住它，应用侧的小段转交代码（stub）通过共享状态把事件交给 Sentry，处理后恢复应用执行。这与第06章直接终止进程的 <code>SIGKILL</code> 不同。这里 seccomp 用于<strong>转交处理</strong>，与上一节“允许或拒绝 syscall”的典型用途不同。</p>
-<p>gVisor 也有基于 Linux 虚拟化设施 KVM 的执行平台。KVM 让程序使用 CPU 提供的虚拟化执行机制，建立和切换受隔离的执行上下文；gVisor 借它运行应用并控制地址空间，应用所需的内核接口仍由 Sentry 实现。硬件辅助虚拟化不等于逐条指令模拟整台机器，这条路径也没有像 Firecracker 那样启动完整 Linux 来宾系统（guest）。Systrap 不要求虚拟化扩展，在已有 VM 内部署时避免依赖嵌套虚拟化；平台选择同时影响性能和使用的宿主机制。</p>
-<h3 id="文件代理不是一个永远固定的拓扑">文件代理不是一个永远固定的拓扑</h3>
-<p>Gofer 为文件挂载提供代理服务。当前文档中的 Directfs 默认开启：Gofer 将挂载目录的已打开句柄（文件描述符，FD）交给 Sentry，Sentry 可用基于 FD 的调用访问授予的树，从而省去部分 RPC；关闭 Directfs 才使用更严格的 Sentry 文件访问限制和更多 Gofer 往返。两者不能画成同一张“所有文件字节都经 Gofer”的图。</p>
-<p>对应本例，关键仍是只暴露仓库和运行时需要的挂载。给 Sentry 暴露整份凭据目录，它就可以在授权范围内读取；application kernel 不会重新推断用户想让哪些文件保密。FD 授权减少路径解析所能触达的对象，选择哪些 FD 仍由外部配置承担。</p>
-<p>网络也有同样的边界：默认 netstack 在用户态实现网络栈，接到受控的底层链路；<code>--network=host</code> 则使用 hostinet，交换了部分隔离以利用原生网络。<strong>用户态 TCP/IP 栈不是域名允许名单</strong>，对包源的目的地限制仍需另行配置。</p>
-<p>这种路线适合讨论多租户不可信代码与内核攻击面，但必须承认 syscall 兼容和中间处理成本。CPU 密集计算与高频小 syscall 的代价不会相同；不能拿一个启动时间或综合 benchmark 为所有 Agent 任务排名。</p>
-<h2 id="4-firecracker应用-syscall-留在-guest跨-vm-边界的是设备交互">4. Firecracker：应用 syscall 留在 guest，跨 VM 边界的是设备交互</h2>
-<p>Firecracker 启动 microVM。脚本先调用来宾 Linux 内核（guest Linux kernel）；guest 通过虚拟设备使用存储和网络，Firecracker 的虚拟机监控器（VMM）与 KVM 提供虚拟机边界。<strong>并非每次应用 syscall 都触发一次 VMM 审查。</strong> 例如 guest 内存里的文件缓存命中可能在 guest 内完成，跨设备 I/O 才进入相应虚拟化处理路径。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="三种隔离后端：调用路径与边界：可滚动示意图"><a href="../../../assets/diagrams/34-sandbox-backends-2.svg"><img src="../../../assets/diagrams/34-sandbox-backends-2.svg" alt="原生应用直接经过宿主资源检查；gVisor 应用由 Sentry 实现内核接口再使用授予资源；microVM 应用先进入 guest kernel，再经虚拟设备边界访问宿主。" width="1065" height="1132" loading="lazy" style="width:1065px;min-width:906px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中三个分支是机制概览；gVisor 的 KVM platform 另见上一节。可见“存在 KVM”不足以判断应用看到哪种 kernel interface。</p>
-<p>Firecracker 的块设备（block device）由宿主文件支撑，网络设备由宿主 TAP 虚拟网络接口支撑。TAP 让 VMM 等用户态程序与宿主网络栈交换以太网帧，即链路层的数据包；它与第26章的同名测试输出格式含义不同。对本例，可以把仓库准备进 guest 可见磁盘，另给产物盘；VMM 处理的是块设备，不会理解哪个文件是 README、哪个 HTTP 操作是发布。设计文档明确要求宿主承担网络过滤，不能把 microVM 误认为自带包源域名策略。</p>
-<p>还要限制 VMM 自己。Firecracker 的 jailer 准备隔离资源、关闭多余 FD、清理继承环境、切换文件视图和用户身份后执行 VMM；VMM 的 seccomp 再约束其宿主 syscall。jailer 的路径和资源输入由可信操作者负责，它不是任意二进制通用的 sandbox launcher。</p>
-<p>因此 VM 把应用与宿主之间加入独立 guest kernel 和虚拟设备边界，但仍需信任 KVM、VMM、宿主设置及授予的设备。为了隔离强敌手，这种边界可能值得；为了频繁读改本地小文件，镜像准备、数据导入导出、内核和设备维护则成为新的工程成本。不能仅凭“有独立内核”判断某个完整服务的安全性。</p>
-<h2 id="5-anthropic-sandbox-runtime代理怎么成为强制经过的网络关口">5. Anthropic sandbox-runtime：代理怎么成为强制经过的网络关口</h2>
-<p>前面三种执行环境都还没回答“只访问指定包源”。把 <code>HTTP_PROXY</code> 写入环境，只帮助愿意遵守的程序路由；恶意脚本可以删掉变量，直接 <code>connect</code>。有效方案还要关闭这条绕行路径。</p>
-<p>当前 Anthropic sandbox-runtime 的 Linux 分支在需要网络限制时使用 <code>--unshare-net</code>，并将通往宿主代理的 Unix socket 桥接进沙箱；macOS 通过 Seatbelt 限制连接到指定代理端口。代理在允许的出口上裁决目的地。环境变量帮助应用使用出口，namespace/profile 负责让忽略变量的应用不能按原方式直连。</p>
-<p>其 <code>filterNetworkRequest</code> 先验证并规范化 host，再检查 deny、allow，未匹配时根据配置拒绝或进入询问 callback。<code>strictAllowlist</code> 禁止 callback 扩张此边界。host 和 port 的一致解释很重要：批准时与连接时若将同一个名称解析成不同形式，就可能检查了一个对象却连接另一个。</p>
-<h3 id="目的地可达与允许上传这份内容之间还差什么">“目的地可达”与“允许上传这份内容”之间还差什么</h3>
-<p>普通 HTTPS CONNECT 代理可以按主机名和端口（host/port）决定是否建隧道，但端到端 TLS 加密下看不到应用请求内容。获准访问代码托管域名，也可能访问攻击者控制的仓库。域名策略限制可达服务，不自动表达“只能下载该依赖，不能上传源码”。</p>
-<p>这个开源库还提供可选 TLS termination：代理终止加密连接，使这一段 HTTPS 请求可被检查；配合 <code>filterRequest</code>，可在明文 HTTP 或被终止的 HTTPS 路径作请求过滤。HTTPS 豁免、SOCKS 代理和非 TLS 的不透明转发隧道不能继承这项检查。进一步约束 API 方法/资源需要显式过滤策略，TLS 检查也会改变原连接的认证条件。</p>
-<p>双向 TLS 认证（mTLS）除验证服务端外，还要求客户端以证书证明身份；代理把一条连接拆成两段时，需要另行安排两侧认证，不能自动继承原来的客户端身份。证书固定（pinning）要求对端证书或公钥与预先认可的值相符；代理出示的替代证书可能因此被客户端拒绝。这些是代理的兼容条件，不表示所有 mTLS 连接都无法代理。<strong>不能把默认隧道能力说成内容防泄漏，也不能说该库永远只能检查域名。</strong></p>
-<p>文件策略亦需读实际默认值：该库 README 将读取设计成默认可读、deny 后可局部 re-allow，写入则需显式 allow 并可设置 deny。要实现“仅可读仓库”，还需收窄默认读取范围；设置工作目录本身不限制可读对象。本文聚焦 macOS/Linux；当前仓库另有 Windows 实现，其机制和默认不从这里继承。</p>
-<p>这里读取的是<strong>独立库当前主干</strong>。Claude Code 如何配置、哪些工具路径覆盖及如何降级，仍以 <a href="33-claude-code-tools-and-safety.html">第33章｜Claude Code：工具、Hooks 与安全</a> 的产品资料范围为准；开源库有新字段不证明已在某个 Claude Code 发布版本接线。</p>
-<h2 id="6-回到-agent可替换执行器与默认强边界是两项能力">6. 回到 Agent：可替换执行器与默认强边界是两项能力</h2>
-<p>Pi 的 <code>BashOperations.exec(command, cwd, options)</code> 把工具输入/输出与实际执行分开。默认 <code>createLocalBashOperations</code> 进入本地 shell spawn；<code>createBashTool</code> 可接入另一份 operations。官方 sandbox 示例就在这个接缝调用 Anthropic <code>wrapWithSandbox</code>，再启动包装后的命令。这是扩展点的具体价值：保留 Bash 工具表面，替换执行位置与限制。</p>
-<p>但示例的 disabled、unsupported 或初始化失败路径会保留本地执行，且该示例只替换相应 Bash 路径。不能由存在这个例子推出“Pi 默认所有工具已强制隔离”。示例依赖声明为 sandbox-runtime <code>0.0.26</code>，也不能把本章读取的独立库主干新字段自动算给它。</p>
-<p>由此得到两种不同的执行合同：开发者自行选择 execution operations，优先组合灵活性；或者只要某任务被声明为必须隔离，初始化失败就禁止启动，优先边界不能降级。前者便于组合，后者适合强制隔离需求；初始化失败时的行为是两者的关键差别。</p>
-<p>再接回 <a href="31-tool-contracts.html">第31章</a>：registry 保证工具身份，approval 确定动作授权，backend 限制其实际访问。Goose 的 owner 重查不能替代 backend，backend 也不能阻止可信远端 API 在已授权范围内做错业务动作。</p>
-<h2 id="7-用同一任务选择边界并保留恢复责任">7. 用同一任务选择边界，并保留恢复责任</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 7. 用同一任务选择边界，并保留恢复责任"><table><caption>表 2 / Table 2 · 7. 用同一任务选择边界，并保留恢复责任</caption><thead><tr><th scope="col">需要优先解决的威胁/约束</th><th scope="col">对本例的具体设计</th><th scope="col">新责任或代价</th></tr></thead><tbody><tr><td>本机误写、有限脚本风险、紧密 IDE 集成</td><td>原生文件限制，测试产物单独可写，必要时加代理</td><td>平台差异、允许的宿主内核面、所有启动路径覆盖</td></tr>
-<tr><td>在 Linux 平台托管互不信任的脚本</td><td>为任务单独配置 gVisor 沙箱与挂载</td><td>Sentry 接口兼容、Directfs/网络模式、syscall 与 I/O 成本</td></tr>
-<tr><td>需要独立 guest kernel 的工作负载边界</td><td>microVM 内准备仓库和运行环境，经受控通道取回产物</td><td>VMM/KVM、镜像/设备/网络策略、启动与状态管理</td></tr>
-<tr><td>主要担心脚本任意外联</td><td>在所选执行环境外设置无法绕过的代理出口</td><td>目的地与数据用途策略、DNS/本地 IPC 例外、代理自身可信性</td></tr></tbody></table></div>
-<p>这不是四选一。可以把代理接在 gVisor 或 VM 外，也可以让 typed Read 留在受信宿主、只把未知脚本送去远端执行。每增加一个通道，数据与授权也会多一个跨界点，必须由该通道的实际控制落实。</p>
-<p>最后考虑：脚本已经创建远端持续集成任务（CI job），回执到来前被杀，随后从 VM 快照恢复。隔离环境恢复不使远端 job 消失。Firecracker 的快照涉及 guest 内存和虚拟机状态，磁盘文件仍有外部管理责任，连接状态也不保证保留；它没有与任意外部服务建立一笔原子事务。</p>
-<p>因此重试仍须由业务 key、效果查询和受信回执决定。停止进程、销毁沙箱、恢复快照和补偿远端效果是四项不同操作。</p>
-<span class="heading-alias" id="8-自测能否沿一次访问走到底" aria-hidden="true"></span><h2 id="8-资源访问与恢复的参考结论">8. 资源访问与恢复的参考结论</h2>
-<p><strong>为什么 <code>cwd=repo</code> 加 <code>HTTP_PROXY</code> 不能限制未知脚本？</strong></p>
-<p>cwd 只影响相对路径；代理变量只是路由建议。脚本仍可能使用绝对路径和原始连接，实际限制还需文件访问控制与无法绕过的网络出口。</p>
-<p><strong>三个环境中的 <code>getpid</code> 由谁提供语义？</strong></p>
-<p>原生进程由宿主内核提供；gVisor 由 Sentry 提供；microVM 中由 guest kernel 提供。不能假设每次 syscall 都由 VMM 按业务规则审批。</p>
-<p><strong>为什么 seccomp allowlist 不能单独表达允许的文件树？</strong></p>
-<p>普通 BPF filter 不能解引用路径指针；文件系统视图、挂载或资源访问控制必须共同表达允许访问的对象。</p>
-<p><strong>Sentry 或 VM 已隔离，为什么还需要挂载、磁盘和出口策略？</strong></p>
-<p>隔离限制对未授予资源的访问，授予哪些资源仍由可信配置决定。允许访问的网络也可能被用于错误目的，目的地限制不等于数据用途许可。</p>
-<p><strong>sandbox extension 初始化失败后继续本地 Bash，改变了什么？</strong></p>
-<p>它不满足“该任务必须隔离，不能绕过后端”的强制合同。若系统只承诺可选扩展，这可以是既定降级策略，但不能再将本次执行描述为受该后端保护。</p>
-<p><strong>恢复到创建 CI job 前的 VM 快照，为什么不能直接重跑提交？</strong></p>
-<p>快照不包含外部服务的原子回滚，原请求可能已经创建 job。恢复流程应查询效果 owner，并按仍有效的幂等合同处理原操作；无法查询时保留未知。</p>
-<p>把这些结论放回同一任务，可以得到一条完整参考路径：Host 生成“仓库可读、产物目录可写、仅经受控出口访问包源”的可信配置，后端安装相应资源限制后启动测试脚本；若所需隔离无法建立，强制隔离合同下不启动。执行后若创建 CI job 的回执丢失，运行状态进入未知效果处理，按原业务标识查询远端，而不是恢复快照后再次提交。这是设计推演，不表示某个 Agent 已完整采用所有机制。</p>
-<p><a href="31-tool-contracts.html">工具与执行</a>、<a href="32-codex-tools-and-permissions.html">Codex</a>和<a href="33-claude-code-tools-and-safety.html">Claude Code</a>分别说明这些边界怎样接到具体工具通道。</p>
+<h2 id="前情回顾获准启动并不回答启动以后能做什么">前情回顾：获准启动，并不回答启动以后能做什么</h2>
+<p><a href="17-permissions-and-sandbox.html">第17章</a>说明，权限（Permission）限定允许的意图，隔离（Isolation）约束进程实际能够访问的资源。把工作目录设为仓库，只改变相对路径的起点；程序仍可能使用绝对路径。<a href="33-claude-code-tools-and-safety.html">第33章</a>进一步区分了本机 Bash、内置文件工具和外部工具路径，不能用一个沙箱（Sandbox）名称替全部通道作保证。</p>
+<p><a href="31-tool-contracts.html">第31章</a>还保留了效果未知（Outcome Unknown）：程序可能已改变远端系统，随后才丢失回执。操作系统（Operating System，OS）限制与恢复（Recovery）协议解决不同问题。本章先研究实际访问，最后再接回这个缺口。</p>
+<p>Codex、Pi 是智能代理（Agent）的执行入口；Anthropic sandbox-runtime 是可接入宿主（Host）的隔离（Isolation）库；gVisor 与 Firecracker 提供底层机制。以下比较它们的位置，不表示这些产品互相采用了全部能力。案例是教学设计，不是一次新运行或跨后端（Backend）测评。</p>
+<span class="heading-alias" id="1-固定任务再决定必须防住什么" aria-hidden="true"></span><h2 id="1-固定任务让测试有足够能力也有明确边界">1. 固定任务：让测试有足够能力，也有明确边界</h2>
+<p>沿用第30、33章的 Python 文档扫描器，当前需要验证空格路径修复。这里把未知测试脚本作为单独的执行对象：项目文件可读，临时目录和指定产物目录可写，用户已有配置不能改。修复实现的编辑入口仍按原任务范围控制，并不意味着测试脚本也需要任意修改源码。</p>
+<p>再设一个有条件的网络变体：只有确需下载依赖且该动作已明确允许时，才开放已确认的包源。这个新增条件不授权上传仓库或发布结果。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 固定任务：让测试有足够能力，也有明确边界"><table><caption>表 1 / Table 1 · 1. 固定任务：让测试有足够能力，也有明确边界</caption><thead><tr><th scope="col">任务操作（Task Operation）</th><th scope="col">正常需要</th><th scope="col">一个偏离目标的行为</th><th scope="col">要落实的边界</th></tr></thead><tbody><tr><td>读取仓库</td><td>源码、测试和必要运行库</td><td>顺便读取宿主（Host）的凭据目录</td><td>实际可读对象集合</td></tr>
+<tr><td>运行测试脚本</td><td>临时文件、指定产物、子进程</td><td>安装钩子（Hook）修改下次启动配置</td><td>子进程继承的限制，以及可写树内的受保护文件</td></tr>
+<tr><td>下载依赖</td><td>到已确认包源的连接</td><td>绕过代理（Proxy），或向获准服务的另一个账户上传源码</td><td>无法绕过的出口、具体目的地和数据用途</td></tr></tbody></table></div>
+<p>这里的不可信代码既包括模型（Model）生成的命令，也包括仓库中原有的测试。允许运行一个入口，不能证明已审阅它调用的每一段代码；只做静态读取时，也没有必要同时授予执行脚本和联网的能力。</p>
+<p>这给出两个设计原则。<strong>最小权限（Least Privilege）</strong> 从完成任务所需能力出发，缩小误操作的影响范围；<strong>完整仲裁（Complete Mediation）</strong> 要求每次资源访问仍受有效授权约束，旧的批准（Approval）不能掩盖后来变化的范围。它们帮助我们选择检查位置，不是某套实现无漏洞的证明。</p>
+<p>还要区分威胁：脚本误写文件，需要限制可写对象；脚本刻意利用内核漏洞，则要看它能够直接接触多少宿主内核（Host Kernel）接口。后一问题才使三种内核边界的比较有意义。</p>
+<span class="heading-alias" id="2-从-agent-参数走到-os-约束原生后端做了哪几步" aria-hidden="true"></span><h2 id="2-原生沙箱native-sandbox把配置变成内核检查">2. 原生沙箱（Native Sandbox）：把配置变成内核检查</h2>
+<p>程序调用 <code>open</code>、<code>connect</code>，分别请求打开文件和建立连接。这类系统调用（System Call，syscall）把用户程序的请求交给内核。原生沙箱（Native Sandbox）仍由宿主内核（Host Kernel）处理请求，但在它提供的检查点限制资源。</p>
+<p>用读取仓库文件这一步理解几种构件：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 2. 原生沙箱（Native Sandbox）：把配置变成内核检查"><table><caption>表 2 / Table 2 · 2. 原生沙箱（Native Sandbox）：把配置变成内核检查</caption><thead><tr><th scope="col">构件</th><th scope="col">约束对象</th><th scope="col">对本例的作用</th></tr></thead><tbody><tr><td>命名空间（Namespace）</td><td>进程看到的资源视图</td><td>让进程只处在准备好的文件或网络环境里</td></tr>
+<tr><td>只读挂载（Read-only Mount）</td><td>某棵可见文件树的写能力</td><td>测试可以读源码，却不能经该挂载修改它</td></tr>
+<tr><td>安全计算机制（Secure Computing，seccomp）</td><td>系统调用（syscall）编号及直接参数</td><td>缩小可向宿主内核（Host Kernel）提出的操作面</td></tr>
+<tr><td>Seatbelt 规则配置（Profile）</td><td>macOS 上的资源操作</td><td>由对应规则限定进程对文件和网络的访问</td></tr></tbody></table></div>
+<p>不是每个操作系统（OS）都使用这四项；它们也不是互相替代的开关。文件可见性、可写范围与允许的系统调用（syscall）需要共同表达任务约束。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="原生限制 · Native Enforcement：可滚动示意图"><a href="../../../assets/diagrams/34-sandbox-backends-1.svg"><img src="../../../assets/diagrams/34-sandbox-backends-1.svg" alt="可信宿主（Host）配置变成后端（Backend）启动限制，进程访问资源时由宿主内核（Host Kernel）落实；模型参数不能自行定义可信策略。" width="720" height="1034" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中的 <code>cwd</code> 是当前工作目录（Current Working Directory），<code>argv</code> 是参数数组（Argument Vector）。可信宿主（Host）准备配置，执行后端（Backend）把它转换为启动条件，内核在访问时执行限制。若模型（Model）可以替换实际配置或绕过启动路径，规则再精细也没有控制住那个执行入口。</p>
+<h3 id="codex-的一条本地启动链">Codex 的一条本地启动链</h3>
+<p>在本章核对的本地路径中，<code>SandboxManager::transform</code> 将有效权限（Permission）转成要启动的参数数组（Argument Vector）：macOS 生成 Seatbelt 参数并加上 <code>sandbox-exec</code>；Linux 交给专用辅助程序（Helper）。未启用 <code>use_legacy_landlock</code> 的 Linux 路径先建立 bubblewrap 环境，再重新进入内部阶段施加安全计算机制（seccomp）。这一路失败不会自动切回旧的 Landlock 路径；后者由显式选项控制。</p>
+<p>因此，类型名 <code>LinuxSeccomp</code> 并没有列出整个执行边界。需要沿真正的启动链检查文件视图、网络与调用过滤如何组合。Maka 的负责者（Owner）、沙箱配置语言（Sandbox Profile Language，SBPL）和文件执行器（File Executor）链见第17章；不同产品必须分别闭合，不能复制默认值。</p>
+<span class="heading-alias" id="为什么-seccomp-不能独自表达只读这个仓库" aria-hidden="true"></span><h3 id="为什么系统调用syscall过滤不能独自表达只读这个仓库">为什么系统调用（syscall）过滤不能独自表达“只读这个仓库”？</h3>
+<p>安全计算机制（seccomp）使用伯克利包过滤器（Berkeley Packet Filter，BPF）形式的程序检查系统调用（syscall）；这里被检查的是调用数据，而非网络包。普通过滤程序可以看到编号和寄存器参数，却不能沿参数指针读取任意路径字符串。</p>
+<p>假设应用请求 <code>open(path)</code>。过滤器看到某个参数位置保存了地址，不等于知道那个地址中的字符串是仓库文件还是凭据路径。只允许 <code>open</code> 也不会自动表达“只打开仓库”。文件视图、挂载和资源访问控制需要负责对象范围，调用过滤则进一步缩小操作面。</p>
+<p>子进程继承过滤器，回答的是限制能否延续；过滤器能否表达文件路径，回答的是规则能检查什么。两者不能混为一谈。所有这些检查仍依赖宿主内核（Host Kernel）正确执行，原生接口带来工具兼容性，也保留了获准内核接口的攻击面。</p>
+<span class="heading-alias" id="路径字符串批准以后对象还可能改变" aria-hidden="true"></span><h3 id="路径检查以后对象可能换成另一个">路径检查以后，对象可能换成另一个</h3>
+<p>设某个只读保护路径穿过仍可写的符号链接（Symbolic Link）。初始化时解析并保护旧目标，脚本随后替换链接，同一逻辑路径就会指向别处。<strong>检查与使用时间差（Time-of-check to Time-of-use，TOCTOU）</strong> 在这里形成竞态；一次 <code>realpath</code> 不能覆盖整个执行期。</p>
+<p>Codex 的 <code>append_read_only_subpath_args</code> 与 <code>append_unreadable_root_args</code> 对跨越可写符号链接（Symbolic Link）的相应保护返回错误。它不把当时目标的快照（Snapshot）冒充持续有效的策略。这个例子说明：当后端（Backend）不能可靠表达所需限制时，停止启动可以比静默近似更符合合同。</p>
+<span class="heading-alias" id="3-gvisor把应用的-linux-接口放到-sentry-中实现" aria-hidden="true"></span><h2 id="3-gvisor应用内核application-kernel接住请求">3. gVisor：应用内核（Application Kernel）接住请求</h2>
+<p>换成 gVisor，应用面对的 Linux 接口由用户态应用内核（Application Kernel）Sentry 实现。Sentry 必要时才使用受限的宿主（Host）能力；应用请求与它发给宿主内核（Host Kernel）的系统调用（syscall）不是一一转发关系。</p>
+<p>用一个简单操作建立直觉：应用请求 <code>getpid</code> 时，Sentry 可以查自己的进程表返回标识，无需问宿主内核（Host Kernel）“当前宿主进程是谁”。读取文件时，则先进入 Sentry 的文件系统语义，再使用授予它的访问路径。应用不能把整套 Linux 应用二进制接口（Application Binary Interface，ABI）原样交给宿主内核（Host Kernel）；未实现的接口会成为兼容性边界。</p>
+<span class="heading-alias" id="系统调用究竟如何转交给-sentry" aria-hidden="true"></span><h3 id="systrap-怎样转交系统调用syscall">Systrap 怎样转交系统调用（syscall）？</h3>
+<p>信号（Signal）是操作系统（OS）向进程或操作系统线程（OS Thread）递送事件（Event）的一种机制。Systrap 使用安全计算机制（seccomp）的 <code>SECCOMP_RET_TRAP</code>，让触发的线程收到 <code>SIGSYS</code>。应用侧已安装的转交代码（Stub）通过共享状态通知 Sentry，后者处理后恢复应用执行。</p>
+<p>这与<a href="06-crash-window.html">第06章</a>的 <code>SIGKILL</code> 不同：后者直接终止进程，不能由应用安装处理程序来继续。这里的调用过滤构件用于转交处理，不能看到安全计算机制（seccomp）就断言“该调用一定被拒绝”。</p>
+<p>gVisor 也有基于内核的虚拟机（Kernel-based Virtual Machine，KVM）执行平台，使用处理器虚拟化机制隔离和切换地址空间（Address Space），应用需要的内核接口仍由 Sentry 实现。它保留进程模型，没有像 Firecracker 那样启动完整 Linux 来宾系统（Guest）。硬件辅助虚拟化（Hardware-assisted Virtualization）也不是逐条模拟整台机器的每条指令。</p>
+<p>Systrap 不要求虚拟化扩展，在已有虚拟机（Virtual Machine，VM）内可以避开嵌套虚拟化（Nested Virtualization）的依赖。平台选择改变所用宿主（Host）机制与开销，不能单凭“基于内核的虚拟机（KVM）”这个名称判断内部是哪一种系统。</p>
+<span class="heading-alias" id="文件代理不是一个永远固定的拓扑" aria-hidden="true"></span><h3 id="gofer-与-directfs授予文件树仍需具体配置">Gofer 与 Directfs：授予文件树，仍需具体配置</h3>
+<p><a href="17-permissions-and-sandbox.html">第17章</a>的文件描述符（File Descriptor，fd）是对已打开对象的句柄；路径后来改变，不会自动让旧句柄指向新文件，但句柄本身不锁住内容。</p>
+<p>Gofer 是 gVisor 的文件代理（File Proxy）。当前官方文档中，Directfs 默认启用：Gofer 把挂载点的文件描述符（fd）交给 Sentry，使其经基于句柄的调用访问已授予的树，减少文件代理（File Proxy）往返。关闭 Directfs 时，Sentry 的文件访问限制更严格，更多操作需要经远程过程调用（Remote Procedure Call，RPC）交给 Gofer。</p>
+<p>所以不能把所有配置都画成“每个文件字节必经 Gofer”。对本例，关键是只授予仓库和运行库所需的树；如果把凭据目录也暴露进去，应用内核（Application Kernel）不会重新推断用户想让它保密。</p>
+<h3 id="网络栈network-stack也不等于目的地许可">网络栈（Network Stack）也不等于目的地许可</h3>
+<p>默认的 netstack 是用户态网络栈（User-space Network Stack），经已准备的底层链路交换数据。<code>--network=host</code> 则使用 hostinet，改用宿主网络（Host Networking），交换了一部分隔离（Isolation）以使用原生网络能力。包源的目的地限制仍需要另行配置。</p>
+<p>这条路线的成本取决于负载。大量本地计算与频繁的小系统调用（syscall）可能承受不同开销；兼容性、文件往返与网络路径也会改变结果。比较时应固定真实任务和配置，不能用一个启动时间或综合性能测试（Benchmark）给所有智能代理（Agent）工作负载排名。</p>
+<span class="heading-alias" id="4-firecracker应用-syscall-留在-guest跨-vm-边界的是设备交互" aria-hidden="true"></span><h2 id="4-firecracker来宾内核guest-kernel与虚拟设备virtual-device">4. Firecracker：来宾内核（Guest Kernel）与虚拟设备（Virtual Device）</h2>
+<p>Firecracker 启动微型虚拟机（microVM）。应用先向独立的来宾 Linux 内核（Guest Linux Kernel）请求服务，再经虚拟设备（Virtual Device）访问存储和网络。虚拟机监控器（Virtual Machine Monitor，VMM）与基于内核的虚拟机（KVM）设施构成相应边界。</p>
+<p>继续问 <code>getpid</code>：本次由来宾内核（Guest Kernel）提供语义。并非每次系统调用（syscall）都触发虚拟机监控器（VMM）的业务审批；例如读取命中来宾内存中的缓存，可在内部完成，涉及设备的输入/输出（Input/Output，I/O）才进入相应设备处理路径。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="内核边界 · Kernel Boundaries：可滚动示意图"><a href="../../../assets/diagrams/34-sandbox-backends-2.svg"><img src="../../../assets/diagrams/34-sandbox-backends-2.svg" alt="原生进程、应用内核（Application Kernel）Sentry与来宾内核（Guest Kernel）三条路径通向宿主资源；Sentry使用已授予资源，不表示gVisor全部文件字节必经Gofer。" width="1091" height="1160" loading="lazy" style="width:1091px;min-width:928px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>三条分支比较请求经过的边界。图中 microVM 是微型虚拟机（Micro Virtual Machine），KVM 是基于内核的虚拟机（Kernel-based Virtual Machine）设施；gVisor 的基于内核的虚拟机（KVM）执行平台已在前节单独解释，不能根据同名设施把两种结构合并。</p>
+<h3 id="磁盘网络和虚拟机监控器vmm自己分别由谁限制">磁盘、网络和虚拟机监控器（VMM）自己分别由谁限制？</h3>
+<p>Firecracker 的块设备（Block Device）由宿主（Host）文件支撑；网络设备由宿主（Host）的 TAP 虚拟网络接口（TAP Virtual Network Interface）支撑。这种接口交换以太网帧，即链路层数据包，与<a href="26-evaluation-and-design.html">第26章</a>的通用测试协议（Test Anything Protocol，TAP）同名但含义不同。</p>
+<p>在本例可把仓库准备到来宾系统（Guest）可见的磁盘，另给产物盘。虚拟机监控器（VMM）处理块设备（Block Device），不会理解哪个文件是 README、哪个业务请求属于发布。Firecracker 的设计文档要求宿主（Host）承担网络过滤，微型虚拟机（microVM）不自带“仅访问本题包源”的业务策略。</p>
+<p>还要约束虚拟机监控器（VMM）进程本身。Firecracker 的隔离启动器（Jailer）准备资源、关闭多余文件描述符（fd）、清理继承环境、改变文件视图和用户身份（Identity），再执行目标程序；目标的安全计算机制（seccomp）继续限制向宿主内核（Host Kernel）发出的系统调用（syscall）。隔离启动器（Jailer）的路径和资源输入由可信操作者负责，它不是任意二进制通用的沙箱（Sandbox）启动器。</p>
+<p>独立来宾内核（Guest Kernel）增加一层边界，但仍需信任基于内核的虚拟机（KVM）设施、虚拟机监控器（VMM）、宿主（Host）配置和授予的设备。镜像准备、数据导入导出、内核与设备维护也会增加工程成本。因此，“有独立内核”不能单独证明完整服务安全。</p>
+<span class="heading-alias" id="5-anthropic-sandbox-runtime代理怎么成为强制经过的网络关口" aria-hidden="true"></span><h2 id="5-网络代理network-proxy怎样让脚本必须经过出口">5. 网络代理（Network Proxy）：怎样让脚本必须经过出口？</h2>
+<p>前面三种环境还没有自动回答“只访问包源”。<code>HTTP_PROXY</code> 环境变量帮助愿意遵守的程序选择出口；脚本可以忽略它，直接建立连接。要形成强制边界，还需关闭绕过代理（Proxy）的路径。</p>
+<p>Anthropic sandbox-runtime 的所核 Linux 分支在需要网络限制时使用 <code>--unshare-net</code> 建立隔离的网络命名空间（Network Namespace），将通往宿主代理（Host Proxy）的 Unix 套接字（Unix Socket）桥接进来。macOS 通过 Seatbelt 限制出站连接，并为指定代理（Proxy）端口添加许可。环境变量负责引导，操作系统（OS）边界负责限制直连；获准的本地通信等例外仍需按实际配置核对。</p>
+<p>接下来，库中的 <code>filterNetworkRequest</code> 验证并规范化目标主机（Host Name），先查拒绝名单（Denylist），再查允许名单（Allowlist）。未匹配时，按配置拒绝或调用询问回调（Ask Callback）；<code>strictAllowlist</code> 禁止用该回调扩大名单。检查时与连接时必须使用一致的目标解释，否则可能检查一个名称、实际连接另一对象。</p>
+<span class="heading-alias" id="目的地可达与允许上传这份内容之间还差什么" aria-hidden="true"></span><h3 id="目的地可达不等于允许上传这份内容">目的地可达，不等于允许上传这份内容</h3>
+<p>超文本传输协议（Hypertext Transfer Protocol，HTTP）的 <code>CONNECT</code> 方法可以建立隧道（Tunnel）。普通代理（Proxy）据主机和端口允许隧道，端到端传输层安全协议（Transport Layer Security，TLS）加密则让它看不到内部请求内容。</p>
+<p>假设包源与攻击者仓库位于同一个获准域名：连接策略可能允许到达两者，却没有表达“只下载这个依赖，不上传源码”。目的地许可（Destination Permission）与数据用途（Data Use）需要分开。</p>
+<p>库的可选传输层安全终止（TLS Termination）让代理（Proxy）终止加密连接，再配合 <code>filterRequest</code> 检查明文超文本传输协议（HTTP）请求或已终止的安全超文本传输协议（Hypertext Transfer Protocol Secure，HTTPS）请求。指定豁免目标、SOCKS 套接字代理（SOCKS Proxy）及非传输层安全协议（TLS）的不透明隧道（Opaque Tunnel）不会自动经过这项内容检查。进一步约束接口方法和业务资源仍需要显式策略。</p>
+<p><strong>双向传输层安全认证（Mutual Transport Layer Security，mTLS）</strong> 还要求客户端（Client）用证书证明身份（Identity）。代理（Proxy）将连接拆为两段后，需要另行安排双方认证，不能自动继承客户端（Client）身份（Identity）。<strong>证书固定（Certificate Pinning）</strong> 要求对端证书或公钥匹配预先认可的值，替代证书可能被拒绝。这些是兼容条件，不代表所有双向传输层安全认证（mTLS）连接都不能经代理（Proxy）转发。</p>
+<p>由此应同时保留两条限制：默认隧道（Tunnel）不是内容防泄漏证明；这个独立库也不只是永远检查域名。该结论针对所核源码分支，不能推广到每个采用它的产品。</p>
+<h3 id="文件默认策略也不能从工作目录猜出来">文件默认策略也不能从工作目录猜出来</h3>
+<p>该库 README 的读取策略默认允许，再按拒绝路径及局部重新允许收窄；写入则需要明确允许，并可在其中继续禁止。若要实现“仅可读仓库”，必须从这个默认值推导额外规则，不能只设置当前工作目录（Current Working Directory）。</p>
+<p>本节核对独立库的 macOS/Linux 路径。仓库另有 Windows 实现，其机制与默认不从这里继承；Claude Code 的产品设置与实际覆盖范围也不能由库主干的新字段推断，仍需按第33章的产品合同判断。</p>
+<span class="heading-alias" id="6-回到-agent可替换执行器与默认强边界是两项能力" aria-hidden="true"></span><h2 id="6-接回-pi可替换执行器executor不等于强制隔离mandatory-isolation">6. 接回 Pi：可替换执行器（Executor）不等于强制隔离（Mandatory Isolation）</h2>
+<p>Pi 把工具输入输出与具体执行分开：<code>BashOperations.exec(command, cwd, options)</code> 提供实际执行操作，<code>createBashTool</code> 可以接收另一份实现。默认 <code>createLocalBashOperations</code> 进入本地命令解释器（Shell）启动路径；官方沙箱扩展（Sandbox Extension）则通过 <code>wrapWithSandbox</code> 包装命令后启动。</p>
+<p>先看外围框架：扩展创建 <code>localBash</code>，注册同名工具，并在会话（Session）启动时初始化沙箱（Sandbox）。下面摘取注册工具内的真实分支，只新增两条教学注释。输入仍是原工具参数，输出仍回到原工具协议；改变的是采用哪份执行实现。</p>
+<pre><code class="language-ts">async execute(id, params, signal, onUpdate, _ctx) {
+    // 未启用或初始化未成功时，这个可选扩展继续使用本地执行。
+    if (!sandboxEnabled || !sandboxInitialized) {
+        return localBash.execute(id, params, signal, onUpdate);
+    }
+
+    // 成功启用后，替换实际操作；工具表面保持不变。
+    const sandboxedBash = createBashTool(localCwd, {
+        operations: createSandboxedBashOps(),
+    });
+    return sandboxedBash.execute(id, params, signal, onUpdate);
+},</code></pre>
+<p>片段需要注册对象和外围变量，不是独立程序。<code>createSandboxedBashOps</code> 内部调用 <code>SandboxManager.wrapWithSandbox</code>，再启动包装后的命令；不是只改工具名称便获得限制。扩展也为 <code>user_bash</code> 提供相同执行操作，但没有因此替换所有文件工具或外部工具通道。</p>
+<p>关闭配置、平台不支持或初始化失败，都会让上述本地分支继续生效。示例依赖的是 sandbox-runtime <code>0.0.26</code>，不能把前节独立库主干的新字段自动赋给它。存在扩展点（Extension Point），只证明开发者可以选择执行器（Executor）；“本任务要求强制隔离（Mandatory Isolation），失败不启动”则需要另一条不能降级的合同。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 6. 接回 Pi：可替换执行器（Executor）不等于强制隔离（Mandatory Isolation）"><table><caption>表 3 / Table 3 · 6. 接回 Pi：可替换执行器（Executor）不等于强制隔离（Mandatory Isolation）</caption><thead><tr><th scope="col">执行合同（Execution Contract）</th><th scope="col">初始化失败时</th><th scope="col">所承诺的能力</th></tr></thead><tbody><tr><td>可选沙箱扩展（Sandbox Extension）</td><td>按示例继续本地执行</td><td>可以组合不同实现，但本次未获得该隔离（Isolation）</td></tr>
+<tr><td>强制隔离（Mandatory Isolation）的教学设计</td><td>拒绝启动</td><td>所需边界无法建立时，不以普通本地执行替代</td></tr></tbody></table></div>
+<p>再接回第31章：工具注册表（Registry）解析身份（Identity），批准（Approval）限定动作，执行后端（Backend）限制实际访问。Goose 对工具负责者（Owner）的重新检查不能替代后端（Backend）；后端（Backend）也不能替可信远端接口判断业务动作是否正确。</p>
+<span class="heading-alias" id="7-用同一任务选择边界并保留恢复责任" aria-hidden="true"></span><h2 id="7-同一任务怎样选择边界并保留恢复recovery责任">7. 同一任务怎样选择边界，并保留恢复（Recovery）责任？</h2>
+<p>三种内核边界和网络代理（Network Proxy）可以组合，不能当成简单四选一：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 7. 同一任务怎样选择边界，并保留恢复（Recovery）责任？"><table><caption>表 4 / Table 4 · 7. 同一任务怎样选择边界，并保留恢复（Recovery）责任？</caption><thead><tr><th scope="col">优先解决的问题</th><th scope="col">本例的设计方向</th><th scope="col">新责任与代价</th></tr></thead><tbody><tr><td>本机误写、有限脚本风险、开发工具集成</td><td>原生沙箱（Native Sandbox），源码只读，指定产物可写</td><td>平台差异、允许的内核接口、全部启动路径覆盖</td></tr>
+<tr><td>托管互不信任的 Linux 脚本</td><td>分开的 gVisor 沙箱（Sandbox）与必要挂载</td><td>Sentry 接口兼容、Directfs/网络模式与调用成本</td></tr>
+<tr><td>需要独立来宾内核（Guest Kernel）</td><td>微型虚拟机（microVM）内准备环境，受控取回产物</td><td>镜像、设备、网络、启动与状态管理</td></tr>
+<tr><td>阻止任意外联</td><td>为选定环境配置无法绕过的代理（Proxy）出口</td><td>目的地与数据用途（Data Use）、本地通信例外、代理（Proxy）可信性</td></tr></tbody></table></div>
+<p>也可以让结构化读取留在受信宿主（Host），只把未知脚本交给另一个执行环境。每增加一个通道，数据与授权就多一个跨界点，必须由该通道的实际控制落实。</p>
+<h3 id="恢复快照snapshot为什么不能直接重发远端任务">恢复快照（Snapshot），为什么不能直接重发远端任务？</h3>
+<p>再改变任务条件：用户明确允许创建一次远端持续集成任务（Continuous Integration Job，CI Job）。脚本已提交请求，回执到来前被终止，随后从较早的虚拟机（VM）快照（Snapshot）继续。</p>
+<p>Firecracker 的快照（Snapshot）保存来宾内存和虚拟机（VM）状态，磁盘文件仍有外部管理责任，连接状态也不保证保留。它没有和任意外部服务组成一笔原子事务（Atomic Transaction）。恢复到本地“尚未提交”的画面，不会使远端已创建的持续集成任务（CI Job）消失。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 恢复快照（Snapshot），为什么不能直接重发远端任务？"><table><caption>表 5 / Table 5 · 恢复快照（Snapshot），为什么不能直接重发远端任务？</caption><thead><tr><th scope="col">操作</th><th scope="col">改变什么</th><th scope="col">没有自动完成什么</th></tr></thead><tbody><tr><td>停止进程</td><td>阻止它继续执行</td><td>撤销先前效果（Effect）</td></tr>
+<tr><td>销毁沙箱（Sandbox）</td><td>释放该环境的资源</td><td>删除远端业务对象</td></tr>
+<tr><td>恢复快照（Snapshot）</td><td>恢复所覆盖的环境状态</td><td>与外部服务一起回滚（Rollback）</td></tr>
+<tr><td>补偿（Compensation）远端效果（Effect）</td><td>在另一次获准操作中改变业务状态</td><td>保证补偿（Compensation）自身一定成功</td></tr></tbody></table></div>
+<p>后续应按原业务标识查询效果（Effect）的负责者（Owner），结合仍有效的幂等（Idempotency）合同决定重试（Retry）。无法查询且缺乏相应合同时，保留效果未知（Outcome Unknown）。沙箱（Sandbox）越强，也不会填平这项业务回执缺口。</p>
+<span class="heading-alias" id="8-自测能否沿一次访问走到底" aria-hidden="true"></span><span class="heading-alias" id="8-资源访问与恢复的参考结论" aria-hidden="true"></span><h2 id="8-参考问答沿真实对象作判断">8. 参考问答：沿真实对象作判断</h2>
+<p><strong>问题 1。</strong> <code>cwd=repo</code> 与 <code>HTTP_PROXY</code> 都已设置，能否限制未知脚本？</p>
+<p><strong>参考答案。</strong> 两者分别提供路径起点和代理（Proxy）路由建议。脚本仍可能用绝对路径或直接连接；必须再有实际文件访问控制和不能绕过的出口。</p>
+<p><strong>问题 2。</strong> 三种环境中的 <code>getpid</code> 分别由谁提供语义？</p>
+<p><strong>参考答案。</strong> 原生进程由宿主内核（Host Kernel）提供；gVisor 由 Sentry 提供；微型虚拟机（microVM）由来宾内核（Guest Kernel）提供。存在基于内核的虚拟机（KVM）设施，不足以判断完整结构。</p>
+<p><strong>问题 3。</strong> 允许某类系统调用（syscall），为何不等于允许某棵文件树？</p>
+<p><strong>参考答案。</strong> 普通安全计算机制（seccomp）的过滤程序不能沿路径指针读取字符串；对象范围需要文件视图、挂载或资源访问控制共同表达。规则继承与表达能力是两个维度。</p>
+<p><strong>问题 4。</strong> 已采用应用内核（Application Kernel）或微型虚拟机（microVM），为何还要配置挂载和出口？</p>
+<p><strong>参考答案。</strong> 隔离（Isolation）限制对未授予资源的访问，授予哪些资源仍由可信配置决定。获准连接也可能承载错误业务请求，目的地许可（Destination Permission）不能代替数据用途（Data Use）判断。</p>
+<p><strong>问题 5。</strong> 沙箱扩展（Sandbox Extension）初始化失败后继续本地执行，何时违反合同？</p>
+<p><strong>参考答案。</strong> 若任务要求强制隔离（Mandatory Isolation），它违反“无法建立限制就不启动”的条件；若系统只承诺可选扩展，这是已定义的降级，但不能再称本次受该后端（Backend）保护。</p>
+<p><strong>问题 6。</strong> 从创建持续集成任务（CI Job）前的快照（Snapshot）恢复，下一步该做什么？</p>
+<p><strong>参考答案。</strong> 先核对远端效果（Effect），不能看到较早本地状态就重复提交。查询与幂等（Idempotency）合同不足时保留未知，并报告恢复（Recovery）范围。</p>
+<p>把本章设计用于原扫描器验证时，可信宿主（Host）先准备所需资源范围，后端（Backend）建立限制后才启动脚本；强制隔离（Mandatory Isolation）失败则停止。网络变体还需受控出口；另行获准的远端动作若丢回执，进入效果未知（Outcome Unknown）处理。这条设计路径并不表示某个智能代理（Agent）已经完整采用全部机制。</p>
 <hr>
-<p><a href="33-claude-code-tools-and-safety.html">上一章：第 33 章｜Claude Code：工具、Hooks 与安全</a> · <a href="35-sandbox-enforcement.html">下一章：第 35 章｜沙箱与文件执行边界</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="33-claude-code-tools-and-safety.html"><span>← 上一章</span><strong>第 33 章｜Claude Code：工具、Hooks 与安全</strong></a><a href="35-sandbox-enforcement.html"><span>下一章 →</span><strong>第 35 章｜沙箱与文件执行边界</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%9B%BA%E5%AE%9A%E4%BB%BB%E5%8A%A1%E5%86%8D%E5%86%B3%E5%AE%9A%E5%BF%85%E9%A1%BB%E9%98%B2%E4%BD%8F%E4%BB%80%E4%B9%88">1. 固定任务，再决定必须防住什么</a></li><li class="toc-level-2"><a href="#2-%E4%BB%8E-agent-%E5%8F%82%E6%95%B0%E8%B5%B0%E5%88%B0-os-%E7%BA%A6%E6%9D%9F%E5%8E%9F%E7%94%9F%E5%90%8E%E7%AB%AF%E5%81%9A%E4%BA%86%E5%93%AA%E5%87%A0%E6%AD%A5">2. 从 Agent 参数走到 OS 约束：原生后端做了哪几步</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88-seccomp-%E4%B8%8D%E8%83%BD%E7%8B%AC%E8%87%AA%E8%A1%A8%E8%BE%BE%E5%8F%AA%E8%AF%BB%E8%BF%99%E4%B8%AA%E4%BB%93%E5%BA%93">为什么 seccomp 不能独自表达“只读这个仓库”</a></li><li class="toc-level-3"><a href="#%E8%B7%AF%E5%BE%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%89%B9%E5%87%86%E4%BB%A5%E5%90%8E%E5%AF%B9%E8%B1%A1%E8%BF%98%E5%8F%AF%E8%83%BD%E6%94%B9%E5%8F%98">路径字符串批准以后，对象还可能改变</a></li><li class="toc-level-2"><a href="#3-gvisor%E6%8A%8A%E5%BA%94%E7%94%A8%E7%9A%84-linux-%E6%8E%A5%E5%8F%A3%E6%94%BE%E5%88%B0-sentry-%E4%B8%AD%E5%AE%9E%E7%8E%B0">3. gVisor：把应用的 Linux 接口放到 Sentry 中实现</a></li><li class="toc-level-3"><a href="#%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E7%A9%B6%E7%AB%9F%E5%A6%82%E4%BD%95%E8%BD%AC%E4%BA%A4%E7%BB%99-sentry">系统调用究竟如何转交给 Sentry</a></li><li class="toc-level-3"><a href="#%E6%96%87%E4%BB%B6%E4%BB%A3%E7%90%86%E4%B8%8D%E6%98%AF%E4%B8%80%E4%B8%AA%E6%B0%B8%E8%BF%9C%E5%9B%BA%E5%AE%9A%E7%9A%84%E6%8B%93%E6%89%91">文件代理不是一个永远固定的拓扑</a></li><li class="toc-level-2"><a href="#4-firecracker%E5%BA%94%E7%94%A8-syscall-%E7%95%99%E5%9C%A8-guest%E8%B7%A8-vm-%E8%BE%B9%E7%95%8C%E7%9A%84%E6%98%AF%E8%AE%BE%E5%A4%87%E4%BA%A4%E4%BA%92">4. Firecracker：应用 syscall 留在 guest，跨 VM 边界的是设备交互</a></li><li class="toc-level-2"><a href="#5-anthropic-sandbox-runtime%E4%BB%A3%E7%90%86%E6%80%8E%E4%B9%88%E6%88%90%E4%B8%BA%E5%BC%BA%E5%88%B6%E7%BB%8F%E8%BF%87%E7%9A%84%E7%BD%91%E7%BB%9C%E5%85%B3%E5%8F%A3">5. Anthropic sandbox-runtime：代理怎么成为强制经过的网络关口</a></li><li class="toc-level-3"><a href="#%E7%9B%AE%E7%9A%84%E5%9C%B0%E5%8F%AF%E8%BE%BE%E4%B8%8E%E5%85%81%E8%AE%B8%E4%B8%8A%E4%BC%A0%E8%BF%99%E4%BB%BD%E5%86%85%E5%AE%B9%E4%B9%8B%E9%97%B4%E8%BF%98%E5%B7%AE%E4%BB%80%E4%B9%88">“目的地可达”与“允许上传这份内容”之间还差什么</a></li><li class="toc-level-2"><a href="#6-%E5%9B%9E%E5%88%B0-agent%E5%8F%AF%E6%9B%BF%E6%8D%A2%E6%89%A7%E8%A1%8C%E5%99%A8%E4%B8%8E%E9%BB%98%E8%AE%A4%E5%BC%BA%E8%BE%B9%E7%95%8C%E6%98%AF%E4%B8%A4%E9%A1%B9%E8%83%BD%E5%8A%9B">6. 回到 Agent：可替换执行器与默认强边界是两项能力</a></li><li class="toc-level-2"><a href="#7-%E7%94%A8%E5%90%8C%E4%B8%80%E4%BB%BB%E5%8A%A1%E9%80%89%E6%8B%A9%E8%BE%B9%E7%95%8C%E5%B9%B6%E4%BF%9D%E7%95%99%E6%81%A2%E5%A4%8D%E8%B4%A3%E4%BB%BB">7. 用同一任务选择边界，并保留恢复责任</a></li><li class="toc-level-2"><a href="#8-%E8%B5%84%E6%BA%90%E8%AE%BF%E9%97%AE%E4%B8%8E%E6%81%A2%E5%A4%8D%E7%9A%84%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">8. 资源访问与恢复的参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="33-claude-code-tools-and-safety.html">上一章：第 33 章｜Claude Code：工具（Tool）、钩子（Hook）与安全边界（Security Boundary）</a> · <a href="35-sandbox-enforcement.html">下一章：第 35 章｜沙箱（Sandbox）与文件执行边界（File Execution Boundary）</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="33-claude-code-tools-and-safety.html"><span>← 上一章</span><strong>第 33 章｜Claude Code：工具（Tool）、钩子（Hook）与安全边界（Security Boundary）</strong></a><a href="35-sandbox-enforcement.html"><span>下一章 →</span><strong>第 35 章｜沙箱（Sandbox）与文件执行边界（Filesystem Boundary）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E8%8E%B7%E5%87%86%E5%90%AF%E5%8A%A8%E5%B9%B6%E4%B8%8D%E5%9B%9E%E7%AD%94%E5%90%AF%E5%8A%A8%E4%BB%A5%E5%90%8E%E8%83%BD%E5%81%9A%E4%BB%80%E4%B9%88">前情回顾：获准启动，并不回答启动以后能做什么</a></li><li class="toc-level-2"><a href="#1-%E5%9B%BA%E5%AE%9A%E4%BB%BB%E5%8A%A1%E8%AE%A9%E6%B5%8B%E8%AF%95%E6%9C%89%E8%B6%B3%E5%A4%9F%E8%83%BD%E5%8A%9B%E4%B9%9F%E6%9C%89%E6%98%8E%E7%A1%AE%E8%BE%B9%E7%95%8C">1. 固定任务：让测试有足够能力，也有明确边界</a></li><li class="toc-level-2"><a href="#2-%E5%8E%9F%E7%94%9F%E6%B2%99%E7%AE%B1native-sandbox%E6%8A%8A%E9%85%8D%E7%BD%AE%E5%8F%98%E6%88%90%E5%86%85%E6%A0%B8%E6%A3%80%E6%9F%A5">2. 原生沙箱（Native Sandbox）：把配置变成内核检查</a></li><li class="toc-level-3"><a href="#codex-%E7%9A%84%E4%B8%80%E6%9D%A1%E6%9C%AC%E5%9C%B0%E5%90%AF%E5%8A%A8%E9%93%BE">Codex 的一条本地启动链</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8syscall%E8%BF%87%E6%BB%A4%E4%B8%8D%E8%83%BD%E7%8B%AC%E8%87%AA%E8%A1%A8%E8%BE%BE%E5%8F%AA%E8%AF%BB%E8%BF%99%E4%B8%AA%E4%BB%93%E5%BA%93">为什么系统调用（syscall）过滤不能独自表达“只读这个仓库”？</a></li><li class="toc-level-3"><a href="#%E8%B7%AF%E5%BE%84%E6%A3%80%E6%9F%A5%E4%BB%A5%E5%90%8E%E5%AF%B9%E8%B1%A1%E5%8F%AF%E8%83%BD%E6%8D%A2%E6%88%90%E5%8F%A6%E4%B8%80%E4%B8%AA">路径检查以后，对象可能换成另一个</a></li><li class="toc-level-2"><a href="#3-gvisor%E5%BA%94%E7%94%A8%E5%86%85%E6%A0%B8application-kernel%E6%8E%A5%E4%BD%8F%E8%AF%B7%E6%B1%82">3. gVisor：应用内核（Application Kernel）接住请求</a></li><li class="toc-level-3"><a href="#systrap-%E6%80%8E%E6%A0%B7%E8%BD%AC%E4%BA%A4%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8syscall">Systrap 怎样转交系统调用（syscall）？</a></li><li class="toc-level-3"><a href="#gofer-%E4%B8%8E-directfs%E6%8E%88%E4%BA%88%E6%96%87%E4%BB%B6%E6%A0%91%E4%BB%8D%E9%9C%80%E5%85%B7%E4%BD%93%E9%85%8D%E7%BD%AE">Gofer 与 Directfs：授予文件树，仍需具体配置</a></li><li class="toc-level-3"><a href="#%E7%BD%91%E7%BB%9C%E6%A0%88network-stack%E4%B9%9F%E4%B8%8D%E7%AD%89%E4%BA%8E%E7%9B%AE%E7%9A%84%E5%9C%B0%E8%AE%B8%E5%8F%AF">网络栈（Network Stack）也不等于目的地许可</a></li><li class="toc-level-2"><a href="#4-firecracker%E6%9D%A5%E5%AE%BE%E5%86%85%E6%A0%B8guest-kernel%E4%B8%8E%E8%99%9A%E6%8B%9F%E8%AE%BE%E5%A4%87virtual-device">4. Firecracker：来宾内核（Guest Kernel）与虚拟设备（Virtual Device）</a></li><li class="toc-level-3"><a href="#%E7%A3%81%E7%9B%98%E7%BD%91%E7%BB%9C%E5%92%8C%E8%99%9A%E6%8B%9F%E6%9C%BA%E7%9B%91%E6%8E%A7%E5%99%A8vmm%E8%87%AA%E5%B7%B1%E5%88%86%E5%88%AB%E7%94%B1%E8%B0%81%E9%99%90%E5%88%B6">磁盘、网络和虚拟机监控器（VMM）自己分别由谁限制？</a></li><li class="toc-level-2"><a href="#5-%E7%BD%91%E7%BB%9C%E4%BB%A3%E7%90%86network-proxy%E6%80%8E%E6%A0%B7%E8%AE%A9%E8%84%9A%E6%9C%AC%E5%BF%85%E9%A1%BB%E7%BB%8F%E8%BF%87%E5%87%BA%E5%8F%A3">5. 网络代理（Network Proxy）：怎样让脚本必须经过出口？</a></li><li class="toc-level-3"><a href="#%E7%9B%AE%E7%9A%84%E5%9C%B0%E5%8F%AF%E8%BE%BE%E4%B8%8D%E7%AD%89%E4%BA%8E%E5%85%81%E8%AE%B8%E4%B8%8A%E4%BC%A0%E8%BF%99%E4%BB%BD%E5%86%85%E5%AE%B9">目的地可达，不等于允许上传这份内容</a></li><li class="toc-level-3"><a href="#%E6%96%87%E4%BB%B6%E9%BB%98%E8%AE%A4%E7%AD%96%E7%95%A5%E4%B9%9F%E4%B8%8D%E8%83%BD%E4%BB%8E%E5%B7%A5%E4%BD%9C%E7%9B%AE%E5%BD%95%E7%8C%9C%E5%87%BA%E6%9D%A5">文件默认策略也不能从工作目录猜出来</a></li><li class="toc-level-2"><a href="#6-%E6%8E%A5%E5%9B%9E-pi%E5%8F%AF%E6%9B%BF%E6%8D%A2%E6%89%A7%E8%A1%8C%E5%99%A8executor%E4%B8%8D%E7%AD%89%E4%BA%8E%E5%BC%BA%E5%88%B6%E9%9A%94%E7%A6%BBmandatory-isolation">6. 接回 Pi：可替换执行器（Executor）不等于强制隔离（Mandatory Isolation）</a></li><li class="toc-level-2"><a href="#7-%E5%90%8C%E4%B8%80%E4%BB%BB%E5%8A%A1%E6%80%8E%E6%A0%B7%E9%80%89%E6%8B%A9%E8%BE%B9%E7%95%8C%E5%B9%B6%E4%BF%9D%E7%95%99%E6%81%A2%E5%A4%8Drecovery%E8%B4%A3%E4%BB%BB">7. 同一任务怎样选择边界，并保留恢复（Recovery）责任？</a></li><li class="toc-level-3"><a href="#%E6%81%A2%E5%A4%8D%E5%BF%AB%E7%85%A7snapshot%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E8%83%BD%E7%9B%B4%E6%8E%A5%E9%87%8D%E5%8F%91%E8%BF%9C%E7%AB%AF%E4%BB%BB%E5%8A%A1">恢复快照（Snapshot），为什么不能直接重发远端任务？</a></li><li class="toc-level-2"><a href="#8-%E5%8F%82%E8%80%83%E9%97%AE%E7%AD%94%E6%B2%BF%E7%9C%9F%E5%AE%9E%E5%AF%B9%E8%B1%A1%E4%BD%9C%E5%88%A4%E6%96%AD">8. 参考问答：沿真实对象作判断</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

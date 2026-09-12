@@ -1,35 +1,35 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 33 章｜Claude Code：工具、Hooks 与安全 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 33 / 62</div><article id="main-content"><span class="heading-alias" id="claude-code-深度课二工具hooks-与安全在正确的位置做判断" aria-hidden="true"></span><span class="heading-alias" id="cc02claude-code工具hooks-与安全" aria-hidden="true"></span><span class="heading-alias" id="第-31-章claude-code工具hooks-与安全" aria-hidden="true"></span><h1 id="第-33-章claude-code工具hooks-与安全">第 33 章｜Claude Code：工具、Hooks 与安全</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 33 章｜Claude Code：工具（Tool）、钩子（Hook）与安全边界（Security Boundary） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 33 / 62</div><article id="main-content"><span class="heading-alias" id="claude-code-深度课二工具hooks-与安全在正确的位置做判断" aria-hidden="true"></span><span class="heading-alias" id="cc02claude-code工具hooks-与安全" aria-hidden="true"></span><span class="heading-alias" id="第-31-章claude-code工具hooks-与安全" aria-hidden="true"></span><span class="heading-alias" id="第-33-章claude-code工具hooks-与安全" aria-hidden="true"></span><h1 id="第-33-章claude-code工具tool钩子hook与安全边界security-boundary">第 33 章｜Claude Code：工具（Tool）、钩子（Hook）与安全边界（Security Boundary）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：Claude Code 的事前批准、执行中限制与事后检查，各能阻止或改变什么？</p>
-<p><strong>关键概念</strong>：权限规则：决定允许、询问或拒绝；PreToolUse（事前钩子）：检查或替换调用输入；PostToolUse（事后钩子）：处理执行后的反馈；Bash 沙箱：限制命令资源访问；MCP：发现并调用外部工具的协议。</p>
-<p><strong>关系主线</strong>：权限规则裁决调用，适用沙箱约束执行中的访问，事后检查影响后续处理；发现工具不等于获准，返回 block（阻断反馈）也不撤销既有写入。</p>
+<p><strong>核心问题</strong>：同一次文件写入，事前拒绝、执行中限制与事后检查，为什么会留下不同结果？</p>
+<p><strong>关键概念</strong>：权限规则（Permission Rule）决定允许、询问或拒绝调用；钩子（Hook）在指定事件（Event）插入检查；沙箱（Sandbox）限制适用进程实际访问的资源；工具发现（Tool Discovery）寻找能力；效果（Effect）是文件或外部系统已经发生的变化。</p>
+<p><strong>关系主线</strong>：先理解控制发生的时点，再检查最终输入和实际执行路径；工具（Tool）被找到不代表获准，事后反馈也不能撤销既有变化。</p>
 </blockquote>
-<p>所属主题：<a href="31-tool-contracts.html">第31章 工具与执行</a>；同题对照：<a href="32-codex-tools-and-permissions.html">Codex 工具与权限</a>。</p>
-<p>前置：<a href="30-claude-code-loop-and-context.html">第30章</a>、<a href="17-permissions-and-sandbox.html">第17章 权限与沙箱</a>。本章沿用扫描器修复案例，按公开产品合同解释权限与 Hooks。</p>
-<h2 id="1-一个动作有五个问题">1. 一个动作有五个问题</h2>
-<p>一个工具动作涉及五个问题：模型知道这个能力吗；参数是否表达了正确对象；当前调用是否被允许；执行环境实际限制什么；结果是否证明目标效果。</p>
-<p>这五层的失败不能都叫“工具报错”。例如搜索不到工具可能是目录发现问题；目标路径拆错是参数问题；调用被拒绝是权限问题；命令启动后无法写文件可能是隔离边界；工具超时却已创建远端对象则是效果未知。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 一个动作有五个问题"><table><caption>表 1 / Table 1 · 1. 一个动作有五个问题</caption><thead><tr><th scope="col">层次</th><th scope="col">输入（Input）</th><th scope="col">本题关心的状态</th><th scope="col">输出或失败</th></tr></thead><tbody><tr><td>发现（Discovery）</td><td>任务描述、可用能力目录</td><td>工具是否可见、外部服务是否可连接</td><td>选中的工具定义，或未找到</td></tr>
-<tr><td>请求（Request）</td><td>工具名与参数</td><td>路径、命令、目标仓库是否准确</td><td>一次候选调用</td></tr>
-<tr><td>决策（Decision）</td><td>调用、权限配置、相关 Hook</td><td>允许、拒绝或仍需交互</td><td>执行许可或拒绝原因</td></tr>
-<tr><td>执行（Execution）</td><td>已获许可的动作与执行环境</td><td>文件系统、网络、进程和远端系统</td><td>已知结果或未知效果</td></tr>
-<tr><td>反馈（Feedback）</td><td>真实输出、事后检查</td><td>目标是否达成、是否需要修复</td><td>下一次判断材料</td></tr></tbody></table></div>
-<p>工具接口越通用，参数中潜藏的语义越多。一个 <code>Bash(command)</code> 可以读文件，也可以运行测试、修改仓库或连接网络。因此“允许 Bash”与“允许这次测试”不是同一个授权粒度。</p>
-<h2 id="2-第一张图事前与事后有不可交换的位置">2. 第一张图：事前与事后有不可交换的位置</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第一张图：事前与事后有不可交换的位置：可滚动示意图"><a href="../../../assets/diagrams/33-claude-code-tools-and-safety-1.svg"><img src="../../../assets/diagrams/33-claude-code-tools-and-safety-1.svg" alt="候选调用先经过调用前 Hook 与权限判断；拒绝产生未执行反馈，允许后才进入执行环境，事后 Hook 处理已发生效果的结果并返回观察。" width="1326" height="1053" loading="lazy" style="width:1326px;min-width:1128px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这是一张位置关系图，调用前框内部没有展开全部 Hook、权限模式与分类器的总排序。它保证我们在讨论时不把执行后的反馈画成执行前拒绝。</p>
-<p>当前公开 Hooks 合同允许 <code>PreToolUse</code> 决定调用是否继续、修改输入；<code>updatedInput</code> 替换整个输入对象，后续权限按修改后的输入检查。<code>PostToolUse</code> 发生在成功执行之后，其中 <code>block</code> 增加反馈，不能撤销已经发生的效果；返回值替换是另一字段负责的行为。</p>
-<p>把图用于扫描器题目：模型要求 <code>Write(report.md)</code>，前置 Hook 可以在写入前检查目标是否属于输出目录；后置 Hook 可以发现报告缺字段。后置检查失败时文件已经写出，下一步应修复或撤回文件。若这里写的是远端系统，补救动作还需要远端自己的能力。</p>
-<h2 id="3-正常案例如何让修复保持在授权范围内">3. 正常案例：如何让修复保持在授权范围内</h2>
-<p>第30章案例中的用户只允许本地修复。我们先为教学环境设计三条规则：可以读取项目和运行具体测试；修改只能发生在目标文件范围；不使用远端写工具。</p>
-<p><strong>调查时</strong>，工具先返回当前文件与失败。这里不需要为了形式完整而强制修改，也不需要全仓搜索所有秘密文件。</p>
-<p><strong>编辑时</strong>，参数应定位当前对象，并以实际内容为基础。路径有空格不是需要压成命令字符串的理由；如果工具本身接收路径字段，应保留该字段边界。</p>
-<p><strong>测试时</strong>，命令即便名叫 <code>pytest</code>，仍应考虑所读测试配置和执行环境。仓库里的测试代码本身可以打开网络或写文件，因此只根据名字判断安全是不完整的。</p>
-<p><strong>收口时</strong>，检查结果是本地报告。若模型发现一个名叫 <code>publish_report</code> 的外部工具，这只增加了候选能力，不改变用户“不发布”的约束。</p>
-<p>这组步骤体现两个并存的目标：既要让已授权的工作顺畅进行，也要把约束落在实际调用与执行的位置。重复询问已明确允许的读取不增加安全；把一句自然语言限制当作全部执行边界也不够。</p>
-<h2 id="4-权限规则冲突时谁获胜">4. 权限规则：冲突时谁获胜</h2>
-<p>Claude Code 的公开权限规则按 deny、ask、allow 判断，同一调用匹配多个层次时，较具体的 allow 不会越过 deny。规则由产品执行；项目说明文字主要影响模型尝试什么。</p>
-<p>下面是<strong>教学配置片段</strong>，用于理解匹配关系，不是完整安全配置：</p>
+<h2 id="前情回顾权限permission隔离isolation与结果各回答什么">前情回顾：权限（Permission）、隔离（Isolation）与结果各回答什么？</h2>
+<p><a href="17-permissions-and-sandbox.html">第17章</a>区分了权限（Permission）与隔离（Isolation）：前者回答某项行动请求（Action）是否允许，后者限制实际执行能够访问什么。允许运行一个测试入口，并不等于它递归调用的所有脚本都只会测试。<a href="31-tool-contracts.html">第31章</a>进一步说明，工具调用（Tool Call）需要合法参数、有效授权和可解释的结果；缺少回执时，效果未知（Outcome Unknown）不能被改写成“没有执行”。</p>
+<p>本章沿用<a href="30-claude-code-loop-and-context.html">第30章</a>的 Python 扫描器：<code>scan.py</code> 在路径含空格时失败，README 的命令也有问题。用户允许修改相关实现、必要回归测试和 README，要求保留已有配置差异，并禁止上传仓库或发布内容。我们研究这些约束怎样进入运行支撑（Agent Harness）的工具控制；以下是公开产品合同与教学推演，不是一次真实 Claude Code 运行，也不假定其内部类型与 Maka 相同。</p>
+<span class="heading-alias" id="2-第一张图事前与事后有不可交换的位置" aria-hidden="true"></span><h2 id="1-同一次写入检查放在哪里会改变结论">1. 同一次写入，检查放在哪里会改变结论</h2>
+<p>先暂时增加一个明确的教学变体：用户允许在指定输出目录生成 <code>report.md</code>。这个文件只用于解释报告写入，不扩大上述扫描器修复题的文件范围。</p>
+<p>模型（Model）提出 <code>Write(report.md)</code> 后，可能出现两种不同情况：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 同一次写入，检查放在哪里会改变结论"><table><caption>表 1 / Table 1 · 1. 同一次写入，检查放在哪里会改变结论</caption><thead><tr><th scope="col">检查时点</th><th scope="col">已知过程</th><th scope="col">可以得出的结论</th></tr></thead><tbody><tr><td>写入前</td><td>最终目标不在允许目录，调用被拒绝</td><td>这次写入没有经该工具路径执行</td></tr>
+<tr><td>写入后</td><td>文件已生成，检查发现缺少必要字段</td><td>写入效果（Effect）已发生，报告质量尚不合格</td></tr></tbody></table></div>
+<p>第二行不能描述成“整个动作被阻止，文件没有变化”。补修或删除报告是后续操作，必须根据当前文件、授权和工具能力另行处理；远端报告还需要服务端支持撤回。</p>
+<p><strong>钩子（Hook）</strong> 是宿主（Host）在指定事件（Event）触发的扩展处理。前置钩子（PreToolUse Hook）可以在工具调用（Tool Call）执行前检查或改变输入；后置钩子（PostToolUse Hook）接收成功执行后的输入与结果。二者的名字相近，能改变的事实却不同。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="钩子时点 · Hook Timing：可滚动示意图"><a href="../../../assets/diagrams/33-claude-code-tools-and-safety-1.svg"><img src="../../../assets/diagrams/33-claude-code-tools-and-safety-1.svg" alt="前置钩子（PreToolUse Hook）的拒绝分支在执行前；后置钩子（PostToolUse Hook）处理既有结果，不能撤销效果（Effect）。调用前控制框不展开内部全排序。" width="1354" height="1273" loading="lazy" style="width:1354px;min-width:1151px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图说明前后位置，不展开全部钩子（Hook）、权限模式（Permission Mode）和分类器（Classifier）的内部总排序。拒绝分支仅说明该路径没有执行这次调用，不能证明别的进程从未修改同一文件。</p>
+<p>公开合同中，后置钩子（PostToolUse Hook）的 <code>block</code> 给模型（Model）增加原因反馈，仍不能回滚已发生的效果（Effect）。</p>
+<p><code>updatedToolOutput</code> 才负责替换送给模型（Model）的结果表示。内置工具的替换值须符合其输出结构（Output Schema）；不匹配时会被忽略，仍使用原结果。通过模型上下文协议（Model Context Protocol，MCP）接入的工具，其结果则不做同样的结构验证。替换显示内容同样不会改写已经写出的文件。成功回包也只是工具层结果，是否满足用户任务仍需检查。</p>
+<span class="heading-alias" id="1-一个动作有五个问题" aria-hidden="true"></span><h2 id="2-从工具tool报错拆出五种不同问题">2. 从“工具（Tool）报错”拆出五种不同问题</h2>
+<p>回到扫描器修复题。一个工具调用（Tool Call）从被想到，到影响下一步决策，中间至少要回答五个问题：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 2. 从“工具（Tool）报错”拆出五种不同问题"><table><caption>表 2 / Table 2 · 2. 从“工具（Tool）报错”拆出五种不同问题</caption><thead><tr><th scope="col">层次</th><th scope="col">本题具体问题</th><th scope="col">相应失败</th><th scope="col">应检查的位置</th></tr></thead><tbody><tr><td>发现（Discovery）</td><td>模型（Model）能否找到有关能力？</td><td>搜索没有返回所需定义</td><td>能力目录与连接状态</td></tr>
+<tr><td>请求（Request）</td><td>输入是否指向正确对象？</td><td>一个空格路径被拆成两个参数</td><td>工具名、字段与参数边界</td></tr>
+<tr><td>决策（Decision）</td><td>当前调用是否允许？</td><td>匹配拒绝（Deny）或需要询问（Ask）</td><td>权限规则（Permission Rule）与相关钩子（Hook）</td></tr>
+<tr><td>执行（Execution）</td><td>进程实际上能访问什么？</td><td>命令已启动，但文件或网络访问被限制</td><td>对应执行环境与沙箱（Sandbox）</td></tr>
+<tr><td>反馈（Feedback）</td><td>返回内容说明了什么？</td><td>断言失败，或远端超时后效果未知（Outcome Unknown）</td><td>真实输出、目标现态与后续检查</td></tr></tbody></table></div>
+<p>这五层解释了为什么同一句“工具（Tool）报错”不足以决定重试（Retry）。找不到定义不等于业务对象不存在；认证（Authentication）失败也不等于查询结果为空；超时不一定意味着远端没有处理请求。</p>
+<p>工具（Tool）接口越通用，参数中承载的语义越多。<code>Bash(command)</code> 可以读取文件、运行测试、修改仓库或连接网络。<strong>允许 Bash 与允许本次测试的授权粒度不同。</strong> 前者开放一种执行入口，后者仍依赖具体命令、被加载的脚本和运行环境。</p>
+<span class="heading-alias" id="4-权限规则冲突时谁获胜" aria-hidden="true"></span><h2 id="3-权限规则permission-rule具体允许allow为何不能覆盖拒绝deny">3. 权限规则（Permission Rule）：具体允许（Allow）为何不能覆盖拒绝（Deny）？</h2>
+<p>Claude Code 的权限规则（Permission Rule）按拒绝（Deny）、询问（Ask）、允许（Allow）顺序判断。匹配得更具体，不改变这项顺序；它由产品执行，项目说明主要影响模型（Model）尝试什么。</p>
+<p>下面保留一份<strong>教学配置片段</strong>。它把经常使用的确切测试命令放入允许（Allow），把提交放入询问（Ask），把两类发布入口放入拒绝（Deny）；它没有表达所有可能的上传路径。</p>
 <pre><code class="language-json">{
   &quot;permissions&quot;: {
     &quot;allow&quot;: [&quot;Bash(python -m pytest tests/test_scan.py)&quot;],
@@ -37,34 +37,26 @@
     &quot;deny&quot;: [&quot;Bash(git push *)&quot;, &quot;mcp__publisher__publish_report&quot;]
   }
 }</code></pre>
-<p>逐条推演：精确的测试命令在允许规则内；加了其他参数是否匹配要重新判断；提交需要按 ask 处理；发布工具被拒绝。若再加入 <code>deny: [&quot;Bash&quot;]</code>，精确测试 allow 不能成为例外。规则设计应避免靠一个广泛 deny 再期待细粒度 allow 绕回来。</p>
-<p>配置仍有边界：禁止一个 <code>publish_report</code> 工具名不证明所有上传渠道已被封住；允许测试命令也不证明测试代码永远只做测试。完整目标若是“任何路径都不外传”，还必须识别所有可能出站的执行路径。</p>
-<h2 id="5-第二张图bash-沙箱与远端-mcp-的边界">5. 第二张图：Bash 沙箱与远端 MCP 的边界</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第二张图：Bash 沙箱与远端 MCP 的边界：可滚动示意图"><a href="../../../assets/diagrams/33-claude-code-tools-and-safety-2.svg"><img src="../../../assets/diagrams/33-claude-code-tools-and-safety-2.svg" alt="产品权限决策分别连接 Bash、内置文件工具和 MCP 路径；启用且生效的 Bash 沙箱仅限制其命令与子进程，远端服务效果不能继承本机 Bash 隔离。" width="1017" height="1181" loading="lazy" style="width:1017px;min-width:865px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中的本机进程沙箱边界只覆盖左侧启用且生效的 Bash 路径。官方 Bash 沙箱使用操作系统级机制限制命令及子进程的文件和网络访问；内置工具权限以及远端工具还需要各自控制。沙箱初始化不可用是否硬失败，以及失败后能否改用无沙箱重试，受配置影响。</p>
-<p>本题的两个动作可以帮助理解这个差别。<code>Bash</code> 运行测试后尝试把日志传出，可能触及 Bash 网络边界；<code>MCP</code> 调用远端发布服务由另一条路径到达远端系统，本地 Bash 的文件限制不能撤销远端发布。对于一个通过标准输入/输出（stdio）通信的本地 MCP 服务，也应按它真正的启动和运行方式核对隔离，不能仅因它“也在本机”就画进 Bash 子进程框。</p>
-<p>“沙箱不可用时停止”的参考配置如下：</p>
-<pre><code class="language-json">{
-  &quot;sandbox&quot;: {
-    &quot;enabled&quot;: true,
-    &quot;failIfUnavailable&quot;: true,
-    &quot;allowUnsandboxedCommands&quot;: false
-  }
-}</code></pre>
-<p>这表示希望启用、初始化失败时不降级、关闭模型请求无沙箱重试的逃生口。它不是“所有执行都被沙箱覆盖”的证明；显式排除项、其他执行路径和不同平台仍需分别检查。设置值表达策略，运行时是否生效还要观察。</p>
-<h2 id="6-mcp先找到工具再决定能否使用">6. MCP：先找到工具，再决定能否使用</h2>
-<p>扩展到数百个工具时，把全部详细定义放进每次请求会有成本。Claude Code 的工具搜索在支持的模型和部署条件下延迟装入 MCP 定义；配置和 provider 存在例外。工具发现的具体启用方式须按部署判断。</p>
-<p>考虑三个结果：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 6. MCP：先找到工具，再决定能否使用"><table><caption>表 2 / Table 2 · 6. MCP：先找到工具，再决定能否使用</caption><thead><tr><th scope="col">观察</th><th scope="col">能说明什么</th><th scope="col">不能立即说明什么</th></tr></thead><tbody><tr><td>搜索返回 <code>get_report</code> 定义</td><td>本轮找到了相关能力</td><td>已获远端授权、数据一定存在</td></tr>
-<tr><td>找不到相关工具</td><td>本轮发现路径没有合适结果</td><td>这个产品永远不支持该功能</td></tr>
-<tr><td>调用报认证失败</td><td>当前连接或身份不能完成动作</td><td>用户业务对象不存在</td></tr></tbody></table></div>
-<p>课程里的工具发现合同可以写成：发现信息要描述适用任务，工具定义要描述输入输出，执行阶段要再次核对身份和权限。不要让“语义上相关”自动推导成“有权访问”。</p>
-<p>对于输出量大的外部工具，还要要求返回有界摘要和后续读取入口。如果每次工具搜索省下了定义，却每次查询都拿回整库数据，整项任务的上下文成本仍然会失控。</p>
-<span class="heading-alias" id="7-写一个-hook-前先写它到底能阻止什么" aria-hidden="true"></span><h2 id="7-文件写入-hook-的参考算法与拒绝结果">7. 文件写入 Hook 的参考算法与拒绝结果</h2>
-<p>以下是<strong>自拟 Hook 检查算法的伪代码</strong>。它并非可直接部署的脚本，路径解析、符号链接、并发变化和平台处理均需真正实现与测试。</p>
+<p>用同一配置走四个判断：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 3. 权限规则（Permission Rule）：具体允许（Allow）为何不能覆盖拒绝（Deny）？"><table><caption>表 3 / Table 3 · 3. 权限规则（Permission Rule）：具体允许（Allow）为何不能覆盖拒绝（Deny）？</caption><thead><tr><th scope="col">候选输入</th><th scope="col">匹配关系与结果</th></tr></thead><tbody><tr><td><code>python -m pytest tests/test_scan.py</code></td><td>原精确命令属于允许（Allow）规则</td></tr>
+<tr><td>同一命令再增加参数</td><td>已不是原精确字符串，应重新匹配；不能继承刚才的判断</td></tr>
+<tr><td><code>git commit -m ...</code></td><td>匹配询问（Ask），由对应权限（Permission）流程处理</td></tr>
+<tr><td><code>mcp__publisher__publish_report</code></td><td>工具名匹配拒绝（Deny），不能因为发现它就使用</td></tr></tbody></table></div>
+<p>若另加 <code>deny: [&quot;Bash&quot;]</code>，精确测试也不能靠原允许（Allow）规则成为例外；裸工具名的拒绝（Deny）还会将该工具从模型（Model）的可见目录中移除。规则设计不能依赖“先广泛禁止，再用更具体允许绕回去”。</p>
+<p>这里仍有两个边界。第一，<code>Bash(git push *)</code> 是命令匹配规则，不是“任何形式的发布”证明；换一种程序或命令写法可能属于不同匹配对象。第二，测试脚本本身可以连接网络或写文件，工具名叫测试不保证其效果（Effect）只有测试。若目标是禁止任何未经授权的外传，必须核对实际出站路径与数据范围。</p>
+<p><strong>问题：已经允许读取项目，为何还不必反复询问同一范围内的读取？</strong></p>
+<p><strong>参考答案。</strong> 有效授权已经覆盖该动作时，重复确认不能增加执行边界。需要核对的是目标、范围和条件是否仍成立；当参数变化或将读取内容发送到远端时，才出现需要另外判断的行为。</p>
+<span class="heading-alias" id="7-写一个-hook-前先写它到底能阻止什么" aria-hidden="true"></span><span class="heading-alias" id="7-文件写入-hook-的参考算法与拒绝结果" aria-hidden="true"></span><h2 id="4-前置钩子pretooluse-hook最终输入才是检查对象">4. 前置钩子（PreToolUse Hook）：最终输入才是检查对象</h2>
+<p>假设某个文件工具（File Tool）接收路径与内容两个字段。前置钩子（PreToolUse Hook）发现路径不合要求，可以拒绝，也可能按预先定义的规则改写目标。公开字段 <code>updatedInput</code> <strong>替换整个输入对象</strong>，不是自动合并一两个字段；后续权限（Permission）检查针对改写后的输入。</p>
+<p>因此，“把路径改到允许目录”仍有两个必要条件：新对象保留工具必需字段；最终目标仍符合当前任务。漏掉内容字段可能导致参数校验失败，只核原路径则可能批准了与实际执行不同的对象。后续检查不能因为输入来自钩子（Hook）就省略。</p>
+<h3 id="先讲检查框架再看伪代码">先讲检查框架，再看伪代码</h3>
+<p>下面是<strong>自拟文件写入检查算法</strong>。输入是候选事件（Event）与可信工作范围；输出是拒绝（Deny）及原因，或“不作决定”。它分三步：识别是否属于本检查、解析实际目标、核对任务范围。路径解析、符号链接（Symbolic Link）、并发变化和平台处理尚未实现，不能直接部署。</p>
 <pre><code class="language-text">receive event
+# 只处理本检查覆盖的写入事件；不匹配不等于批准。
 if event is not a file-write candidate:
     return no decision
 
+# 可信工作范围不能由待检查的参数自行指定。
 target = resolve target under trusted workspace
 if target cannot be resolved safely:
     deny with actionable reason
@@ -72,8 +64,10 @@ if target is outside the allowed task files:
     deny and explain the allowed scope
 otherwise:
     return no decision; continue normal permission evaluation</code></pre>
-<p>这里故意不让脚本简单检查字符串是否包含 <code>src/</code>。<code>src/../private/</code>、路径别名或符号链接都可能使字符串和实际对象不同。前置检查与真正执行之间还可能有状态变化；强边界要尽量落到执行时仍成立的位置。</p>
-<p>如果要把输出表达为公开 Hook 形式，拒绝分支可以使用下面的教学返回值：</p>
+<p>这里的“不作决定”让正常权限（Permission）流程继续，并不是允许（Allow）。在扫描器修复题里，范围集合是实现、必要回归测试和 README；前面的报告变体则有另一份明确允许的产物范围，不能混用两者。</p>
+<p>算法不使用“字符串包含 <code>src/</code>”作为通过条件。<code>src/../private/</code>、别名和符号链接（Symbolic Link）会让文本路径与实际对象不同；检查以后到执行以前，链接还可能改变。强约束需要尽量落实到实际使用资源时仍成立的位置，<a href="34-sandbox-backends.html">第34章</a>继续解释。</p>
+<h3 id="如何把拒绝deny交给宿主host">如何把拒绝（Deny）交给宿主（Host）</h3>
+<p>下列<strong>教学返回值</strong>只表达“检查已经得出拒绝”，并不执行上面的检查。外层字段选择事件（Event）专用输出，事件（Event）名指向 <code>PreToolUse</code>，后两项给出决定与可理解的原因：</p>
 <pre><code class="language-json">{
   &quot;hookSpecificOutput&quot;: {
     &quot;hookEventName&quot;: &quot;PreToolUse&quot;,
@@ -81,32 +75,49 @@ otherwise:
     &quot;permissionDecisionReason&quot;: &quot;本任务只允许修改扫描器、相关回归测试及 README&quot;
   }
 }</code></pre>
-<p>这段返回值本身没有执行安全检查。它只说明检查结果如何交给宿主。生产实现还应处理空输入、解析失败、超时和 Hook 自身的副作用。官方 Hook 指南提供事件配置与调试入口；“配置文件里有 Hook”与“目标动作实际触发了它”也需要分开验证。</p>
-<h2 id="8-三个故障推演">8. 三个故障推演</h2>
-<p><strong>故障一：格式化 Hook 在文件已写后失败。</strong> 应报告“写入已发生，事后格式化失败”，读取文件现态并决定补修。不能报告“工具整体被阻止，所以文件未变”。验证时同时检查 Hook 日志和文件内容。</p>
-<p><strong>故障二：Hook 改写输入时遗漏路径字段。</strong> 如果 <code>updatedInput</code> 替换整个对象，漏字段可能让工具参数校验失败。正确设计是保留必须字段并重新验证最终输入。不能假设它总是局部合并，也不能按原始参数判断实际目标。</p>
-<p><strong>故障三：远端创建报告后超时。</strong> 此时重试可能重复创建。课程方案是标记结果未知，按稳定业务标识查询，再决定补发或报告异常。禁止盲目重试并不等于宣称 Claude Code 内部已有此套协议；这是我们希望类似系统闭合的责任。</p>
-<p>加入用户取消后，仍应做同样区分：尚未发送的调用可阻止；已经发生的效果要检查；无法查询的远端效果保持未知。取消不是时间倒流。</p>
-<h2 id="9-取舍少询问强边界可恢复要一起考虑">9. 取舍：少询问、强边界、可恢复要一起考虑</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 9. 取舍：少询问、强边界、可恢复要一起考虑"><table><caption>表 3 / Table 3 · 9. 取舍：少询问、强边界、可恢复要一起考虑</caption><thead><tr><th scope="col">设计选择</th><th scope="col">适用条件</th><th scope="col">容易漏掉的代价</th><th scope="col">失败场景的参考判断</th></tr></thead><tbody><tr><td>精确允许测试入口</td><td>入口稳定且任务反复使用</td><td>参数变化导致额外决策；测试本身可执行其他行为</td><td>原精确命令匹配 allow；增加参数后重新匹配，不能继承原判断</td></tr>
-<tr><td>前置 Hook 动态检查</td><td>目标依赖结构化输入或业务规则</td><td>Hook 自身会出错；规则覆盖不完整</td><td>缺字段不能形成合法输入；解析到范围外的路径拒绝；Hook 超时不能伪造成功决策</td></tr>
-<tr><td>Bash 运行隔离（Isolation）</td><td>需要限制进程及子进程实际访问</td><td>兼容性与必要资源声明成本</td><td>按上面的配置，初始化不可用时不降级；远端工具仍由其自身身份和权限约束</td></tr>
-<tr><td>事后验证（Post-execution verification）</td><td>结果质量不能事前确定</td><td>效果已发生，失败需要补救</td><td>报告已写出却缺少字段时，保留写入事实并补修，不能声称此前未执行</td></tr></tbody></table></div>
-<p>四种机制因此需要同时存在。权限减少未经允许的调用，沙箱限制实际能力，Hook 放置确定性的检查，事后验证回答结果是否合格。它们各自解决问题，也各自有失效面。</p>
-<span class="heading-alias" id="10-自测与完整参考答案" aria-hidden="true"></span><h2 id="10-常见场景与完整参考结论">10. 常见场景与完整参考结论</h2>
-<p><strong>题一：<code>PostToolUse</code> 返回 block，远端报告是否没有发布？</strong></p>
-<p>参考答案：不能这样判断。事后 Hook 接到的是工具已执行后的结果，block 是反馈。应查询远端状态；若已发布，需要另一个明确授权且受支持的撤回动作。当前反馈不具有自动回滚能力。</p>
-<p><strong>题二：一个 deny Bash 与一个 allow 精确测试同时存在，测试能运行吗？</strong></p>
-<p>参考答案：不能靠较具体 allow 越过 deny。应重新设计规则，使允许范围与禁止范围没有这种错误依赖。还需检查其他 mode 和 Hook，但不能据此忽略已匹配的 deny。</p>
-<p><strong>题三：沙箱拦住测试网络，应该立刻关闭沙箱重试吗？</strong></p>
-<p>参考答案：先确认测试是否需要网络、目标域是否在任务范围。可调整测试依赖、使用离线 fixture 或按既有策略配置必要访问。是否能无沙箱重试取决于允许的执行路径，不能把测试失败当成扩大权限的理由。</p>
-<p><strong>题四：为什么只拦 Edit 无法保证某个文件不被修改？</strong></p>
-<p>参考答案：同一文件可能由 Bash、其他内置工具、外部进程或另一个会话修改。必须识别实际写路径，并在合适的权限和执行层施加边界。按工具名匹配的 Hook 只覆盖其匹配事件。</p>
-<p><strong>题五：如何证明 Hook 的保护有效？</strong></p>
-<p>参考答案：先证明配置被加载和目标事件触发，再检查最终输入、Hook 决策及文件/远端状态。设计允许动作和越界动作对照，加入格式错误的输入和 Hook 失败。仅看到一条“已配置”提示不够。</p>
-<p><strong>换成只读数据库分析时，边界怎样改变？</strong></p>
-<p>参考答案：权限落到数据库工具与远端身份，选择只读凭据和必要表范围；限制查询量与返回字段；本地 Bash 沙箱仍只能约束它的执行路径。查询取消要结合数据库实际状态，查询结果进入上下文后仍作为数据处理。</p>
-<p>相关机制见<a href="42-claude-code-memory-and-skills.html">Memory 与 Skills</a>；权限与恢复的完整场景见<a href="52-permissions-and-recovery.html">第52章</a>。</p>
+<p>这段返回值应与实际触发的事件（Event）相连。配置被加载、目标调用匹配、处理程序成功运行、宿主（Host）收到决定，是不同环节；文件里写了钩子（Hook）不证明它保护了目标写入。生产实现还需处理空输入、解析失败、超时，以及检查程序本身可能产生的效果（Effect），不能把这些失败伪装成成功决定。</p>
+<span class="heading-alias" id="5-第二张图bash-沙箱与远端-mcp-的边界" aria-hidden="true"></span><h2 id="5-沙箱sandbox约束的是具体执行路径">5. 沙箱（Sandbox）：约束的是具体执行路径</h2>
+<p>假设已允许测试。若测试内部尝试把日志上传，前面的命令匹配未必足以发现；执行时还需要限制其网络能力。Claude Code 的 Bash 沙箱（Sandbox）通过操作系统（Operating System，OS）机制限制命令及子进程的文件和网络访问。</p>
+<p>但同一产品还有内置文件工具（File Tool），以及通过模型上下文协议（Model Context Protocol，MCP）连接外部能力的客户端（Client）。它们可以到达不同资源，不能把所有路径圈进同一个 Bash 沙箱（Sandbox）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="沙箱覆盖 · Sandbox Scope：可滚动示意图"><a href="../../../assets/diagrams/33-claude-code-tools-and-safety-2.svg"><img src="../../../assets/diagrams/33-claude-code-tools-and-safety-2.svg" alt="启用且生效的Bash执行路径在沙箱（Sandbox）范围内；内置文件工具（File Tool）与远端模型上下文协议（MCP）路径有各自边界，产生效果后再形成观察结果（Observation）。" width="986" height="1181" loading="lazy" style="width:986px;min-width:839px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中只把启用且生效的 Bash 路径画进边界。测试进程上传日志可能触及本机网络限制，经模型上下文协议（MCP）发起的远端发布则由另一条路径产生效果（Effect）。通过标准输入/输出（Standard Input/Output，stdio）通信的本地模型上下文协议（MCP）服务，也要按真实启动与运行方式检查隔离（Isolation），不能因“它也在本机”就归入 Bash 子进程。</p>
+<h3 id="初始化失败与无沙箱重试unsandboxed-retry是两个问题">初始化失败与无沙箱重试（Unsandboxed Retry）是两个问题</h3>
+<p>以下仍是<strong>参考配置</strong>，未安装到任何项目。它希望启用沙箱（Sandbox）、在初始化不可用时停止，并关闭模型（Model）请求无沙箱重试（Unsandboxed Retry）的入口：</p>
+<pre><code class="language-json">{
+  &quot;sandbox&quot;: {
+    &quot;enabled&quot;: true,
+    &quot;failIfUnavailable&quot;: true,
+    &quot;allowUnsandboxedCommands&quot;: false
+  }
+}</code></pre>
+<p><code>failIfUnavailable</code> 针对依赖缺失或平台不支持导致的启动问题；<code>allowUnsandboxedCommands: false</code> 则让 <code>dangerouslyDisableSandbox</code> 不能成为失败后的逃生口。两项不可互相代替。</p>
+<p>这份配置仍不是“所有执行都被覆盖”的证明。显式排除项、其他工具路径、平台与设置来源要分别核对。若测试因网络受限而失败，应先确认它是否需要网络、目标是否属于任务，考虑离线样例或既有策略允许的访问；失败本身不提供扩权理由。后端（Backend）与代理（Proxy）怎样落实限制，下一章继续展开。</p>
+<span class="heading-alias" id="6-mcp先找到工具再决定能否使用" aria-hidden="true"></span><h2 id="6-工具发现tool-discovery找到能力以后还差哪些条件">6. 工具发现（Tool Discovery）：找到能力以后还差哪些条件？</h2>
+<p>当外部工具很多时，每次模型（Model）请求都携带完整定义会挤占上下文（Context）。Claude Code 的工具搜索（Tool Search）可延迟装入模型上下文协议（MCP）的工具定义，具体条件依赖模型（Model）、配置和模型服务提供方（Provider）。减少定义装载成本，不改变实际调用的权限（Permission）。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 6. 工具发现（Tool Discovery）：找到能力以后还差哪些条件？"><table><caption>表 4 / Table 4 · 6. 工具发现（Tool Discovery）：找到能力以后还差哪些条件？</caption><thead><tr><th scope="col">本轮观察</th><th scope="col">已经知道什么</th><th scope="col">仍然不知道什么</th></tr></thead><tbody><tr><td>搜索返回 <code>get_report</code> 定义</td><td>找到了相关能力</td><td>是否有权访问，目标数据是否存在</td></tr>
+<tr><td>没有搜索到相关工具</td><td>当前发现路径未返回合适结果</td><td>整个产品是否永远不支持它</td></tr>
+<tr><td>调用时认证（Authentication）失败</td><td>当前连接或身份（Identity）不能完成调用</td><td>业务对象是否不存在</td></tr></tbody></table></div>
+<p>因而，工具发现（Tool Discovery）需要描述适用任务，工具定义需要说明输入输出，执行阶段还要核对有效身份（Identity）与权限（Permission）。语义相关性不能直接推导成访问授权。</p>
+<p>回到本章“不发布”的限制：<code>publish_report</code> 被找到，只增加一个候选能力，不会改变用户范围。若外部工具返回量很大，还需有界摘要（Summary）和后续读取入口；搜索省下了定义、查询却每次取回整库数据，整项任务仍可能耗尽上下文（Context）。</p>
+<span class="heading-alias" id="3-正常案例如何让修复保持在授权范围内" aria-hidden="true"></span><span class="heading-alias" id="8-三个故障推演" aria-hidden="true"></span><span class="heading-alias" id="9-取舍少询问强边界可恢复要一起考虑" aria-hidden="true"></span><h2 id="7-把正常修复与三种失败连起来">7. 把正常修复与三种失败连起来</h2>
+<p>正常扫描器修复依次使用已有授权：读取当前文件和失败，基于实际内容编辑，运行确切测试，再检查差异，并向用户给出本地修复报告。路径字段保留自己的边界；含空格不要求压成命令字符串。调查没有发现必须修改的内容，就无需为了流程完整而强行编辑；测试通过以后，不发布的限制仍然生效。</p>
+<p>三种条件变化会改变后续动作。第三项另设用户明确允许创建一次远端报告的变体，不扩大原题的发布范围：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 7. 把正常修复与三种失败连起来"><table><caption>表 5 / Table 5 · 7. 把正常修复与三种失败连起来</caption><thead><tr><th scope="col">变化</th><th scope="col">应保留的事实</th><th scope="col">后续处理</th></tr></thead><tbody><tr><td>文件写出后，格式化钩子（Hook）失败</td><td>写入效果（Effect）已经发生，事后处理失败</td><td>读取现态与相关日志，再补修；不能说此前未执行</td></tr>
+<tr><td>前置钩子（PreToolUse Hook）改写输入，遗漏必要字段</td><td>最终参数与原提案不同，可能不满足工具格式</td><td>补全必要字段并重新检查；不能假设自动局部合并</td></tr>
+<tr><td>远端创建报告后超时</td><td>回执缺席，效果未知（Outcome Unknown）</td><td>按稳定业务标识查询，再决定补发、补偿（Compensation）或报告限制</td></tr></tbody></table></div>
+<p>最后一行是本课程希望系统闭合的恢复（Recovery）责任，不宣称 Claude Code 已有某个内部幂等协议。用户取消时同样先区分：尚未发送的调用可阻止，已发生的效果（Effect）要检查，无法查询的远端结果保持未知。取消（Cancellation）不会使时间倒流。</p>
+<p>少询问、强边界与可恢复性各有代价。精确允许（Allow）减少重复交互，但参数变化要重新匹配；动态钩子（Hook）更灵活，却增加自身出错和漏匹配的可能；沙箱（Sandbox）需要平台支持和资源配置；事后验证（Post-execution Verification）能检查质量，但失败发生时可能已经需要补救。理解各自位置，才能解释它们为何同时存在。</p>
+<span class="heading-alias" id="10-自测与完整参考答案" aria-hidden="true"></span><span class="heading-alias" id="10-常见场景与完整参考结论" aria-hidden="true"></span><h2 id="8-场景问答从观察得出有限结论">8. 场景问答：从观察得出有限结论</h2>
+<p><strong>问题 1。</strong> 后置钩子（PostToolUse Hook）返回 <code>block</code>，是否可以报告“远端报告未发布”？</p>
+<p><strong>参考答案。</strong> 不能。它是在成功执行后的反馈，应查询远端实际状态。已发布时，撤回需要另外受支持且获授权的操作；当前反馈没有自动回滚（Rollback）能力。</p>
+<p><strong>问题 2。</strong> 一个广泛拒绝（Deny）与精确允许（Allow）同时匹配，哪个决定结果？</p>
+<p><strong>参考答案。</strong> 拒绝（Deny）优先，具体程度不能构成例外。需要重新设计规则；不能用其它权限模式（Permission Mode）或钩子（Hook）的存在忽略已经匹配的拒绝（Deny）。</p>
+<p><strong>问题 3。</strong> 为什么只检查 <code>Edit</code> 无法保证某文件不被修改？</p>
+<p><strong>参考答案。</strong> Bash、其他内置工具、外部进程或另一个会话（Session）都可能写它。钩子（Hook）的匹配范围与真实写路径不相同，必须由实际执行层落实所需边界。</p>
+<p><strong>问题 4。</strong> 怎样判断文件写入检查真的生效？</p>
+<p><strong>参考答案。</strong> 需要把配置加载、事件（Event）匹配、最终输入、决定和文件现态连起来。允许动作、越界目标、错误输入及检查程序失败分别对应不同观察；只看到“已配置”不够。这是判断依据，不能据本章未执行的配置声称已有运行验证。</p>
+<p><strong>问题 5。</strong> 若任务改成只读数据库分析，哪些限制要重新表达？</p>
+<p><strong>参考答案。</strong> 在数据库工具和远端身份（Identity）上选择只读能力与必要表范围，限制查询量和返回字段。本地 Bash 沙箱（Sandbox）只约束自己的路径；查询取消（Cancellation）仍需结合服务端状态，结果进入上下文（Context）后也只是数据，不提供新的授权。</p>
+<p>进一步阅读：<a href="42-claude-code-memory-and-skills.html">第42章记忆（Memory）与技能说明包（Skill）</a>、<a href="52-permissions-and-recovery.html">第52章权限（Permission）与恢复（Recovery）</a>。</p>
 <hr>
-<p><a href="32-codex-tools-and-permissions.html">上一章：第 32 章｜Codex：工具、执行通道与权限</a> · <a href="34-sandbox-backends.html">下一章：第 34 章｜沙箱隔离后端</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="32-codex-tools-and-permissions.html"><span>← 上一章</span><strong>第 32 章｜Codex：工具、执行通道与权限</strong></a><a href="34-sandbox-backends.html"><span>下一章 →</span><strong>第 34 章｜沙箱隔离后端</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E4%B8%80%E4%B8%AA%E5%8A%A8%E4%BD%9C%E6%9C%89%E4%BA%94%E4%B8%AA%E9%97%AE%E9%A2%98">1. 一个动作有五个问题</a></li><li class="toc-level-2"><a href="#2-%E7%AC%AC%E4%B8%80%E5%BC%A0%E5%9B%BE%E4%BA%8B%E5%89%8D%E4%B8%8E%E4%BA%8B%E5%90%8E%E6%9C%89%E4%B8%8D%E5%8F%AF%E4%BA%A4%E6%8D%A2%E7%9A%84%E4%BD%8D%E7%BD%AE">2. 第一张图：事前与事后有不可交换的位置</a></li><li class="toc-level-2"><a href="#3-%E6%AD%A3%E5%B8%B8%E6%A1%88%E4%BE%8B%E5%A6%82%E4%BD%95%E8%AE%A9%E4%BF%AE%E5%A4%8D%E4%BF%9D%E6%8C%81%E5%9C%A8%E6%8E%88%E6%9D%83%E8%8C%83%E5%9B%B4%E5%86%85">3. 正常案例：如何让修复保持在授权范围内</a></li><li class="toc-level-2"><a href="#4-%E6%9D%83%E9%99%90%E8%A7%84%E5%88%99%E5%86%B2%E7%AA%81%E6%97%B6%E8%B0%81%E8%8E%B7%E8%83%9C">4. 权限规则：冲突时谁获胜</a></li><li class="toc-level-2"><a href="#5-%E7%AC%AC%E4%BA%8C%E5%BC%A0%E5%9B%BEbash-%E6%B2%99%E7%AE%B1%E4%B8%8E%E8%BF%9C%E7%AB%AF-mcp-%E7%9A%84%E8%BE%B9%E7%95%8C">5. 第二张图：Bash 沙箱与远端 MCP 的边界</a></li><li class="toc-level-2"><a href="#6-mcp%E5%85%88%E6%89%BE%E5%88%B0%E5%B7%A5%E5%85%B7%E5%86%8D%E5%86%B3%E5%AE%9A%E8%83%BD%E5%90%A6%E4%BD%BF%E7%94%A8">6. MCP：先找到工具，再决定能否使用</a></li><li class="toc-level-2"><a href="#7-%E6%96%87%E4%BB%B6%E5%86%99%E5%85%A5-hook-%E7%9A%84%E5%8F%82%E8%80%83%E7%AE%97%E6%B3%95%E4%B8%8E%E6%8B%92%E7%BB%9D%E7%BB%93%E6%9E%9C">7. 文件写入 Hook 的参考算法与拒绝结果</a></li><li class="toc-level-2"><a href="#8-%E4%B8%89%E4%B8%AA%E6%95%85%E9%9A%9C%E6%8E%A8%E6%BC%94">8. 三个故障推演</a></li><li class="toc-level-2"><a href="#9-%E5%8F%96%E8%88%8D%E5%B0%91%E8%AF%A2%E9%97%AE%E5%BC%BA%E8%BE%B9%E7%95%8C%E5%8F%AF%E6%81%A2%E5%A4%8D%E8%A6%81%E4%B8%80%E8%B5%B7%E8%80%83%E8%99%91">9. 取舍：少询问、强边界、可恢复要一起考虑</a></li><li class="toc-level-2"><a href="#10-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">10. 常见场景与完整参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="32-codex-tools-and-permissions.html">上一章：第 32 章｜Codex：工具（Tool）与权限（Permission）</a> · <a href="34-sandbox-backends.html">下一章：第 34 章｜沙箱（Sandbox）隔离后端（Backend）</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="32-codex-tools-and-permissions.html"><span>← 上一章</span><strong>第 32 章｜Codex：工具（Tool）、执行通道与权限（Permission）</strong></a><a href="34-sandbox-backends.html"><span>下一章 →</span><strong>第 34 章｜沙箱（Sandbox）隔离后端（Backend）：谁约束实际资源访问？</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E6%9D%83%E9%99%90permission%E9%9A%94%E7%A6%BBisolation%E4%B8%8E%E7%BB%93%E6%9E%9C%E5%90%84%E5%9B%9E%E7%AD%94%E4%BB%80%E4%B9%88">前情回顾：权限（Permission）、隔离（Isolation）与结果各回答什么？</a></li><li class="toc-level-2"><a href="#1-%E5%90%8C%E4%B8%80%E6%AC%A1%E5%86%99%E5%85%A5%E6%A3%80%E6%9F%A5%E6%94%BE%E5%9C%A8%E5%93%AA%E9%87%8C%E4%BC%9A%E6%94%B9%E5%8F%98%E7%BB%93%E8%AE%BA">1. 同一次写入，检查放在哪里会改变结论</a></li><li class="toc-level-2"><a href="#2-%E4%BB%8E%E5%B7%A5%E5%85%B7tool%E6%8A%A5%E9%94%99%E6%8B%86%E5%87%BA%E4%BA%94%E7%A7%8D%E4%B8%8D%E5%90%8C%E9%97%AE%E9%A2%98">2. 从“工具（Tool）报错”拆出五种不同问题</a></li><li class="toc-level-2"><a href="#3-%E6%9D%83%E9%99%90%E8%A7%84%E5%88%99permission-rule%E5%85%B7%E4%BD%93%E5%85%81%E8%AE%B8allow%E4%B8%BA%E4%BD%95%E4%B8%8D%E8%83%BD%E8%A6%86%E7%9B%96%E6%8B%92%E7%BB%9Ddeny">3. 权限规则（Permission Rule）：具体允许（Allow）为何不能覆盖拒绝（Deny）？</a></li><li class="toc-level-2"><a href="#4-%E5%89%8D%E7%BD%AE%E9%92%A9%E5%AD%90pretooluse-hook%E6%9C%80%E7%BB%88%E8%BE%93%E5%85%A5%E6%89%8D%E6%98%AF%E6%A3%80%E6%9F%A5%E5%AF%B9%E8%B1%A1">4. 前置钩子（PreToolUse Hook）：最终输入才是检查对象</a></li><li class="toc-level-3"><a href="#%E5%85%88%E8%AE%B2%E6%A3%80%E6%9F%A5%E6%A1%86%E6%9E%B6%E5%86%8D%E7%9C%8B%E4%BC%AA%E4%BB%A3%E7%A0%81">先讲检查框架，再看伪代码</a></li><li class="toc-level-3"><a href="#%E5%A6%82%E4%BD%95%E6%8A%8A%E6%8B%92%E7%BB%9Ddeny%E4%BA%A4%E7%BB%99%E5%AE%BF%E4%B8%BBhost">如何把拒绝（Deny）交给宿主（Host）</a></li><li class="toc-level-2"><a href="#5-%E6%B2%99%E7%AE%B1sandbox%E7%BA%A6%E6%9D%9F%E7%9A%84%E6%98%AF%E5%85%B7%E4%BD%93%E6%89%A7%E8%A1%8C%E8%B7%AF%E5%BE%84">5. 沙箱（Sandbox）：约束的是具体执行路径</a></li><li class="toc-level-3"><a href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E5%A4%B1%E8%B4%A5%E4%B8%8E%E6%97%A0%E6%B2%99%E7%AE%B1%E9%87%8D%E8%AF%95unsandboxed-retry%E6%98%AF%E4%B8%A4%E4%B8%AA%E9%97%AE%E9%A2%98">初始化失败与无沙箱重试（Unsandboxed Retry）是两个问题</a></li><li class="toc-level-2"><a href="#6-%E5%B7%A5%E5%85%B7%E5%8F%91%E7%8E%B0tool-discovery%E6%89%BE%E5%88%B0%E8%83%BD%E5%8A%9B%E4%BB%A5%E5%90%8E%E8%BF%98%E5%B7%AE%E5%93%AA%E4%BA%9B%E6%9D%A1%E4%BB%B6">6. 工具发现（Tool Discovery）：找到能力以后还差哪些条件？</a></li><li class="toc-level-2"><a href="#7-%E6%8A%8A%E6%AD%A3%E5%B8%B8%E4%BF%AE%E5%A4%8D%E4%B8%8E%E4%B8%89%E7%A7%8D%E5%A4%B1%E8%B4%A5%E8%BF%9E%E8%B5%B7%E6%9D%A5">7. 把正常修复与三种失败连起来</a></li><li class="toc-level-2"><a href="#8-%E5%9C%BA%E6%99%AF%E9%97%AE%E7%AD%94%E4%BB%8E%E8%A7%82%E5%AF%9F%E5%BE%97%E5%87%BA%E6%9C%89%E9%99%90%E7%BB%93%E8%AE%BA">8. 场景问答：从观察得出有限结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

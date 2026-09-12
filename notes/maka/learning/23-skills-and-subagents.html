@@ -220,20 +220,20 @@ S1/T8 首次组成输入：重新取得目录，可看到 NEW_DESCRIPTION</code>
 任务文字：只读，不修改文件，不运行有副作用命令</code></pre>
 <p>这里必须区分“告诉子代理（Subagent）不要做什么”和“系统真的不让它做什么”。任务文字表达委托意图；真正的强制执行（Enforcement）来自 <code>local_read</code> 定义与配置（Definition / Profile）冻结的 <code>explore</code> 模式（Mode）、只包含 <code>Read</code> / <code>Glob</code> / <code>Grep</code> 的工具上限（Tool Ceiling），以及最终的执行边界（Execution Boundary）。只在提示词（Prompt）里写“禁止修改”并不能构成安全边界。</p>
 <h3 id="如果把代码修改也委托出去改的是哪一份文件">如果把代码修改也委托出去，改的是哪一份文件</h3>
-<p>上面的只读子代理（Subagent）有独立对话，文件仍从父任务（Parent Task）的工作目录读取。<strong>上下文（Context）独立、工具（Tool）受限、文件工作副本（Worktree）分离是三种不同机制。</strong> Maka 的 <code>implementation</code> 配置（Profile）才会要求宿主（Host）建立独立 Git 工作副本（Worktree），也就是同一个 Git 仓库的一份单独工作副本（Worktree）；它可以运行本地修改与命令解释器（Shell）工具（Tool），最后交回补丁（Patch）。工作副本（Worktree）自身不等于操作系统（Operating System，OS）沙箱（Sandbox），实际访问许可仍由执行边界（Execution Boundary）决定。</p>
+<p>上面的只读子代理（Subagent）有独立对话，文件仍从父任务（Parent Task）的工作目录读取。<strong>上下文（Context）独立、工具（Tool）受限、文件工作树（Worktree）分离是三种不同机制。</strong> Maka 的 <code>implementation</code> 配置（Profile）才会要求宿主（Host）建立独立 Git 工作树（Worktree），也就是同一个 Git 仓库的一份单独工作副本（Working Copy）；它可以运行本地修改与命令解释器（Shell）工具（Tool），最后交回补丁（Patch）。工作树（Worktree）自身不等于操作系统（Operating System，OS）沙箱（Sandbox），实际访问许可仍由执行边界（Execution Boundary）决定。</p>
 <p>理解起点时，先分开 Git 的<strong>已提交版本</strong>和<strong>工作目录当前文件</strong>。提交记录某一版文件；<code>HEAD</code> 通常指向当前分支，由此确定当前检出的提交，也可能直接指向某个提交。工作目录中的未提交编辑不会自动进入该提交。本节的 <code>dirty</code>（有改动）表示 Git 状态（State）检查发现尚未提交的变化；没有这些变化时称为干净。</p>
-<p>例如，<code>HEAD</code> 中的 README 仍写 <code>npm run check</code>，父工作目录却已将它改为 <code>npm test</code>、尚未提交；直接从 <code>HEAD</code> 建立的副本不会包含这次编辑。本节所查的 Maka 新建工作副本（Fresh Worktree）路径会拒绝这样的有未提交改动的起点，避免静默漏掉父目录改动。这是该创建路径的约束，不是 Git 一概禁止从有改动的目录创建工作副本（Worktree）。</p>
+<p>例如，<code>HEAD</code> 中的 README 仍写 <code>npm run check</code>，父工作目录却已将它改为 <code>npm test</code>、尚未提交；直接从 <code>HEAD</code> 建立的副本不会包含这次编辑。本节所查的 Maka 新建工作树（Fresh Worktree）路径会拒绝这样的有未提交改动的起点，避免静默漏掉父目录改动。这是该创建路径的约束，不是 Git 一概禁止从有改动的目录创建工作树（Worktree）。</p>
 <p>下面重新以父工作区干净、已提交 README 仍含错误测试命令为初态，沿用“修改 README 测试步骤”的子任务（Child Task）。本分支另有将文档修改与测试委托给子代理（Subagent）的授权，<code>implementation</code> 配置（Profile）及实际执行边界（Execution Boundary）也允许相应操作；不能从前面的只读委托继承可写权限（Permission）。这是依据源码设计的状态（State）轨迹，没有实际创建子代理（Subagent）：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 如果把代码修改也委托出去，改的是哪一份文件"><table><caption>表 8 / Table 8 · 如果把代码修改也委托出去，改的是哪一份文件</caption><thead><tr><th scope="col">时点</th><th scope="col">子代理（Subagent）工作副本（Worktree）</th><th scope="col">父工作副本（Worktree）与可得结论</th></tr></thead><tbody><tr><td>创建前</td><td>尚不存在</td><td>父 Git 工作区干净；宿主（Host）从其 <code>HEAD</code> 建立子代理（Subagent）的起点</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 如果把代码修改也委托出去，改的是哪一份文件"><table><caption>表 8 / Table 8 · 如果把代码修改也委托出去，改的是哪一份文件</caption><thead><tr><th scope="col">时点</th><th scope="col">子代理（Subagent）工作树（Worktree）</th><th scope="col">父工作树（Worktree）与可得结论</th></tr></thead><tbody><tr><td>创建前</td><td>尚不存在</td><td>父 Git 工作区干净；宿主（Host）从其 <code>HEAD</code> 建立子代理（Subagent）的起点</td></tr>
 <tr><td>子代理（Subagent） <code>Edit</code> 并测试</td><td>README 已修改，子代理（Subagent）保存自己的观察（Observation）</td><td>父 README 仍未因此改变；子代理（Subagent）测试只说明它测试的那份状态（State）</td></tr>
-<tr><td>子代理（Subagent）执行（Run）到达终态（Terminal State）</td><td>文件差异（Delta）仍在工作副本（Worktree）；宿主（Host）还须确认没有活跃运行资源（Live Runtime Resource）</td><td><code>completed</code> 本身不证明补丁（Patch）已经发布</td></tr>
+<tr><td>子代理（Subagent）执行（Run）到达终态（Terminal State）</td><td>文件差异（Delta）仍在工作树（Worktree）；宿主（Host）还须确认没有活跃运行资源（Live Runtime Resource）</td><td><code>completed</code> 本身不证明补丁（Patch）已经发布</td></tr>
 <tr><td>宿主（Host）发布结果</td><td>保存相对起点的 <code>workspace.patch</code> 产物（Artifact）</td><td>父收到子代理（Subagent）状态（State）、摘要（Summary）和产物（Artifact） ID；仍不是自动合并</td></tr>
-<tr><td>父任务（Parent Task）采纳</td><td>子代理（Subagent）原产物（Artifact）可供追溯</td><td>父检查补丁（Patch）、决定如何应用或重做修改，再验证最终工作副本（Worktree）</td></tr></tbody></table></div>
+<tr><td>父任务（Parent Task）采纳</td><td>子代理（Subagent）原产物（Artifact）可供追溯</td><td>父检查补丁（Patch）、决定如何应用或重做修改，再验证最终工作树（Worktree）</td></tr></tbody></table></div>
 <p>这解释了“结果交回”和“父任务（Parent Task）验收（Acceptance）”的差别。子代理（Subagent）说测试通过时，父任务（Parent Task）仍要检查测试范围、补丁（Patch）内容和自己的当前文件是否已变化，不能只转述成功文字。若父目录后来已有另一份 README 修改，是否还能采用该补丁（Patch）需要新的判断；创建子代理（Subagent）时的干净起点并不保证未来合并无冲突。</p>
 <p>两个失败窗口尤其值得辨认：</p>
 <ul>
-<li><strong>父目录本来就有未提交修改</strong>：当前新建工作副本（Fresh Worktree）路径会拒绝创建，而不是默默从 <code>HEAD</code> 出发漏掉这些修改；父任务（Parent Task）必须重新选择和确认工作起点，不能假定子代理（Subagent）已看到未提交改动。</li>
-<li><strong>子代理（Subagent）已结束，但发布前失败</strong>：恢复逻辑可以在最新子代理（Subagent）的执行（Run）已到终态（Terminal State）时，从仍保留的工作副本（Worktree）补发它的补丁（Patch）；已发布的产物（Artifact）会复用。它不能任意重建所有历史工作轮次（Turn）的旧补丁（Patch）。子代理（Subagent）失败或被取消也可能留下修改，产物（Artifact）存在不代表修改可采纳。</li>
+<li><strong>父目录本来就有未提交修改</strong>：当前新建工作树（Fresh Worktree）路径会拒绝创建，而不是默默从 <code>HEAD</code> 出发漏掉这些修改；父任务（Parent Task）必须重新选择和确认工作起点，不能假定子代理（Subagent）已看到未提交改动。</li>
+<li><strong>子代理（Subagent）已结束，但发布前失败</strong>：恢复逻辑可以在最新子代理（Subagent）的执行（Run）已到终态（Terminal State）时，从仍保留的工作树（Worktree）补发它的补丁（Patch）；已发布的产物（Artifact）会复用。它不能任意重建所有历史工作轮次（Turn）的旧补丁（Patch）。子代理（Subagent）失败或被取消也可能留下修改，产物（Artifact）存在不代表修改可采纳。</li>
 </ul>
 <span class="heading-alias" id="误区三child-应该继承父任务的全部-context" aria-hidden="true"></span><span class="heading-alias" id="父子之间的上下文与能力继承" aria-hidden="true"></span><h3 id="父子之间的上下文context与能力capability继承">父子之间的上下文（Context）与能力（Capability）继承</h3>
 <h4 id="父子关系中哪些东西不会自动相等">父子关系中哪些东西不会自动相等</h4>
@@ -269,7 +269,7 @@ S1/T8 首次组成输入：重新取得目录，可看到 NEW_DESCRIPTION</code>
 <p>I/E 表示任务文字与结果应覆盖的语义，不是 Maka 已强制验证的完整参数结构（Schema）。例如 I 明确“仅检查脚本和说明，返回原文位置，不推断测试通过”；E 应报告“package.json 的 test 脚本是 node --test，README 写 npm run check；未运行测试”。如果 E 只剩“应改为npm test，一切完成”，父任务（Parent Task）就丢失了决定是否已验收（Acceptance）的关键信息。保留结论却删掉观察（Observation）范围，可能比少传一点背景更危险；子任务（Child Task）输出压缩和第19章的上下文（Context）压缩都要说明哪些决策前提必须保留。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 13 / Table 13 · 压缩后的子任务（Child Task）结果，是否足够让父任务（Parent Task）决策"><table><caption>表 13 / Table 13 · 压缩后的子任务（Child Task）结果，是否足够让父任务（Parent Task）决策</caption><thead><tr><th scope="col">父任务（Parent Task）收到的东西</th><th scope="col">已证明什么</th><th scope="col">本例中还要做什么</th></tr></thead><tbody><tr><td>子代理（Subagent）的 <code>status=completed</code></td><td>这次子执行有其完成状态（State）</td><td>核对它实际检查了什么，不等于主任务（Main Task）通过</td></tr>
 <tr><td>摘要（Summary）给出两处对照原文</td><td>子模型（Model）报告了观察（Observation）和建议</td><td>必要时回读当前正文，检查是否已被修改</td></tr>
-<tr><td><code>implementation</code> 子代理（Subagent）的补丁（Patch）产物（Artifact）</td><td>可定位交回的工作副本（Worktree）差异</td><td>检查状态（State）/差异，再决定采纳；不会自动合并到父目录</td></tr>
+<tr><td><code>implementation</code> 子代理（Subagent）的补丁（Patch）产物（Artifact）</td><td>可定位交回的工作树（Worktree）差异</td><td>检查状态（State）/差异，再决定采纳；不会自动合并到父目录</td></tr>
 <tr><td>父侧修改并获得验收（Acceptance）证据</td><td>有了针对最终状态（State）的检查</td><td>才能按第26章的任务要求报告完成</td></tr></tbody></table></div>
 <p><strong>同题的另一种实现是持续通信。</strong> Codex 的可寻址消息（Message）协作路径（实现中称 <code>Multi-Agent V2</code>）把发消息（Message）和触发新工作分开：普通消息（Message）先入队，活跃工作轮次（Turn）在允许消费输入的模型步骤（Model Step）边界接收；后续工作请求（Follow-up）还能在目标空闲、容量等条件满足时开新普通工作轮次（Turn）。这适合发现新线索后继续协商，而 Maka 本例的前台子任务（Foreground Child）更适合输入明确、返回有界结果的一次委托。</p>
 <p>这条路径有个细节：仅入队（Queue-only）表示仅投递消息（Message），通常不单独启动普通空闲任务；但目标没有活跃工作轮次（Turn）、仍保留持久等待（Durable Sleep）记录时，也可触发新的普通工作轮次（Turn）处理等待中的工作。它不重开旧工作轮次（Turn），也不恢复旧调用栈；第41章会展开该接收分支。</p>
@@ -290,7 +290,7 @@ S1/T8 首次组成输入：重新取得目录，可看到 NEW_DESCRIPTION</code>
 <p>额外核对改变了关键路径，已经超出预算。应调整计划、缩小有授权的交付或如实说明未完成验证；不能用子代理（Subagent）的 <code>completed</code> 状态（State）或旧观察（Observation）省略最终状态（State）检查。新增共享写冲突也会破坏原来的独立前提。</p>
 <p><strong>变式二：子代理（Subagent）的摘要（Summary）说“已修好”，状态（State）却是 <code>failed</code>，且返回补丁（Patch）。父任务（Parent Task）能直接合并并宣布主任务（Main Task）完成吗？如果改用消息（Message）协作，消息发送成功能代替验收（Acceptance）吗？</strong></p>
 <p class="answer-label"><strong>参考答案</strong></p>
-<p>不能。失败也可能留下有用甚至部分正确的补丁（Patch）；父任务（Parent Task）需核对失败原因、完整差异、当前工作副本（Worktree）和检查结果，在已有授权内决定是否采纳。摘要（Summary）、状态（State）、产物（Artifact）和主任务（Main Task）验收（Acceptance）是不同证据。消息（Message）协作的发送成功也只说明提交被接受，不证明对方已经阅读、做完或结论正确；它不能替代结果和验收（Acceptance）链。</p>
+<p>不能。失败也可能留下有用甚至部分正确的补丁（Patch）；父任务（Parent Task）需核对失败原因、完整差异、当前工作树（Worktree）和检查结果，在已有授权内决定是否采纳。摘要（Summary）、状态（State）、产物（Artifact）和主任务（Main Task）验收（Acceptance）是不同证据。消息（Message）协作的发送成功也只说明提交被接受，不证明对方已经阅读、做完或结论正确；它不能替代结果和验收（Acceptance）链。</p>
 <span class="heading-alias" id="深化自测" aria-hidden="true"></span><h3 id="机制问题解析">机制问题解析</h3>
 <p><strong>问题 1。</strong> 子代理（Subagent）的任务文字说“只读”，具体什么机制才限制修改？</p>
 <p><strong>解释。</strong> 本例由 <code>local_read</code> 定义与配置（Definition / Profile）固定 <code>explore</code> 模式（Mode）、<code>Read</code> / <code>Glob</code> / <code>Grep</code> 工具上限（Tool Ceiling），并结合执行边界（Execution Boundary）执行；提示词（Prompt）表达意图，不能代替强制约束。</p>
@@ -303,7 +303,7 @@ S1/T8 首次组成输入：重新取得目录，可看到 NEW_DESCRIPTION</code>
 <p><strong>问题 5。</strong> 一个技能说明包（Skill）的 <code>required-tools</code> 包含 <code>Bash</code>，但当前宿主（Host）没有 <code>Bash</code>；把它改成 <code>allowed-tools</code> 是否就能运行命令？</p>
 <p><strong>解释。</strong> <code>required-tools</code> 不满足会阻止资格；改成 <code>allowed-tools</code> 只改变声明，不会产生 <code>Bash</code> 工具（Tool）或执行许可。既不能把加载成功当成授权，也不能把授权当成实际执行。</p>
 <p><strong>问题 6。</strong> <code>implementation</code> 子代理（Subagent）返回 <code>completed</code> 和补丁（Patch）标识（ID），父 README 是否已经改变？如果父目录在创建前已有未提交修改，会发生什么？</p>
-<p><strong>解释。</strong> 不一定；这条结果写回（Write-back）链发布产物（Artifact），没有自动合并到父目录。父任务（Parent Task）仍须检查、采纳并验证。新建工作副本（Fresh Worktree）在父目录有未提交改动时拒绝创建，不能假定子代理（Subagent）复制了未提交修改。</p>
+<p><strong>解释。</strong> 不一定；这条结果写回（Write-back）链发布产物（Artifact），没有自动合并到父目录。父任务（Parent Task）仍须检查、采纳并验证。新建工作树（Fresh Worktree）在父目录有未提交改动时拒绝创建，不能假定子代理（Subagent）复制了未提交修改。</p>
 <p><strong>问题 7。</strong> 子代理（Subagent）的执行（Run）已到终态（Terminal State），但宿主（Host）在发布补丁（Patch）前退出；能否仅凭这个终态（Terminal State）认定产物（Artifact）已交回？恢复可以补什么？</p>
 <p><strong>解释。</strong> 不能，执行（Run）终态（Terminal State）与产物（Artifact）发布是两个事实。在绑定（Binding）仍有效且工作区无活跃运行资源（Live Runtime Resource）的条件下，恢复可在最新子代理（Subagent）的执行（Run）已到终态（Terminal State）时补发它尚未发布的补丁（Patch）；它不是任意历史工作轮次（Turn）的快照恢复。</p>
 <h3 id="继续阅读">继续阅读</h3>
