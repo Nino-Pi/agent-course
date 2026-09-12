@@ -48,7 +48,7 @@
 <tr><td>历史（History）摘要丢了关联的工具调用（Tool Call）</td><td>结果属于哪次动作</td><td>按调用身份检查配对，拒绝不安全投影（Projection）</td></tr>
 <tr><td>请求经过整理仍超出窗口</td><td>可接受的下一次模型输入（Model Input）</td><td>返回真实容量错误；不能制造完成总结</td></tr></tbody></table></div>
 <h3 id="把四步示意对照一条真实轨迹">把四步示意对照一条真实轨迹</h3>
-<p>上面的 R7 便于理解信息流。下面先摘取后续第22章的<a href="22-agent-cases.html#2-maka%E5%90%8C%E4%B8%80%E4%BB%B6%E5%B7%A5%E4%BD%9C%E6%8D%A2%E4%B8%80%E7%A7%8D%E5%B7%A5%E5%85%B7%E8%A1%A8%E8%BE%BE">真实 Maka 修复</a>：它同时修正 README 与 <code>formatDuration</code>，实际用了 7 次模型调用（Model Query）。其中几次输入变化如下：</p>
+<p>上面的 R7 便于理解信息流。下面先摘取后续第22章的<a href="22-agent-cases.html#2-maka%E7%9B%B8%E5%90%8C%E4%BB%BB%E5%8A%A1%E5%8F%A6%E4%B8%80%E6%9D%A1%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82action%E8%B7%AF%E5%BE%84">真实 Maka 修复</a>：它同时修正 README 与 <code>formatDuration</code>，实际用了 7 次模型调用（Model Query）。其中几次输入变化如下：</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 把四步示意对照一条真实轨迹"><table><caption>表 4 / Table 4 · 把四步示意对照一条真实轨迹</caption><thead><tr><th scope="col">下一次请求之前</th><th scope="col">新加入模型输入（Model Input）的观察</th><th scope="col">还不能由此断言</th></tr></thead><tbody><tr><td>Bash 列出目录后</td><td>项目文件名</td><td>已知函数内部逻辑</td></tr>
 <tr><td>四个 Read 返回后</td><td>脚本（Script）、README、源码、测试正文</td><td>文件已经被修复</td></tr>
 <tr><td>两个 Edit 返回后</td><td>两处修改的报告</td><td>测试已经通过</td></tr>

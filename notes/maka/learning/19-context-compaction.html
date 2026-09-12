@@ -46,7 +46,7 @@ else:
 <tr><td>结果归档（Result Archive）</td><td>有界内容及可证明恢复来源的引用</td><td>在实际提供 <code>ArchiveRead</code>能力（Capability）时读取片段</td></tr></tbody></table></div>
 <p>引用必须确实可读；仅制造一个看似能跳转的地址，不会建立恢复能力。整理后请求仍被模型服务提供方（Provider）拒绝时，应保留真实失败。已取得测试（Test）失败与必要错误片段时，则可以准确报告文档已改、测试（Test）失败，以及已知错误。T7的中文要求仍来自当前输入，不证明长期记忆（Long-Term Memory）已经写入。</p>
 <span class="heading-alias" id="真实补例摘要说还没修下一轮才继续修" aria-hidden="true"></span><h3 id="既有真实案例摘要summary保留待修复">既有真实案例：摘要（Summary）保留“待修复”</h3>
-<p><a href="22-agent-cases.html#4-%E5%8E%8B%E7%BC%A9%E5%90%8E%E7%9A%84%E7%8A%B6%E6%80%81%E4%B8%8E%E9%81%97%E6%BC%8F">第22章的真实压缩案例</a>使用的是另一条完整修复分支：原函数仍有 <code>% 100</code> 缺陷，Maka先读文件、分析失败并只改README。原生手动上下文压缩（Context Compaction）得到的摘要（Summary）保留了文档已改、函数未修、测试（Test）2通过2失败，下一步才修函数并复测。之后的真实工具结果（Tool Result）才证明修复与验证发生。</p>
+<p><a href="22-agent-cases.html#4-%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9context-compaction%E4%BF%9D%E7%95%99%E7%9A%84%E7%8A%B6%E6%80%81%E4%B8%8E%E9%81%97%E6%BC%8F">第22章的真实压缩案例</a>使用的是另一条完整修复分支：原函数仍有 <code>% 100</code> 缺陷，Maka先读文件、分析失败并只改README。原生手动上下文压缩（Context Compaction）得到的摘要（Summary）保留了文档已改、函数未修、测试（Test）2通过2失败，下一步才修函数并复测。之后的真实工具结果（Tool Result）才证明修复与验证发生。</p>
 <p>这段旧记录没有证明所有重要信息均被保留：摘要（Summary）未复述中文要求，最终中文来自继续消息（Message）再次提出的要求。它也没有演示自动溢出触发或大日志归档读取。分清这些范围，才能用实例说明状态连续性，而不扩大结论。</p>
 <span class="heading-alias" id="首读出口五个问题与参考答案" aria-hidden="true"></span><span class="heading-alias" id="自测怎样缩短输入并保留事实" aria-hidden="true"></span><h3 id="缩短输入与保留事实问答">缩短输入与保留事实问答</h3>
 <p><strong>问题1。</strong> 完整历史（History）为什么不等于下一次上下文（Context）？</p>

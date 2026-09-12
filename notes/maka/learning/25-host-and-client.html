@@ -1,267 +1,166 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 25 章｜Host、Client 与连接连续性 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 25 / 62</div><article id="main-content"><span class="heading-alias" id="12hostclient-与-continuity关掉窗口不等于工作消失" aria-hidden="true"></span><span class="heading-alias" id="m12hostclient-与连接连续性" aria-hidden="true"></span><span class="heading-alias" id="第-24-章hostclient-与连接连续性" aria-hidden="true"></span><h1 id="第-25-章hostclient-与连接连续性">第 25 章｜Host、Client 与连接连续性</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 25 章｜宿主（Host）、客户端（Client）与连接连续性（Connection Continuity） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script><link rel="stylesheet" href="../../../assets/katex/katex.min.css"><link rel="stylesheet" href="../../../assets/course-math.css"></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 25 / 62</div><article id="main-content"><span class="heading-alias" id="12hostclient-与-continuity关掉窗口不等于工作消失" aria-hidden="true"></span><span class="heading-alias" id="m12hostclient-与连接连续性" aria-hidden="true"></span><span class="heading-alias" id="第-24-章hostclient-与连接连续性" aria-hidden="true"></span><span class="heading-alias" id="第-25-章hostclient-与连接连续性" aria-hidden="true"></span><h1 id="第-25-章宿主host客户端client与连接连续性connection-continuity">第 25 章｜宿主（Host）、客户端（Client）与连接连续性（Connection Continuity）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：界面失联时，怎样区分观察中断、执行器丢失与 Host 退出，避免重复工作？</p>
-<p><strong>关键概念</strong>：Host（宿主）：接纳工作并管理运行控制；Client（客户端）：提交意图和显示结果；快照：当前权威状态的表示；订阅游标：某条更新流的位置；未知效果：可能已执行但结果尚未确认；settled（资源结算）：清理与释放完成。</p>
-<p><strong>关系主线</strong>：连接按身份、快照和游标恢复观察；Host 存活时按原执行记录结算工作，宿主退出或客户端能力丢失则另按恢复合同处理。</p>
+<p><strong>核心问题</strong>：界面失联以后，怎样知道工作是否仍在执行，怎样恢复观察而不重复修改？</p>
+<p><strong>关键概念</strong>：宿主（Host）接纳工作并维持运行控制；客户端（Client）提交意图和显示结果；快照（Snapshot）提供当前状态基线；订阅游标（Subscription Cursor）指出某条更新流的位置；效果未知（Outcome Unknown）表示操作可能发生、结果尚未确认。</p>
+<p><strong>关系主线</strong>：先分清失去的是观察路径、实际执行器（Executor）还是控制责任，再恢复对应状态（State）。终态（Terminal State）说明执行如何结束，资源结算（Settlement）则说明清理是否完成。</p>
 </blockquote>
-<p>前置：<a href="13-session-turn-run.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">Owner 与执行身份</a>、<a href="14-events-and-projections.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">事实与视图</a>、<a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">效果窗口</a>。</p>
-<h2 id="核心路线">核心路线</h2>
-<span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><h3 id="工作与界面为何有不同寿命">工作与界面为何有不同寿命</h3>
-<p>用户通过 Desktop、TUI 或 CLI 操作 Agent。直觉上很容易认为：哪个界面启动了任务，哪个界面就拥有任务；界面断线，任务也应该消失。</p>
-<p>Maka 的边界不是这样。工作的长期控制责任和事实 authority 由 <a href="glossary.html#runtime-host%E8%BF%90%E8%A1%8C%E6%97%B6%E5%AE%BF%E4%B8%BB">Runtime Host</a> 与 Runtime/Storage 共同承载，<a href="glossary.html#client%E5%AE%A2%E6%88%B7%E7%AB%AF">Client</a> 负责提交意图、订阅状态和呈现结果。长期逻辑责任不等于要求某一个 Host 进程永久存活；但下面的断线案例明确以当前 Host 仍存活为前提。</p>
-<span class="heading-alias" id="先看贯穿案例" aria-hidden="true"></span><h3 id="测试期间关闭-desktop">测试期间关闭 Desktop</h3>
-<p>S1/T7/R7 已经开始：</p>
-<pre><code class="language-text">模型 step 1 → 并行 Read(package.json) 与 Read(README.md)
-模型 step 2 → Edit(README.md)
-模型 step 3 → Bash(test) 正在运行</code></pre>
-<p>就在 Bash 运行时，用户关闭 Desktop 窗口，或 Desktop Client 与<strong>仍然存活的 Host</strong> 失去连接。稍后，用户从 CLI 打开同一个 Session。</p>
-<p>在同一 Host 仍存活、普通工具由 Host 执行的条件下：</p>
-<pre><code class="language-text">Desktop connection lost
-  ├─ 不凭断线宣布 R7 cancelled
-  └─ R7 继续由 Host/Runtime 拥有
-
-CLI connects to the same Host / Session
-  → 取得 canonical snapshot
-  → 从正确 sequence 继续订阅
-  → 看到 Bash 结果和 R7 terminal</code></pre>
-<p>CLI 应先确认自己接入的是同一 Host 和 Session。看到同名项目或标题，不足以证明目标身份相同。也不应为了“恢复”再次发送同一条用户消息，因为那可能创建重复修改或重复测试。</p>
-<p>合上笔记本可能让操作系统睡眠并暂停本地 Host；Host 进程退出或机器休眠属于 Host/recovery lifecycle，而不是单纯的 connection continuity。当前结论只证明：<strong>Client disconnect 本身不会取消一个已经 admission、且其 Host 仍存活的 execution</strong>；它不证明机器睡眠时工作仍持续消耗 CPU 或继续向前执行。</p>
-<span class="heading-alias" id="最简单的实现会怎样做" aria-hidden="true"></span><h3 id="把循环放进-ui-进程会失去什么">把循环放进 UI 进程会失去什么</h3>
-<p>许多 Demo 把 Agent loop 直接放在网页或 Desktop 进程里：</p>
-<pre><code class="language-text">button click
-→ UI process calls model
-→ UI process executes tools
-→ UI memory stores messages</code></pre>
-<p>这种设计简单，但有几个直接后果：</p>
-<ul>
-<li>页面刷新就丢失 active state；</li>
-<li>UI 无法区分“网络断了”和“Run 失败了”；</li>
-<li>两个 Client 可能各自运行一份 Agent；</li>
-<li>重连时只好重发最后一条消息；</li>
-<li>loading spinner 很容易被误当成业务事实。</li>
-</ul>
-<p>Maka 把产品界面和长期执行 authority 分开，就是为了让连接生命周期不等于工作生命周期。</p>
-<span class="heading-alias" id="常见误区" aria-hidden="true"></span><h3 id="三种状态必须分开">三种状态必须分开</h3>
-<h4 id="client-ui-state">Client UI state</h4>
-<p>例如：</p>
-<ul>
-<li>输入框内容；</li>
-<li>当前选中的 Session；</li>
-<li>loading 动画；</li>
-<li>已渲染到第几个 stream event；</li>
-<li>本地窗口是否仍打开。</li>
-</ul>
-<p>这些状态可以丢失或重建，不能证明 Run terminal。</p>
-<h4 id="host-connection-state">Host connection state</h4>
-<p>例如：</p>
-<ul>
-<li>Client 是否已认证；</li>
-<li>WebSocket/IPC 是否连接；</li>
-<li>当前 subscription sequence；</li>
-<li>capability offer（客户端声明可提供的能力）是否仍有效；</li>
-<li>reconnect epoch（重连代际）是否变化。</li>
-</ul>
-<p>连接状态决定 Client 能否继续通信，但不自动决定 R7 是否完成。握手还会检查 protocol version 与 compatibility epoch：它们表示通信双方是否兼容，与某条订阅的序列号或重连代际分别判断。</p>
-<span class="heading-alias" id="误区三ui-显示-completed-就是-canonical-terminal" aria-hidden="true"></span><h4 id="canonical-execution-state">Canonical execution state</h4>
-<p>例如：</p>
-<ul>
-<li>S1/T7/R7 是否已 admission；</li>
-<li>AgentRun 和 RuntimeEvents 已持久化什么；</li>
-<li>Tool T1/T2 记录到哪里；</li>
-<li>是否已有唯一 terminal fact。</li>
-</ul>
-<p>这才是恢复和多 Client 观察时的裁决依据。</p>
-<p>三种状态的恢复来源不同：</p>
-<pre><code class="language-text">窗口状态      可以消失
-连接状态      可以重建
-canonical fact 必须从 durable authority 读取</code></pre>
-<h3 id="runtime-host-为什么存在">Runtime Host 为什么存在</h3>
-<p>Runtime Host 接纳工作、管理连接和订阅，并让不同 Client 观察同一份执行状态。它的存活周期不等于某个窗口的周期。</p>
-<p>真正的模型—工具 loop 仍由 Runtime 执行。Host 和 Runtime 不是竞争的两套 Agent，而是控制面与执行面的分工。</p>
-<h3 id="一次断线重连怎样发生">一次断线重连怎样发生</h3>
-<span class="heading-alias" id="误区一关闭-desktop-就等于取消-run" aria-hidden="true"></span><h4 id="阶段-adesktop-断线">阶段 A：Desktop 断线</h4>
-<p>Desktop 不再收到 live events（实时更新）。Host 处理连接中断；如果这个 Client 还提供执行工具的能力，Host 也要按那条能力的约定处理丢失，不能只清除界面状态。</p>
-<p>关键点：<strong>连接关闭本身不是 R7 的 stop 或 terminal fact。</strong> 若产品确实想在关闭窗口时取消任务，必须通过显式 stop/cancel operation 表达，而不是从 TCP/WebSocket 断开猜测。</p>
-<h4 id="阶段-br7-继续或进入自己的失败状态">阶段 B：R7 继续或进入自己的失败状态</h4>
-<p>在 Host 仍存活的前提下，如果 Bash 是 Host/Runtime 拥有的普通工具，执行和 settlement 继续由原 Run 管理。它可能成功、失败、超时或被显式取消；结果由工具和 Run 账本证明。</p>
-<h4 id="阶段-ccli-连接并选择-s1">阶段 C：CLI 连接并选择 S1</h4>
-<p>CLI 先建立新的已认证连接，选择同一 Session target，并打开新的订阅。服务端返回当前 snapshot、新 subscriptionId 与这条订阅的起始 sequence。Snapshot 告诉它当前已接受的状态，而不是让它从自己最后一次 UI cache 猜测。</p>
-<h4 id="阶段-d继续接收更新">阶段 D：继续接收更新</h4>
-<p>CLI 在快照基础上接收后续增量。如果发现更新不连续，就重新读取权威快照，不用重复执行用户任务来补显示。<a href="#sequence-%E4%B8%8E-epoch-%E6%80%8E%E6%A0%B7%E4%BF%AE%E5%A4%8D%E5%A2%9E%E9%87%8F%E7%BC%BA%E5%8F%A3">sequence 与 epoch</a>用于识别这些缺口。</p>
-<h4 id="阶段-ecli-看到-terminal">阶段 E：CLI 看到 terminal</h4>
-<p>Bash 结算后，模型产生最终中文回答，R7 写入 terminal fact。CLI 收到的是这个事实的 projection。Desktop 以后重新打开，也应看到同一个 canonical 结论，而不是重新运行 T7。</p>
-<span class="heading-alias" id="先确认真实执行者在哪里" aria-hidden="true"></span><h3 id="执行者的位置决定断线后果">执行者的位置决定断线后果</h3>
-<p>上述 Bash 由仍存活的 Host/Runtime 运行。若工具实际依赖 Desktop 操作浏览器或本机应用，断线影响的是执行者的一部分，不能直接套用 Bash 的结论。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 执行者的位置决定断线后果"><table><caption>表 1 / Table 1 · 执行者的位置决定断线后果</caption><thead><tr><th scope="col">这次操作由谁执行</th><th scope="col">Desktop 断线时先判断什么</th></tr></thead><tbody><tr><td>Host/Runtime 的普通 Bash</td><td>原 Run 是否仍在运行、工具是否已有结果；断线本身不取消它</td></tr>
-<tr><td>Desktop 提供的 Client Capability</td><td>Client 是否已获准开始、是否已返回结果；必要时保留效果未知</td></tr></tbody></table></div>
-<p>在后一种情形，即使 Host 仍活着，也可能无法证明客户端已经点击了哪个按钮。可用的下一步是读取已有记录并处理该能力的结果边界，而不是换个 Client 把相同操作再做一遍。具体分叉见<a href="#client-%E6%8F%90%E4%BE%9B%E8%83%BD%E5%8A%9B%E6%97%B6%E7%9A%84%E6%96%AD%E7%BA%BF%E7%AA%97%E5%8F%A3">Client 提供能力时的断线窗口</a>。</p>
-<span class="heading-alias" id="误区二重连就是重发最后一条用户消息" aria-hidden="true"></span><h3 id="query-重试和-command-replay-为什么不同">Query 重试和 Command replay 为什么不同</h3>
-<h4 id="query">Query</h4>
-<p>Query 只读取状态，例如“给我 S1 当前 snapshot”。连接中断后重新发送，通常不会产生外部副作用，因此更容易安全重试。</p>
-<h4 id="command">Command</h4>
-<p>Command 会改变状态，例如“开始 Turn”“批准权限”“停止 Run”“发送消息”。如果 Client 已发送 command，但在收到响应前断线，它不知道 Host 是否已经接受。</p>
-<p>盲目 replay 可能导致：</p>
-<ul>
-<li>创建第二个 Turn；</li>
-<li>重复批准或触发工作；</li>
-<li>重复外部副作用。</li>
-</ul>
-<p>安全系统需要 exact identity、dedupe/admission contract 或重新查询 canonical state，而不是把所有 command 当普通 HTTP GET 重发。</p>
-<p>在贯穿案例中，CLI 应读取 S1/T7/R7，而不是再次提交“检查配置、更新 README”。</p>
-<h3 id="多-client-不等于多份-runtime">多 Client 不等于多份 Runtime</h3>
-<p>Desktop 和 CLI 可以同时观察 S1，但它们不应各自成为 canonical owner：</p>
-<p>两个客户端共享观察目标（Observation target），并不各自拥有第二份执行状态。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="多 Client 不等于多份 Runtime：可滚动示意图"><a href="../../../assets/diagrams/25-host-and-client-1.svg"><img src="../../../assets/diagrams/25-host-and-client-1.svg" alt="Desktop 与 CLI 的操作和订阅交给同一 Runtime Host，共同观察同一份 S1/R7 权威执行状态，不各自创建第二份运行。" width="720" height="655" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><span class="heading-alias" id="核心出口自测与答案" aria-hidden="true"></span><h3 id="核心问题解析">核心问题解析</h3>
-<p><strong>问题 1。</strong> Host 仍存活时，Desktop 在普通 Bash 执行期间断线，是否等于 R7 被取消？</p>
-<p><strong>解释。</strong> 不是。连接关闭本身不是 stop 或 terminal fact；执行仍由原 Run 按自己的成功、失败、超时或取消规则处理。</p>
-<p><strong>问题 2。</strong> CLI 接入 S1 时，为什么先读 snapshot，而不是重新提交 T7？</p>
-<p><strong>解释。</strong> snapshot 用持久事实恢复观察；通知丢失不代表工作未接受或未执行。重发修改类 command 需要独立的 identity、payload 与去重契约。</p>
-<p><strong>问题 3。</strong> 同样一次断线，如果模型使用的是 Desktop 提供的外部能力，是否能直接套用普通 Host 工具的结论？</p>
-<p><strong>解释。</strong> 不能直接套用。先确认真实执行器与工具 lane；Client capability 断线时效果是否已开始，需要它自己的边界与记录。</p>
-<h2 id="实现深化">实现深化</h2>
-<p>连接时序还要与资源寿命相接：断线可能只丢失观察流，也可能丢失真正的执行器，或伴随 Host owner 退出。三者需要读取的状态和恢复操作不同。</p>
-<h3 id="一次-turnstart请求返回后谁继续消费工作">一次 <code>turn.start</code>：请求返回后，谁继续消费工作</h3>
-<p>在 S1/T7/R7 修复任务中，Client C1 提交请求，Host 已接纳，普通 Host 工具正在测试，此时 C1 失联。一次连接请求与已接纳的业务执行有彼此独立的寿命。下面的字母、数字与断线时点用于教学推演，不是实际捕获的运行记录。</p>
-<p>开始前，Host 必须取得 <a href="glossary.html#state-root--single-writer%E7%8A%B6%E6%80%81%E6%A0%B9--%E5%8D%95%E5%86%99%E8%80%85">State Root</a> 的有效 writer authority。<code>tryAcquireInteractiveRootOwner</code> 经 root authority 获取写锁与 lease；kernel 启动时核对这个 owner，再完成组成、恢复和监听准备。State Root 组织长期控制状态，其身份与 Session 的 <code>workspaceRoot/cwd</code> 分开：前者回答“谁能修改这些运行记录”，后者回答“在哪份项目文件上工作”。同一 Root 的写锁不锁住整个项目，也不接管 Client 的浏览器或远端服务。</p>
+<h2 id="前情回顾同一份工作有哪些不同身份identity">前情回顾：同一份工作，有哪些不同身份（Identity）？</h2>
+<p><a href="13-session-turn-run.html">第13章</a>区分了会话（Session）、工作轮次（Turn）与执行（Run）：前者组织长期工作，第二个对应一次被接纳的任务，第三个承载实际推进。界面换了，这三种身份（Identity）不必跟着变。<a href="14-events-and-projections.html">第14章</a>进一步区分运行时事件（Runtime Event）与投影（Projection）：持久记录保存发生了什么，界面只是其中一种表示，丢失画面不等于丢失工作。</p>
+<p><a href="18-effects-and-recovery.html">第18章</a>的两个持久边界解释了另一种缺口：T1 标出操作可能开始，T2 保存结果。只有 T1、没有 T2 时，外部世界可能已经改变。连接恢复可以让我们重新读取记录，却不能凭空确认缺失回执对应的效果（Effect）。</p>
+<p>本章沿用第12章的文档任务分支：函数已经正确，只需检查配置、把 README 的测试入口修正，再运行测试；不把第04章的函数缺陷重新带进来。记会话（Session）为 S1、工作轮次（Turn）为 T7、执行（Run）为 R7。下面的关窗、换路和升级时点是教学推演，不是实际捕获的桌面到命令行运行记录。</p>
+<span class="heading-alias" id="核心路线" aria-hidden="true"></span><h2 id="1-测试正在运行关闭窗口会发生什么">1. 测试正在运行，关闭窗口会发生什么？</h2>
+<span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><span class="heading-alias" id="先看贯穿案例" aria-hidden="true"></span><span class="heading-alias" id="误区一关闭-desktop-就等于取消-run" aria-hidden="true"></span><span class="heading-alias" id="工作与界面为何有不同寿命" aria-hidden="true"></span><span class="heading-alias" id="测试期间关闭-desktop" aria-hidden="true"></span><span class="heading-alias" id="阶段-adesktop-断线" aria-hidden="true"></span><span class="heading-alias" id="阶段-br7-继续或进入自己的失败状态" aria-hidden="true"></span><h3 id="先固定宿主host与执行器executor的位置">先固定宿主（Host）与执行器（Executor）的位置</h3>
+<p>假设桌面客户端（Desktop Client）已经提交任务，R7 依次完成了下面的步骤：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 先固定宿主（Host）与执行器（Executor）的位置"><table><caption>表 1 / Table 1 · 先固定宿主（Host）与执行器（Executor）的位置</caption><thead><tr><th scope="col">模型步骤（Model Step）</th><th scope="col">已提出的工具调用（Tool Call）</th><th scope="col">本题当前状态</th></tr></thead><tbody><tr><td>1</td><td>并行 <code>Read(package.json)</code> 与 <code>Read(README.md)</code></td><td>已取得配置与文档</td></tr>
+<tr><td>2</td><td><code>Edit(README.md)</code></td><td>修改结果已返回</td></tr>
+<tr><td>3</td><td><code>Bash(test)</code></td><td>测试仍在运行</td></tr></tbody></table></div>
+<p>此时关闭窗口，稍后从命令行界面（Command-Line Interface，CLI）打开同一个目标。先给出结论：<strong>如果宿主（Host）仍存活，且普通测试工具由它和运行时（Runtime）执行，客户端（Client）断线本身不会取消已经准入的 R7。</strong> 原工作仍可能成功、失败、超时或被显式取消；要看它自己的记录。</p>
+<p>这个条件很具体。合上笔记本可能让操作系统睡眠，暂停本机进程；浏览器操作也可能实际依赖已关闭的界面。两种情况都改变了执行器（Executor）的可用性，不能从“窗口和任务分开”推导机器休眠时仍能向前执行。</p>
+<p>命令行界面（CLI）正确的下一步是确认同一宿主（Host）和会话（Session），读取当前快照（Snapshot），再接收后续更新。相同项目名或标题不够；重发“检查配置、更新 README”也不能用来补画面，因为那可能建立第二份修改任务。</p>
+<span class="heading-alias" id="最简单的实现会怎样做" aria-hidden="true"></span><span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区三ui-显示-completed-就是-canonical-terminal" aria-hidden="true"></span><span class="heading-alias" id="把循环放进-ui-进程会失去什么" aria-hidden="true"></span><span class="heading-alias" id="三种状态必须分开" aria-hidden="true"></span><span class="heading-alias" id="client-ui-state" aria-hidden="true"></span><span class="heading-alias" id="host-connection-state" aria-hidden="true"></span><span class="heading-alias" id="canonical-execution-state" aria-hidden="true"></span><span class="heading-alias" id="runtime-host-为什么存在" aria-hidden="true"></span><span class="heading-alias" id="多-client-不等于多份-runtime" aria-hidden="true"></span><h3 id="三种状态state分别由谁解释">三种状态（State）分别由谁解释</h3>
+<p>运行时宿主（Runtime Host）管理工作准入、连接与订阅（Subscription）；运行时（Runtime）推进模型与工具；存储层保存持久事实。客户端（Client）通过用户界面（User Interface，UI）提出请求与显示结果。这是控制面（Control Plane）和执行面（Execution Plane）的分工，不是两套互相竞争的智能代理（Agent）。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 三种状态（State）分别由谁解释"><table><caption>表 2 / Table 2 · 三种状态（State）分别由谁解释</caption><thead><tr><th scope="col">状态（State）</th><th scope="col">例子</th><th scope="col">丢失后从哪里恢复</th><th scope="col">能否据此认定 R7 完成</th></tr></thead><tbody><tr><td>界面状态（UI State）</td><td>输入框、选中项、加载动画、已渲染内容</td><td>本地设置或重新建立视图</td><td>不能；动画停止只说明显示发生变化</td></tr>
+<tr><td>连接状态（Connection State）</td><td>认证结果、连接身份（Identity）、订阅游标（Subscription Cursor）、能力声明</td><td>重新认证、握手与建立观察基线</td><td>不能；失联不等于业务终止</td></tr>
+<tr><td>权威执行状态（Canonical Execution State）</td><td>已准入身份（Identity）、运行时事件（Runtime Event）、T1/T2、终态事实（Terminal Fact）</td><td>有效控制责任下的持久记录</td><td>是判断执行结果与恢复条件的依据</td></tr></tbody></table></div>
+<p>这里的“权威”限定在运行记录，不能代替对外部文件或服务的实际核对。把代理循环（Agent Loop）直接放在界面进程、只在其内存保存历史的简单实现，容易同时失去执行和显示；两个窗口还可能各跑一份。拆开这三种状态（State），才有可能重建显示而不重复效果（Effect）。</p>
+<p>多个客户端（Client）可以共同观察同一份工作：</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="多端观察 · Shared Observation：可滚动示意图"><a href="../../../assets/diagrams/25-host-and-client-1.svg"><img src="../../../assets/diagrams/25-host-and-client-1.svg" alt="桌面端（Desktop）与命令行客户端（CLI）通过同一运行时宿主（Runtime Host）读取和订阅权威状态（Authoritative State）；显示状态不是另一份执行裁决权（Execution Authority）。" width="720" height="768" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中只有一份权威执行状态（Canonical Execution State）。两个入口不会各自获得第二份执行裁决权（Authority）。如果产品希望关窗同时取消工作，必须另发停止或取消命令（Command），不能只从连接关闭猜测用户意图。</p>
+<span class="heading-alias" id="误区二重连就是重发最后一条用户消息" aria-hidden="true"></span><span class="heading-alias" id="query-重试和-command-replay-为什么不同" aria-hidden="true"></span><span class="heading-alias" id="query" aria-hidden="true"></span><span class="heading-alias" id="command" aria-hidden="true"></span><h3 id="查询query与命令重放command-replay为何不同">查询（Query）与命令重放（Command Replay）为何不同</h3>
+<p>查询（Query）读取状态，例如取得 S1 的快照（Snapshot）；命令（Command）改变状态，例如开始工作、批准权限或请求停止。响应丢失后，前者通常较容易重试，后者必须先回答“原请求是否已经被接受”。</p>
+<p>连接里的 <code>requestId</code> 用于匹配响应，<strong>不自动成为业务幂等键（Idempotency Key）</strong>。安全的命令重放（Command Replay）需要原身份（Identity）、原内容和授权匹配，以及对应的去重（Deduplication）或准入（Admission）规则。新建一个标识、填入相同文字，不等于原请求重放。</p>
+<p><strong>问题。</strong> 命令行界面（CLI）没看见启动回执（Receipt），是否应该再提交一次 T7？</p>
+<p><strong>参考答案。</strong> 先查询原工作。回执（Receipt）丢失时，宿主（Host）可能已经接纳任务；重建观察只需快照（Snapshot）和订阅（Subscription）。只有查清原身份（Identity）、内容及幂等（Idempotency）约定，才能判断能否重发修改类命令（Command）。</p>
+<span class="heading-alias" id="实现深化" aria-hidden="true"></span><h2 id="2-请求返回以后谁继续消费运行时事件runtime-event">2. 请求返回以后，谁继续消费运行时事件（Runtime Event）？</h2>
+<h3 id="状态根state-root约束哪一份写权">状态根（State Root）约束哪一份写权</h3>
+<p>在 <code>turn.start</code> 之前，宿主（Host）必须取得<a href="glossary.html#state-root--single-writer%E7%8A%B6%E6%80%81%E6%A0%B9--%E5%8D%95%E5%86%99%E8%80%85">状态根（State Root）的单写者（Single Writer）约束</a>。<code>tryAcquireInteractiveRootOwner</code> 经状态根（State Root）的控制机制获取写锁与租约（Lease），启动内核再核对该负责者（Owner），完成组成、恢复和监听准备。</p>
+<p>这份身份（Identity）与会话（Session）的 <code>workspaceRoot/cwd</code> 分开：前者回答“谁能修改运行记录”，后者回答“在哪份项目文件上工作”。持有运行记录的写锁不锁住整个项目，外部编辑器仍可改变 README；它也不会接管客户端（Client）的浏览器或远端服务。旧的 <code>Read</code> 只是原时刻的观察结果（Observation）。</p>
+<span class="heading-alias" id="一次-turnstart请求返回后谁继续消费工作" aria-hidden="true"></span><span class="heading-alias" id="多入口与顶层执行准入" aria-hidden="true"></span><h3 id="沿着-turnstart-找到持续消费者consumer">沿着 <code>turn.start</code> 找到持续消费者（Consumer）</h3>
+<p>理解生命周期（Lifecycle），不必先记住所有类名。只追踪四次交接：谁接受请求，谁启动工作，谁持续读取事件，谁回答原请求。</p>
 <ol>
-<li><strong>连接先被认证，operation 再被授权。</strong> <code>RuntimeHostConnectionSession.#handleRequest</code> 对具体 operation 核对 grants 和边界，随后分派 <code>turn.start</code>。这里的 Peer 是通信对端；能连上它，不等于能观察 S1 或开始 T7。连接中的 requestId 用于匹配请求响应，不自动成为业务效果的幂等键。</li>
-<li><strong>Turn 先持久准入，再交给 Runtime。</strong> root coordinator 规范化内容、取得 reservation，并核对已知 admission。重复 T7 必须匹配原 execution、content、authorization；一个新 ID 加相同文字不是同一项 exact replay。新工作被接纳后，<code>startRootMessageTurn</code> 将已分配身份和 <code>durability: &#39;required&#39;</code> 交给 <code>SessionManager.sendMessage</code>。</li>
-<li><strong>Host 持有持续消费任务。</strong> <code>prepareAdmittedTurn</code> 取得执行期间所需的 residency（保持宿主资源不被提前回收的持有条件），并登记 ActiveRootTurn；其 <code>entry.done</code> 承接 <code>drainTurn</code>，持续消费 Runtime events，送入 continuity 并完成终结清理。这里的 <strong>drain 是把事件流持续读完</strong>，不是“停止接纳新工作”的停机流程。这个消费者不在 UI 的渲染循环里。</li>
-<li><strong>回执和终态有不同消费者。</strong> <code>resolveStartDisposition</code> 等准入启动结果并读取 canonical snapshot，给原请求返回接纳结果；<code>drainTurn</code> 继续处理其后的执行事件。Client 没收到回执时，T7 仍可能已经入账。若只为恢复观察，先查询/订阅 S1/T7/R7；不能用新 Turn 再做同一修改。</li>
+<li><strong>连接认证后，具体操作仍要授权。</strong> <code>RuntimeHostConnectionSession.#handleRequest</code> 核对操作授权（Operation Grant）与边界，再分派 <code>turn.start</code>。通信对端（Peer）能连上，不等于能读 S1 或启动 T7。</li>
+<li><strong>顶层工作先持久准入（Admission）。</strong> 协调器（Coordinator）规范化输入并取得预留（Reservation），核对已有准入（Admission）。重复 T7 必须匹配原执行描述、内容与授权。<code>startRootMessageTurn</code> 将已分配的身份（Identity）和 <code>durability: &#39;required&#39;</code> 交给 <code>SessionManager.sendMessage</code>。</li>
+<li><strong>宿主（Host）留下持续消费者（Consumer）。</strong> <code>prepareAdmittedTurn</code> 取得驻留持有（Residency），避免在途资源被提前回收，并登记 <code>ActiveRootTurn</code>。<code>entry.done</code> 承接 <code>drainTurn</code>，持续读取运行时事件（Runtime Event），送入连续性发布链并完成终结清理。这里的 <code>drain</code> 指“读完事件流”，不同于停止接纳新工作的停机收束（Drain）。</li>
+<li><strong>启动回执（Receipt）走另一条等待路径。</strong> <code>resolveStartDisposition</code> 等启动结果并读取权威快照（Canonical Snapshot），回答原请求；长期消费者（Consumer）继续处理其后的事件。前者返回或原连接失效，不会自动撤销后者的工作。</li>
 </ol>
-<p>这条结构解释了普通主路中“连接关闭不等于取消”的原因：连接资源会释放，已接纳的执行仍有自己的 owner 和收尾任务。它没有承诺 Host 永不退出、工具永不失败或所有资源都在 Host。</p>
-<h3 id="同一个失联提示三种不同的状态变化">同一个失联提示，三种不同的状态变化</h3>
-<p>用四个小对象记录本题状态，避免一个 <code>connected=false</code> 同时代表失去观察、失去执行器和失去 owner。组合方式是教学模型，不是新增产品 schema；其中 hostEpoch 标识宿主代际：</p>
-<pre><code class="language-text">H = (State Root, 有效 writer, hostEpoch)       谁能控制运行状态
-W = (Session, Turn, Run, 执行阶段)             哪份工作仍在推进
-V = (connectionId, subscriptionId, nextSequence) 哪条观察流的下一帧
-E = (执行者, 资源位置, 已知结果)                谁可能已改变外部世界</code></pre>
-<p>断线前假设 H 的 writer 有效，W=(S1,T7,R7,active)，V=(C1,U1,42)：U1 已接受 sequence 41，下一帧应为 42。E 此时是 Host 上的普通测试工具，结果尚未结算。</p>
-<p>A/B 分支假设 Host 仍活着；C 分支先处理 owner 和持久事实，不能沿用旧界面的执行状态。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="同一个失联提示，三种不同的状态变化：可滚动示意图"><a href="../../../assets/diagrams/25-host-and-client-2.svg"><img src="../../../assets/diagrams/25-host-and-client-2.svg" alt="失联按物理路径、逻辑连接和 Host 控制权变化分三路；分别保留原 U1 游标42、建立新 U2 游标1，或先核对持久事实与交接恢复条件。图中不重做工具。" width="983" height="1371" loading="lazy" style="width:983px;min-width:836px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中的箭头恢复的是连接、控制条件和视图，<strong>没有一条表示重新执行工具</strong>。A 还要求路径恢复受支持且未超出恢复预算；条件失效时，须重新判断逻辑连接与 Host 状态。B 的新订阅不能沿用 U1 的游标。若实际执行器在 Client，例如浏览器，断线还可能带来能力丢失或未知效果；不能因为 Host 活着就认定所有动作都能继续。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 同一个失联提示，三种不同的状态变化"><table><caption>表 2 / Table 2 · 同一个失联提示，三种不同的状态变化</caption><thead><tr><th scope="col">只改变一个条件</th><th scope="col">保留什么、重建什么</th><th scope="col">正确下一步与错误反例</th></tr></thead><tbody><tr><td><strong>A：Peer 物理路径断了，逻辑流与 Host 还活着</strong></td><td>在支持恢复且未超预算的路径中，重新认证并 attach 新路径；原 Host connection、U1 仍可保留</td><td>同一 U1 可继续等待 42；不能因路径换了就新建 T7 或声称迁移了 Host</td></tr>
-<tr><td><strong>B：C1 逻辑连接真正关闭，Host 仍存活</strong></td><td>H 不因这一事件转移，普通 W 仍按自己的生命周期推进；C2 打开新的 U2，返回当前 snapshot 和 <code>nextSequence=1</code></td><td>用 snapshot 建立观察基线，从 U2 的 1 开始；把 U1 的 42 当作 U2 起点，会混淆两个流</td></tr>
-<tr><td><strong>C：Host 退出或需要换 owner</strong></td><td>不能恢复已经丢失的内存 Peer stream；先核对旧 writer 收束、新 owner 和持久执行事实，重新获得 ready 的连接与观察基线</td><td>合作交接需经过明确的 seal/detach 边界，即封存旧执行并解除其绑定；任意崩溃不等于交接完成，更不能据旧截图继续写状态或重做工具</td></tr></tbody></table></div>
-<p>A 中的 <code>ResumablePeerStream.reserve/attach</code> 还用 generation 拒绝迟到旧路径，按字节 offset 去重；ACK 是传输层字节确认；这条实现确认上层 read 已取走的字节，仍不证明 JSON 已处理、T7 已准入或文件已修改。B 中新 <code>subscription.open</code> 先返回 snapshot、subscriptionId 等信息，服务端在响应 flushed（经连接写出，不指数据库持久化）后才激活增量；Client 分别核对 hostEpoch、subscriptionId、sequence 与投影版本，不能把它们混成一个“全局版本”。这套检查能拒绝不匹配的更新，但不保证所有 Desktop/CLI 错误都能自动恢复。</p>
-<p>C 还必须分开合作升级与意外崩溃：合作交接路径会关闭相关 admission、核对 seal、residency 和在途操作条件，再提交 detach；资源收束后才释放 owner。它可在对应接续合同下让后继物理执行继续同一逻辑 Turn，不能重新开放旧物理执行。项目文件、Client 浏览器、远端效果是否可用，是 E 的问题，不随 H 的 writer 移交自动解决。</p>
-<p>若把 E 改成 Client 提供的浏览器点击，B 的结论也要改变：连接释放时仅 dispatched/accepted 的调用可报告 <code>capability_lost</code>；已进入执行准入、结果却没回来时可能是 <code>outcome_unknown</code>。Host 仍存活时，应由其按记录保存和解释这些状态，不能因此推断点击尚未发生，也不能排除持久化或 owner 失效。具体窗口见<a href="#client-%E6%8F%90%E4%BE%9B%E8%83%BD%E5%8A%9B%E6%97%B6%E7%9A%84%E6%96%AD%E7%BA%BF%E7%AA%97%E5%8F%A3">Client 能力断线</a>。</p>
-<p>这套设计适合多界面观察和较长工作：将业务身份、控制权与观察游标分别保存，可以重建显示而不重复效果。代价是必须管理资源持有、订阅 bootstrap、失效代际和未知结果。单进程脚本无需先复制全部协议；确实需要路径恢复时补 A，需要新 Client 观察时补 B，需要 owner 交接时再补 C。对照 <a href="29-codex-runtime-and-lifecycle.html#%E5%90%8C%E4%B8%80%E6%96%AD%E7%BA%BF%E9%97%AE%E9%A2%98thread-%E4%B8%8E%E8%BF%9E%E6%8E%A5%E6%8B%A5%E6%9C%89%E7%9A%84%E8%BF%9B%E7%A8%8B%E5%90%84%E8%87%AA%E6%80%8E%E6%A0%B7%E6%94%B6%E5%B0%BE">Codex 的资源分支</a>，不能仅凭“也有 App Server”就借用上述全部结论。</p>
-<h3 id="host-的具体职责与其他唤醒机制">Host 的具体职责与其他唤醒机制</h3>
-<p>Runtime Host 承担以下长期控制职责：</p>
-<ul>
-<li><a href="glossary.html#state-root--single-writer%E7%8A%B6%E6%80%81%E6%A0%B9--%E5%8D%95%E5%86%99%E8%80%85">State Root 的单 writer/lease（状态根的单写者约束）</a>；</li>
-<li>Client 认证和 protocol；</li>
-<li>root execution admission；</li>
-<li>Session 目标与 subscription；</li>
-<li>stop、recovery 和 managed lifecycle；</li>
-<li>Plan/Goal/Schedule/Graph 等 domain coordinator；</li>
-<li>共享 Session 的 grant/approval；</li>
-<li><a href="glossary.html#broker%E8%83%BD%E5%8A%9B%E4%B8%AD%E4%BB%8B">Client Capability broker（客户端能力中介）</a>。</li>
-</ul>
-<blockquote><p><strong>业务唤醒与恢复观察：</strong> Agent Graph 的 supervisor wake 也必须经过 Host root admission，随后创建新的普通 root Turn / Run，并不是把旧 Run 重新打开。Inter-agent <a href="glossary.html#mailbox%E7%A7%81%E6%9C%89%E4%BF%A1%E7%AE%B1">Mailbox</a> 则是可寻址 Agent 之间的通信与调度原语；它不同于本章的 Client ↔ Host connection continuity，后者是在重连后继续观察同一份 Host-owned canonical execution。</p>
-</blockquote>
-<span class="heading-alias" id="再向下一层长期责任与执行载体能否分开" aria-hidden="true"></span><h3 id="长期责任与执行载体能否分开">长期责任与执行载体能否分开</h3>
-<p>长期逻辑工作是否必须一直绑定同一份计算环境？Maka 的官方 Serverless 设计文章把它作为资源运行契约：需要时取得计算，之后按规则冻结、复用或释放；业务正确性不能依赖下次必定还是同一个进程。文章用外部 Sandbox/Actor 系统分析不同选择，不表示 Maka 已集成这些实现。</p>
-<p>同一份 README 修复可以遇到四种恢复需求：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 长期责任与执行载体能否分开"><table><caption>表 3 / Table 3 · 长期责任与执行载体能否分开</caption><thead><tr><th scope="col">发生了什么</th><th scope="col">需要恢复或核对什么</th><th scope="col">不能从中推导什么</th></tr></thead><tbody><tr><td>Client 断线，或改用另一条 Peer 路由</td><td>Client 完全重连时核对同一 Host 的身份并恢复快照、订阅；受支持的 Peer 换路可以保留原上层连接</td><td>路径改变不证明 Host、文件或执行 authority 已迁移</td></tr>
-<tr><td>Host 进程退出后重新启动</td><td>持久事实、owner/lease、未结算工具与业务控制状态</td><td>读取旧记录不表示旧调用栈回来，也不自动批准重做操作</td></tr>
-<tr><td>在允许的安全边界继续工作</td><td>核对已有结果和 continuation 条件，建立新的执行边界</td><td>不重新打开已终结的旧 Run，不忽略效果未知的工具</td></tr>
-<tr><td>恢复虚拟机执行快照</td><td>看具体机制保存了哪些进程、内存、文件与连接状态</td><td>T2、Context checkpoint 或数据库 WAL 都不能代替这种能力；也不能推导任意外部副作用被撤销</td></tr></tbody></table></div>
-<p>前两种涉及访问和 Host 生命周期，第三种涉及执行准入，第四种涉及保存计算现场。不能从某一层的恢复推导其他层也已恢复。</p>
-<p><strong>问题。</strong> CLI 经新的 Peer 路由看到 S1/T7/R7 的旧记录，同时发现一份 Context checkpoint。能否据此说“Host 已搬到另一台机器，原浏览器进程仍在，R7 自动继续”？</p>
-<p class="answer-label"><strong>参考答案</strong></p>
-<p>三项都不能。新路由只支持连接路径的判断；Context checkpoint 服务于模型历史，不证明浏览器现场仍在；是否能继续执行还须核对 authority、已保存结果和 continuation 条件，不能从可读记录推导旧 Run 被重新打开。要证明计算迁移或进程恢复，需要对应机制与运行证据。</p>
-<h3 id="升级-host-时工作完成了吗">升级 Host 时，工作完成了吗？</h3>
-<p>假设 R7 已执行一次 Edit，结果已写入账本；此时客户端要更新 Host。当前 cooperative handoff 会请求下一个可证明的持久边界。抵达边界之前取消交接，R7 继续；抵达后由 Host 完成 seal 和 detach，后继物理 invocation 继续同一个逻辑 Turn。旧物理执行结束，不代表用户的修复任务完成，也不应再次执行已经确认的 Edit。</p>
-<p>再假设导出 S1，导出前检查时它空闲，复制期间另一个客户端开始工作。若只凭第一次检查打包，就可能把运行中的状态叫作静止快照。当前 portable export 在一致数据库副本中判断 quiescence，使检查对象与交付对象相同；包中没有用户项目目录或凭据，更没有旧浏览器/进程的执行现场。</p>
-<p><strong>问题。</strong> 看到 <code>handoff_pause</code> 和一个 Session 导出包，能否直接将 T7 标为完成并在另一台机器重发 Edit？不能：前者证明物理边界与后继接续权，后者是有范围的状态出口；完成事实、接管权及旧效果是否可重做仍须分别核对。这个情境用于区分交接与交付，不能当作已经完成的跨机运行实验。</p>
-<span class="heading-alias" id="误区四host-拥有所有副作用" aria-hidden="true"></span><h3 id="client-提供能力时的断线窗口">Client 提供能力时的断线窗口</h3>
-<p>如果调用依赖 Desktop 提供的 Computer Use/Client Capability，需要把“愿意接收”和“准许执行”分开：</p>
-<pre><code class="language-text">Host 发 call → Client accepted（接受准备请求）
-  → Host 完成准入条件；Runtime 提交 T1
-  → prepared.admit 发出 admitted（准许执行）
-  → Client 执行 → 返回结果</code></pre>
-<p>仍存活的 Host 在连接释放时，broker 将 <code>dispatched</code> 或 <code>accepted</code> 阶段的丢失判为 <code>capability_lost</code>；发送执行准入之后没有收到结果，则保守地判为 <code>outcome_unknown</code>。因此，<strong>仅收到 Client 的 accepted，并不意味着已经准许它产生效果</strong>。这个区别依赖 Client 遵守协议，不是 Host 能监视一切外部进程的证明。发送 admitted 本身失败也可能被判为未知，因为 Host 不能确定远端是否已经收到。</p>
-<p>这里的连接阶段还不能直接代替 Host 重启时的判断。重启后 broker 的内存阶段已经丢失；恢复器只能按未结算 operation 的持久记录保守结算。连接测试与存储恢复测试分别检查这两种输入条件。</p>
-<p>因此，“Host 继续存在”不意味着所有 Client 提供的外部能力都获得 exactly-once。</p>
-<h3 id="用断线与恢复测试检验状态判断">用断线与恢复测试检验状态判断</h3>
-<p>下面用两项局部测试检查前面的判断：一项控制连接断开的时点，另一项直接调用存储恢复器。它们不是 S1/T7/R7 的完整产品轨迹，也没有启动真实 Desktop 或 Computer Use。<code>session-1</code>、<code>capability-operation</code> 是测试设置中的身份。</p>
-<span class="heading-alias" id="先观察断线时点改变了什么" aria-hidden="true"></span><h4 id="连接断开时点的分类">连接断开时点的分类</h4>
-<p><code>assertLossClassification</code> 创建 coordinator、模拟 Client 连接并注册工具。<code>send(frame)</code> 回调决定断线发生在哪条协议消息上：</p>
-<p>这里的 fixture 是测试预先搭好的受控场景；其 <code>invoke</code> helper 直接调用 snapshot tool 的 <code>impl</code>，没有经过完整 ToolRuntime T1/T2。后面的 Store 恢复 fixture 是另一项测试。两者不能拼接成已经捕获的一次端到端恢复 trace。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 连接断开时点的分类"><table><caption>表 4 / Table 4 · 连接断开时点的分类</caption><thead><tr><th scope="col">固定输入与触发</th><th scope="col">实际断言</th><th scope="col">支持的结论</th></tr></thead><tbody><tr><td>收到 <code>client.capability.call</code> 后，尚未回 <code>accepted</code> 就关闭连接</td><td>拒绝值为 <code>ClientCapabilityInvocationError</code>，code 是 <code>capability_lost</code></td><td>本次尚未准入的连接丢失能够被分类</td></tr>
-<tr><td>先返回 <code>accepted</code>，收到 Host 的 <code>client.capability.admitted</code> 时关闭连接</td><td>拒绝值为 <code>ToolOutcomeUnknownError</code></td><td>准入后无法取得结果，不能把它当成确定未执行</td></tr></tbody></table></div>
-<p>测试没有实际执行外部效果，所以不能由第二行推断“已经点了按钮”。它只检查系统对不确定性的分类。<code>accepted</code> 后、<code>admitted</code> 前这一中间窗口由 broker 的 <code>releaseConnection</code> 源码支持；上述两分支测试没有单独覆盖这个时点，不能让它继承该测试的运行结论。</p>
-<span class="heading-alias" id="再观察-host-恢复器能从存储证明什么" aria-hidden="true"></span><h4 id="host-恢复器读取的存储状态">Host 恢复器读取的存储状态</h4>
-<p>恢复测试使用真实 SQLite Runtime Store 的 <code>:memory:</code> 数据库，先调用 <code>commitToolPrepared</code> 建立三条未结算 operation，然后直接调用恢复函数。这里没有真的杀进程；测试名称中的 successor recovery 指恢复器的行为。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · Host 恢复器读取的存储状态"><table><caption>表 5 / Table 5 · Host 恢复器读取的存储状态</caption><thead><tr><th scope="col">初始记录</th><th scope="col">会话（Session）</th><th scope="col">恢复模式（recoveryMode）</th><th scope="col">为什么放入 fixture</th></tr></thead><tbody><tr><td><code>capability-operation</code></td><td><code>session-1</code></td><td><code>outcome_unknown</code></td><td>本次要恢复的目标</td></tr>
-<tr><td><code>ordinary-operation</code></td><td><code>session-1</code></td><td><code>never_auto_retry</code></td><td>验证恢复器不会按 Session 无差别结算所有工具</td></tr>
-<tr><td><code>other-session-operation</code></td><td><code>session-2</code></td><td><code>outcome_unknown</code></td><td>验证指定 Session 范围有效</td></tr></tbody></table></div>
-<p>每条记录有模型 call 与 dispatch RuntimeEvent，关联 invocation、Run、Turn、toolCallId 和参数哈希；尚无 outcome。恢复器的输入为 <code>[&#39;session-1&#39;]</code>，并注入固定时钟 <code>() =&gt; 50</code>。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · Host 恢复器读取的存储状态"><table><caption>表 6 / Table 6 · Host 恢复器读取的存储状态</caption><thead><tr><th scope="col">动作（Action）</th><th scope="col">源测试实际断言的结果</th><th scope="col">支持的状态判断</th></tr></thead><tbody><tr><td>第一次 <code>recoverClientCapabilityOutcomes</code></td><td>返回 <code>1</code>；目标 Run 的最后一个 event 是对应的 <code>function_response</code>，<code>isError=true</code>，时间为 50</td><td>结果属于原调用，没有另造一次业务执行</td></tr>
-<tr><td>检查结果内容</td><td><code>uncertainOutcome.code=&#39;outcome_unknown&#39;</code>，<code>retrySafe=false</code>；模型投影同样报告错误与未知</td><td>系统保存的是“无法判定外部效果”，并没有假装修复成功</td></tr>
-<tr><td>检查 <code>session-1</code> 未结算清单</td><td>只剩 <code>ordinary-operation</code></td><td>目标已结算，普通工具未被这个恢复器接管</td></tr>
-<tr><td>同一 Session 再恢复，时钟改为 60</td><td>返回 <code>0</code></td><td>对已结算记录的顺序重复调用没有再生成一份结算</td></tr>
-<tr><td>检查 <code>session-2</code></td><td>仍有 <code>other-session-operation</code></td><td>恢复没有越过传入的 Session 范围</td></tr></tbody></table></div>
-<h4 id="从断言到有边界的结论">从断言到有边界的结论</h4>
-<p>因此可以说：这两个测试验证了指定连接时点的错误分类，以及给定存储输入上的恢复结算、范围和顺序重复调用行为。不能说：已验证真实外部效果是否发生、磁盘掉电恢复、并发恢复、多 Client 产品全流程或任意 adapter 的 exactly-once。尤其 <code>:memory:</code> Store 的断言不能独自证明跨进程持久性。</p>
-<p><strong>改变一个条件后，哪些结论需要改变？</strong></p>
-<ol>
-<li>如果 Client 已回 accepted，但 Host 尚未发 admitted 就失联，能否套用测试第二行的未知结果？不能直接套用；连接仍由存活 broker 处理时，<code>accepted</code> 分支按源码是 <code>capability_lost</code>。上面的两项测试没有单独触发这个中间窗口。</li>
-<li>如果 Host 已退出，存储只有目标的 T1、没有 outcome，能否凭自己记得“也许还没 admitted”自动重做？不能。恢复器按持久输入结算未知，不能恢复已经丢失的内存阶段。</li>
-<li>第二次恢复返回 0，是否证明外部操作只发生一次？不证明。它只表明该存储场景下没有再次创建结算；外部效果的次数没有被此测试观察。</li>
-<li>若把恢复目标改成 <code>session-2</code>，预期哪个 operation 被结算？<code>other-session-operation</code>；这是根据相同选择规则的纸面推导，本节没有运行该变体。</li>
-</ol>
-<span class="heading-alias" id="阶段-d从-sequence-继续订阅" aria-hidden="true"></span><h3 id="sequence-与-epoch-怎样修复增量缺口">Sequence 与 epoch 怎样修复增量缺口</h3>
-<p>sequence 属于某个 subscription，不是 RuntimeEvent 的全局编号。下面两种状态必须分开：</p>
-<pre><code class="language-text">同一逻辑连接、同一订阅 U1 仍存活：
-  U1 最后接受 41 → 继续期待 U1 的 42
-  受支持的 Peer 换路可以保留这条上层连接与订阅
-
-逻辑连接已关闭，重新握手并新开 U2：
-  subscription.open → 新 subscriptionId + 当前 snapshot + nextSequence=1
-  从 U2 的 1 开始；不把 U1 的 42 当作续点</code></pre>
-<p>新订阅的 Client 以返回值建立游标；hostEpoch 相同也不能替代 subscriptionId 匹配。遇到 gap、错误 subscription 或旧 epoch，应拒绝把不匹配帧接到现有视图，再按连接/订阅恢复合同重建基线。Snapshot 可以恢复当前投影，不表示它逐帧补回每个历史增量，更不会自动恢复工具进程。详见<a href="#%E5%90%8C%E4%B8%80%E4%B8%AA%E5%A4%B1%E8%81%94%E6%8F%90%E7%A4%BA%E4%B8%89%E7%A7%8D%E4%B8%8D%E5%90%8C%E7%9A%84%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96">状态演算</a>。</p>
-<h3 id="terminal-与-settled">Terminal 与 Settled</h3>
-<p><a href="glossary.html#terminal-state--terminal-fact%E7%BB%88%E6%80%81--%E7%BB%88%E6%80%81%E4%BA%8B%E5%AE%9E">Terminal state</a> 回答“这次 Run 最终是完成、失败还是取消”。<a href="glossary.html#settled%E8%B5%84%E6%BA%90%E7%BB%93%E7%AE%97%E5%AE%8C%E6%AF%95">Settled</a> 回答“相关 iterator、后台清理和资源释放是否全部结束”。</p>
-<p>终态同时支持结果展示与后续清理；展示不是清理的前置条件，资源真正释放后才达到 settled。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Terminal 与 Settled：可滚动示意图"><a href="../../../assets/diagrams/25-host-and-client-3.svg"><img src="../../../assets/diagrams/25-host-and-client-3.svg" alt="持久终态允许展示最终结果，同时后端还要清理迭代器并释放资源；资源全部收束后才达到 settled，显示结果不代替清理。" width="720" height="753" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>产品可以快速发布 terminal，但关闭 Host、复用资源或判断进程完全退出时，可能仍需等待 settled；后续工作能否接纳也须服从对应 gate，不能仅凭界面完成就跳过。把两个信号合并，会让 UI 响应性和资源正确性相互冲突。</p>
-<h3 id="多入口与顶层执行准入">多入口与顶层执行准入</h3>
-<p>Host 的 root admission gate/reservation 防止多个入口同时为同一 Session 创建冲突的顶层工作。Runtime 内允许的并发 Run 模型和 Host 对 root execution 的准入约束是两个层次，不能用一句“Session 是否允许并发”概括。</p>
-<span class="heading-alias" id="误区五peer-已认证就能访问所有-session" aria-hidden="true"></span><h3 id="共享-session-与-peer-mesh-的边界">共享 Session 与 Peer Mesh 的边界</h3>
-<h4 id="shared-session">Shared Session</h4>
-<p>共享 Session 需要明确的 guest/grant/approval/revoke 状态。Guest 可以提出受限请求，但 Session owner 的 authority 不会因为 transcript 可见就自动转移。</p>
-<p>还要单独考虑披露：thinking、tool result、<a href="glossary.html#composition-snapshot--promptcomposition%E7%BB%84%E6%88%90%E5%BF%AB%E7%85%A7--%E8%AF%B7%E6%B1%82%E7%BB%84%E6%88%90%E8%AF%8A%E6%96%AD">请求组成与调用诊断</a>、Memory 和 attachment 是否应向 guest 展示，不能只用“共享了会话”一项开关概括。当前 shared transcript 保留 thinking 文本与 <code>tool_result.content</code>，但消息整体仍经过字段投影。</p>
-<p>凭据的有效条件是另一项限制。guest credential 在 finalize 后转为 active，当前实现会移除它的到期时间，认证时也不再按时间判它失效。该 credential 仍可被撤销或替换，guest 访问具体 Session 也仍受 Session grant 等条件限制。因此“只读共享”只限制 guest 能否修改，并不等于已经做到最小信息披露或短期凭证治理。</p>
-<h4 id="peer-mesh">Peer Mesh</h4>
-<p>Peer Mesh 解决节点发现、路由和成员关系，不等于 Session grant。某个 peer 能被找到或能转发消息，不能证明它有权读取 S1 或创建 R7。</p>
-<p>官方将 direct-peer transport 标为 experimental。不能从接口存在推导它在各种 WAN、NAT、relay 或密钥轮换条件下都可靠。</p>
-<span class="heading-alias" id="深化自测" aria-hidden="true"></span><h3 id="机制问题解析">机制问题解析</h3>
-<p><strong>问题 1。</strong> sequence 出现 gap 时，为什么重读 snapshot？</p>
-<p><strong>解释。</strong> 本地投影缺少连续前缀，不能可靠应用后续增量；应从权威快照重建，再接收匹配更新。</p>
-<p><strong>问题 2。</strong> 一个 command 响应丢失时，需要核对什么才能判断是否可重试？</p>
-<p><strong>解释。</strong> 命令的幂等契约、exact identity 与 payload，以及已持久化的 receipt/admission 等事实。</p>
-<p><strong>问题 3。</strong> terminal 已发布、settled 尚未到达，用户与 Host 分别可以依据它做什么？</p>
-<p><strong>解释。</strong> 可以展示语义终态；资源清理与后续准入仍需服从相应 settled/gate，不因显示完成而跳过。</p>
-<p><strong>问题 4。</strong> Peer 已认证、guest 能读 transcript，是否就获得 Session 的全部 authority？</p>
-<p><strong>解释。</strong> 不会。节点连通、credential 与 Session grant 是不同边界；共享还要单独核对披露字段和撤销条件。</p>
-<h3 id="改变条件失联发生在哪一层">改变条件：失联发生在哪一层</h3>
-<p>以下改变 H/W/V/E 的一项状态，其余条件沿用前面的推演。</p>
-<p><strong>问题 1。</strong> U1 已接受 41。先假设仅 Peer 路径从 generation 6 换到 7、原逻辑流仍存活；再假设 C1 真正关闭，C2 打开 U2。两种情况下 V 的订阅与 nextSequence 分别是什么？为什么相同 hostEpoch 不足以共用 42？</p>
-<p><strong>解释。</strong> 有限恢复成功且原逻辑流仍在时，V 可保持 C1/U1，期待 42；真正重开后是 C2/U2，以 open 响应的 nextSequence=1 与 snapshot 建立新基线。epoch 识别宿主代际，subscriptionId 区分观察流，sequence 只在该流内解释；三个量职责不同。</p>
-<p><strong>问题 2。</strong> 同一时刻测试仍由 Host 运行，但另一个动作是 Client 提供的浏览器点击。Client 分别在仅 accepted、已准入但未回结果时失联，能否把两种点击都换到新 Client 重做？</p>
-<p><strong>解释。</strong> 不能统一重做。普通 Host 测试仍查原 W 的运行与结算；点击仅 accepted 时，在协议被遵守的前提下尚未获准产生效果，连接丢失可判 capability_lost。执行准入已发而结果缺席时可能已点击，应保留未知、查外部状态或由专用恢复合同处理。新 Client 连通不提供旧效果未发生的证据。</p>
-<p><strong>问题 3。</strong> R7 已有 terminal，但资源尚未 settled；旧 Host 要退出，新机器已有项目 worktree。还缺哪些条件，才能说执行权和工作已安全交接？若 Host 仍持 Root writer，外部编辑器是否仍能改变 README？</p>
-<p><strong>解释。</strong> 本题 R7 已有 terminal，它不会因换 Host 再续跑；此时交接的是控制责任，不能跳过剩余资源的收束与 writer 释放。新 owner 还需有效并完成就绪检查，核对项目文件、Client/OS 进程及外部效果的所在位置和状态。只有另有未完成工作需要继续时，才进一步核对那份工作的持久接续点与准入条件。worktree 只提供一份代码工作副本，不搬进程或内存，不证明远端操作可回滚；任意崩溃不能冒充合作 handoff。Root writer 约束运行状态库，不锁住全部项目内容，外部编辑器仍可改 README，旧 Read 只是原时刻观察。</p>
-<h3 id="继续阅读">继续阅读</h3>
-<ul>
-<li>结果判断：<a href="26-evaluation-and-design.html#%E4%B8%80%E6%AC%A1%E5%AE%8C%E6%95%B4%E4%BF%AE%E5%A4%8D%E7%9A%84%E4%BA%94%E9%A1%B9%E5%88%A4%E6%96%AD">第26章｜任务评价与综合设计</a> 或 <a href="26-evaluation-and-design.html#%E7%BB%BC%E5%90%88%E8%AE%BE%E8%AE%A1%E8%A7%A3%E9%87%8A%E6%AF%94%E8%BE%83%E4%B8%8E%E9%99%90%E5%AE%9A%E7%BB%93%E8%AE%BA">综合设计</a></li>
-<li>相关机制：<a href="24-continuation-and-orchestration.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第24章｜计划、目标与持续执行</a>；<a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章｜持久效果与故障恢复</a></li>
-<li>总导航：<a href="README.html">从零学习 Maka Agent</a></li>
-</ul>
-<h3 id="延伸阅读">延伸阅读</h3>
-<p><a href="../../../extended-reading.html#reference-13" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/runtime-host-system.md">Runtime Host 系统分析</a>汇集请求、连接、资源归属与恢复的完整实现及源码入口。</p>
+<p>这条链在 <a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/server/root-turn-coordinator.ts">Maka 顶层工作协调器（Root Turn Coordinator）</a>的 <code>prepareAdmittedTurn</code>、<code>startRootMessageTurn</code> 和 <code>drainTurn</code> 中相接。解释的关键是持有者与消费者（Consumer）在哪里，而不是函数名称中有没有“后台”二字。</p>
+<p>顶层准入（Root Admission）还防止多个入口为同一会话（Session）建立冲突工作。它与运行时（Runtime）内部允许的并发执行（Concurrent Run）模型属于不同层次；不能用一句“会话能否并发”概括两个约束。</p>
+<span class="heading-alias" id="一次断线重连怎样发生" aria-hidden="true"></span><h2 id="3-同一个失联提示对应三种恢复recovery">3. 同一个失联提示，对应三种恢复（Recovery）</h2>
+<span class="heading-alias" id="同一个失联提示三种不同的状态变化" aria-hidden="true"></span><h3 id="用四组坐标分清控制工作观察与效果effect">用四组坐标分清控制、工作、观察与效果（Effect）</h3>
+<p>以下是教学元组，<strong>不是产品新增的数据结构</strong>。字母只用于在改变条件时指出哪一部分发生变化：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mtable rowspacing="0.25em" columnalign="right left" columnspacing="0em"><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mi>H</mi></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mo stretchy="false">(</mo><mtext>state root</mtext><mo separator="true">,</mo><mtext> valid writer</mtext><mo separator="true">,</mo><mtext> host epoch</mtext><mo stretchy="false">)</mo><mo separator="true">,</mo></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mi>W</mi></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mo stretchy="false">(</mo><mtext>session</mtext><mo separator="true">,</mo><mtext> turn</mtext><mo separator="true">,</mo><mtext> run</mtext><mo separator="true">,</mo><mtext> phase</mtext><mo stretchy="false">)</mo><mo separator="true">,</mo></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mi>V</mi></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mo stretchy="false">(</mo><mtext>connection ID</mtext><mo separator="true">,</mo><mtext> subscription ID</mtext><mo separator="true">,</mo><mtext> next sequence</mtext><mo stretchy="false">)</mo><mo separator="true">,</mo></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mi>E</mi></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mo stretchy="false">(</mo><mtext>executor</mtext><mo separator="true">,</mo><mtext> resource location</mtext><mo separator="true">,</mo><mtext> known outcome</mtext><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow></mstyle></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{aligned}
+H &amp;= (\text{state root},\ \text{valid writer},\ \text{host epoch}),\\
+W &amp;= (\text{session},\ \text{turn},\ \text{run},\ \text{phase}),\\
+V &amp;= (\text{connection ID},\ \text{subscription ID},\ \text{next sequence}),\\
+E &amp;= (\text{executor},\ \text{resource location},\ \text{known outcome}).
+\end{aligned}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:5.7em;vertical-align:-2.6em;"></span><span class="mord"><span class="mtable"><span class="col-align-r"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:3.1em;"><span style="top:-5.26em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0813em;">H</span></span></span><span style="top:-3.76em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">W</span></span></span><span style="top:-2.26em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.2222em;">V</span></span></span><span style="top:-0.76em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0576em;">E</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:2.6em;"><span></span></span></span></span></span><span class="col-align-l"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:3.1em;"><span style="top:-5.26em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mopen">(</span><span class="mord text"><span class="mord">state root</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">valid writer</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">host epoch</span></span><span class="mclose">)</span><span class="mpunct">,</span></span></span><span style="top:-3.76em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mopen">(</span><span class="mord text"><span class="mord">session</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">turn</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">run</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">phase</span></span><span class="mclose">)</span><span class="mpunct">,</span></span></span><span style="top:-2.26em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mopen">(</span><span class="mord text"><span class="mord">connection ID</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">subscription ID</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">next sequence</span></span><span class="mclose">)</span><span class="mpunct">,</span></span></span><span style="top:-0.76em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mopen">(</span><span class="mord text"><span class="mord">executor</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">resource location</span></span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">known outcome</span></span><span class="mclose">)</span><span class="mord">.</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:2.6em;"><span></span></span></span></span></span></span></span></span></span></span></span></div>
+<p><span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>H</mi></mrow><annotation encoding="application/x-tex">H</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0813em;">H</span></span></span></span></span> 表示状态根（State Root）、有效写者（Writer）与宿主代际（Host Epoch）；<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>W</mi></mrow><annotation encoding="application/x-tex">W</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span></span></span></span></span> 表示会话（Session）、工作轮次（Turn）、执行（Run）及阶段；<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>V</mi></mrow><annotation encoding="application/x-tex">V</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.2222em;">V</span></span></span></span></span> 表示连接身份（Connection ID）、订阅身份（Subscription ID）和下一序号（Next Sequence）；<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi></mrow><annotation encoding="application/x-tex">E</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span></span></span></span></span> 表示执行器（Executor）、资源位置与已知结果。</p>
+<p>断线前，假设 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>H</mi></mrow><annotation encoding="application/x-tex">H</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0813em;">H</span></span></span></span></span> 有效，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>W</mi><mo>=</mo><mo stretchy="false">(</mo><mi>S</mi><mn>1</mn><mo separator="true">,</mo><mi>T</mi><mn>7</mn><mo separator="true">,</mo><mi>R</mi><mn>7</mn><mo separator="true">,</mo><mtext>active</mtext><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">W=(S1,T7,R7,\text{active})</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="mord">7</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="mord">7</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord">active</span></span><span class="mclose">)</span></span></span></span></span>，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>V</mi><mo>=</mo><mo stretchy="false">(</mo><mi>C</mi><mn>1</mn><mo separator="true">,</mo><mi>U</mi><mn>1</mn><mo separator="true">,</mo><mn>42</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">V=(C1,U1,42)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.2222em;">V</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0715em;">C</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">U</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">42</span><span class="mclose">)</span></span></span></span></span>：U1 已接受序号（Sequence）41，下一帧应为 42。<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi></mrow><annotation encoding="application/x-tex">E</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span></span></span></span></span> 是宿主（Host）上的普通测试工具，结果尚未结算。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="三种失联 · Three Disconnects：可滚动示意图"><a href="../../../assets/diagrams/25-host-and-client-2.svg"><img src="../../../assets/diagrams/25-host-and-client-2.svg" alt="短时断线可在同一订阅（Subscription）U1继续期待序号（Sequence）42；重建订阅U2从1开始；宿主（Host）退出则须先核对裁决权（Authority）与持久事实（Durable Fact），再判断交接或恢复。三类不能共用旧游标（Cursor）。" width="991" height="1398" loading="lazy" style="width:991px;min-width:843px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这张图的箭头恢复连接、控制条件和观察，<strong>没有一条代表再次执行工具</strong>。A/B 以原宿主（Host）仍存活为前提；C 必须先重建有效控制责任。</p>
+<h3 id="a物理路径transport-path变化原逻辑流仍在">A：物理路径（Transport Path）变化，原逻辑流仍在</h3>
+<p>受支持的对端（Peer）换路机制可以把原逻辑字节流接到新路径。<code>ResumablePeerStream.reserve/attach</code> 重新核对通信身份（Identity），并用代次（Generation）拒绝迟到的旧路径。例如从 6 换到 7，旧的 6 不能稍后回来覆盖新连接。原逻辑连接 C1 和订阅（Subscription）U1 若都保留，仍期待 42。</p>
+<p>这里依赖活动进程中的有限恢复预算；不支持恢复、超过预算或旧流已失效时，就不能沿用这个结论。换路也没有迁移 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>H</mi></mrow><annotation encoding="application/x-tex">H</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0813em;">H</span></span></span></span></span> 所代表的控制责任，更不会新建 T7。</p>
+<p>还要区分两种“收到”。传输层确认（Acknowledgment，ACK）按字节偏移（Byte Offset）管理去重（Deduplication）；本实现确认的是上层 <code>read</code> 已取走的字节。它不证明 JavaScript 对象表示法（JavaScript Object Notation，JSON）消息已经处理，也不证明 T7 已准入或 README 已修改。<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/transport/resumable-peer-stream.ts">可恢复对端流（Resumable Peer Stream）源码</a>将字节消费位置与后续业务处理分开保存。</p>
+<span class="heading-alias" id="阶段-d从-sequence-继续订阅" aria-hidden="true"></span><span class="heading-alias" id="阶段-ccli-连接并选择-s1" aria-hidden="true"></span><span class="heading-alias" id="阶段-d继续接收更新" aria-hidden="true"></span><span class="heading-alias" id="sequence-与-epoch-怎样修复增量缺口" aria-hidden="true"></span><h3 id="b逻辑连接logical-connection关闭新建观察基线">B：逻辑连接（Logical Connection）关闭，新建观察基线</h3>
+<p>如果 C1 真正关闭，但宿主（Host）仍存活，新的 C2 要打开新订阅（Subscription）U2。<code>subscription.open</code> 返回当前快照（Snapshot）、新 <code>subscriptionId</code> 和 <code>nextSequence=1</code>。这次应从 U2 的 1 开始，不能把 U1 的 42 搬过来。</p>
+<p>服务端先让打开响应经连接写出，再激活增量发布；源码中的 <code>receipt.flushed</code> 是连接写出完成，<strong>不是数据库持久提交</strong>。这保证客户端（Client）有机会先建立基线，再解释新流中的更新。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · B：逻辑连接（Logical Connection）关闭，新建观察基线"><table><caption>表 3 / Table 3 · B：逻辑连接（Logical Connection）关闭，新建观察基线</caption><thead><tr><th scope="col">更新中的坐标</th><th scope="col">要排除哪一种混淆</th></tr></thead><tbody><tr><td>宿主代际（Host Epoch），<code>hostEpoch</code></td><td>旧宿主（Host）的帧不能接到新代际</td></tr>
+<tr><td>订阅身份（Subscription ID），<code>subscriptionId</code></td><td>同一宿主（Host）的两个观察流也不能混用</td></tr>
+<tr><td>序号（Sequence），<code>sequence</code></td><td>普通状态更新必须接在该流的连续位置上</td></tr>
+<tr><td>投影版本（Projection Revision）</td><td>同一目标的状态表示不能倒退或错误拼接</td></tr></tbody></table></div>
+<p><a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/client/session-subscription.ts">客户端订阅接收器（Client Session Subscription）</a>先核对身份（Identity），再按消息类别处理。上表的连续序号（Sequence）规则针对普通状态更新；伪终端（Pseudo-Terminal，PTY）数据有专用处理分支，不能把该规则说成所有帧共用一套业务编号。</p>
+<p>若普通更新出现缺口，后续增量就不再有完整前缀。应重新取得匹配快照（Snapshot）和观察基线，不能用重新执行任务来补齐。快照（Snapshot）恢复当前投影（Projection），不保证逐帧补回所有旧通知，也不恢复工具进程。</p>
+<p>握手中的协议版本（Protocol Version）和兼容代际（Compatibility Epoch）另用于判断双方是否能通信；它们既不替代 <code>hostEpoch</code>，也不替代订阅游标（Subscription Cursor）。这些校验能拒绝不匹配更新，不能据此承诺所有界面错误都自动恢复。</p>
+<h3 id="c宿主host退出先恢复有效控制责任">C：宿主（Host）退出，先恢复有效控制责任</h3>
+<p>宿主（Host）退出后，原对端流（Peer Stream）的内存状态可能已经消失。新入口不能凭旧画面继续写运行记录。先核对旧写者（Writer）的收束、新负责者（Owner）的有效性与持久事实，再建立就绪连接和观察基线。</p>
+<p>如果是协作交接（Cooperative Handoff），系统可以在规定边界封存旧物理执行（Physical Invocation），让后继继续同一逻辑工作轮次（Turn）；如果是意外崩溃，必须按已有事实与恢复合同处理。两者不是同一个入口。项目文件、客户端（Client）的浏览器和远端效果（Effect）是否还在，仍是 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi></mrow><annotation encoding="application/x-tex">E</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span></span></span></span></span> 的问题，不会随着 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>H</mi></mrow><annotation encoding="application/x-tex">H</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0813em;">H</span></span></span></span></span> 的移交自动解决。</p>
+<p><strong>问题。</strong> U1 已接受 41，换路与重连为何不能统一写成“继续从 42 开始”？</p>
+<p><strong>参考答案。</strong> 换路成功且原逻辑流仍在时，可以保留 C1/U1 并期待 42。真正重开后是 C2/U2，以返回的 <code>nextSequence=1</code> 与快照（Snapshot）建立新基线。相同宿主代际（Host Epoch）只说明控制端代际相同，不说明订阅（Subscription）相同。</p>
+<span class="heading-alias" id="先确认真实执行者在哪里" aria-hidden="true"></span><span class="heading-alias" id="执行者的位置决定断线后果" aria-hidden="true"></span><h2 id="4-客户端能力client-capability丢失效果effect可能已经发生">4. 客户端能力（Client Capability）丢失，效果（Effect）可能已经发生</h2>
+<span class="heading-alias" id="误区四host-拥有所有副作用" aria-hidden="true"></span><span class="heading-alias" id="client-提供能力时的断线窗口" aria-hidden="true"></span><h3 id="接受准备accepted与执行准入admitted之间有一道门">接受准备（Accepted）与执行准入（Admitted）之间有一道门</h3>
+<p>把普通测试换成桌面客户端（Desktop Client）提供的浏览器点击，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi></mrow><annotation encoding="application/x-tex">E</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span></span></span></span></span> 就变了。宿主（Host）仍能控制工作记录，却可能失去真正产生效果（Effect）的执行器（Executor）。不能直接把相同点击交给新客户端（Client）重做。</p>
+<p>这条客户端能力（Client Capability）路径先准备，再准入，最后执行：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 接受准备（Accepted）与执行准入（Admitted）之间有一道门"><table><caption>表 4 / Table 4 · 接受准备（Accepted）与执行准入（Admitted）之间有一道门</caption><thead><tr><th scope="col">阶段</th><th scope="col">原协议或实现标识</th><th scope="col">含义</th></tr></thead><tbody><tr><td>发出调用</td><td><code>client.capability.call</code></td><td>请对端准备接收此次调用</td></tr>
+<tr><td>接受准备（Accepted）</td><td><code>accepted</code></td><td>对端愿意接收，尚未获准产生效果（Effect）</td></tr>
+<tr><td>宿主（Host）检查条件、运行时（Runtime）提交 T1</td><td>持久操作记录</td><td>记录本次可能执行的边界</td></tr>
+<tr><td>执行准入（Admitted）</td><td><code>prepared.admit</code> 发出 <code>client.capability.admitted</code></td><td>允许对端执行</td></tr>
+<tr><td>执行并回传</td><td>结果或结果分块</td><td>按原调用身份（Identity）完成结算</td></tr></tbody></table></div>
+<p>存活的<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/server/client-capability-invocation-broker.ts">客户端能力中介（Client Capability Broker）</a>在 <code>releaseConnection</code> 中用阶段分类连接丢失。下面只摘它选择错误对象的一段，外围仍负责找到该连接的调用、结束交互（Interaction）或结算结果：</p>
+<pre><code class="language-ts">// 教学注释：前两阶段尚未获得执行准入（Admitted）。
+const error =
+  invocation.phase === &#39;dispatched&#39; || invocation.phase === &#39;accepted&#39;
+    ? new ClientCapabilityInvocationError(
+        &#39;capability_lost&#39;,
+        &#39;Client Capability provider disconnected before admission&#39;,
+      )
+    : new ToolOutcomeUnknownError(
+        &#39;Client Capability provider disconnected after accepting the call&#39;,
+      );</code></pre>
+<p><code>capability_lost</code> 表示在该分支尚未获得执行准入（Admitted）的能力丢失；后一个错误保留效果未知（Outcome Unknown）。这里应读判别条件，不能只读第二条英文错误文字中的 <code>accepting</code>，就把它误当成协议的 <code>accepted</code> 阶段。</p>
+<p>准入消息发送结果也可能不确定：发送已经尝试但失败，宿主（Host）未必知道远端是否收到，所以源码保守使用 <code>ToolOutcomeUnknownError</code>。另有明确找不到发送端、尚未发送的分支仍返回 <code>capability_lost</code>；不能把所有发送前失败都概括成未知。</p>
+<p>这套区分依赖客户端（Client）遵守“获准以后才产生效果（Effect）”的协议。它不是宿主（Host）能监视一切外部进程的证明，也不自动提供恰好一次（Exactly-once）效果（Effect）。</p>
+<span class="heading-alias" id="先观察断线时点改变了什么" aria-hidden="true"></span><span class="heading-alias" id="用断线与恢复测试检验状态判断" aria-hidden="true"></span><span class="heading-alias" id="连接断开时点的分类" aria-hidden="true"></span><h3 id="两项测试分别观察了什么">两项测试分别观察了什么</h3>
+<p>现有测试提供两个局部场景：一项控制连接断开的时点，另一项直接调用存储恢复器。它们使用受控测试场景（Fixture），不是 S1/T7/R7 的完整产品执行轨迹（Trajectory），也没有启动真实桌面或点击浏览器。</p>
+<p>连接分类测试的 <code>assertLossClassification</code> 创建协调器（Coordinator）、模拟连接并注册工具；发送回调决定何时断开。辅助函数 <code>invoke</code> 直接调用工具的 <code>impl</code>，<strong>没有经过完整工具运行时（ToolRuntime）的 T1/T2</strong>。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 两项测试分别观察了什么"><table><caption>表 5 / Table 5 · 两项测试分别观察了什么</caption><thead><tr><th scope="col">测试触发</th><th scope="col">原断言</th><th scope="col">可以说明什么</th></tr></thead><tbody><tr><td>收到 <code>client.capability.call</code>，尚未回复 <code>accepted</code> 就关闭连接</td><td><code>ClientCapabilityInvocationError</code>，code 为 <code>capability_lost</code></td><td>这个尚未准入的丢失时点能被分类</td></tr>
+<tr><td>先回复 <code>accepted</code>，收到 <code>client.capability.admitted</code> 时关闭连接</td><td><code>ToolOutcomeUnknownError</code></td><td>准入后无法取得结果，不能认定未执行</td></tr></tbody></table></div>
+<p>测试没有执行外部效果（Effect），第二行不证明“按钮已被点击”。<code>accepted</code> 后、<code>admitted</code> 前的中间窗口由 <code>releaseConnection</code> 的源码分支支持，上述两个测试分支没有单独触发它。</p>
+<span class="heading-alias" id="再观察-host-恢复器能从存储证明什么" aria-hidden="true"></span><span class="heading-alias" id="host-恢复器读取的存储状态" aria-hidden="true"></span><span class="heading-alias" id="从断言到有边界的结论" aria-hidden="true"></span><h3 id="重启以后恢复器recovery-handler只能读取持久输入">重启以后，恢复器（Recovery Handler）只能读取持久输入</h3>
+<p>宿主（Host）重启后，中介（Broker）内存中的阶段已经丢失。恢复器（Recovery Handler）不能凭维护者记得“可能还没获准”重做操作，只能按未结算操作（Unsettled Operation）的持久输入处理。</p>
+<p>对应测试使用真实 SQLite 运行存储（Runtime Store）的 <code>:memory:</code> 数据库，先用 <code>commitToolPrepared</code> 建立三条记录，再调用恢复函数。这里没有真实杀进程，内存数据库也不证明跨进程持久性。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 重启以后，恢复器（Recovery Handler）只能读取持久输入"><table><caption>表 6 / Table 6 · 重启以后，恢复器（Recovery Handler）只能读取持久输入</caption><thead><tr><th scope="col">初始操作（Operation）</th><th scope="col">会话（Session）</th><th scope="col">原字段 <code>recoveryMode</code></th><th scope="col">所检验的边界</th></tr></thead><tbody><tr><td><code>capability-operation</code></td><td><code>session-1</code></td><td><code>outcome_unknown</code></td><td>本次目标</td></tr>
+<tr><td><code>ordinary-operation</code></td><td><code>session-1</code></td><td><code>never_auto_retry</code></td><td>不接管同一目标内的全部工具</td></tr>
+<tr><td><code>other-session-operation</code></td><td><code>session-2</code></td><td><code>outcome_unknown</code></td><td>不越过指定范围</td></tr></tbody></table></div>
+<p>每条记录都有模型（Model）提出的工具调用（Tool Call）内容与派发运行时事件（Runtime Event），关联物理执行（Physical Invocation）、执行（Run）、工作轮次（Turn）、<code>toolCallId</code> 和参数哈希（Argument Hash），尚无结果。<code>recoverClientCapabilityOutcomes</code> 收到 <code>[&#39;session-1&#39;]</code> 和固定时钟 <code>() =&gt; 50</code>。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 重启以后，恢复器（Recovery Handler）只能读取持久输入"><table><caption>表 7 / Table 7 · 重启以后，恢复器（Recovery Handler）只能读取持久输入</caption><thead><tr><th scope="col">检查步骤</th><th scope="col">源测试中的断言</th><th scope="col">解释</th></tr></thead><tbody><tr><td>首次恢复</td><td>返回 <code>1</code>；原执行（Run）最后一个事件（Event）为对应 <code>function_response</code>，<code>isError=true</code>，时间为 50</td><td>给原调用增加结算，没有另造业务执行</td></tr>
+<tr><td>结果与模型投影（Model Projection）</td><td><code>uncertainOutcome.code=&#39;outcome_unknown&#39;</code>，<code>retrySafe=false</code>；模型侧同样收到错误与未知</td><td>保存的是无法判定效果（Effect），不是假装修复成功</td></tr>
+<tr><td>检查 <code>session-1</code></td><td>只剩 <code>ordinary-operation</code> 未结算</td><td>目标已处理，普通工具仍由自己的合同处理</td></tr>
+<tr><td>同一范围再次恢复，时钟为 60</td><td>返回 <code>0</code></td><td>顺序重复调用没有再创建一份结算</td></tr>
+<tr><td>检查 <code>session-2</code></td><td><code>other-session-operation</code> 仍在</td><td>没有越界处理</td></tr></tbody></table></div>
+<p><a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/server/client-capability-recovery.ts">恢复器（Recovery Handler）源码</a>按目标与恢复模式（Recovery Mode）筛选，再以原身份（Identity）提交 <code>commitToolOutcome</code>；只有新建结算才计数。返回 0 不表示外部操作只发生一次，因为这个测试没有观察外部效果（Effect）次数。</p>
+<p>因此，两项局部测试支持连接分类和给定存储输入上的恢复结算；它们不能拼成真实断电、并发恢复、多客户端（Client）全流程或所有模型协议适配器（Model Adapter）的恰好一次（Exactly-once）保证。本章沿用这些测试场景解释机制，没有把它们改写成新运行。</p>
+<p><strong>问题。</strong> 若把恢复范围改为 <code>session-2</code>，会处理谁？若只有 T1，没有结果，能否凭猜测自动重做？</p>
+<p><strong>参考答案。</strong> 按同一选择规则，预期处理 <code>other-session-operation</code>；这是未运行变体的推导。只有 T1 时应按恢复模式（Recovery Mode）保留未知，不能恢复已丢失的内存阶段，也不能由结果缺席推断效果（Effect）未发生。</p>
+<h2 id="5-终态terminal-state资源结算settlement与宿主交接host-handoff">5. 终态（Terminal State）、资源结算（Settlement）与宿主交接（Host Handoff）</h2>
+<span class="heading-alias" id="阶段-ecli-看到-terminal" aria-hidden="true"></span><span class="heading-alias" id="terminal-与-settled" aria-hidden="true"></span><h3 id="显示完成以后哪些资源还没有释放">显示完成以后，哪些资源还没有释放？</h3>
+<p><a href="glossary.html#terminal-state--terminal-fact%E7%BB%88%E6%80%81--%E7%BB%88%E6%80%81%E4%BA%8B%E5%AE%9E">终态（Terminal State）</a>回答“这次执行（Run）如何结束”；<a href="glossary.html#settled%E8%B5%84%E6%BA%90%E7%BB%93%E7%AE%97%E5%AE%8C%E6%AF%95">资源结算（Settlement）</a>回答“迭代器（Iterator）、后台清理和资源释放是否全部结束”，代码状态 <code>settled</code> 保留其原名。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="终态与结算 · Terminal and Settlement：可滚动示意图"><a href="../../../assets/diagrams/25-host-and-client-3.svg"><img src="../../../assets/diagrams/25-host-and-client-3.svg" alt="终态事实（Terminal Fact）分别供展示与清理消费；资源释放后才达到资源结算（Settlement）。界面显示结束不等于执行资源（Execution Resource）已经释放，展示也不是清理的前置条件。" width="720" height="781" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>展示与清理从同一终态事实（Terminal Fact）分叉；<strong>展示不是清理的前置条件</strong>。界面可以及时显示结果，关闭宿主（Host）或复用资源仍须等待对应资源结算（Settlement）与准入门（Admission Gate）。将两者合并，要么拖慢显示，要么把尚在清理的资源误当已经可用。</p>
+<span class="heading-alias" id="升级-host-时工作完成了吗" aria-hidden="true"></span><h3 id="协作交接cooperative-handoff结束的是哪个边界">协作交接（Cooperative Handoff）结束的是哪个边界？</h3>
+<p>先改变条件：假设 R7 仍未终结，但一次 <code>Edit</code> 的结果已经入账，此时需要升级宿主（Host）。协作交接（Cooperative Handoff）请求下一个可证明的持久边界；抵达并提交之前取消，原工作继续。满足条件后，系统封存（Seal）旧物理执行（Physical Invocation），核对驻留持有（Residency）、在途命令（Command）与连接，再解除绑定（Detach）。后继可以按持久接续合同继续同一个逻辑工作轮次（Turn）。</p>
+<p>这里没有恢复旧 JavaScript 调用栈，也没有重新执行已确认的 <code>Edit</code>。旧物理执行（Physical Invocation）结束，不意味着用户任务完成；一旦交接进入提交边界，旧取消信号也不能重新放行它。</p>
+<p><a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/server/host-kernel.ts">Maka 宿主内核（Host Kernel）</a>中的 <code>#prepareCooperativeHandoff</code> 与 <code>#closeResources</code> 分别核对交接条件、完成资源收束并释放负责者（Owner）。新端仍须取得有效写权并完成就绪检查；安装命令返回不能替代这些条件。</p>
+<span class="heading-alias" id="再向下一层长期责任与执行载体能否分开" aria-hidden="true"></span><span class="heading-alias" id="长期责任与执行载体能否分开" aria-hidden="true"></span><h3 id="可携带导出portable-export为何先复制再检查静止">可携带导出（Portable Export）为何先复制，再检查静止？</h3>
+<p>再换一种需求：把 S1 导出成包。若先检查它空闲，再复制数据库，复制期间其他客户端（Client）可能开始新工作；“检查过的状态”与“交付的状态”就不是同一份。</p>
+<p>当前会话导出（Session Export）先取得一致数据库副本，再在<strong>将交付的副本</strong>中检查静止条件（Quiescence），筛选会话（Session）子树、所需资源与引用，并核对外键。运行时（Runtime）入口要求静止；已有目标不覆盖，活动工作、缺失资源、越界引用、不支持的结构或限额失败会使导出失败。<a href="https://github.com/apache/maka/blob/HEAD/packages/storage/src/session-bundle-policy.ts">存储导出策略（Session Bundle Policy）</a>的 <code>exportSessionBundleState</code> 与 <code>filterBackedUpDatabase</code> 明确了这个顺序。</p>
+<p>包里不包含用户项目目录、凭据（Credential）或旧浏览器进程。它是有范围的状态出口，不自动证明另一台机器已完成导入、写权接管或计算现场恢复。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 可携带导出（Portable Export）为何先复制，再检查静止？"><table><caption>表 8 / Table 8 · 可携带导出（Portable Export）为何先复制，再检查静止？</caption><thead><tr><th scope="col">恢复需求</th><th scope="col">必须恢复或核对什么</th></tr></thead><tbody><tr><td>重新观察同一宿主（Host）</td><td>连接身份（Identity）、快照（Snapshot）与订阅游标（Subscription Cursor）</td></tr>
+<tr><td>重启宿主（Host）</td><td>有效负责者（Owner）、持久事实与未结算工具</td></tr>
+<tr><td>从安全边界继续</td><td>原结果、接续（Continuation）条件与新执行边界</td></tr>
+<tr><td>恢复虚拟机（Virtual Machine，VM）现场</td><td>具体机制保存了哪些进程、内存、文件和网络状态</td></tr></tbody></table></div>
+<p>T2、上下文检查点（Context Checkpoint）或数据库预写日志（Write-Ahead Log，WAL）都不等于虚拟机（VM）快照（Snapshot），更不表示任意外部副作用已被撤销。官方无服务器（Serverless）设计文章讨论按需取得、冻结、复用或释放计算资源，说明逻辑责任可以与物理载体分开；它引用外部沙箱（Sandbox）和执行体（Actor）方案，不表示 Maka 已集成全部方案。</p>
+<p><strong>问题。</strong> R7 已有终态（Terminal State），资源却尚未结算；新机器已有项目工作副本，能否立即“恢复 R7”并重发 <code>Edit</code>？</p>
+<p><strong>参考答案。</strong> 不能重新开放已终结的 R7。此时要交接的是控制责任，并完成剩余清理、旧写权释放与新端就绪。项目工作副本不搬运进程或内存；只有另有未完成工作时，才进一步核对它的持久接续点。看到 <code>handoff_pause</code> 或导出包，也不能直接宣布任务完成或允许重做旧效果（Effect）。</p>
+<span class="heading-alias" id="误区五peer-已认证就能访问所有-session" aria-hidden="true"></span><span class="heading-alias" id="共享-session-与-peer-mesh-的边界" aria-hidden="true"></span><h2 id="6-连通授权与共享披露是三道不同边界">6. 连通、授权与共享披露是三道不同边界</h2>
+<span class="heading-alias" id="shared-session" aria-hidden="true"></span><h3 id="共享会话shared-session让谁看见什么">共享会话（Shared Session）让谁看见什么？</h3>
+<p>访客（Guest）读取会话（Session），仍受授权（Grant）、批准（Approval）与撤销（Revoke）状态约束。能看见对话记录（Transcript），不代表负责者（Owner）的裁决权（Authority）转移给了访客（Guest）。</p>
+<p>只读权限与披露范围也不同。共享投影（Shared Projection）会筛选消息字段，但当前保留思考文本（Thinking Text）及其文本分段，以及 <code>tool_result.content</code>；不能说保留了完整工具结果（Tool Result）记录的每个字段，也不能说所有敏感内容已最小化。<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime-host/src/server/shared-session-transcript.ts">共享对话投影（Shared Session Transcript）</a>具体决定哪些字段进入视图。请求组成诊断（Prompt Composition）、记忆（Memory）和附件（Attachment）的可见性也需分别判断。</p>
+<p>凭据（Credential）的时效是另一层。待激活凭据（Pending Credential）有到期时间；<code>finalize</code> 后变为有效凭据（Active Credential），当前实现移除到期字段，认证时不再按时间判它失效。它仍能撤销或替换，具体会话（Session）授权（Grant）也仍须满足。因此这不是永久访问权，也不能由“只读分享”推导短期凭据（Credential）治理已经完成。</p>
+<span class="heading-alias" id="host-的具体职责与其他唤醒机制" aria-hidden="true"></span><span class="heading-alias" id="peer-mesh" aria-hidden="true"></span><h3 id="对等网络peer-mesh与业务唤醒分别解决什么">对等网络（Peer Mesh）与业务唤醒分别解决什么？</h3>
+<p>对等网络（Peer Mesh）解决节点发现、路由和成员关系，不等于会话（Session）授权（Grant）。能找到或转发到某个对端（Peer），不能证明它有权读取 S1 或创建 R7。官方把直接对端传输（Direct-peer Transport）标为实验性（Experimental）；接口存在不能替代真实广域网络（Wide Area Network，WAN）、网络地址转换（Network Address Translation，NAT）、中继（Relay）或密钥轮换（Key Rotation）条件的检验。</p>
+<p>运行时宿主（Runtime Host）还承接计划（Plan）、目标（Goal）、调度（Schedule）和代理图（Agent Graph）的业务协调。代理图（Agent Graph）的监督唤醒（Supervisor Wake）仍经顶层准入（Root Admission），创建新的普通工作轮次（Turn）与执行（Run），不会把旧 R7 重新打开。<a href="glossary.html#mailbox%E7%A7%81%E6%9C%89%E4%BF%A1%E7%AE%B1">私有信箱（Mailbox）</a>负责智能代理（Agent）之间的通信与调度；本章的连接连续性（Connection Continuity）负责重新观察同一份工作。两者可共存，但唤醒新工作与恢复显示需要不同证据。</p>
+<span class="heading-alias" id="核心出口自测与答案" aria-hidden="true"></span><span class="heading-alias" id="深化自测" aria-hidden="true"></span><span class="heading-alias" id="核心问题解析" aria-hidden="true"></span><span class="heading-alias" id="机制问题解析" aria-hidden="true"></span><span class="heading-alias" id="改变条件失联发生在哪一层" aria-hidden="true"></span><h2 id="7-直接问答改变一个条件再判断恢复recovery">7. 直接问答：改变一个条件，再判断恢复（Recovery）</h2>
+<p><strong>问题 1。</strong> 宿主（Host）仍在测试；同一客户端（Client）的浏览器点击分别在 <code>accepted</code> 和执行准入（Admitted）后失联，能否统一换端重做？</p>
+<p><strong>参考答案。</strong> 普通测试仍查询原 R7。对点击，存活中介（Broker）在 <code>accepted</code> 阶段按源码归为 <code>capability_lost</code>，前提是对端遵守准入（Admission）协议；执行准入（Admitted）已发、结果缺席时可能已点击，应保留效果未知（Outcome Unknown），检查外部状态或按专用恢复合同处理。新端连通不证明旧效果（Effect）未发生。</p>
+<p><strong>问题 2。</strong> 新路由看到 S1/T7/R7，还看到上下文检查点（Context Checkpoint），能否说原浏览器已迁移且 R7 自动继续？</p>
+<p><strong>参考答案。</strong> 不能。路由支持连接判断，检查点（Checkpoint）服务模型历史；浏览器是否仍在属于资源位置问题。继续工作还需要有效裁决权（Authority）、已有结果和接续（Continuation）条件。</p>
+<p><strong>问题 3。</strong> 界面已显示完成，但资源结算（Settlement）尚未结束，能否直接释放状态根（State Root）的写者（Writer）？</p>
+<p><strong>参考答案。</strong> 不能用显示替代停机合同。语义终态（Terminal State）可以展示，资源清理、驻留持有（Residency）和后续准入（Admission）仍各有条件；旧端收束、新端取得有效写权和就绪必须分别成立。</p>
+<p><strong>问题 4。</strong> 恢复器（Recovery Handler）第二次返回 0，是否证明外部效果（Effect）只发生一次？</p>
+<p><strong>参考答案。</strong> 0 只说明该存储场景没有重复创建结算，未观察外部效果（Effect）次数。记录的顺序幂等性（Idempotency）与外部操作的次数是不同问题。</p>
+<p><strong>问题 5。</strong> 访客（Guest）能看见结果，凭据（Credential）又没有到期字段，是否已经取得永久的全部权限？</p>
+<p><strong>参考答案。</strong> 不能。可见性只说明共享披露，访问仍受会话（Session）授权（Grant）、凭据（Credential）撤销或替换约束，负责者（Owner）的裁决权（Authority）也没有转移。</p>
+<span class="heading-alias" id="延伸阅读" aria-hidden="true"></span><h2 id="继续阅读">继续阅读</h2>
+<p><a href="26-evaluation-and-design.html">第26章的任务评价（Task Evaluation）</a>把这些“能观察到什么”的边界放进成功率、成本和设计比较；<a href="24-continuation-and-orchestration.html">第24章</a>说明业务接续（Continuation）。对照 <a href="29-codex-runtime-and-lifecycle.html#%E5%90%8C%E4%B8%80%E6%96%AD%E7%BA%BF%E9%97%AE%E9%A2%98thread-%E4%B8%8E%E8%BF%9E%E6%8E%A5%E6%8B%A5%E6%9C%89%E7%9A%84%E8%BF%9B%E7%A8%8B%E5%90%84%E8%87%AA%E6%80%8E%E6%A0%B7%E6%94%B6%E5%B0%BE">Codex 的资源分支</a>时，应重新定位实际执行器（Executor），不能仅凭同样存在应用服务端（App Server）就继承本章全部结论。<a href="../../../extended-reading.html#reference-14" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/runtime-host-system.md">运行时宿主（Runtime Host）系统分析</a>保留完整机制与源码入口。</p>
 <hr>
-<p><a href="24-continuation-and-orchestration.html">上一章：第 24 章｜计划、目标与持续执行</a> · <a href="26-evaluation-and-design.html">下一章：第 26 章｜任务评价与综合设计</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="24-continuation-and-orchestration.html"><span>← 上一章</span><strong>第 24 章｜计划、目标与持续执行</strong></a><a href="26-evaluation-and-design.html"><span>下一章 →</span><strong>第 26 章｜任务评价与综合设计</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E5%B7%A5%E4%BD%9C%E4%B8%8E%E7%95%8C%E9%9D%A2%E4%B8%BA%E4%BD%95%E6%9C%89%E4%B8%8D%E5%90%8C%E5%AF%BF%E5%91%BD">工作与界面为何有不同寿命</a></li><li class="toc-level-3"><a href="#%E6%B5%8B%E8%AF%95%E6%9C%9F%E9%97%B4%E5%85%B3%E9%97%AD-desktop">测试期间关闭 Desktop</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E5%BE%AA%E7%8E%AF%E6%94%BE%E8%BF%9B-ui-%E8%BF%9B%E7%A8%8B%E4%BC%9A%E5%A4%B1%E5%8E%BB%E4%BB%80%E4%B9%88">把循环放进 UI 进程会失去什么</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E7%8A%B6%E6%80%81%E5%BF%85%E9%A1%BB%E5%88%86%E5%BC%80">三种状态必须分开</a></li><li class="toc-level-3"><a href="#runtime-host-%E4%B8%BA%E4%BB%80%E4%B9%88%E5%AD%98%E5%9C%A8">Runtime Host 为什么存在</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1%E6%96%AD%E7%BA%BF%E9%87%8D%E8%BF%9E%E6%80%8E%E6%A0%B7%E5%8F%91%E7%94%9F">一次断线重连怎样发生</a></li><li class="toc-level-3"><a href="#%E6%89%A7%E8%A1%8C%E8%80%85%E7%9A%84%E4%BD%8D%E7%BD%AE%E5%86%B3%E5%AE%9A%E6%96%AD%E7%BA%BF%E5%90%8E%E6%9E%9C">执行者的位置决定断线后果</a></li><li class="toc-level-3"><a href="#query-%E9%87%8D%E8%AF%95%E5%92%8C-command-replay-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E5%90%8C">Query 重试和 Command replay 为什么不同</a></li><li class="toc-level-3"><a href="#%E5%A4%9A-client-%E4%B8%8D%E7%AD%89%E4%BA%8E%E5%A4%9A%E4%BB%BD-runtime">多 Client 不等于多份 Runtime</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1-turnstart%E8%AF%B7%E6%B1%82%E8%BF%94%E5%9B%9E%E5%90%8E%E8%B0%81%E7%BB%A7%E7%BB%AD%E6%B6%88%E8%B4%B9%E5%B7%A5%E4%BD%9C">一次 turn.start：请求返回后，谁继续消费工作</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E4%B8%AA%E5%A4%B1%E8%81%94%E6%8F%90%E7%A4%BA%E4%B8%89%E7%A7%8D%E4%B8%8D%E5%90%8C%E7%9A%84%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96">同一个失联提示，三种不同的状态变化</a></li><li class="toc-level-3"><a href="#host-%E7%9A%84%E5%85%B7%E4%BD%93%E8%81%8C%E8%B4%A3%E4%B8%8E%E5%85%B6%E4%BB%96%E5%94%A4%E9%86%92%E6%9C%BA%E5%88%B6">Host 的具体职责与其他唤醒机制</a></li><li class="toc-level-3"><a href="#%E9%95%BF%E6%9C%9F%E8%B4%A3%E4%BB%BB%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%BD%BD%E4%BD%93%E8%83%BD%E5%90%A6%E5%88%86%E5%BC%80">长期责任与执行载体能否分开</a></li><li class="toc-level-3"><a href="#%E5%8D%87%E7%BA%A7-host-%E6%97%B6%E5%B7%A5%E4%BD%9C%E5%AE%8C%E6%88%90%E4%BA%86%E5%90%97">升级 Host 时，工作完成了吗？</a></li><li class="toc-level-3"><a href="#client-%E6%8F%90%E4%BE%9B%E8%83%BD%E5%8A%9B%E6%97%B6%E7%9A%84%E6%96%AD%E7%BA%BF%E7%AA%97%E5%8F%A3">Client 提供能力时的断线窗口</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E6%96%AD%E7%BA%BF%E4%B8%8E%E6%81%A2%E5%A4%8D%E6%B5%8B%E8%AF%95%E6%A3%80%E9%AA%8C%E7%8A%B6%E6%80%81%E5%88%A4%E6%96%AD">用断线与恢复测试检验状态判断</a></li><li class="toc-level-3"><a href="#sequence-%E4%B8%8E-epoch-%E6%80%8E%E6%A0%B7%E4%BF%AE%E5%A4%8D%E5%A2%9E%E9%87%8F%E7%BC%BA%E5%8F%A3">Sequence 与 epoch 怎样修复增量缺口</a></li><li class="toc-level-3"><a href="#terminal-%E4%B8%8E-settled">Terminal 与 Settled</a></li><li class="toc-level-3"><a href="#%E5%A4%9A%E5%85%A5%E5%8F%A3%E4%B8%8E%E9%A1%B6%E5%B1%82%E6%89%A7%E8%A1%8C%E5%87%86%E5%85%A5">多入口与顶层执行准入</a></li><li class="toc-level-3"><a href="#%E5%85%B1%E4%BA%AB-session-%E4%B8%8E-peer-mesh-%E7%9A%84%E8%BE%B9%E7%95%8C">共享 Session 与 Peer Mesh 的边界</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E6%94%B9%E5%8F%98%E6%9D%A1%E4%BB%B6%E5%A4%B1%E8%81%94%E5%8F%91%E7%94%9F%E5%9C%A8%E5%93%AA%E4%B8%80%E5%B1%82">改变条件：失联发生在哪一层</a></li><li class="toc-level-3"><a href="#%E7%BB%A7%E7%BB%AD%E9%98%85%E8%AF%BB">继续阅读</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="24-continuation-and-orchestration.html">上一章：第24章｜计划（Plan）、目标（Goal）与持续执行</a> · <a href="26-evaluation-and-design.html">下一章：第26章｜任务评价（Task Evaluation）与综合设计（Integrated Design）</a> · <a href="README.html">课程导航</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="24-continuation-and-orchestration.html"><span>← 上一章</span><strong>第 24 章｜计划（Plan）、目标（Goal）、定时任务（Scheduled Task）与任务图（Agent Graph）怎样继续工作</strong></a><a href="26-evaluation-and-design.html"><span>下一章 →</span><strong>第 26 章｜任务评价（Task Evaluation）与综合设计（Integrated Design）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E5%90%8C%E4%B8%80%E4%BB%BD%E5%B7%A5%E4%BD%9C%E6%9C%89%E5%93%AA%E4%BA%9B%E4%B8%8D%E5%90%8C%E8%BA%AB%E4%BB%BDidentity">前情回顾：同一份工作，有哪些不同身份（Identity）？</a></li><li class="toc-level-2"><a href="#1-%E6%B5%8B%E8%AF%95%E6%AD%A3%E5%9C%A8%E8%BF%90%E8%A1%8C%E5%85%B3%E9%97%AD%E7%AA%97%E5%8F%A3%E4%BC%9A%E5%8F%91%E7%94%9F%E4%BB%80%E4%B9%88">1. 测试正在运行，关闭窗口会发生什么？</a></li><li class="toc-level-3"><a href="#%E5%85%88%E5%9B%BA%E5%AE%9A%E5%AE%BF%E4%B8%BBhost%E4%B8%8E%E6%89%A7%E8%A1%8C%E5%99%A8executor%E7%9A%84%E4%BD%8D%E7%BD%AE">先固定宿主（Host）与执行器（Executor）的位置</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E7%8A%B6%E6%80%81state%E5%88%86%E5%88%AB%E7%94%B1%E8%B0%81%E8%A7%A3%E9%87%8A">三种状态（State）分别由谁解释</a></li><li class="toc-level-3"><a href="#%E6%9F%A5%E8%AF%A2query%E4%B8%8E%E5%91%BD%E4%BB%A4%E9%87%8D%E6%94%BEcommand-replay%E4%B8%BA%E4%BD%95%E4%B8%8D%E5%90%8C">查询（Query）与命令重放（Command Replay）为何不同</a></li><li class="toc-level-2"><a href="#2-%E8%AF%B7%E6%B1%82%E8%BF%94%E5%9B%9E%E4%BB%A5%E5%90%8E%E8%B0%81%E7%BB%A7%E7%BB%AD%E6%B6%88%E8%B4%B9%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BA%8B%E4%BB%B6runtime-event">2. 请求返回以后，谁继续消费运行时事件（Runtime Event）？</a></li><li class="toc-level-3"><a href="#%E7%8A%B6%E6%80%81%E6%A0%B9state-root%E7%BA%A6%E6%9D%9F%E5%93%AA%E4%B8%80%E4%BB%BD%E5%86%99%E6%9D%83">状态根（State Root）约束哪一份写权</a></li><li class="toc-level-3"><a href="#%E6%B2%BF%E7%9D%80-turnstart-%E6%89%BE%E5%88%B0%E6%8C%81%E7%BB%AD%E6%B6%88%E8%B4%B9%E8%80%85consumer">沿着 turn.start 找到持续消费者（Consumer）</a></li><li class="toc-level-2"><a href="#3-%E5%90%8C%E4%B8%80%E4%B8%AA%E5%A4%B1%E8%81%94%E6%8F%90%E7%A4%BA%E5%AF%B9%E5%BA%94%E4%B8%89%E7%A7%8D%E6%81%A2%E5%A4%8Drecovery">3. 同一个失联提示，对应三种恢复（Recovery）</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E5%9B%9B%E7%BB%84%E5%9D%90%E6%A0%87%E5%88%86%E6%B8%85%E6%8E%A7%E5%88%B6%E5%B7%A5%E4%BD%9C%E8%A7%82%E5%AF%9F%E4%B8%8E%E6%95%88%E6%9E%9Ceffect">用四组坐标分清控制、工作、观察与效果（Effect）</a></li><li class="toc-level-3"><a href="#a%E7%89%A9%E7%90%86%E8%B7%AF%E5%BE%84transport-path%E5%8F%98%E5%8C%96%E5%8E%9F%E9%80%BB%E8%BE%91%E6%B5%81%E4%BB%8D%E5%9C%A8">A：物理路径（Transport Path）变化，原逻辑流仍在</a></li><li class="toc-level-3"><a href="#b%E9%80%BB%E8%BE%91%E8%BF%9E%E6%8E%A5logical-connection%E5%85%B3%E9%97%AD%E6%96%B0%E5%BB%BA%E8%A7%82%E5%AF%9F%E5%9F%BA%E7%BA%BF">B：逻辑连接（Logical Connection）关闭，新建观察基线</a></li><li class="toc-level-3"><a href="#c%E5%AE%BF%E4%B8%BBhost%E9%80%80%E5%87%BA%E5%85%88%E6%81%A2%E5%A4%8D%E6%9C%89%E6%95%88%E6%8E%A7%E5%88%B6%E8%B4%A3%E4%BB%BB">C：宿主（Host）退出，先恢复有效控制责任</a></li><li class="toc-level-2"><a href="#4-%E5%AE%A2%E6%88%B7%E7%AB%AF%E8%83%BD%E5%8A%9Bclient-capability%E4%B8%A2%E5%A4%B1%E6%95%88%E6%9E%9Ceffect%E5%8F%AF%E8%83%BD%E5%B7%B2%E7%BB%8F%E5%8F%91%E7%94%9F">4. 客户端能力（Client Capability）丢失，效果（Effect）可能已经发生</a></li><li class="toc-level-3"><a href="#%E6%8E%A5%E5%8F%97%E5%87%86%E5%A4%87accepted%E4%B8%8E%E6%89%A7%E8%A1%8C%E5%87%86%E5%85%A5admitted%E4%B9%8B%E9%97%B4%E6%9C%89%E4%B8%80%E9%81%93%E9%97%A8">接受准备（Accepted）与执行准入（Admitted）之间有一道门</a></li><li class="toc-level-3"><a href="#%E4%B8%A4%E9%A1%B9%E6%B5%8B%E8%AF%95%E5%88%86%E5%88%AB%E8%A7%82%E5%AF%9F%E4%BA%86%E4%BB%80%E4%B9%88">两项测试分别观察了什么</a></li><li class="toc-level-3"><a href="#%E9%87%8D%E5%90%AF%E4%BB%A5%E5%90%8E%E6%81%A2%E5%A4%8D%E5%99%A8recovery-handler%E5%8F%AA%E8%83%BD%E8%AF%BB%E5%8F%96%E6%8C%81%E4%B9%85%E8%BE%93%E5%85%A5">重启以后，恢复器（Recovery Handler）只能读取持久输入</a></li><li class="toc-level-2"><a href="#5-%E7%BB%88%E6%80%81terminal-state%E8%B5%84%E6%BA%90%E7%BB%93%E7%AE%97settlement%E4%B8%8E%E5%AE%BF%E4%B8%BB%E4%BA%A4%E6%8E%A5host-handoff">5. 终态（Terminal State）、资源结算（Settlement）与宿主交接（Host Handoff）</a></li><li class="toc-level-3"><a href="#%E6%98%BE%E7%A4%BA%E5%AE%8C%E6%88%90%E4%BB%A5%E5%90%8E%E5%93%AA%E4%BA%9B%E8%B5%84%E6%BA%90%E8%BF%98%E6%B2%A1%E6%9C%89%E9%87%8A%E6%94%BE">显示完成以后，哪些资源还没有释放？</a></li><li class="toc-level-3"><a href="#%E5%8D%8F%E4%BD%9C%E4%BA%A4%E6%8E%A5cooperative-handoff%E7%BB%93%E6%9D%9F%E7%9A%84%E6%98%AF%E5%93%AA%E4%B8%AA%E8%BE%B9%E7%95%8C">协作交接（Cooperative Handoff）结束的是哪个边界？</a></li><li class="toc-level-3"><a href="#%E5%8F%AF%E6%90%BA%E5%B8%A6%E5%AF%BC%E5%87%BAportable-export%E4%B8%BA%E4%BD%95%E5%85%88%E5%A4%8D%E5%88%B6%E5%86%8D%E6%A3%80%E6%9F%A5%E9%9D%99%E6%AD%A2">可携带导出（Portable Export）为何先复制，再检查静止？</a></li><li class="toc-level-2"><a href="#6-%E8%BF%9E%E9%80%9A%E6%8E%88%E6%9D%83%E4%B8%8E%E5%85%B1%E4%BA%AB%E6%8A%AB%E9%9C%B2%E6%98%AF%E4%B8%89%E9%81%93%E4%B8%8D%E5%90%8C%E8%BE%B9%E7%95%8C">6. 连通、授权与共享披露是三道不同边界</a></li><li class="toc-level-3"><a href="#%E5%85%B1%E4%BA%AB%E4%BC%9A%E8%AF%9Dshared-session%E8%AE%A9%E8%B0%81%E7%9C%8B%E8%A7%81%E4%BB%80%E4%B9%88">共享会话（Shared Session）让谁看见什么？</a></li><li class="toc-level-3"><a href="#%E5%AF%B9%E7%AD%89%E7%BD%91%E7%BB%9Cpeer-mesh%E4%B8%8E%E4%B8%9A%E5%8A%A1%E5%94%A4%E9%86%92%E5%88%86%E5%88%AB%E8%A7%A3%E5%86%B3%E4%BB%80%E4%B9%88">对等网络（Peer Mesh）与业务唤醒分别解决什么？</a></li><li class="toc-level-2"><a href="#7-%E7%9B%B4%E6%8E%A5%E9%97%AE%E7%AD%94%E6%94%B9%E5%8F%98%E4%B8%80%E4%B8%AA%E6%9D%A1%E4%BB%B6%E5%86%8D%E5%88%A4%E6%96%AD%E6%81%A2%E5%A4%8Drecovery">7. 直接问答：改变一个条件，再判断恢复（Recovery）</a></li><li class="toc-level-2"><a href="#%E7%BB%A7%E7%BB%AD%E9%98%85%E8%AF%BB">继续阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

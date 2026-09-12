@@ -50,7 +50,7 @@
 <p>下一次模型输入（Model Input）可能包含用户要求、选中的完整回答、工具调用（Tool Call）及对应结果，也可能根据可见性（Visibility）、长度和协议规则过滤或重组。显示给用户的短报告，不能直接拿来充当完整的工具协议（Tool Protocol）历史。</p>
 <p>例如，原结果有两条失败断言（Assertion），摘要（Summary）只保留“2项失败”，模型（Model）就不能仅凭摘要（Summary）复述具体期望值。另一份界面投影（Projection）仍可能展示原文。两种表示的差异由用途解释，正确性则要看它们是否保留了各自承诺的信息。</p>
 <span class="heading-alias" id="对照一次真实-edit-的两种表示" aria-hidden="true"></span><h3 id="对照一项历史真实编辑">对照一项历史真实编辑</h3>
-<p><a href="22-agent-cases.html#%E7%9C%8B%E8%A7%81%E4%BA%86%E7%BC%96%E8%BE%91%E6%8A%A5%E5%91%8A%E8%BF%98%E6%B2%A1%E7%9C%8B%E8%A7%81%E6%95%B4%E4%B8%AA%E6%9C%80%E7%BB%88%E6%96%87%E4%BB%B6">第22章</a>保存了完整函数与文档修复的一次真实 <code>Edit</code>：原始工具结果（Tool Result）与送给模型（Model）的简短修改报告不同，之后模型（Model）另用 <code>git diff</code>取得两文件完整差异（Diff）。这里仅沿用该历史原生宿主（Host）运行与请求捕获，桌面界面未在该例运行，本章也未重跑。</p>
+<p><a href="22-agent-cases.html#%E7%BC%96%E8%BE%91%E6%8A%A5%E5%91%8A%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%B7%AE%E5%BC%82diff%E4%B8%8D%E6%98%AF%E5%90%8C%E4%B8%80%E4%BB%BD%E8%BE%93%E5%85%A5">第22章</a>保存了完整函数与文档修复的一次真实 <code>Edit</code>：原始工具结果（Tool Result）与送给模型（Model）的简短修改报告不同，之后模型（Model）另用 <code>git diff</code>取得两文件完整差异（Diff）。这里仅沿用该历史原生宿主（Host）运行与请求捕获，桌面界面未在该例运行，本章也未重跑。</p>
 <p>它说明三个观察对象不能合并：文件现态、工具（Tool）修改报告、模型输入（Model Input）。报告可以准确描述这次局部替换，仍不足以证明整个最终文件没有其他内容；要核对完整差异（Diff），需要额外读取。</p>
 <span class="heading-alias" id="误解五completed-就说明所有后台资源已经清理" aria-hidden="true"></span><span class="heading-alias" id="terminal最终状态为什么需要唯一裁决" aria-hidden="true"></span><span class="heading-alias" id="terminal-裁决与-settled-结算" aria-hidden="true"></span><span class="heading-alias" id="terminal-与-settled-不同" aria-hidden="true"></span><h3 id="终态terminal-state与完成文字">终态（Terminal State）与完成文字</h3>
 <p>终态（Terminal State）记录这次执行（Run）已经怎样结束。合法持久终态（Terminal State）形成后，普通执行（Run）过程不能随意追加并重新裁决；这不等于所有其他类别的业务记录都停止写入。</p>

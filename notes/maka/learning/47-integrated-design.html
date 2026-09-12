@@ -7,7 +7,7 @@
 </blockquote>
 <p>相关基础是 第28、31、36、39、40章 与<a href="README.html#%E6%8C%89%E6%A8%A1%E5%9D%97%E9%80%89%E6%8B%A9%E6%B7%B1%E5%8C%96%E5%86%85%E5%AE%B9">14 模块地图</a>中对应的机制；<a href="62-complete-design-cases.html">第62章</a>提供完整综合案例。</p>
 <span class="heading-alias" id="从已有设计分析卡开始不重复交一套材料" aria-hidden="true"></span><h2 id="综合设计的四个连接问题">综合设计的四个连接问题</h2>
-<p>模块连接产生四个具体问题：谁接纳工作，哪些记录让下一步可见，效果未知由谁处理，怎样判断最终交付？下面的参考方案把<a href="26-evaluation-and-design.html#%E7%BB%BC%E5%90%88%E8%AE%BE%E8%AE%A1%E8%A7%A3%E9%87%8A%E6%AF%94%E8%BE%83%E4%B8%8E%E9%99%90%E5%AE%9A%E7%BB%93%E8%AE%BA">第26章设计分析示例</a>中的身份、状态与判定扩展到一项完整任务。实现事实与额外设计分别标明，避免把更强的参考合同当成产品现状。</p>
+<p>模块连接产生四个具体问题：谁接纳工作，哪些记录让下一步可见，效果未知由谁处理，怎样判断最终交付？下面的参考方案把<a href="26-evaluation-and-design.html#8-%E9%87%87%E7%94%A8%E4%B8%80%E4%B8%AA%E6%96%B0%E8%AE%BE%E8%AE%A1%E6%97%B6%E6%80%8E%E6%A0%B7%E5%90%8C%E6%97%B6%E6%AF%94%E8%BE%83%E6%94%B6%E7%9B%8A%E4%B8%8E%E4%BB%A3%E4%BB%B7">第26章设计分析示例</a>中的身份、状态与判定扩展到一项完整任务。实现事实与额外设计分别标明，避免把更强的参考合同当成产品现状。</p>
 <p>在连接这些模块前，完整项目还有两个外层入口：开始时建立<a href="09-project-workspace.html">项目工作环境</a>，中断后通过<a href="27-task-continuity.html">工作交接</a>重新确认现状。它们给内部循环提供可用的起点，也让已经产生的结果能服务下一次工作。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 综合设计的四个连接问题"><table><caption>表 1 / Table 1 · 综合设计的四个连接问题</caption><thead><tr><th scope="col">工作边界（Boundary）</th><th scope="col">交给后续步骤的内容</th><th scope="col">后续负责者怎样使用</th></tr></thead><tbody><tr><td>首次接手项目</td><td>当前要求、相关文件地图、已有改动和测试基线</td><td>输入组装读取必要材料，执行器按当前范围开展修复</td></tr>
 <tr><td>一次工作结束</td><td>已完成部分、未完成项、检查对象与结果、未知效果</td><td>下一次接手先核对变化与许可，再选择仍有必要的工作</td></tr>

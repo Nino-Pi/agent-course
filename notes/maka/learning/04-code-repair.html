@@ -64,7 +64,7 @@ r=s-60m,\qquad 0\le r&lt;60.</annotation></semantics></math></span><span class="
 <p>验证（Verification）也有两个消费者（Consumer）：测试（Test）程序消费修改后的函数，给出具体输入的行为结果；检查差异（Diff）的人或程序消费文件改动，判断修改是否符合授权。两边都需要材料，不能把模型（Model）的“已经修好”同时当作两种检查的结果。</p>
 <p><strong>反例：只针对测试（Test）输入打补丁。</strong> 如果一个补丁只给 60、125 写特判，保留其余 <code>% 100</code> 逻辑，它也能让现有四例通过。按任务契约（Task Contract），59 秒应为 <code>0:59</code>，61 秒应为 <code>1:01</code>；该特判补丁却会把 61 秒算成 <code>1:61</code>。这是根据代码的纸面计算，固定示例项目（Fixture）的四个测试（Test）没有包含这两个边界样例，不能把此推导写成新增运行结果。一般规律、边界样例和差异（Diff）审查互相补充，不能把多跑几个数说成穷尽证明。</p>
 <p>本固定案例保持测试（Test）不变，是为了让验收可比较；它不是“真实项目禁止改测试（Test）”的规则。真实修复可以增加符合独立需求的回归测试（Regression Test），先确认它在旧实现暴露故障、在修复后通过，并保留相关既有检查。若怀疑原断言（Assertion）有误，先依据需求说明理由，不能仅为变绿而删除断言（Assertion）或改期望。</p>
-<p><a href="05-exit-and-trajectory.html#%E5%85%88%E7%9C%8B%E5%AE%8C%E6%88%90%E5%91%BD%E4%BB%A4%E5%86%8D%E7%9C%8B%E5%AE%9E%E9%99%85%E6%B6%88%E8%B4%B9%E8%80%85consumer">第05章的退出检查</a>只决定循环怎样停下，不能代替修复验收。<a href="26-evaluation-and-design.html#%E8%AF%84%E4%BB%B7%E6%9C%80%E5%B0%8F%E6%A8%A1%E5%9E%8B">第26章</a>讨论多次任务委托的评价；本实验的固定回放次数不能生成模型（Model）成功率。</p>
+<p><a href="05-exit-and-trajectory.html#%E5%85%88%E7%9C%8B%E5%AE%8C%E6%88%90%E5%91%BD%E4%BB%A4%E5%86%8D%E7%9C%8B%E5%AE%9E%E9%99%85%E6%B6%88%E8%B4%B9%E8%80%85consumer">第05章的退出检查</a>只决定循环怎样停下，不能代替修复验收。<a href="26-evaluation-and-design.html#%E6%AD%A3%E7%A1%AE%E6%80%A7%E6%A0%87%E5%87%86oracle%E4%B8%8E%E5%88%A4%E5%AE%9A%E5%99%A8grader%E5%90%84%E5%81%9A%E4%BB%80%E4%B9%88">第26章</a>讨论多次任务委托的评价；本实验的固定回放次数不能生成模型（Model）成功率。</p>
 <span class="heading-alias" id="第二遍让真实-mini-循环推进同一组动作" aria-hidden="true"></span><span class="heading-alias" id="练习二固定响应驱动真实循环" aria-hidden="true"></span><h2 id="固定响应怎样驱动真实循环">固定响应怎样驱动真实循环</h2>
 <p>本节使用已有固定响应运行，起点是同一套未修复的四文件项目。每个行动请求（Action）、返回结果与最终差异（Diff）都已给出，可以直接沿表格理解循环如何推进。</p>
 <p>前面已经解释“为什么这项修改合理”，这里换一个问题：即使下一步早就写好，真实的解析、执行和反馈链是否仍按协议工作？确定性模型（Deterministic Model）用于隔离这条机制链，不用于评价定位能力。</p>
@@ -101,7 +101,7 @@ changed_files: [README.md, src/duration.js]
 exit_status: Submitted
 acceptance: PASS</code></pre>
 <span class="heading-alias" id="第三遍可选看看真实模型怎么走" aria-hidden="true"></span><span class="heading-alias" id="真实模型生成的修复路线" aria-hidden="true"></span><h2 id="真实模型model生成的修复路线">真实模型（Model）生成的修复路线</h2>
-<p><a href="22-agent-cases.html#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">第22章的真实 mini 修复</a>沿用四份原始文件，由真实 K3 生成行动请求（Action）。它读取文件、选择测试（Test）时点并修改代码，行动请求（Action）顺序由模型（Model）响应决定，可与这里预写的八步对比。</p>
+<p><a href="22-agent-cases.html#1-mini%E4%BB%8E%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9%E5%88%B0%E4%BF%AE%E6%94%B9%E4%B8%8E%E9%AA%8C%E8%AF%81verification">第22章的真实 mini 修复</a>沿用四份原始文件，由真实 K3 生成行动请求（Action）。它读取文件、选择测试（Test）时点并修改代码，行动请求（Action）顺序由模型（Model）响应决定，可与这里预写的八步对比。</p>
 <span class="heading-alias" id="自测先解释再看答案" aria-hidden="true"></span><span class="heading-alias" id="练习判断失败与修复证据" aria-hidden="true"></span><h2 id="失败与修复结果问答">失败与修复结果问答</h2>
 <p><strong>问题 1。</strong> 第 2 步与第 4 步都是退出码（Exit Code）<code>returncode</code> 1，为什么不能按同一种故障修复？</p>
 <p><strong>解释。</strong> 第 2 步失败在 npm 的入口选择，测试（Test）尚未运行；第 4 步运行到了测试（Test）断言（Assertion），需核对函数逻辑与测试（Test）需求。必须阅读观察消息（Observation Message）的内容，不能只看退出码（Exit Code）。</p>

@@ -1,80 +1,160 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 21 章｜记忆的保存、读取与使用 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 21 / 62</div><article id="main-content"><span class="heading-alias" id="l02文件里有偏好为什么新任务还可能看不见" aria-hidden="true"></span><span class="heading-alias" id="l02记忆的保存读取与使用" aria-hidden="true"></span><span class="heading-alias" id="第-20-章记忆的保存读取与使用" aria-hidden="true"></span><h1 id="第-21-章记忆的保存读取与使用">第 21 章｜记忆的保存、读取与使用</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 21 章｜记忆（Memory）的保存、回读（Readback）与提交（Commit）边界 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script><link rel="stylesheet" href="../../../assets/katex/katex.min.css"><link rel="stylesheet" href="../../../assets/course-math.css"></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 21 / 62</div><article id="main-content"><span class="heading-alias" id="l02文件里有偏好为什么新任务还可能看不见" aria-hidden="true"></span><span class="heading-alias" id="l02记忆的保存读取与使用" aria-hidden="true"></span><span class="heading-alias" id="第-20-章记忆的保存读取与使用" aria-hidden="true"></span><span class="heading-alias" id="第-21-章记忆的保存读取与使用" aria-hidden="true"></span><h1 id="第-21-章记忆memory的保存回读readback与提交commit边界">第 21 章｜记忆（Memory）的保存、回读（Readback）与提交（Commit）边界</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：保存偏好、关闭读取和提交后崩溃，会怎样改变下一进程看到的状态与输入？</p>
-<p><strong>关键概念</strong>：跨进程读取检验信息是否保留；scope（范围）决定选择；composer（组装器）生成请求背景；COMMIT（事务提交）成功后使本次事务修改生效；receipt（回执记录）识别同一操作的重放。</p>
-<p><strong>关系主线</strong>：Python 案例展示范围选择，Maka 案例对照文件、数据库与组装结果。关闭读取不等于删除，提交后丢回执不等于回滚；两组都未调用模型，不能由此保证偏好被采用。</p>
+<p><strong>核心问题</strong>：保存偏好、关闭读取和事务提交（Commit）后崩溃，会怎样改变新进程能够取得的状态与输入？</p>
+<p><strong>关键概念</strong>：作用域（Scope）决定背景选择；组装器（Composer）准备模型输入（Model Input）；版本（Revision）识别更新依据；事务提交（Commit）决定修改是否生效；回执（Receipt）帮助查回同一操作的结果。</p>
+<p><strong>关系主线</strong>：先用固定程序追踪文件保存与范围选择，再用Maka组件对照缓存（Cache）、提交（Commit）前回滚（Rollback）和提交（Commit）后重放（Replay）。关闭读取不删除文件，丢失回复不撤销提交（Commit）；这些实验没有调用模型（Model），使用效果仍需另行观察。</p>
 </blockquote>
-<p>第一项使用 Python 标准库、JSON 文件和顺序启动的新进程，不调用 Maka；第二项使用真实 Maka Memory 存储、composer 和 SQLite 事务。两项都不调用模型，相关定义见 <a href="20-memory.html">第20章</a>。</p>
-<p>旧会话保存“解释用中文”，随后增加“工作区 A 用英文，其他工作区继续中文”。新请求始终只有“解释 formatDuration 的测试结果”，没有重述偏好。</p>
-<span class="heading-alias" id="先预测再运行" aria-hidden="true"></span><h2 id="工作区规则与预期背景">工作区规则与预期背景</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 工作区规则与预期背景"><table><caption>表 1 / Table 1 · 工作区规则与预期背景</caption><thead><tr><th scope="col">情况</th><th scope="col">新请求背景（Request context）应包含什么</th></tr></thead><tbody><tr><td>只有全局中文偏好，在 A 中读取</td><td>中文偏好</td></tr>
-<tr><td>保存 A 英文例外后，在 A 中读取</td><td>英文偏好</td></tr>
-<tr><td>保存 A 英文例外后，在 B 中读取</td><td>原来的中文偏好</td></tr>
-<tr><td>在 A 中关闭读取</td><td>空背景，文件仍存在</td></tr>
-<tr><td>故意忽略工作区例外，只读全局偏好</td><td>错误的中文背景；用于检验断言能否辨认范围错误</td></tr></tbody></table></div>
-<p>这个工作区选择规则是教学设计，不是对 Maka Local Memory scope 的复刻。Maka 两套 Memory 的真实 scope 与读取链应查 <a href="20-memory.html#%E6%9C%AC%E5%9C%B0%E8%AE%B0%E5%BF%86%E7%AC%94%E8%AE%B0local-memory%E5%85%88%E8%BF%BD%E8%B8%AA%E4%B8%80%E6%9D%A1%E5%8F%AF%E8%A7%81%E7%9A%84%E8%AF%BB%E5%8F%96%E9%93%BE">第20章 实现深化</a>。</p>
-<span class="heading-alias" id="执行一次完整过程" aria-hidden="true"></span><h2 id="跨进程保存与读取的完整过程">跨进程保存与读取的完整过程</h2>
-<p>这个固定输入案例的结果为 <code>PASS</code>，七项检查均通过。它只调用 Python 标准库，没有调用 Maka 或模型。</p>
-<p>脚本每次保存或读取都用 <code>subprocess.run</code> 启动新进程，并等待它退出后才启动下一步。trace 记录动作与 PID，因此读取不会依赖上一个进程里的 Python 字典。文件是本实验跨进程保留信息的载体。</p>
-<h2 id="关键代码改变了什么">关键代码改变了什么</h2>
-<p><a href="../../../attachments/memory-write-read-lab.py.html">实验脚本</a>中，三个分支决定状态变化：</p>
-<ol>
-<li><code>worker</code> 的两个保存分支：先保存全局偏好，再添加 A 的例外，原全局值仍保留。</li>
-<li><code>worker</code> 的读取分支：关闭读取时直接返回空背景；开启时按工作区选择。这一步决定“已经保存的信息”是否进入背景。</li>
-<li><code>run</code> 的正反对照：比较 A、B、关闭读取和故意只读全局偏好的结果，同时核对关闭读取前后的文件 hash 相同。</li>
-</ol>
-<p>实际状态依次为：</p>
-<pre><code class="language-text">文件：global=zh
-  → 新读进程A：background=zh
-文件：global=zh，workspace A=en
-  → 新读进程A：background=en
-  → 新读进程B：background=zh
-  → 关闭读取的A：background=[]；文件不变
-  → 错误读取器A：background=zh；暴露scope选择错误</code></pre>
-<p>输出的 <code>background</code> 是供请求装配使用的数据，不是模型回答。即使程序选择了 <code>en</code>，也没有验证模型最终用英文、更没有证明模型正确解释了测试。</p>
-<span class="heading-alias" id="接着看真实模型怎样使用" aria-hidden="true"></span><h2 id="真实模型的输出对照">真实模型的输出对照</h2>
-<p><a href="22-agent-cases.html#5-memory%E6%96%B0%E4%BC%9A%E8%AF%9D%E7%9A%84%E8%BF%99%E4%B8%89%E4%B8%AA%E5%B0%8F%E6%A0%87%E9%A2%98%E4%BB%8E%E5%93%AA%E9%87%8C%E6%9D%A5">第22章 的真实 Local Memory 案例</a>继续观察模型输出：相同保存条目，开启读取的新会话按指定三段格式解释测试，关闭读取的新会话使用普通结构。程序选择了什么与模型怎样回答，是两项独立观察。</p>
-<span class="heading-alias" id="补全与迁移" aria-hidden="true"></span><span class="heading-alias" id="练习增加工作区与任务规则" aria-hidden="true"></span><h2 id="增加工作区例外与任务规则">增加工作区例外与任务规则</h2>
-<p><strong>问题。</strong> 新用户要求“B 用日文，其他工作区照旧”。存储中增加什么，A、B、C 分别读取什么？</p>
-<p class="answer-label"><strong>参考答案</strong></p>
-<p>在既有工作区映射中增加 B 的日文例外，保留 global=zh 和 A=en。A 读英文，B 读日文，C 回落到全局中文。实现时还需让写入分支接收对应值；本实验源为便于观察而固定写入 en，因此仅更换 workspace 参数不能完成该迁移。</p>
-<p><strong>问题。</strong> 若要求变成“发布说明用英文，排错解释用中文”，仅按 workspace 选择还够吗？</p>
-<p><strong>解释。</strong> 不够，新规则区分的是任务类型。一个明确的教学方案是先由本次任务确定 <code>task_type</code>，再按 <code>release_notes → en</code>、<code>debug_explanation → zh</code> 选择；未知类型继续使用原工作区规则。这样，A 的发布说明用英文、A 的排错解释用中文，B 的发布说明也用英文。这里假定任务规则优先于工作区规则，并由用户要求支持这一优先级；若任务同时属于两类且没有优先规则，应保留冲突。该选择器是新条件的设计推演，原 Python 脚本没有实现它。</p>
-<p>这个 Python 实验用 <code>write_text</code> 保存文件，没有建立崩溃事务，也没有处理多写者或幂等重试。真实存储的重开、事务和故障行为由下面的 Maka 实验检查。</p>
-<span class="heading-alias" id="二读实现让当前-maka-真正写入重开和组装" aria-hidden="true"></span><h2 id="maka-的写入重开与输入组装">Maka 的写入、重开与输入组装</h2>
-<p>第二个案例直接使用构建后的 Maka 模块，在独立测试状态根中保存明确给定的内容。写入进程退出后，新进程重新打开同一状态并组成输入；它不读取用户实际 Memory，也不调用模型。</p>
-<p>运行环境需与编译产物和原生依赖匹配。若进程未能启动，或尚未取得状态根的使用资格，失败发生在 Memory 操作之前，不能据此判断保存或事务行为。</p>
-<span class="heading-alias" id="先画清楚这次到底执行谁" aria-hidden="true"></span><h3 id="local-与-atomic-的实验调用链">Local 与 Atomic 的实验调用链</h3>
-<p>两组实验各自有完整消费者：Local 路线读取后组成输入，Atomic 路线重开后查询事务与回执。两条路径没有画出模型调用，也没有把 Atomic 接到 Local composer。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Local 与 Atomic 的实验调用链：可滚动示意图"><a href="../../../assets/diagrams/21-memory-lifecycle-1.svg"><img src="../../../assets/diagrams/21-memory-lifecycle-1.svg" alt="两条记忆实验路径分别展示 Local 的条目写入、取得状态根资格与输入组装，以及 Atomic 的事务提交、故障、新进程查询与同操作重放；两条路径没有自动模型消费连接。" width="804" height="1228" loading="lazy" style="width:804px;min-width:684px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>Local 部分使用真实 root lease（对该状态根的独占写入资格）、policy Store、Memory coordinator 与 composer；为了隔离本题，可用 Skill 方法目录（inventory）与工具集合均设为空，workspace instructions 关闭。Skill 的加载机制将在第23章展开。Atomic 部分直接调用低层 Store 的 failpoint，测试事务本身；它不运行模型提取器，也不绕此接口宣称生产权限已验证。</p>
-<span class="heading-alias" id="打开产物逐个判断成功发生在哪" aria-hidden="true"></span><h3 id="产物与结算时点">产物与结算时点</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 产物与结算时点"><table><caption>表 2 / Table 2 · 产物与结算时点</caption><thead><tr><th scope="col">操作（Operation）</th><th scope="col">核对的对象</th><th scope="col">本例结果</th></tr></thead><tbody><tr><td>使用当前 revision 正常保存 workspace 与 Session A 偏好</td><td>写入结果与 <code>MEMORY.md</code></td><td>保存成功，文档包含对应偏好</td></tr>
-<tr><td>随后故意使用旧 revision 再写一次</td><td>拒绝结果与当前 <code>MEMORY.md</code></td><td>旧 revision 被拒绝，没有覆盖已保存内容</td></tr>
-<tr><td>新进程分别为 Session A/B 组成输入</td><td>两个 Session 的 prompt</td><td>两者有 workspace 偏好；只有 A 有 Session A 条目，带 untrusted block</td></tr>
-<tr><td>关闭读取再组成输入</td><td>prompt 与关闭前后的记忆文件</td><td>无 local-memory block；关闭前后 MEMORY.md digest 相同，文件未删除</td></tr>
-<tr><td>同一 Turn 已抓取后新增条目</td><td>当前 Turn 与新 Turn 的 prompt</td><td>同 Turn 不含新增条目；新 Turn 含新增条目</td></tr>
-<tr><td>Item 与 cursor 写入后、COMMIT 前抛错</td><td>新进程重开的数据库</td><td>新进程重开后 Item/cursor/receipt 全部不存在</td></tr>
-<tr><td>提取 COMMIT 后杀死子进程</td><td>数据库状态与同一操作的重放结果</td><td>新进程读到 Item、cursor=1、receipt；相同 operation 返回 replayed，查询仅一条</td></tr>
-<tr><td>Atomic 已在同一 root 的 memory.sqlite 中，再组成 Local prompt</td><td>数据库内容与 Local prompt</td><td>数据库有 Atomic 标记，prompt 没有；不能把“保存成功”写成“Agent 会自动召回”</td></tr></tbody></table></div>
-<p>输出的 prompt 是真实 composer 的结果，但不是 provider wire 请求，更不是模型回答。后续链会将其送到 adapter 的 <code>system</code> 参数；本实验停在 composer。<a href="22-agent-cases.html#5-memory%E6%96%B0%E4%BC%9A%E8%AF%9D%E7%9A%84%E8%BF%99%E4%B8%89%E4%B8%AA%E5%B0%8F%E6%A0%87%E9%A2%98%E4%BB%8E%E5%93%AA%E9%87%8C%E6%9D%A5">第22章</a>另以真实模型输入与回答对照说明采用情况；两组实验的结果不能混成同一次执行。</p>
-<span class="heading-alias" id="从实验结果追到实现" aria-hidden="true"></span><h3 id="写入事务与重读怎样解释结果">写入、事务与重读怎样解释结果</h3>
-<p>该案例的 10 项检查均通过，真实调用了 Maka 存储与组装组件，没有调用模型或 provider。下面的调用顺序解释了表中结果为何不同。</p>
-<p>三个调用窗口分别负责写入、事务与重读：</p>
-<ol>
-<li><code>memory-coordinator.ts::#commitSemantic/readPromptProjection</code>：写入用 revision CAS；读关闭在 bundle read 前返回。<code>interactive-run-composer.ts::readPromptState/resolveSystemPrompt</code> 则把 body 放进输入，并按 Session/Turn 缓存。</li>
-<li><code>sqlite-long-term-memory-store.ts::commitExtraction</code>：<code>BEGIN IMMEDIATE</code> 开启事务，<code>after_cursor_write</code> 位于 cursor 写入后，随后写 operation/receipt 并 <code>COMMIT</code>；<code>after_commit</code> 已在提交之后。因此两侧抛错会留下不同持久结果，统一 catch 中的 rollback 不能撤销已经提交的事务。</li>
-<li>同文件 <code>readItem/searchByKeys/#readSnapshot</code>：重开的读侧查询真实数据库，不依赖写进程中的对象。composer 没有调用 Atomic 查询来组成输入，因此 Store 查询成功仍不等于自动召回。</li>
-</ol>
-<p>这里的关键反例是：<strong>commit 后抛错或进程死掉，调用者没收到成功，却不能推出数据库没有提交。</strong> 重试应携带原 operation identity，先识别 receipt；另造新 identity 会丢失这层幂等关系。实验中的固定 key/用户文本是明确输入，不是模型实际抽取的成果。</p>
-<p><strong>实现问题解析</strong></p>
-<ul>
-<li>文件已更新而同 Turn prompt 不变，是持久化失败吗？不是；先检查是否命中了同一 Session/Turn 的 composer 缓存。新 Turn 能读到新增内容才是这个实验的下一步观察。</li>
-<li>COMMIT 前后两个故障都使调用失败，为什么数据库结果相反？前者仍可整体回滚，后者已提交，只是结果未交到调用者；重开与 receipt 才能区分。</li>
-<li><code>memory.sqlite</code> 有 Item 且 key query 命中，为什么没有进入 prompt？这证明了 Store 查询；当前 composer 只接 Local Memory，不能自动补出缺失的 Atomic recall caller。</li>
-<li>这 10 项能证明模型会遵守偏好吗？不能；它们覆盖存储与输入组成，没有模型输出。还需固定当前请求、读取条件与验收标准，观察实际回答。</li>
-</ul>
-<p>相关机制：<a href="20-memory.html">第20章 Memory</a>；<a href="26-evaluation-and-design.html">第26章 设计分析</a>。</p>
+<h2 id="前情回顾第20章的四个环节分别怎样取得证据">前情回顾：第20章的四个环节，分别怎样取得证据？</h2>
+<p><a href="20-memory.html">第20章</a>把长期信息的使用拆成保存、取回、组装输入与实际采用。文件中有一条偏好，只回答第一件事；本次请求是否读取它、模型（Model）是否按它回答，仍有各自的消费者（Consumer）和观察依据。本章继续用“解释结果时采用什么语言”检验前面的关系。</p>
+<p>这里有两项已经执行过的实验。第一项是Python标准库程序，每个动作启动一个新进程；第二项调用真实Maka存储与组装组件。<strong>两项都没有调用模型（Model）。</strong> 输出中的背景和提示词（Prompt）只能说明准备了什么，不能直接当作回答。</p>
+<p>先分清下面三种范围，避免同样的A/B字母带来误解：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 前情回顾：第20章的四个环节，分别怎样取得证据？"><table><caption>表 1 / Table 1 · 前情回顾：第20章的四个环节，分别怎样取得证据？</caption><thead><tr><th scope="col">所处情境</th><th scope="col">A/B究竟指什么</th><th scope="col">谁负责选择或隔离</th></tr></thead><tbody><tr><td>本章Python程序</td><td>字典里的工作区（Workspace）名称</td><td>程序显式按名称选择例外</td></tr>
+<tr><td>本章Maka组件实验</td><td>同一状态根（State Root）中的会话（Session）A/B</td><td>会话作用域（Session Scope）筛选对应偏好</td></tr>
+<tr><td>第20章项目更正示例</td><td>使用不同状态根（State Root）的两个项目</td><td>部署边界；不是自动按目录识别项目</td></tr></tbody></table></div>
+<h2 id="固定程序新进程怎样选出正确背景">固定程序：新进程怎样选出正确背景？</h2>
+<span class="heading-alias" id="先预测再运行" aria-hidden="true"></span><span class="heading-alias" id="工作区规则与预期背景" aria-hidden="true"></span><h3 id="输入与选择规则先于实现">输入与选择规则先于实现</h3>
+<p>旧会话（Session）先保存“解释用中文”，随后增加“工作区（Workspace）A用英文，其他工作区（Workspace）继续中文”。新请求始终是“解释 formatDuration 的测试结果。”，没有再次写入语言偏好。</p>
+<p>用 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>g</mi></mrow><annotation encoding="application/x-tex">g</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">g</span></span></span></span></span> 表示全局语言，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi></mrow><annotation encoding="application/x-tex">O</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">O</span></span></span></span></span> 表示工作区（Workspace）例外映射，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>W</mi></mrow><annotation encoding="application/x-tex">W</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span></span></span></span></span> 表示本次工作区（Workspace）。<strong>只在允许读取并成功取得文件后</strong>，正常选择器按下面的规则返回语言 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">ℓ</mi><mo stretchy="false">(</mo><mi>W</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">\ell(W)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">ℓ</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span><span class="mclose">)</span></span></span></span></span>：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi mathvariant="normal">ℓ</mi><mo stretchy="false">(</mo><mi>W</mi><mo stretchy="false">)</mo><mo>=</mo><mrow><mo fence="true">{</mo><mtable rowspacing="0.36em" columnalign="left left" columnspacing="1em"><mtr><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mi>O</mi><mo stretchy="false">[</mo><mi>W</mi><mo stretchy="false">]</mo><mo separator="true">,</mo></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mi>W</mi><mo>∈</mo><mi mathvariant="normal">dom</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>O</mi><mo stretchy="false">)</mo><mo separator="true">,</mo></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mi>g</mi><mo separator="true">,</mo></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mi>W</mi><mo mathvariant="normal">∉</mo><mi mathvariant="normal">dom</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>O</mi><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow></mstyle></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">\ell(W)=
+\begin{cases}
+O[W], &amp; W\in\operatorname{dom}(O),\\
+g, &amp; W\notin\operatorname{dom}(O).
+\end{cases}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">ℓ</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:3em;vertical-align:-1.25em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;"><span class="delimsizing size4">{</span></span><span class="mord"><span class="mtable"><span class="col-align-l"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.69em;"><span style="top:-3.69em;"><span class="pstrut" style="height:3.008em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0278em;">O</span><span class="mopen">[</span><span class="mord mathnormal" style="margin-right:0.1389em;">W</span><span class="mclose">]</span><span class="mpunct">,</span></span></span><span style="top:-2.25em;"><span class="pstrut" style="height:3.008em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0359em;">g</span><span class="mpunct">,</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.19em;"><span></span></span></span></span></span><span class="arraycolsep" style="width:1em;"></span><span class="col-align-l"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.69em;"><span style="top:-3.69em;"><span class="pstrut" style="height:3.008em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">W</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mop"><span class="mord mathrm">dom</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">O</span><span class="mclose">)</span><span class="mpunct">,</span></span></span><span style="top:-2.25em;"><span class="pstrut" style="height:3.008em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">W</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel"><span class="mord"><span class="mrel">∈</span></span><span class="mord vbox"><span class="thinbox"><span class="llap"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="inner"><span class="mord"><span class="mord">/</span><span class="mspace" style="margin-right:0.0556em;"></span></span></span><span class="fix"></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mop"><span class="mord mathrm">dom</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">O</span><span class="mclose">)</span><span class="mord">.</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.19em;"><span></span></span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span></div>
+<p><span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">dom</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>O</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">\operatorname{dom}(O)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop"><span class="mord mathrm">dom</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">O</span><span class="mclose">)</span></span></span></span></span> 是映射中已有例外的名称集合。本例先有 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>g</mi><mo>=</mo><mtext>zh</mtext></mrow><annotation encoding="application/x-tex">g=\text{zh}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">g</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord text"><span class="mord">zh</span></span></span></span></span></span>、空映射，后来增加 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">[</mo><mtext>A</mtext><mo stretchy="false">]</mo><mo>=</mo><mtext>en</mtext></mrow><annotation encoding="application/x-tex">O[\text{A}]=\text{en}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">O</span><span class="mopen">[</span><span class="mord text"><span class="mord">A</span></span><span class="mclose">]</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord text"><span class="mord">en</span></span></span></span></span></span>。因此A选英文，B回落到中文。关闭读取时不计算这项选择，而是直接返回空背景；“空背景”也不表示偏好被删除。</p>
+<p>这是一项明确的教学规则，并非Maka本地记忆笔记（Local Memory）的作用域（Scope）复刻。第20章已经说明，Maka工作区作用域（Workspace Scope）不会仅凭当前项目目录自动过滤。</p>
+<span class="heading-alias" id="关键代码改变了什么" aria-hidden="true"></span><h3 id="保存分支补充例外保留全局值">保存分支：补充例外，保留全局值</h3>
+<p>完整程序的核心处理函数名为 <code>worker</code>。它接收动作、文件路径、工作区（Workspace）和读取开关。先看同一函数的两个保存分支：<code>save-global</code>建立初态，<code>save-override</code>读回文件后只添加指定工作区（Workspace）的英文例外。</p>
+<pre><code class="language-python">def worker(action: str, store: Path, workspace: str, read_enabled: bool) -&gt; dict:
+    if action == &#39;save-global&#39;:
+        # 首次保存：全局中文，尚无工作区（Workspace）例外。
+        data = {&#39;global&#39;: &#39;zh&#39;, &#39;workspaces&#39;: {}}
+        store.write_text(json.dumps(data, ensure_ascii=False, indent=2) + &#39;\n&#39;)
+        return {&#39;pid&#39;: os.getpid(), &#39;action&#39;: action, &#39;saved&#39;: data}
+    if action == &#39;save-override&#39;:
+        # 先回读已有状态，只补充当前工作区（Workspace）的例外。
+        data = json.loads(store.read_text())
+        data[&#39;workspaces&#39;][workspace] = &#39;en&#39;
+        store.write_text(json.dumps(data, ensure_ascii=False, indent=2) + &#39;\n&#39;)
+        return {&#39;pid&#39;: os.getpid(), &#39;action&#39;: action, &#39;saved&#39;: data}</code></pre>
+<p><code>data</code>是该进程内的字典，<code>write_text</code>才把它写进文件。第二个分支保留已有的 <code>global</code>和其他映射，不把A的例外改写为全局英文。<code>pid</code>是进程标识符（Process Identifier，PID），用于把结果与本次进程联系起来；它不是永久不重复的工作身份。</p>
+<p>代码中的 <code>en</code>是固定实验输入。这个保存分支尚未接受任意语言参数，所以后面讨论日文时，不能只换工作区（Workspace）名称就宣称完成了功能迁移。</p>
+<h3 id="读取分支关闭读取时连文件也不读">读取分支：关闭读取时连文件也不读</h3>
+<p>下面接着同一个 <code>worker</code>函数，缩进仍属于函数内部。它先检查读取开关，再读取文件。<code>read-global-only</code>是故意忽略例外的错误读取器，用于负向对照（Negative Control）；正常读取采用前面的选择规则。</p>
+<pre><code class="language-python">    if not read_enabled:
+        # 读取开关在文件读取之前判断；文件仍保留。
+        # No store read is needed for this branch. The file still exists.
+        return {&#39;pid&#39;: os.getpid(), &#39;action&#39;: action, &#39;workspace&#39;: workspace,
+                &#39;current_request&#39;: REQUEST, &#39;background&#39;: [], &#39;store_read&#39;: False}
+    data = json.loads(store.read_text())
+    # 正常路径先选工作区（Workspace）例外；错误路径故意只选全局。
+    # The deliberately broken variant ignores the workspace exception.
+    language = (data[&#39;global&#39;] if action == &#39;read-global-only&#39;
+                else data[&#39;workspaces&#39;].get(workspace, data[&#39;global&#39;]))
+    return {&#39;pid&#39;: os.getpid(), &#39;action&#39;: action, &#39;workspace&#39;: workspace,
+            &#39;current_request&#39;: REQUEST, &#39;store_read&#39;: True,
+            &#39;background&#39;: [{&#39;kind&#39;: &#39;explanation-language&#39;, &#39;value&#39;: language,
+                            &#39;source&#39;: &#39;saved-preference&#39;, &#39;authority&#39;: &#39;background&#39;}]}</code></pre>
+<p>这里的关键顺序有两点。第一，关闭读取会在 <code>store.read_text()</code>之前返回，结果同时写明 <code>background=[]</code>与 <code>store_read=False</code>。第二，正常读取中的 <code>.get(workspace, data[&#39;global&#39;])</code>先查例外，找不到才用全局值；错误读取器则绕过这项判断。</p>
+<p><code>background</code>包含偏好的值、来源及 <code>authority=&#39;background&#39;</code>。这个标记表达程序把它当背景材料，不是赋予文件或命令权限（Permission）的安全机制。输出只是JavaScript对象表示法（JavaScript Object Notation，JSON）数据，没有生成任何语言回答。</p>
+<span class="heading-alias" id="执行一次完整过程" aria-hidden="true"></span><span class="heading-alias" id="跨进程保存与读取的完整过程" aria-hidden="true"></span><h3 id="为什么这不是同一个字典被反复读取">为什么这不是同一个字典被反复读取？</h3>
+<p>父程序通过下面的 <code>child</code>函数逐次启动子进程（Child Process），等它退出后才进入下一步。传给子进程（Child Process）的是文件路径和参数，不是前一个 <code>data</code>字典。</p>
+<pre><code class="language-python">def child(action: str, store: Path, workspace: str = &#39;A&#39;, enabled: bool = True) -&gt; dict:
+    command = [sys.executable, str(Path(__file__).resolve()), &#39;--worker&#39;, action,
+               &#39;--store&#39;, str(store), &#39;--workspace&#39;, workspace]
+    if not enabled:
+        command.append(&#39;--read-disabled&#39;)
+    # 每次另启子进程（Child Process），等待成功结束后才解析输出。
+    completed = subprocess.run(command, check=True, capture_output=True, text=True, timeout=15)
+    return json.loads(completed.stdout)</code></pre>
+<p><code>sys.executable</code>使用当前Python解释器；<code>subprocess.run</code>启动脚本的工作分支、等待完成并捕获输出。<code>check=True</code>使异常退出不能悄悄成为正常结果，<code>json.loads</code>再解析子进程（Child Process）输出。这解释了为什么新读取进程必须依靠文件恢复信息。</p>
+<p>以上三段来自实际固定程序的核心函数，保存与读取两段合起来是完整 <code>worker</code>。命令行接口（Command-Line Interface，CLI）、输出路径检查和主入口在<a href="../../../attachments/memory-write-read-lab.py.html">完整脚本</a>中；片段本身依赖这些定义和导入，不能单独运行。</p>
+<h3 id="原结果每一项检查分别证明什么">原结果：每一项检查分别证明什么？</h3>
+<p>父程序按“保存全局→新进程读取→增加A例外→分别读A/B→关闭读取→错误读取器”执行。原运行返回 <code>PASS</code>，七项检查全部通过：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 原结果：每一项检查分别证明什么？"><table><caption>表 2 / Table 2 · 原结果：每一项检查分别证明什么？</caption><thead><tr><th scope="col">检查</th><th scope="col">实际观察结果（Observation）</th><th scope="col">可以作出的判断</th></tr></thead><tbody><tr><td>新进程恢复全局偏好</td><td>首次A背景为 <code>zh</code></td><td>内容跨过了该次进程退出</td></tr>
+<tr><td>A选择例外</td><td>增加例外后A背景为 <code>en</code></td><td>正常选择器采用了工作区（Workspace）规则</td></tr>
+<tr><td>B保留全局值</td><td>B背景仍为 <code>zh</code></td><td>A例外没有覆盖全局值</td></tr>
+<tr><td>关闭读取</td><td><code>background=[]</code>，<code>store_read=false</code></td><td>本次没有沿该路径读入背景</td></tr>
+<tr><td>文件保持</td><td>关闭前后文件摘要（Digest）相同</td><td>关闭读取没有改写该文件</td></tr>
+<tr><td>当前请求固定</td><td>各次请求都没有中文或英文要求</td><td>选择结果没有从当前请求重复取得偏好</td></tr>
+<tr><td>负向对照（Negative Control）</td><td>错误读取器在A返回 <code>zh</code></td><td>比较能辨认丢失例外的范围错误</td></tr></tbody></table></div>
+<p>文件的最终内容仍是全局中文加A英文。程序没有调用模型（Model），因此 <code>en</code>只代表英文背景被选出；它没有证明模型（Model）最终用英文，更没有证明测试（Test）解释正确。</p>
+<p>该程序使用顺序文件写入，没有建立崩溃事务（Transaction）、多写者并发控制或幂等重试（Idempotent Retry）。这些限制解释了下一项实验为什么需要真实存储组件。</p>
+<span class="heading-alias" id="补全与迁移" aria-hidden="true"></span><span class="heading-alias" id="练习增加工作区与任务规则" aria-hidden="true"></span><span class="heading-alias" id="增加工作区例外与任务规则" aria-hidden="true"></span><h3 id="改变规则时哪些部分需要跟着变">改变规则时，哪些部分需要跟着变？</h3>
+<p><strong>问题1。</strong> 新要求是“B用日文，其他工作区（Workspace）照旧”。A、B、C分别选择什么？</p>
+<p><strong>参考答案。</strong> 保留 <code>global=zh</code>与A的 <code>en</code>，增加B的日文例外，A选英文、B选日文、C回落到中文。还需使保存分支接受对应语言值；原脚本固定写入 <code>en</code>，没有实现这一扩展。</p>
+<p><strong>问题2。</strong> 改为“发布说明用英文，排错解释用中文”，仅按工作区（Workspace）选择还够吗？</p>
+<p><strong>参考答案。</strong> 不够，条件改成了任务类型。一项明确的教学设计是先选择 <code>task_type</code>：<code>release_notes → en</code>、<code>debug_explanation → zh</code>，未知类型再回落到原工作区（Workspace）规则。这里假定用户支持任务规则优先；若任务同时属于两类却没有优先规则，应保留冲突。该设计没有在原脚本中执行。</p>
+<span class="heading-alias" id="二读实现让当前-maka-真正写入重开和组装" aria-hidden="true"></span><span class="heading-alias" id="先画清楚这次到底执行谁" aria-hidden="true"></span><span class="heading-alias" id="maka-的写入重开与输入组装" aria-hidden="true"></span><span class="heading-alias" id="local-与-atomic-的实验调用链" aria-hidden="true"></span><h2 id="maka组件先区分读取链与事务transaction链">Maka组件：先区分读取链与事务（Transaction）链</h2>
+<p>第二项实验在独立测试（Test）状态根（State Root）中保存明确给定的内容。写入进程退出后，新进程重新取得同根使用资格并回读（Readback）。它使用当时构建的Maka模块，不读取用户日常记忆（Memory），也不调用模型（Model）。</p>
+<p>本地记忆笔记（Local Memory）使用 <code>MEMORY.md</code>与 <code>PENDING.md</code>文件组（Bundle）；条目化长期记忆（Atomic Long-Term Memory，Atomic LTM）使用独立数据库。下图中的两条路径各有消费者（Consumer），并没有把数据库查询接到本地组装器（Composer）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="记忆读取与提交 · Memory Read and Commit：可滚动示意图"><a href="../../../assets/diagrams/21-memory-lifecycle-1.svg"><img src="../../../assets/diagrams/21-memory-lifecycle-1.svg" alt="本地记忆笔记（Local Memory）经条目写入、状态根租约（State Root Lease）与输入组装形成可读材料；条目化长期记忆（Atomic LTM）经事务提交、故障、新进程查询与同操作重放核对结果，两条链没有自动的模型消费连接。" width="804" height="1284" loading="lazy" style="width:804px;min-width:684px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>本地记忆笔记（Local Memory）分支使用真实根租约（Root Lease）、策略存储（Policy Store）、记忆协调器（Memory Coordinator）和组装器（Composer）。根租约（Root Lease）在这里提供该状态根（State Root）的独占写入资格。为隔离本题，技能说明包（Skill）目录清单（Inventory）和工具（Tool）集合为空，工作区指令（Workspace Instructions）关闭；第23章再展开技能说明包（Skill）的装载。</p>
+<p>条目化长期记忆（Atomic LTM）分支直接调用低层存储（Store）的故障注入点（Failpoint），检验事务（Transaction），没有运行模型（Model）提取器，也不能据此声称生产权限（Permission）已验证。若环境或原生依赖导致进程无法启动，或尚未取得根租约（Root Lease），失败发生在记忆（Memory）操作之前。</p>
+<span class="heading-alias" id="打开产物逐个判断成功发生在哪" aria-hidden="true"></span><span class="heading-alias" id="产物与结算时点" aria-hidden="true"></span><h3 id="保存旧版本revision和新进程回读readback">保存、旧版本（Revision）和新进程回读（Readback）</h3>
+<p>本地记忆笔记（Local Memory）先写入一条工作区（Workspace）偏好和一条仅会话（Session）A适用的偏好。两次正常保存各使用当时版本（Revision）；然后故意拿初始旧版本（Revision）再写一次。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 保存、旧版本（Revision）和新进程回读（Readback）"><table><caption>表 3 / Table 3 · 保存、旧版本（Revision）和新进程回读（Readback）</caption><thead><tr><th scope="col">操作</th><th scope="col">实际结果</th><th scope="col">为什么这样判断</th></tr></thead><tbody><tr><td>按当前版本（Revision）保存两条偏好</td><td>文档包含两条指定内容</td><td>正常写入已被接受</td></tr>
+<tr><td>使用旧版本（Revision）追加</td><td>返回 <code>revision_conflict</code>，旧请求内容未写入</td><td>比较后写入（Compare-And-Swap，CAS）拒绝过期依据</td></tr>
+<tr><td>新进程为会话（Session）A组装</td><td>包含公共偏好和A专属内容</td><td>文件回读（Readback）与会话作用域（Session Scope）筛选接通</td></tr>
+<tr><td>新进程为会话（Session）B组装</td><td>包含公共偏好，不含A专属内容</td><td>同一状态根（State Root）不表示所有内容都适用</td></tr>
+<tr><td>关闭读取后组装</td><td>无 <code>&lt;local-memory&gt;</code>，文件摘要（Digest）不变</td><td>读取策略没有删除正文</td></tr></tbody></table></div>
+<p>实际调用中，<code>HostMemoryCoordinator</code>负责管理操作；写入用版本（Revision）比较，<code>readPromptProjection</code>在读取关闭时于文件组（Bundle）读取前返回。随后 <code>readPromptState</code>与 <code>resolveSystemPrompt</code>消费可选正文。这些职责对应第20章已经解释的保存与读取条件。</p>
+<h3 id="文件已经新增为什么本轮提示词prompt仍不变">文件已经新增，为什么本轮提示词（Prompt）仍不变？</h3>
+<p>实验先让组装器（Composer）为同一会话（Session）的 <code>turn-1</code>捕获正文，之后再保存一个带 <code>M_AFTER_CAPTURE</code>标记的新偏好。下面是探针对缓存（Cache）的完整局部分支；<code>mutate</code>负责显式保存，<code>promptContext</code>中已有会话（Session）、工作轮次（Turn）与目录。</p>
+<pre><code class="language-js">    if (action === &#39;local-cache&#39;) {
+      // 文件先保存；随后分别观察同一工作轮次（Turn）和新工作轮次（Turn）。
+      await mutate(ADDED, { kind: &#39;workspace&#39; });
+      const same = await composer.resolveSystemPrompt(promptContext);
+      const next = await composer.resolveSystemPrompt({ ...promptContext, turnId: &#39;turn-2&#39; });
+      await writeFile(join(output, &#39;local-next-turn.prompt.txt&#39;), next.text ?? &#39;&#39;);
+      return { sameTurnContainsAdded: (same.text ?? &#39;&#39;).includes(ADDED), nextTurnContainsAdded: (next.text ?? &#39;&#39;).includes(ADDED), hasAtomic: (next.text ?? &#39;&#39;).includes(ATOMIC) };
+    }</code></pre>
+<p>先调用 <code>mutate</code>再重新解析同一个 <code>promptContext</code>，得到的 <code>same</code>仍是已捕获材料；只把 <code>turnId</code>改成 <code>turn-2</code>后，<code>next</code>才重新采集。原结果为 <code>sameTurnContainsAdded=false</code>、<code>nextTurnContainsAdded=true</code>。</p>
+<p>这不是持久化（Persistence）失败。文件已保存，变化发生在输入何时重新采集；同一工作轮次（Turn）的缓存（Cache）不会追溯改写已发出的请求。输出是实际组装器（Composer）的提示词（Prompt）。探针没有调用模型协议适配器（Model Adapter），所以这还不是提供方协议请求（Provider Wire Request），更不是模型（Model）回答。原实验停在这里。</p>
+<span class="heading-alias" id="从实验结果追到实现" aria-hidden="true"></span><span class="heading-alias" id="写入事务与重读怎样解释结果" aria-hidden="true"></span><h3 id="事务提交commit前后相同失败表象不同持久结果">事务提交（Commit）前后：相同失败表象，不同持久结果</h3>
+<p>条目化长期记忆（Atomic LTM）实验提交明确构造的条目（Memory Item），并一起推进游标（Cursor）、保存回执（Receipt）。游标（Cursor）说明已覆盖范围，回执（Receipt）说明该操作的结算结果；三者需要在同一事务（Transaction）中决定，防止重复提取或漏存。</p>
+<p>探针固定操作身份（Operation Identity）为 <code>lab-extraction</code>，预期游标（Expected Cursor）为0，提交（Commit）后游标（Cursor）为1。条目（Memory Item）文本、来源和检索键（Retrieval Key）均由程序给定；它们不是模型（Model）真实提取出的成果。</p>
+<p>先看存储实现中的顺序：<code>BEGIN IMMEDIATE</code>开始写事务（Transaction），检查已有回执（Receipt）与预期游标（Expected Cursor），写入条目（Memory Item）和游标（Cursor），再写操作与回执（Receipt），最后 <code>COMMIT</code>。探针在两个既有位置制造故障：</p>
+<pre><code class="language-js">  const store = new SqliteMemoryItemStore(databasePath, { now: () =&gt; 1000, idFactory: () =&gt; &#39;atomic-item&#39;,
+    // 两处故障注入点（Failpoint）跨在事务提交（Commit）两侧。
+    failpoint(point) {
+      if (action === &#39;atomic-before-commit&#39; &amp;&amp; point === &#39;after_cursor_write&#39;) throw new Error(&#39;LAB_BEFORE_COMMIT&#39;);
+      if (action === &#39;atomic-after-commit-kill&#39; &amp;&amp; point === &#39;after_commit&#39;) {
+        writeFileSync(join(output, &#39;atomic-kill-boundary.json&#39;), JSON.stringify({ point, pid: process.pid }));
+        process.kill(process.pid, &#39;SIGKILL&#39;);
+      }
+    } });</code></pre>
+<p>这段为已选定的 <code>databasePath</code>建立存储（Store），固定时间与条目（Memory Item）名称，再提供故障注入点（Failpoint）回调。提交（Commit）前试验使用单独的回滚（Rollback）数据库，提交（Commit）后试验使用测试（Test）状态根（State Root）中的数据库；两者不会互相承接未提交（Commit）的状态。<code>after_cursor_write</code>位于事务提交（Commit）之前；<code>after_commit</code>已经在提交（Commit）之后。后者通过 <code>SIGKILL</code>硬终止（Hard Termination）子进程（Child Process），令它来不及返回成功。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 事务提交（Commit）前后：相同失败表象，不同持久结果"><table><caption>表 4 / Table 4 · 事务提交（Commit）前后：相同失败表象，不同持久结果</caption><thead><tr><th scope="col">故障时点</th><th scope="col">当时已发生什么</th><th scope="col">新进程实际读到什么</th></tr></thead><tbody><tr><td><code>after_cursor_write</code>抛错</td><td>事务（Transaction）内已有条目（Memory Item）与游标（Cursor）写入，但尚未提交（Commit）</td><td>三者均不存在，未提交（Commit）的修改回滚（Rollback）</td></tr>
+<tr><td><code>after_commit</code>发出 <code>SIGKILL</code></td><td>条目（Memory Item）、游标（Cursor）、回执（Receipt）已共同提交（Commit）</td><td>条目（Memory Item）存在、游标（Cursor）为1、回执（Receipt）存在</td></tr></tbody></table></div>
+<p>若故障回调抛出普通异常，存储方法的异常处理（Exception Handling）会尝试回滚（Rollback）；本例的 <code>SIGKILL</code>直接终止进程，不会继续执行该处理。无论如何，回滚（Rollback）都不能撤销已经完成的事务提交（Commit）。因此“调用方（Caller）没收到成功”只描述回复路径，无法单独确定数据库结果。</p>
+<h3 id="重开与同一操作重放operation-replay怎样消除歧义">重开与同一操作重放（Operation Replay）怎样消除歧义？</h3>
+<p>新进程重新打开数据库后，先读条目（Memory Item）、游标（Cursor）和回执（Receipt），再提交相同的固定请求。下面的 <code>extractionRequest()</code>每次返回相同内容，绝不只是复用名称却换了参数。</p>
+<pre><code class="language-js">    // 重开后查询数据库中的三份状态，不依赖旧进程对象。
+    const item = await store.readItem(&#39;atomic-item&#39;);
+    const cursor = await store.readExtractionCursor(&#39;atomic-session&#39;);
+    const receipt = await store.readExtractionReceipt(&#39;lab-extraction&#39;);
+    if (action === &#39;atomic-read-rollback&#39;) return { itemMissing: !item, cursorMissing: !cursor, receiptMissing: !receipt };
+    // 只有提交后分支继续重放（Replay）；请求内容仍由同一函数产生。
+    const replay = await store.commitExtraction(extractionRequest());
+    return { hasItem: item?.item.content === ATOMIC, cursor: cursor?.processedOrdinal, hasReceipt: Boolean(receipt),
+      replayed: replay.replayed, matchCount: (await store.searchByKeys({ terms: [&#39;atomic-lab&#39;], match: &#39;exact&#39; })).length };</code></pre>
+<p>提交（Commit）前故障对应三个缺席标记均为 <code>true</code>。提交（Commit）后故障对应 <code>hasItem=true</code>、<code>cursor=1</code>、<code>hasReceipt=true</code>；相同请求返回 <code>replayed=true</code>，按固定键查询得到 <code>matchCount=1</code>。存储会检查操作身份（Operation Identity）与请求内容是否匹配，不能把同一身份用来提交另一份修改。</p>
+<p>这里的幂等（Idempotency）来自查回同一决定。另造一个操作身份（Operation Identity）会失去这层关联，不能因为上次没有返回就盲目重做。回执（Receipt）并不证明偏好内容有用，只帮助确定该次事务（Transaction）发生了什么。</p>
+<h3 id="十项检查的整体边界">十项检查的整体边界</h3>
+<p>Maka原实验返回 <code>PASS</code>，十项检查全部通过：旧版本（Revision）拒绝、跨进程留存、会话作用域（Session Scope）、关闭读取保留字节、不可信提示块（Untrusted Block）、同轮缓存（Cache）、提交（Commit）前回滚（Rollback）、提交（Commit）后留存、同请求重放（Replay）一次、条目化长期记忆（Atomic LTM）未进入本地输入。</p>
+<p>最后一项把同一状态根（State Root）中的数据库与本地提示词（Prompt）并排检查：数据库确有 <code>ATOMIC</code>常量指定的标记，本地组装结果没有。<code>readItem</code>或 <code>searchByKeys</code>成功，只证明存储查询；本地组装器（Composer）没有调用这条查询链，不能自动补出尚未接通的召回（Recall）消费者（Consumer）。</p>
+<p>这些代码摘自<a href="../../../extended-reading.html#reference-11" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="labs/assets/maka-memory-implementation-lab.mjs">完整Maka探针</a>，局部变量、模块导入和启动条件由整份脚本提供；它们不是可单独提交给生产接口（Interface）的程序。十项Maka组件检查与前面的七项Python检查必须分别解释，不能相加后称“十七项Maka测试（Test）”。</p>
+<span class="heading-alias" id="接着看真实模型怎样使用" aria-hidden="true"></span><span class="heading-alias" id="真实模型的输出对照" aria-hidden="true"></span><h2 id="从观察结果observation走到结论">从观察结果（Observation）走到结论</h2>
+<p><strong>问题1。</strong> 文件已更新而同一工作轮次（Turn）提示词（Prompt）不变，是保存失败吗？</p>
+<p><strong>参考答案。</strong> 先区分文件状态和输入采集。该例已经保存成功，但组装器（Composer）命中同一会话（Session）/工作轮次（Turn）的缓存（Cache）；新工作轮次（Turn）取得新内容，才是对应的下一项观察。</p>
+<p><strong>问题2。</strong> 事务提交（Commit）前后两个故障都使调用失败，为什么数据库结果相反？</p>
+<p><strong>参考答案。</strong> 前者尚未提交（Commit），未提交（Commit）的修改可共同回滚（Rollback）；后者已经提交（Commit），只是回复没有到达调用方（Caller）。重开数据库并核对回执（Receipt）才能区分，外层退出码（Exit Code）不能替代它们。</p>
+<p><strong>问题3。</strong> 数据库有条目（Memory Item）且按键查询命中，为什么没进入提示词（Prompt）？</p>
+<p><strong>参考答案。</strong> 数据库提供查询能力，本次组装器（Composer）却只消费本地记忆笔记（Local Memory）。保存、查询、请求消费是不同阶段，打开本地读取开关也不会创建条目化长期记忆（Atomic LTM）的召回（Recall）调用链。</p>
+<p><strong>问题4。</strong> 这些结果能证明模型（Model）遵守偏好吗？</p>
+<p><strong>参考答案。</strong> 不能。两项实验均没有模型（Model）输出。<a href="22-agent-cases.html">第22章</a>另以相同保存条目、不同读取条件的新会话（Session）观察实际请求和回答；那是另一组已有真实运行，不能拼成这里的一次执行（Run）。</p>
+<h2 id="继续阅读">继续阅读</h2>
+<p><a href="20-memory.html">第20章</a>解释两套记忆（Memory）的机制与更正条件；<a href="22-agent-cases.html">第22章</a>继续核对真实模型（Model）的行动请求（Action）与回答；<a href="26-evaluation-and-design.html">第26章</a>区分各项验证（Verification）能支持的设计判断。</p>
 <hr>
-<p><a href="20-memory.html">上一章：第 20 章｜记忆的写入、读取与更新</a> · <a href="22-agent-cases.html">下一章：第 22 章｜mini 与 Maka 的任务执行案例</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="20-memory.html"><span>← 上一章</span><strong>第 20 章｜记忆（Memory）的写入、读取与更新</strong></a><a href="22-agent-cases.html"><span>下一章 →</span><strong>第 22 章｜mini 与 Maka 的任务执行案例</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%B7%A5%E4%BD%9C%E5%8C%BA%E8%A7%84%E5%88%99%E4%B8%8E%E9%A2%84%E6%9C%9F%E8%83%8C%E6%99%AF">工作区规则与预期背景</a></li><li class="toc-level-2"><a href="#%E8%B7%A8%E8%BF%9B%E7%A8%8B%E4%BF%9D%E5%AD%98%E4%B8%8E%E8%AF%BB%E5%8F%96%E7%9A%84%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B">跨进程保存与读取的完整过程</a></li><li class="toc-level-2"><a href="#%E5%85%B3%E9%94%AE%E4%BB%A3%E7%A0%81%E6%94%B9%E5%8F%98%E4%BA%86%E4%BB%80%E4%B9%88">关键代码改变了什么</a></li><li class="toc-level-2"><a href="#%E7%9C%9F%E5%AE%9E%E6%A8%A1%E5%9E%8B%E7%9A%84%E8%BE%93%E5%87%BA%E5%AF%B9%E7%85%A7">真实模型的输出对照</a></li><li class="toc-level-2"><a href="#%E5%A2%9E%E5%8A%A0%E5%B7%A5%E4%BD%9C%E5%8C%BA%E4%BE%8B%E5%A4%96%E4%B8%8E%E4%BB%BB%E5%8A%A1%E8%A7%84%E5%88%99">增加工作区例外与任务规则</a></li><li class="toc-level-2"><a href="#maka-%E7%9A%84%E5%86%99%E5%85%A5%E9%87%8D%E5%BC%80%E4%B8%8E%E8%BE%93%E5%85%A5%E7%BB%84%E8%A3%85">Maka 的写入、重开与输入组装</a></li><li class="toc-level-3"><a href="#local-%E4%B8%8E-atomic-%E7%9A%84%E5%AE%9E%E9%AA%8C%E8%B0%83%E7%94%A8%E9%93%BE">Local 与 Atomic 的实验调用链</a></li><li class="toc-level-3"><a href="#%E4%BA%A7%E7%89%A9%E4%B8%8E%E7%BB%93%E7%AE%97%E6%97%B6%E7%82%B9">产物与结算时点</a></li><li class="toc-level-3"><a href="#%E5%86%99%E5%85%A5%E4%BA%8B%E5%8A%A1%E4%B8%8E%E9%87%8D%E8%AF%BB%E6%80%8E%E6%A0%B7%E8%A7%A3%E9%87%8A%E7%BB%93%E6%9E%9C">写入、事务与重读怎样解释结果</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="20-memory.html">上一章：第20章｜记忆（Memory）的写入、读取与更新</a> · <a href="22-agent-cases.html">下一章：第22章｜真实智能代理（Agent）的任务执行案例</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="20-memory.html"><span>← 上一章</span><strong>第 20 章｜记忆（Memory）的写入、读取与更新</strong></a><a href="22-agent-cases.html"><span>下一章 →</span><strong>第 22 章｜真实智能代理（Agent）的任务执行案例</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E7%AC%AC20%E7%AB%A0%E7%9A%84%E5%9B%9B%E4%B8%AA%E7%8E%AF%E8%8A%82%E5%88%86%E5%88%AB%E6%80%8E%E6%A0%B7%E5%8F%96%E5%BE%97%E8%AF%81%E6%8D%AE">前情回顾：第20章的四个环节，分别怎样取得证据？</a></li><li class="toc-level-2"><a href="#%E5%9B%BA%E5%AE%9A%E7%A8%8B%E5%BA%8F%E6%96%B0%E8%BF%9B%E7%A8%8B%E6%80%8E%E6%A0%B7%E9%80%89%E5%87%BA%E6%AD%A3%E7%A1%AE%E8%83%8C%E6%99%AF">固定程序：新进程怎样选出正确背景？</a></li><li class="toc-level-3"><a href="#%E8%BE%93%E5%85%A5%E4%B8%8E%E9%80%89%E6%8B%A9%E8%A7%84%E5%88%99%E5%85%88%E4%BA%8E%E5%AE%9E%E7%8E%B0">输入与选择规则先于实现</a></li><li class="toc-level-3"><a href="#%E4%BF%9D%E5%AD%98%E5%88%86%E6%94%AF%E8%A1%A5%E5%85%85%E4%BE%8B%E5%A4%96%E4%BF%9D%E7%95%99%E5%85%A8%E5%B1%80%E5%80%BC">保存分支：补充例外，保留全局值</a></li><li class="toc-level-3"><a href="#%E8%AF%BB%E5%8F%96%E5%88%86%E6%94%AF%E5%85%B3%E9%97%AD%E8%AF%BB%E5%8F%96%E6%97%B6%E8%BF%9E%E6%96%87%E4%BB%B6%E4%B9%9F%E4%B8%8D%E8%AF%BB">读取分支：关闭读取时连文件也不读</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%99%E4%B8%8D%E6%98%AF%E5%90%8C%E4%B8%80%E4%B8%AA%E5%AD%97%E5%85%B8%E8%A2%AB%E5%8F%8D%E5%A4%8D%E8%AF%BB%E5%8F%96">为什么这不是同一个字典被反复读取？</a></li><li class="toc-level-3"><a href="#%E5%8E%9F%E7%BB%93%E6%9E%9C%E6%AF%8F%E4%B8%80%E9%A1%B9%E6%A3%80%E6%9F%A5%E5%88%86%E5%88%AB%E8%AF%81%E6%98%8E%E4%BB%80%E4%B9%88">原结果：每一项检查分别证明什么？</a></li><li class="toc-level-3"><a href="#%E6%94%B9%E5%8F%98%E8%A7%84%E5%88%99%E6%97%B6%E5%93%AA%E4%BA%9B%E9%83%A8%E5%88%86%E9%9C%80%E8%A6%81%E8%B7%9F%E7%9D%80%E5%8F%98">改变规则时，哪些部分需要跟着变？</a></li><li class="toc-level-2"><a href="#maka%E7%BB%84%E4%BB%B6%E5%85%88%E5%8C%BA%E5%88%86%E8%AF%BB%E5%8F%96%E9%93%BE%E4%B8%8E%E4%BA%8B%E5%8A%A1transaction%E9%93%BE">Maka组件：先区分读取链与事务（Transaction）链</a></li><li class="toc-level-3"><a href="#%E4%BF%9D%E5%AD%98%E6%97%A7%E7%89%88%E6%9C%ACrevision%E5%92%8C%E6%96%B0%E8%BF%9B%E7%A8%8B%E5%9B%9E%E8%AF%BBreadback">保存、旧版本（Revision）和新进程回读（Readback）</a></li><li class="toc-level-3"><a href="#%E6%96%87%E4%BB%B6%E5%B7%B2%E7%BB%8F%E6%96%B0%E5%A2%9E%E4%B8%BA%E4%BB%80%E4%B9%88%E6%9C%AC%E8%BD%AE%E6%8F%90%E7%A4%BA%E8%AF%8Dprompt%E4%BB%8D%E4%B8%8D%E5%8F%98">文件已经新增，为什么本轮提示词（Prompt）仍不变？</a></li><li class="toc-level-3"><a href="#%E4%BA%8B%E5%8A%A1%E6%8F%90%E4%BA%A4commit%E5%89%8D%E5%90%8E%E7%9B%B8%E5%90%8C%E5%A4%B1%E8%B4%A5%E8%A1%A8%E8%B1%A1%E4%B8%8D%E5%90%8C%E6%8C%81%E4%B9%85%E7%BB%93%E6%9E%9C">事务提交（Commit）前后：相同失败表象，不同持久结果</a></li><li class="toc-level-3"><a href="#%E9%87%8D%E5%BC%80%E4%B8%8E%E5%90%8C%E4%B8%80%E6%93%8D%E4%BD%9C%E9%87%8D%E6%94%BEoperation-replay%E6%80%8E%E6%A0%B7%E6%B6%88%E9%99%A4%E6%AD%A7%E4%B9%89">重开与同一操作重放（Operation Replay）怎样消除歧义？</a></li><li class="toc-level-3"><a href="#%E5%8D%81%E9%A1%B9%E6%A3%80%E6%9F%A5%E7%9A%84%E6%95%B4%E4%BD%93%E8%BE%B9%E7%95%8C">十项检查的整体边界</a></li><li class="toc-level-2"><a href="#%E4%BB%8E%E8%A7%82%E5%AF%9F%E7%BB%93%E6%9E%9Cobservation%E8%B5%B0%E5%88%B0%E7%BB%93%E8%AE%BA">从观察结果（Observation）走到结论</a></li><li class="toc-level-2"><a href="#%E7%BB%A7%E7%BB%AD%E9%98%85%E8%AF%BB">继续阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

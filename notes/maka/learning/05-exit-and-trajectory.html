@@ -73,7 +73,7 @@ if (
 <span class="heading-alias" id="真实任务怎样结束" aria-hidden="true"></span><span class="heading-alias" id="中文说明与-submission-不是同一个字段" aria-hidden="true"></span><h3 id="回答文字与-submission-分别来自哪里">回答文字与 <code>submission</code> 分别来自哪里</h3>
 <p>模型（Model）在同一条助手消息（Message）里写的中文总结属于 <code>content</code>，可以显示在终端，也能进入执行轨迹（Trajectory）。<code>submission</code> 则只取完成标记首行之后的标准输出（Standard Output）。</p>
 <p>若命令只有上面的 <code>echo</code>，标准输出（Standard Output）通常只有标记那一行，<code>submission</code> 就是空字符串。空字符串不表示助手没给总结；有总结也不表示它自动被复制进 <code>submission</code>。两个字段的消费者（Consumer）需要按各自来源读取。</p>
-<p>后面的<a href="22-agent-cases.html#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">第22章真实案例</a>保存（Save）了一次原生 mini 命令行界面（CLI） / K3 的限定记录：第 8 次模型（Model）响应给出中文结果说明并发出完成命令，随后出现上述占位内容。这是已有运行片段；修复和测试发生在此前，本章没有重新运行它，也没有把占位内容当作 Bash 失败。</p>
+<p>后面的<a href="22-agent-cases.html#1-mini%E4%BB%8E%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9%E5%88%B0%E4%BF%AE%E6%94%B9%E4%B8%8E%E9%AA%8C%E8%AF%81verification">第22章真实案例</a>保存（Save）了一次原生 mini 命令行界面（CLI） / K3 的限定记录：第 8 次模型（Model）响应给出中文结果说明并发出完成命令，随后出现上述占位内容。这是已有运行片段；修复和测试发生在此前，本章没有重新运行它，也没有把占位内容当作 Bash 失败。</p>
 <span class="heading-alias" id="固定案例的完整退出轨迹" aria-hidden="true"></span><h3 id="把完整完成路径放在一起读">把完整完成路径放在一起读</h3>
 <p>下面是 README 已正确、只需修改实现并通过测试的教学推演，用于说明完整消息（Message）顺序。它既不是第04章八步案例的原始执行轨迹（Trajectory），也不是第22章的真实输出副本。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 把完整完成路径放在一起读"><table><caption>表 4 / Table 4 · 把完整完成路径放在一起读</caption><thead><tr><th scope="col">顺序</th><th scope="col">消息（Message）角色或步骤</th><th scope="col">本步留下什么</th></tr></thead><tbody><tr><td>1</td><td><code>system</code>、<code>user</code></td><td>规则、任务和修改范围</td></tr>

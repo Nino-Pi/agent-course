@@ -25,7 +25,7 @@
 <p>如果接口另有独立的最大输入或最大输出限制，也必须同时满足；此时不能仅凭共享窗口公式判定请求可发送。输出预留也应包含该接口计入输出预算的其他生成开销。</p>
 <p>如果文件只需十行，先有界读取。若日志只有少量相关结果，先提取和回读。只有在相关历史本身也无法容纳时，才需要更强的摘要、窗口替换或其他输入管理策略。</p>
 <p>代码尚未进入窗口时，选择算法见<a href="37-code-retrieval.html">《代码不在窗口里：Aider 的仓库图怎样选择上下文》</a>：它讨论先选哪些符号，与下面整理已发生历史的位置不同。</p>
-<p>“先选材料”还可借鉴搜索与推荐，但要对齐阶段：材料生产者（Producer）产生并保存文件/观察，索引组织可查对象，召回提出候选，消费者再把有身份的证据放进 prompt。代码关系图、文件目录树和向量近邻是不同选择方法；向量近邻按材料的数值表示寻找距离较近的候选。若失败日志根本没进候选，扩大窗口无济于事；若已进候选却被重复片段挤掉，先查重排与预算。本章后文展开 Letta 的文件树，第37章展开 Aider 的代码关系图。通用原理和一个完整数值例子见<a href="../../../extended-reading.html#reference-18" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/retrieval/agent-retrieval-and-search.md#1-agent-实际做了什么先画到消费者">《Agent 检索与搜索、推荐》</a>，其中还区分近似最近邻（ANN）搜索找回精确近邻的比例、业务召回和必要证据覆盖。</p>
+<p>“先选材料”还可借鉴搜索与推荐，但要对齐阶段：材料生产者（Producer）产生并保存文件/观察，索引组织可查对象，召回提出候选，消费者再把有身份的证据放进 prompt。代码关系图、文件目录树和向量近邻是不同选择方法；向量近邻按材料的数值表示寻找距离较近的候选。若失败日志根本没进候选，扩大窗口无济于事；若已进候选却被重复片段挤掉，先查重排与预算。本章后文展开 Letta 的文件树，第37章展开 Aider 的代码关系图。通用原理和一个完整数值例子见<a href="../../../extended-reading.html#reference-19" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/retrieval/agent-retrieval-and-search.md#1-agent-实际做了什么先画到消费者">《Agent 检索与搜索、推荐》</a>，其中还区分近似最近邻（ANN）搜索找回精确近邻的比例、业务召回和必要证据覆盖。</p>
 <h2 id="3-真实算法一pi-怎样把一个长-turn-分开">3. 真实算法一：Pi 怎样把一个长 Turn 分开</h2>
 <p>Pi 不只保存一串聊天文本。会话条目（Session entry）有 <code>id/parentId</code>，当前分支是沿父指针得到的路径；一次 compaction 保存 <code>summary</code> 和 <code>firstKeptEntryId</code>，后者指向仍应逐字保留的第一条 entry。这样可以在完整 Session 记录仍存在时，单独重建较短的模型输入。下面走 Pi 的默认 compaction 路径；扩展可以替换它。</p>
 <p>阅读这条算法时先抓住三个问题：预算把切点推到哪里，工具调用与结果是否仍成对，被切走的用户要求怎样回到下一次输入。下文的计数、合法边界和摘要分别回答这三个问题；单看剩余 token 数不能判断压缩是否合格。</p>

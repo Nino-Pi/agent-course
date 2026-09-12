@@ -1,37 +1,40 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 24 章｜计划、目标与持续执行 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 24 / 62</div><article id="main-content"><span class="heading-alias" id="11plangoalschedule-与-graph谁决定下一轮开始" aria-hidden="true"></span><span class="heading-alias" id="m11计划目标与持续执行" aria-hidden="true"></span><span class="heading-alias" id="第-23-章计划目标与持续执行" aria-hidden="true"></span><h1 id="第-24-章计划目标与持续执行">第 24 章｜计划、目标与持续执行</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 24 章｜计划（Plan）、目标（Goal）、定时任务（Scheduled Task）与任务图（Agent Graph）怎样继续工作 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 24 / 62</div><article id="main-content"><span class="heading-alias" id="11plangoalschedule-与-graph谁决定下一轮开始" aria-hidden="true"></span><span class="heading-alias" id="m11计划目标与持续执行" aria-hidden="true"></span><span class="heading-alias" id="第-23-章计划目标与持续执行" aria-hidden="true"></span><span class="heading-alias" id="第-24-章计划目标与持续执行" aria-hidden="true"></span><h1 id="第-24-章计划plan目标goal定时任务scheduled-task与任务图agent-graph怎样继续工作">第 24 章｜计划（Plan）、目标（Goal）、定时任务（Scheduled Task）与任务图（Agent Graph）怎样继续工作</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：计划获批、目标未完、时钟到点或依赖完成后，什么事实允许系统继续工作？</p>
-<p><strong>关键概念</strong>：Plan（计划）：用户控制的工作流状态；Goal（目标）：按评估与预算推进的结果要求；Schedule（定时任务）：未来触发机会；Graph（任务图）：依赖与调度状态；claim（认领）：绑定一次确切执行的记录。</p>
-<p><strong>关系主线</strong>：各控制器维护继续工作的理由，经 Host 准入交给普通 AgentRun；触发、启动、终态与任务验收不能互相替代。</p>
+<p><strong>核心问题</strong>：计划（Plan）获批、目标（Goal）未完、时钟到点或依赖完成后，什么事实允许系统继续工作？</p>
+<p><strong>关键概念</strong>：计划（Plan）：用户控制的工作流（Workflow）状态（State）；目标（Goal）：按评估与预算推进的结果要求；定时任务（Scheduled Task）：未来触发机会；任务图（Agent Graph）：依赖与调度状态（State）；认领（Claim）：绑定（Binding）一次确切执行的记录。</p>
+<p><strong>关系主线</strong>：各控制器维护继续工作的理由，经宿主（Host）准入（Admission）交给普通代理执行（AgentRun）；触发、启动、终态（Terminal State）与任务验收（Acceptance）不能互相替代。</p>
 </blockquote>
-<p>前置：<a href="13-session-turn-run.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">执行身份</a>、<a href="14-events-and-projections.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">事实与投影</a>；Graph 节点使用<a href="23-skills-and-subagents.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第23章的独立 child</a>。</p>
+<h2 id="前情回顾先找到继续理由再接回普通执行">前情回顾：先找到继续理由，再接回普通执行</h2>
+<p><a href="13-session-turn-run.html">第13章</a>区分会话（Session） S1、工作轮次（Turn） T7、执行（Run）R7：长期归属相同，后续任务仍要有自己的工作身份（Work Identity）。<a href="14-events-and-projections.html">第14章</a>说明可读投影（Projection）不能反向裁定执行事实；界面没有完成结果，不等于可以重做。<a href="18-effects-and-recovery.html">第18章</a>进一步把终态（Terminal State）与未知工具（Tool）效果分开。<a href="23-skills-and-subagents.html">第23章</a>则让独立子任务（Child Task）交回有界结果，由父任务（Parent Task）继续判断。</p>
+<p>本章把这些关系用于“下一项工作为什么可以开始”。计划（Plan）、目标（Goal）、定时任务（Scheduled Task）和任务图（Agent Graph）各自保存控制状态（State），由相应负责者（Owner）判断继续条件；宿主（Host）再核对确切工作身份（Work Identity）并准入（Admission）。已经开始的模型（Model）与工具（Tool）过程仍走普通代理执行（AgentRun），不需要为每一种触发重新实现一套循环。</p>
 <h2 id="核心路线">核心路线</h2>
 <span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><h3 id="继续工作的四种触发">继续工作的四种触发</h3>
-<p>复杂 Agent 产品经常需要“以后继续工作”：</p>
+<p>复杂智能代理（Agent）产品经常需要“以后继续工作”：</p>
 <ul>
-<li>用户批准计划后继续；</li>
-<li>目标还没完成时再尝试一轮；</li>
+<li>用户批准计划（Plan）后继续；</li>
+<li>目标（Goal）还没完成时再尝试一轮；</li>
 <li>明天九点自动检查；</li>
-<li>等多个子任务完成后，让主 Agent 以 supervisor（监督者）角色重新审阅结果。</li>
+<li>等多个子任务（Child Task）完成后，让主代理（Main Agent）以监督者（Supervisor）角色重新审阅结果。</li>
 </ul>
-<p>这些都可以口头叫作 <a href="glossary.html#continuation%E7%BB%A7%E7%BB%AD%E6%89%A7%E8%A1%8C">continuation</a>，但它们不是同一种机制。domain 指负责某一类业务状态的范围，例如计划或定时任务，不指网络域名。每种 continuation 都必须确定：</p>
-<blockquote><p><strong>谁拥有控制状态，什么事实允许它创建下一项普通 Agent 工作？</strong></p>
+<p>这些都可以口头叫作 <a href="glossary.html#continuation%E7%BB%A7%E7%BB%AD%E6%89%A7%E8%A1%8C">继续执行（Continuation）</a>，但它们不是同一种机制。业务域（Domain）指负责某一类业务状态（State）的范围，例如计划（Plan）或定时任务（Scheduled Task），不指网络域名。每种继续执行（Continuation）都必须确定：</p>
+<blockquote><p><strong>谁拥有控制状态（State），什么事实允许它创建下一项普通智能代理（Agent）工作？</strong></p>
 </blockquote>
 <span class="heading-alias" id="先看贯穿案例" aria-hidden="true"></span><h3 id="readme-任务的四种后续需求">README 任务的四种后续需求</h3>
 <p>任务是：</p>
 <blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，把 README 的测试步骤更新正确，运行测试；以后请用中文解释结果。</p>
 </blockquote>
-<p>现在分别想象四种产品需求：</p>
+<p>先固定文档支线的初态：README 写错测试入口 <code>npm run check</code>，<code>package.json</code> 实际提供 <code>&quot;test&quot;: &quot;node --test&quot;</code>；函数正确，四项既有测试原本通过，工作范围是修改说明、检查结果并用中文报告。会话（Session） S1 中的 T7/R7 表示这项工作轮次（Turn）及其执行（Run）；G1、T8/R8、FC1、N1–N4、W1 都将在各自使用前定义。以下过程是教学情境与源码推演，不是新运行日志。</p>
+<p>现在分别想象四种产品需求，分支之间不继承后文才增加的授权：</p>
 <ol>
-<li><strong>Plan</strong>：先把修改计划展示给用户，用户批准后再编辑文件；</li>
-<li><strong>Goal</strong>：在用户同时授权修复源码的条件下，根据测试失败继续修复，直到满足目标或停止条件；</li>
-<li><strong>Schedule</strong>：明天上午再检查 README 是否仍与项目配置一致；</li>
-<li><strong>Graph</strong>：让多个 child 分别检查 <code>package.json</code> 的 test script、README 当前测试步骤和平台差异，全部完成后再综合。</li>
+<li><strong>计划（Plan）</strong>：先把修改计划（Plan）展示给用户，用户批准后再编辑文件；</li>
+<li><strong>目标（Goal）</strong>：另切回第04章仍含 <code>% 100</code> 函数缺陷的初态，用户同时授权修复源码；根据测试失败继续修复，直到满足目标（Goal）或停止条件；</li>
+<li><strong>定时任务（Scheduled Task）</strong>：明天上午再检查 README 是否仍与项目配置一致；</li>
+<li><strong>任务图（Agent Graph）</strong>：让多个子代理（Subagent）分别检查 <code>package.json</code> 的测试脚本（Test Script）、README 当前测试步骤和平台差异，全部完成后再综合。</li>
 </ol>
-<p>它们最后都会进入普通 AgentRun，但“允许创建下一轮”的理由不同。</p>
-<p>四种控制状态分别提供继续理由，汇入同一执行准入；它们是并列的触发机制，不是四步固定流程。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="README 任务的四种后续需求：可滚动示意图"><a href="../../../assets/diagrams/24-continuation-and-orchestration-1.svg"><img src="../../../assets/diagrams/24-continuation-and-orchestration-1.svg" alt="Plan 批准、Goal 评估、Schedule 到点认领和 Graph 唤醒分别提供继续理由，统一交给 Host 执行准入，再进入普通 AgentRun；四项不是固定执行顺序。" width="1204" height="626" loading="lazy" style="width:1204px;min-width:1024px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><span class="heading-alias" id="最简单的实现会怎样做" aria-hidden="true"></span><h3 id="一张后台任务表缺少哪些控制状态">一张后台任务表缺少哪些控制状态</h3>
+<p>它们最后都会进入普通代理执行（AgentRun），但“允许创建下一轮”的理由不同。</p>
+<p>四种控制状态（State）分别提供继续理由，汇入同一执行准入（Admission）；它们是并列的触发机制，不是四步固定流程。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="继续工作的理由 · Continuation Triggers：可滚动示意图"><a href="../../../assets/diagrams/24-continuation-and-orchestration-1.svg"><img src="../../../assets/diagrams/24-continuation-and-orchestration-1.svg" alt="计划（Plan）批准、目标（Goal）评估、定时任务（Scheduled Task）火次认领（Fire Claim）与任务图（Agent Graph）唤醒并列提供继续理由，经宿主（Host）准入（Admission）进入普通代理执行（AgentRun）。" width="1171" height="626" loading="lazy" style="width:1171px;min-width:996px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><span class="heading-alias" id="最简单的实现会怎样做" aria-hidden="true"></span><span class="heading-alias" id="一张后台任务表缺少哪些控制状态" aria-hidden="true"></span><h3 id="一张后台任务表缺少哪些控制状态state">一张后台任务表缺少哪些控制状态（State）</h3>
 <p>一个简单但危险的实现可能只有一张表：</p>
 <pre><code class="language-text">background_tasks
   id
@@ -43,264 +46,263 @@
   call_model_again(prompt)</code></pre>
 <p>这样做会马上遇到问题：</p>
 <ul>
-<li>Plan 还没被用户批准，系统是否可以继续？</li>
-<li>Goal <a href="glossary.html#evaluator%E5%AE%8C%E6%88%90%E8%AF%84%E4%BC%B0%E5%99%A8">evaluator（完成评估器）</a>的输出解析失败，是“完成”还是“未知”？</li>
-<li>Schedule 到点后进程崩溃，重启会不会触发两次？</li>
-<li>Graph 的一个 child 失败，supervisor 应等待、取消还是继续？</li>
-<li>已经开始的新 Run 与旧 <code>running</code> row 之间怎样对应？</li>
+<li>计划（Plan）还没被用户批准，系统是否可以继续？</li>
+<li>目标（Goal） <a href="glossary.html#evaluator%E5%AE%8C%E6%88%90%E8%AF%84%E4%BC%B0%E5%99%A8">评估器（Evaluator）</a>的输出解析失败，是“完成”还是“未知”？</li>
+<li>定时任务（Scheduled Task）到点后进程崩溃，重启会不会触发两次？</li>
+<li>任务图（Agent Graph）的一个子代理（Subagent）失败，监督者（Supervisor）应等待、取消还是继续？</li>
+<li>已经开始的新执行（Run）与旧 <code>running</code> 记录之间怎样对应？</li>
 </ul>
-<p>“下一轮再调用一次模型”只是执行动作，不是控制语义。每个 domain 必须拥有自己的状态和合法触发条件。本章后文的 Goal/Graph checkpoint 是推进和恢复的控制检查点；第19章的 Context checkpoint 则表示一段模型历史，两者保存的对象不同。</p>
-<span class="heading-alias" id="一张表先分清四个-domain" aria-hidden="true"></span><span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区一plangoalschedulegraph-都是后台-agent" aria-hidden="true"></span><h3 id="四个-domain-的触发与执行职责">四个 domain 的触发与执行职责</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 四个 domain 的触发与执行职责"><table><caption>表 1 / Table 1 · 四个 domain 的触发与执行职责</caption><thead><tr><th scope="col">需求</th><th scope="col">谁决定可继续</th><th scope="col">后续实际做什么</th></tr></thead><tbody><tr><td>Plan：先计划、再批准</td><td>用户批准与 Plan owner</td><td>创建普通 Run 执行获准工作</td></tr>
-<tr><td>Goal：目标尚未满足</td><td>Goal owner 根据评估、预算和当前策略判断</td><td>需要时创建下一轮普通 Run</td></tr>
-<tr><td>Schedule：未来再做</td><td>时钟触发，由 Schedule owner 认领本次机会</td><td>接纳并启动 Run，工作随后独立完成</td></tr>
-<tr><td>Graph：子任务有依赖</td><td>Graph coordinator 根据依赖与持久状态推进</td><td>子 Run 执行节点，必要时让主 Agent 再判断</td></tr></tbody></table></div>
-<p>这些 owner 管理继续的理由与状态，实际模型—工具执行仍复用普通 AgentRun。触发或启动成功，不能替代工作结果。</p>
-<span class="heading-alias" id="误区三plan-会自动执行所有步骤" aria-hidden="true"></span><h3 id="plan由用户控制的-durable-workflow">Plan：由用户控制的 durable workflow</h3>
-<h4 id="它解决什么问题">它解决什么问题</h4>
+<p>“下一轮再调用一次模型（Model）”只是执行动作，不是控制语义。每个业务域（Domain）必须拥有自己的状态（State）和合法触发条件。本章后文的目标（Goal）/任务图（Agent Graph）检查点（Checkpoint）是推进和恢复的控制检查点（Checkpoint）；第19章的上下文（Context）检查点（Checkpoint）则表示一段模型（Model）历史，两者保存的对象不同。</p>
+<span class="heading-alias" id="一张表先分清四个-domain" aria-hidden="true"></span><span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区一plangoalschedulegraph-都是后台-agent" aria-hidden="true"></span><span class="heading-alias" id="四个-domain-的触发与执行职责" aria-hidden="true"></span><h3 id="四个业务域domain的触发与执行职责">四个业务域（Domain）的触发与执行职责</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 四个业务域（Domain）的触发与执行职责"><table><caption>表 1 / Table 1 · 四个业务域（Domain）的触发与执行职责</caption><thead><tr><th scope="col">业务输入</th><th scope="col">控制状态（State）由谁维护</th><th scope="col">交给实际消费者（Consumer）的工作</th><th scope="col">不能仅据此推断</th></tr></thead><tbody><tr><td>用户批准一份计划（Plan）</td><td>计划（Plan）负责者（Owner）核对当前提案与批准</td><td>宿主（Host）接纳获准工作，普通执行（Run）落实修改与检查</td><td>批准时文件已经改好</td></tr>
+<tr><td>目标（Goal）评估返回判断</td><td>目标（Goal）负责者（Owner）核对评估、预算与当前控制状态（State）</td><td>条件允许时，经宿主（Host）开启后续普通执行（Run）</td><td>评估文本就是独立测试结果</td></tr>
+<tr><td>时钟报告到点</td><td>定时任务（Scheduled Task）负责者（Owner）认领（Claim）这次机会</td><td>按固定输入和身份（Identity）启动执行（Run）</td><td>启动成功就是后续工作成功</td></tr>
+<tr><td>图节点已有结果</td><td>任务图（Agent Graph）协调器（Coordinator）读取依赖与持久事实（Durable Fact）</td><td>派发符合条件的子执行，或让主代理（Main Agent）审阅结果</td><td>就绪投影（Readiness Projection）等于已经启动</td></tr></tbody></table></div>
+<p>这些负责者（Owner）管理继续的理由与状态（State），实际模型（Model）—工具（Tool）执行仍复用普通代理执行（AgentRun）。触发或启动成功，不能替代工作结果。</p>
+<span class="heading-alias" id="误区三plan-会自动执行所有步骤" aria-hidden="true"></span><span class="heading-alias" id="plan由用户控制的-durable-workflow" aria-hidden="true"></span><h3 id="计划plan由用户控制的持久工作流durable-workflow">计划（Plan）：由用户控制的持久工作流（Durable Workflow）</h3>
+<span class="heading-alias" id="它解决什么问题" aria-hidden="true"></span><h4 id="计划plan解决什么问题">计划（Plan）解决什么问题</h4>
 <p>有些修改需要先把步骤展示给用户，再等待批准。例如：</p>
 <pre><code class="language-text">1. 读取 package.json 与 README.md
 2. 修改 README 测试步骤
 3. 运行测试</code></pre>
-<p>Plan 保存的是工作流控制状态。用户可以查看、批准、推进、取消或恢复它。</p>
-<h4 id="它不是什么">它不是什么</h4>
-<p>Plan 不是“模型自己一直循环直到完成”。用户批准是关键 trigger。在批准并启动工作的路径中，新 AgentRun 执行计划中的工作；批准保存的是工作流状态，真正修改与测试仍由 Run 执行。</p>
-<h4 id="在案例中怎样运行">在案例中怎样运行</h4>
-<pre><code class="language-text">R7 生成计划
-→ Plan durable 保存
-→ 当前阶段等待用户批准
-→ 用户 approve
-→ Plan coordinator 创建新的 root execution intent（顶层工作启动意图）
-→ Host admission
-→ 新 AgentRun 执行 Edit/Bash
-→ 模型根据观察调用 update_plan 报告进度，Plan 保存状态</code></pre>
-<p>因此，计划显示“步骤完成”还需要对应的修改和测试证据。进度报告不是独立验证器；某一轮模型已经结束，也不等于所有计划步骤都已完成。</p>
-<h3 id="goal由完成判断驱动的自主-continuation">Goal：由完成判断驱动的自主 continuation</h3>
-<h4 id="它解决什么问题-1">它解决什么问题</h4>
-<p>Goal 表达的是结果，例如“让 README 测试步骤正确且测试通过”。它不会自动扩大文件或工具授权；若本次只获准改文档，源码中的错误仍需要按实际范围处理。保存目标也不等于已经开始工作：Client 的 <code>goal.arm</code> 只建立目标状态，等待后续 Turn 承载它；它本身不启动模型。对已暂停的目标，用户也可以通过合法的 <code>resume</code> 恢复驱动。</p>
-<p>下面把身份写全。G1、T7、R7 等都是教学记号，不是本次运行记录：</p>
-<pre><code class="language-text">S1：用户先 arm Goal G1；尚无新 Run
-  → 用户提交 T7，Host 准入 R7；这项 Turn 承载 G1
-  → R7 读取、修改、测试并报告结果，Turn 完成结算
-  → evaluator 对 G1 与近期对话做一次无工具评估
-  → 若未满足且预算、状态与准入条件允许，形成 continuation
-  → S1 的新 Turn T8 / Run R8 继续实际工作
-  → R8 结算后再次评估；若判定 met，G1 进入 achieved</code></pre>
-<p>工作模型和 evaluator 要分开理解。R7/R8 通过普通 AgentRun 调用 Read、Edit、Bash；evaluator 是使用该 Session 模型配置的一次辅助模型调用，没有工具，也不创建一个“评估 AgentRun”。它判断收到的文本，不会自己重跑测试。因此，R7 的结果报告需要说明真实测试入口、输出和未完成项；独立调用评估模型并不自动获得独立验证。</p>
-<h4 id="goal-terminal-与-run-terminal-不相等">Goal terminal 与 Run terminal 不相等</h4>
-<p>某一次 Run 完成只说明这一轮 AgentRun 已 terminal。Goal 可能仍未满足；反过来，Goal 已取消也需要协调正在运行的 Run。两个生命周期不能合并。</p>
-<p>这描述正常完成判断的路线；当前实现对评估失败仍可能选择继续，不应把每次 continuation 都解释成模型已经可靠证明“目标未完成”。具体分支见<a href="#goal-evaluator-%E7%9A%84%E5%BD%93%E5%89%8D%E5%A4%B1%E8%B4%A5%E7%AD%96%E7%95%A5">Goal evaluator 的失败策略</a>。</p>
-<span class="heading-alias" id="误区二scheduledtask-显示-fired-就代表工作完成" aria-hidden="true"></span><h3 id="scheduledtask时钟只负责到点不负责完成工作">ScheduledTask：时钟只负责到点，不负责完成工作</h3>
-<h4 id="它解决什么问题-2">它解决什么问题</h4>
-<p>Schedule 让某个工作意图在未来时间获得触发机会。案例中可以创建：</p>
+<p>计划（Plan）保存的是工作流（Workflow）控制状态（State）。用户可以查看、批准、推进、取消或恢复它。</p>
+<span class="heading-alias" id="它不是什么" aria-hidden="true"></span><h4 id="计划plan批准没有证明什么">计划（Plan）批准没有证明什么</h4>
+<p>计划（Plan）不是“模型（Model）自己一直循环直到完成”。用户批准是关键触发（Trigger）。在批准并启动工作的路径中，新代理执行（AgentRun）执行计划（Plan）中的工作；批准保存的是工作流（Workflow）状态（State），真正修改与测试仍由执行（Run）落实。</p>
+<span class="heading-alias" id="在案例中怎样运行" aria-hidden="true"></span><h4 id="计划plan的状态state怎样交给下一位消费者consumer">计划（Plan）的状态（State）怎样交给下一位消费者（Consumer）</h4>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 计划（Plan）的状态（State）怎样交给下一位消费者（Consumer）"><table><caption>表 2 / Table 2 · 计划（Plan）的状态（State）怎样交给下一位消费者（Consumer）</caption><thead><tr><th scope="col">阶段</th><th scope="col">哪份状态（State）改变</th><th scope="col">下一步由谁推进</th></tr></thead><tbody><tr><td>R7 提交计划（Plan）</td><td>保存待批准提案；当前循环交接结束</td><td>用户检查并决定是否批准</td></tr>
+<tr><td>用户批准并启动</td><td>当前版本获准，形成顶层工作启动意图</td><td>宿主（Host）准入（Admission）新的 T8/R8</td></tr>
+<tr><td>R8 修改与检查</td><td>普通工具（Tool）记录结果，模型（Model）得到观察（Observation）</td><td>模型（Model）据此报告计划（Plan）进度</td></tr>
+<tr><td><code>update_plan</code> 接收进度</td><td>计划（Plan）状态（State）按步骤报告更新</td><td>后续总结和执行终态（Terminal State）仍走普通会话（Session）过程</td></tr></tbody></table></div>
+<p>因此，计划（Plan）显示“步骤完成”还需要对应的修改和测试证据。进度报告不是独立验证器；某一轮模型（Model）已经结束，也不等于所有计划（Plan）步骤都已完成。</p>
+<span class="heading-alias" id="goal由完成判断驱动的自主-continuation" aria-hidden="true"></span><h3 id="目标goal由完成判断驱动的自主继续执行continuation">目标（Goal）：由完成判断驱动的自主继续执行（Continuation）</h3>
+<span class="heading-alias" id="它解决什么问题-1" aria-hidden="true"></span><h4 id="目标goal解决什么问题">目标（Goal）解决什么问题</h4>
+<p>目标（Goal）表达的是结果，例如“让 README 测试步骤正确且测试通过”。它不会自动扩大文件或工具（Tool）授权；若本次只获准改文档，源码中的错误仍需要按实际范围处理。保存目标（Goal）也不等于已经开始工作：客户端（Client）的 <code>goal.arm</code> 只建立目标（Goal）状态（State），等待后续工作轮次（Turn）承载它；它本身不启动模型（Model）。对已暂停的目标（Goal），用户也可以通过合法的 <code>resume</code> 恢复驱动。</p>
+<p>下面把身份（Identity）写全。G1、T7、R7 等都是教学记号，不是本次运行记录：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 目标（Goal）解决什么问题"><table><caption>表 3 / Table 3 · 目标（Goal）解决什么问题</caption><thead><tr><th scope="col">过程</th><th scope="col">目标（Goal）状态（State）与工作身份（Work Identity）</th><th scope="col">新增什么依据</th></tr></thead><tbody><tr><td>用户在 S1 设置目标（Goal） G1</td><td><code>goal.arm</code> 保存目标（Goal），尚无新执行（Run）</td><td>有待后续工作承载的目标（Goal）要求</td></tr>
+<tr><td>用户提交 T7，宿主（Host）准入（Admission） R7</td><td>T7 开始时绑定（Binding）当时的目标（Goal）控制租约（Control Lease）</td><td>这项工作与 G1 有可核对的归属</td></tr>
+<tr><td>R7 读取、修改、测试并报告</td><td>普通工具（Tool）与执行形成记录，工作轮次（Turn）结束结算</td><td>最近对话中有可供评估的工作报告</td></tr>
+<tr><td>辅助评估判断 G1</td><td>评估器（Evaluator）读取目标（Goal）与近期对话，不运行工具（Tool）</td><td>得到需解码与核对有效性的判断</td></tr>
+<tr><td>满足继续条件</td><td>新的 T8/R8 经宿主（Host）准入（Admission）后继续</td><td>原 R7 不复活，新执行（Run）产生新的观察（Observation）</td></tr>
+<tr><td>后续评估判断已满足</td><td>当前控制条件有效时 G1 进入 <code>achieved</code></td><td>目标（Goal）结算完成；正确性仍取决于依据</td></tr></tbody></table></div>
+<p>工作模型（Model）和评估器（Evaluator）要分开理解。R7/R8 通过普通代理执行（AgentRun）调用 <code>Read</code>、<code>Edit</code>、<code>Bash</code>；评估器（Evaluator）是使用该会话（Session）模型（Model）配置的一次辅助模型调用（Model Query），没有工具（Tool），也不创建一个“评估代理执行（AgentRun）”。它判断收到的文本，不会自己重跑测试。因此，R7 的结果报告需要说明真实测试入口、输出和未完成项；独立调用评估模型（Model）并不自动获得独立验证。</p>
+<span class="heading-alias" id="goal-terminal-与-run-terminal-不相等" aria-hidden="true"></span><h4 id="目标goal终态terminal-state与执行run终态terminal-state不相等">目标（Goal）终态（Terminal State）与执行（Run）终态（Terminal State）不相等</h4>
+<p>某一次执行（Run）完成只说明这一轮代理执行（AgentRun）已到终态（Terminal State）。目标（Goal）可能仍未满足；反过来，目标（Goal）已取消也需要协调正在运行的执行（Run）。两个生命周期（Lifecycle）不能合并。</p>
+<p>这描述正常完成判断的路线；当前实现对评估失败仍可能选择继续，不应把每次继续执行（Continuation）都解释成模型（Model）已经可靠证明“目标（Goal）未完成”。具体分支见<a href="#%E7%9B%AE%E6%A0%87goal%E8%AF%84%E4%BC%B0%E5%99%A8evaluator%E7%9A%84%E5%BD%93%E5%89%8D%E5%A4%B1%E8%B4%A5%E7%AD%96%E7%95%A5">目标（Goal）评估器（Evaluator）的失败策略</a>。</p>
+<span class="heading-alias" id="误区二scheduledtask-显示-fired-就代表工作完成" aria-hidden="true"></span><span class="heading-alias" id="scheduledtask时钟只负责到点不负责完成工作" aria-hidden="true"></span><h3 id="定时任务scheduled-task时钟只负责到点不负责完成工作">定时任务（Scheduled Task）：时钟只负责到点，不负责完成工作</h3>
+<span class="heading-alias" id="它解决什么问题-2" aria-hidden="true"></span><h4 id="定时任务scheduled-task解决什么问题">定时任务（Scheduled Task）解决什么问题</h4>
+<p>定时任务（Scheduled Task）让某个工作意图在未来时间获得触发机会。案例中可以创建：</p>
 <blockquote><p>明天上午九点检查 README 与 package.json 是否仍一致。</p>
 </blockquote>
 <h4 id="到点与执行成功之间还有很多步骤">“到点”与“执行成功”之间还有很多步骤</h4>
-<pre><code class="language-text">clock says due
-→ coordinator 取得 fire claim
-→ 冻结或解析目标 Session/Connection
-→ Host admission
-→ AgentRun start 稳定
-→ Schedule 将本次 fire 结算为 ok/fired
-→ AgentRun 随后独立运行并形成 terminal</code></pre>
-<p>fire 是一次到点触发，fire claim 是对这次机会的认领记录。它配合执行身份与准入检查，避免重启或多个 worker 把同一次触发重复启动。Schedule 的 <code>ok/fired</code> 在 hosted root 已 admission、Run start 稳定后即可结算，<strong>不会等待 AgentRun terminal</strong>；它只能证明触发和启动边界已经完成，不能证明后续 Agent 工作成功。</p>
-<h3 id="agent-graph依赖与唤醒的持久控制平面">Agent Graph：依赖与唤醒的持久控制平面</h3>
-<h4 id="第一步dag-表达偏序不是固定的全序脚本">第一步：DAG 表达偏序，不是固定的全序脚本</h4>
-<p>当任务可拆成多个依赖节点时，Graph 记录“哪些工作依赖哪些结果”，并决定何时可以派发工作。节点由独立的 child Session/Run 执行，也就是 <a href="23-skills-and-subagents.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第23章</a> 中有自己身份、输入与结果的子任务。图的结构常称为 topology（拓扑）；这里最基本的结构是 DAG（有向无环图）：</p>
+<p>先定义两个对象：火次（Fire）是一次到点触发，火次认领（Fire Claim）是对这次机会的认领（Claim）记录。下面沿它们找到实际执行（Run）：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · “到点”与“执行成功”之间还有很多步骤"><table><caption>表 4 / Table 4 · “到点”与“执行成功”之间还有很多步骤</caption><thead><tr><th scope="col">从到点到结束</th><th scope="col">谁消费上一步的结果</th><th scope="col">到这里还缺什么</th></tr></thead><tbody><tr><td>时钟给出到期时间</td><td>定时协调器（Schedule Coordinator）认领（Claim）一次火次</td><td>还没有证明某次模型（Model）请求已开始</td></tr>
+<tr><td>绑定（Binding）会话（Session）、连接与确切工作身份（Work Identity）</td><td>宿主（Host）执行准入（Admission）</td><td>仍要确认普通执行（Run）稳定开始</td></tr>
+<tr><td>准入（Admission）通过、执行开始已确认</td><td>定时协调器（Schedule Coordinator）把火次结算为 <code>ok/fired</code></td><td>执行还可能运行中、失败或留下未知效果</td></tr>
+<tr><td>普通执行（Run）随后结束</td><td>客户端（Client）或后续工作读取终态（Terminal State）与结果</td><td>仍需按 README 与测试要求验收（Acceptance）</td></tr></tbody></table></div>
+<p>火次认领（Fire Claim）配合执行身份（Execution Identity）与准入（Admission）检查，避免重启或多个工作进程（Worker）把同一次触发重复启动。定时任务（Scheduled Task）的 <code>ok/fired</code> 在宿主顶层执行（Hosted Root Execution）已准入（Admission）、执行（Run）的启动（Start）稳定后即可结算，<strong>不会等待代理执行（AgentRun）终态（Terminal State）</strong>；它只能证明触发和启动边界已经完成，不能证明后续智能代理（Agent）工作成功。</p>
+<span class="heading-alias" id="agent-graph依赖与唤醒的持久控制平面" aria-hidden="true"></span><h3 id="任务图agent-graph依赖与唤醒的持久控制平面">任务图（Agent Graph）：依赖与唤醒的持久控制平面</h3>
+<span class="heading-alias" id="第一步dag-表达偏序不是固定的全序脚本" aria-hidden="true"></span><h4 id="第一步用依赖图表达偏序不是固定的全序脚本">第一步：用依赖图表达偏序，不是固定的全序脚本</h4>
+<p>当任务可拆成多个依赖节点时，任务图（Agent Graph）记录“哪些工作依赖哪些结果”，并决定何时可以派发工作。节点由独立的子会话（Child Session）/执行（Run）落实，也就是 <a href="23-skills-and-subagents.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第23章</a> 中有自己身份（Identity）、输入与结果的子任务（Child Task）。图的结构常称为拓扑（Topology）；这里最基本的结构是有向无环图（Directed Acyclic Graph，DAG）：</p>
 <p>下图的边表示前置依赖（Dependency）：N1–N3 的结果满足后，N4 才有汇总所需材料；并列节点之间没有先后边。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第一步：DAG 表达偏序，不是固定的全序脚本：可滚动示意图"><a href="../../../assets/diagrams/24-continuation-and-orchestration-2.svg"><img src="../../../assets/diagrams/24-continuation-and-orchestration-2.svg" alt="三个独立检查节点分别核对测试入口、README 与平台差异，其结果为汇总节点提供前置依赖，之后才修改 README。" width="927" height="626" loading="lazy" style="width:927px;min-width:788px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>边表达“谁必须先完成”，而不是预先排好所有节点的执行次序。N1、N2、N3 之间没有依赖，所以它们构成可并发的偏序；N4 必须等待自己的前置输入满足。三个基本对象是：</p>
-<pre><code class="language-text">Node  = 一个边界明确的 Operator
-Edge  = 前置依赖或结果流向
-Ready = 依赖条件当前看起来已满足</code></pre>
-<p>每个节点仍由普通 child AgentRun 工作，Graph 负责依赖和推进状态。一个节点返回结果，只能说明这个子步骤的情况；主任务还要检查其他依赖、综合结果并完成修改与验证。<a href="#graph-%E4%BB%8E%E4%BE%9D%E8%B5%96%E5%9B%BE%E5%88%B0%E6%8C%81%E4%B9%85%E8%B0%83%E5%BA%A6">revision、claim 和 wake</a>把依赖判断连接到实际派发。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="汇集检查结果 · Gather Results：可滚动示意图"><a href="../../../assets/diagrams/24-continuation-and-orchestration-2.svg"><img src="../../../assets/diagrams/24-continuation-and-orchestration-2.svg" alt="三个独立只读节点（Node）检查测试入口、文档与平台条件，结果沿依赖（Dependency）进入汇总，之后才修改文档；并发仍要求资源和文件状态可比。" width="930" height="626" loading="lazy" style="width:930px;min-width:791px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>边表达“谁必须先完成”，而不是预先排好所有节点的执行次序。N1、N2、N3 都是只读检查，彼此之间没有依赖；在资源允许且文件状态（State）可比的前提下，它们构成可并发的偏序；N4 必须等待自己的前置输入满足。三个基本对象是：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 第一步：用依赖图表达偏序，不是固定的全序脚本"><table><caption>表 5 / Table 5 · 第一步：用依赖图表达偏序，不是固定的全序脚本</caption><thead><tr><th scope="col">图中对象</th><th scope="col">含义</th><th scope="col">本例如何使用</th></tr></thead><tbody><tr><td>节点（Node）</td><td>一个任务边界明确的算子（Operator）</td><td>N1 只核测试入口，N2 只核文档，N3 只核平台条件</td></tr>
+<tr><td>边（Edge）</td><td>前置依赖与结果流向</td><td>N4 需要三项检查所提供的材料</td></tr>
+<tr><td>就绪投影（Readiness Projection）</td><td>当前快照中满足了规定的依赖条件</td><td>可以尝试认领（Claim），尚未证明实际执行已开始</td></tr></tbody></table></div>
+<p>每个节点仍由子代理（Subagent）的普通代理执行（AgentRun）工作，任务图（Agent Graph）负责依赖和推进状态（State）。一个节点返回结果，只能说明这个子步骤的情况；主任务（Main Task）还要检查其他依赖、综合结果并完成修改与验证。<a href="#%E4%BB%BB%E5%8A%A1%E5%9B%BEagent-graph%E4%BB%8E%E4%BE%9D%E8%B5%96%E5%9B%BE%E5%88%B0%E6%8C%81%E4%B9%85%E8%B0%83%E5%BA%A6">修订（Revision）、认领（Claim）和唤醒（Wake）</a>把依赖判断连接到实际派发。</p>
 <h3 id="把业务继续与恢复观察放在一起判断">把业务继续与恢复观察放在一起判断</h3>
 <p>现在可以把四种业务触发和一种连接行为放在同一张检查表中：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 把业务继续与恢复观察放在一起判断"><table><caption>表 2 / Table 2 · 把业务继续与恢复观察放在一起判断</caption><thead><tr><th scope="col">口头说法</th><th scope="col">真正发生的事</th><th scope="col">谁决定</th></tr></thead><tbody><tr><td>“批准后继续”</td><td>Plan 状态允许创建下一项工作</td><td>用户 + Plan owner</td></tr>
-<tr><td>“没完成就继续”</td><td>Goal owner 按评估结果、预算与当前状态决定下一轮</td><td>Goal owner</td></tr>
-<tr><td>“明天继续”</td><td>时钟到点并取得 fire claim</td><td>Schedule owner</td></tr>
-<tr><td>“子任务完成后继续”</td><td>依赖与已提交结果允许推进或唤醒主任务</td><td>Graph coordinator + Host</td></tr>
-<tr><td>“断线后继续看”</td><td>Client 恢复 subscription/snapshot</td><td>Host continuity；通常不创建新业务 Run</td></tr></tbody></table></div>
-<p>最后一行恢复的是观察，其连接和快照规则见 <a href="25-host-and-client.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第25章</a>。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 把业务继续与恢复观察放在一起判断"><table><caption>表 6 / Table 6 · 把业务继续与恢复观察放在一起判断</caption><thead><tr><th scope="col">口头说法</th><th scope="col">真正发生的事</th><th scope="col">谁决定</th></tr></thead><tbody><tr><td>“批准后继续”</td><td>计划（Plan）状态（State）允许创建下一项工作</td><td>用户 + 计划负责者（Plan Owner）</td></tr>
+<tr><td>“没完成就继续”</td><td>目标负责者（Goal Owner）按评估结果、预算与当前状态（State）决定下一轮</td><td>目标负责者（Goal Owner）</td></tr>
+<tr><td>“明天继续”</td><td>时钟到点并取得火次认领（Fire Claim）</td><td>定时任务负责者（Schedule Owner）</td></tr>
+<tr><td>“子任务（Child Task）完成后继续”</td><td>依赖与已提交结果允许推进或唤醒主任务（Main Task）</td><td>任务图协调器（Graph Coordinator） + 宿主（Host）</td></tr>
+<tr><td>“断线后继续看”</td><td>客户端（Client）恢复订阅（Subscription）与快照（Snapshot）</td><td>宿主（Host）连续性（Continuity）；通常不创建新业务执行（Run）</td></tr></tbody></table></div>
+<p>最后一行恢复的是观察（Observation），其连接和快照规则见 <a href="25-host-and-client.html#1-%E6%B5%8B%E8%AF%95%E6%AD%A3%E5%9C%A8%E8%BF%90%E8%A1%8C%E5%85%B3%E9%97%AD%E7%AA%97%E5%8F%A3%E4%BC%9A%E5%8F%91%E7%94%9F%E4%BB%80%E4%B9%88">第25章</a>。</p>
 <span class="heading-alias" id="核心出口自测与答案" aria-hidden="true"></span><h3 id="核心问题解析">核心问题解析</h3>
-<p><strong>问题 1。</strong> Schedule 显示 fired，为什么不能据此说 README 已经修好？</p>
-<p><strong>解释。</strong> fired 说明触发和启动边界已经结算；还要等待随后 Run 的工具结果和终态，并核对 README 与测试要求。Run 正常结束本身也不能证明任务验收通过。</p>
-<p><strong>问题 2。</strong> 一个 Run 已完成，Goal 为什么仍可能继续？</p>
-<p><strong>解释。</strong> Run terminal 结束一次执行；Goal 还要依自己的完成条件、评估和预算决定目标状态。</p>
-<p><strong>问题 3。</strong> Graph 中检查 package.json 的节点完成，主任务还缺什么？</p>
-<p><strong>解释。</strong> 还需核对其他依赖、已提交结果与综合结论，再完成修改和测试；节点终态不能代替整个目标的完成。</p>
-<p><strong>问题 4。</strong> 重新打开 Desktop 为什么通常不是业务 continuation？</p>
+<p><strong>问题 1。</strong> 定时任务（Scheduled Task）显示 <code>fired</code>，为什么不能据此说 README 已经修好？</p>
+<p><strong>解释。</strong> <code>fired</code> 说明触发和启动边界已经结算；还要等待随后执行（Run）的工具结果（Tool Result）和终态（Terminal State），并核对 README 与测试要求。执行（Run）正常结束本身也不能证明任务验收（Acceptance）通过。</p>
+<p><strong>问题 2。</strong> 一个执行（Run）已完成，目标（Goal）为什么仍可能继续？</p>
+<p><strong>解释。</strong> 执行（Run）终态（Terminal State）结束一次执行；目标（Goal）还要依自己的完成条件、评估和预算决定目标（Goal）状态（State）。</p>
+<p><strong>问题 3。</strong> 任务图（Agent Graph）中检查 package.json 的节点完成，主任务（Main Task）还缺什么？</p>
+<p><strong>解释。</strong> 还需核对其他依赖、已提交结果与综合结论，再完成修改和测试；节点终态（Terminal State）不能代替整个目标的完成。</p>
+<p><strong>问题 4。</strong> 重新打开桌面端（Desktop）为什么通常不是业务继续执行（Continuation）？</p>
 <p><strong>解释。</strong> 重连先恢复观察同一份事实，并不自动创建新的业务工作。</p>
-<p><strong>问题 5。</strong> Goal 已 arm，但用户尚未提交后续 Turn，能否认定测试修复已开始？evaluator 能否自己运行测试？</p>
-<p><strong>解释。</strong> 不能。arm 保存目标，后续承载 Turn 或合法的 resume 才推动实际工作；evaluator 只做无工具文本判断，实际测试属于普通 AgentRun 的工具执行。</p>
-<p><strong>问题 6。</strong> Plan 显示某个步骤已完成，为什么仍需要修改或测试证据？</p>
-<p><strong>解释。</strong> Plan 保存模型报告的工作流进度；实际修改与测试由普通工具和 Run 执行，进度状态不独立验证这些结果。</p>
+<p><strong>问题 5。</strong> 目标（Goal）已设置（Armed），但用户尚未提交后续工作轮次（Turn），能否认定测试修复已开始？评估器（Evaluator）能否自己运行测试？</p>
+<p><strong>解释。</strong> 不能。设置（Arm）保存目标（Goal），后续承载工作轮次（Turn）或合法恢复（Resume）才推动实际工作；评估器（Evaluator）只做无工具（Tool）文本判断，实际测试属于普通代理执行（AgentRun）的工具（Tool）执行。</p>
+<p><strong>问题 6。</strong> 计划（Plan）显示某个步骤已完成，为什么仍需要修改或测试证据？</p>
+<p><strong>解释。</strong> 计划（Plan）保存模型（Model）报告的工作流（Workflow）进度；实际修改与测试由普通工具（Tool）和执行（Run）落实，进度状态（State）不独立验证这些结果。</p>
 <h2 id="实现深化">实现深化</h2>
-<p>这些控制器都需要处理状态过期、重复触发和进程重启。已经启动的 Run 还可能留下 <a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章 所述的未知工具效果</a>，控制状态恢复不能替它消除不确定性。</p>
-<h3 id="plan批准进度与实际结果各自说明什么">Plan：批准、进度与实际结果各自说明什么</h3>
-<p>继续使用“读取配置 → 修改 README → 运行测试”的三步计划。下面是教学轨迹，身份和结果均是假设值，不是实际运行记录：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · Plan：批准、进度与实际结果各自说明什么"><table><caption>表 3 / Table 3 · Plan：批准、进度与实际结果各自说明什么</caption><thead><tr><th scope="col">发生的动作</th><th scope="col">由谁保存什么</th><th scope="col">仍需检查什么</th></tr></thead><tbody><tr><td>R7 调用 SubmitPlan</td><td>PlanStore 保存待批准 proposal，当前 loop 交接结束</td><td>计划尚未授权实施</td></tr>
-<tr><td>用户批准并启动</td><td>Plan 状态变为 approved/active，各步骤初始为 pending；Host 为新 Turn 准入 R8</td><td>批准不说明文件已修改；源码另有单独的状态控制入口</td></tr>
-<tr><td>R8 执行 Edit/Bash</td><td>普通工具与 Run 记录修改和测试观察</td><td>这些观察是否覆盖目标、是否来自最终代码状态</td></tr>
-<tr><td>R8 调用 update_plan</td><td>模型报告全部步骤的状态；全部 completed 或 skipped 时 Plan 完成</td><td>PlanStore 不重跑测试，也不检验模型是否误报</td></tr>
-<tr><td>R8 生成最终响应</td><td>普通 Run 随后形成自己的终态</td><td>Plan 完成、Run 完成、目标满足需要分别判断</td></tr></tbody></table></div>
-<p>例如 Bash 明确返回测试失败，模型却把前两步标 <code>completed</code>、测试步骤标 <code>skipped</code>：在其他输入约束满足时，当前 PlanStore 会完成这份 execution。这只反映收到的步骤报告，不能据此写“测试通过”。反向也成立：R8 已正常结束，但没有把全部步骤报告为 completed/skipped，Plan 可以仍为 active。</p>
-<p>源码把两个入口分开：<code>plan.control</code> 控制状态，<code>plan.turn.start</code> 将 approve/resume 与新 hosted root Turn 组合；批准还会核对是否是最新待批准版本。不要把一个过时按钮或重复请求当成新的执行授权。若 R8 failed/cancelled，或 Host 在 active Plan 中重启，Plan 转为 interrupted；用户对这个执行合法 resume 后，由新 Turn 继续工作，旧 Run 不会复活。恢复时仍要读取已经发生的工具效果，不能从原步骤列表推断文件没有改变。</p>
-<h3 id="plan-的工具返回与会话结束">Plan 的工具返回与会话结束</h3>
-<p><code>update_plan</code> 更新步骤或结束 execution 只是 tool boundary，不意味着当前 conversational Turn 必须立即停止；模型仍可能读取工具结果并给用户总结。</p>
-<span class="heading-alias" id="误区四goal-evaluator-说差不多了就能完成" aria-hidden="true"></span><h3 id="goal-evaluator-的当前失败策略">Goal evaluator 的当前失败策略</h3>
-<span class="heading-alias" id="从-arm-到驱动先核对承载关系" aria-hidden="true"></span><h4 id="从-arm-到驱动的承载关系">从 arm 到驱动的承载关系</h4>
-<p><code>goal.arm</code> 即使返回 <code>active</code>，也可能还没有任何 Goal 驱动的执行。Host 在普通 Turn 开始前绑定当时的 Goal control lease，完成后才按这份绑定结算；如果先开始 T7、再从 Client arm G1，T7 不会被事后归入 G1，后续 Turn 才承载它。恢复同样区分“已开始驱动”和“仅保存目标”：重启不会让从未被 Turn 承载的 armed Goal 自动开跑。</p>
-<p>暂停后，Client 的 <code>goal.control(resume)</code> 会核对目标身份与 revision，再恢复驱动意图；仍要经过普通 root admission。已经结束的模型调用不会复活，Session 忙也不意味着可以越过准入立即新开 Run。</p>
-<h4 id="评估器真正能看到什么">评估器真正能看到什么</h4>
-<p>当前 Host 经 SessionManager 取得 RuntimeEvent 派生的 StoredMessage，再筛选最近六条 user/assistant 消息，逐条截断后组成近期对话，再与 Goal condition 一起交给 evaluator。它没有直接拿到完整 RuntimeEvent 或原始工具结果，也不能读文件、执行 Bash 来补证据。假如 assistant 只写“测试没问题”，评估器获得的就是这份报告；它不会凭空知道测试入口是否错误、失败行是否被省略。</p>
-<p>这是专门的 Goal 评估输入，不应与普通工作模型由 RuntimeEvent 构造的 provider history 混为一谈。当前辅助调用使用 Session 的连接与模型配置、输出上限为 1,024 token；它有自己的调用记录，但不成为新的 Turn/Run。</p>
-<h4 id="为什么-evaluator-是关键边界">为什么 evaluator 是关键边界</h4>
-<p>Goal 是否继续是一项业务 authority，需要检查 evaluator 结果的类型，并为未知结果设置预算和失败处理。Maka 拒绝非布尔 flag：字符串 <code>&quot;false&quot;</code> 与 timeout、调用错误或不可解析结果一样，进入 <code>evaluatorFailed</code> 的中性结果；采用 <strong>fail-open 策略，允许在状态、预算和准入仍满足时继续</strong>。</p>
-<p>当前实现有 iteration 上限，evaluator 持续失败时仍可能继续多轮。检查布尔类型也不等于完整 schema 校验：缺字段仍有默认值，额外字段也未全面拒绝，需逐项看 contract。</p>
-<p>下面按当前 parser 和 continuation consumer 推演。除特别写出的字段外，布尔字段均设为 <code>false</code>；表格不是实际模型输出或产品运行结果。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 为什么 evaluator 是关键边界"><table><caption>表 4 / Table 4 · 为什么 evaluator 是关键边界</caption><thead><tr><th scope="col">收到的评估结果</th><th scope="col">当前解码与处理</th><th scope="col">能否直接认定任务成功</th></tr></thead><tbody><tr><td>JSON 布尔 <code>met: true</code></td><td><code>met</code> 为 true，当前 lease/checkpoint 仍有效时按 achieved 结算</td><td>这是 Goal 判断；质量仍受输入证据与评估正确性限制</td></tr>
-<tr><td><code>met: false, progress: true</code></td><td>记录进展，按预算和状态决定是否继续，后续工作仍要准入</td><td>不能</td></tr>
-<tr><td><code>met: false, waiting: true</code></td><td>预算、轮数等限制仍允许时进入 waiting；否则按限制停止，不能解释为立即循环</td><td>不能</td></tr>
-<tr><td>字符串 <code>met: &quot;false&quot;</code></td><td>非布尔 flag 被拒绝，返回 <code>evaluatorFailed: true</code>；不再直接得到 met=true</td><td>不能；这是无效评估，不是任务完成或失败的证据</td></tr>
-<tr><td>可解析的空对象 <code>{}</code></td><td>缺失布尔字段转为 false，<code>evaluatorFailed</code> 仍为 false，可被当作没有进展</td><td>不能；这也不是严格 schema 校验</td></tr>
-<tr><td>无法解析、调用错误或超时</td><td><code>evaluatorFailed: true</code>；不把本次失败计为进展或停滞，仍可能继续</td><td>不能；失败不是“已证明目标未完成”</td></tr></tbody></table></div>
-<p>处理顺序也很重要：continuation 先检查当前 Goal/checkpoint 是否仍有效，再消费结果。错误或超时返回之后若目标已暂停、清除或换代，旧评估不能据此继续。读取评估上下文本身失败则走暂停处理，不属于上表的模型调用 fail-open。对有效的继续判断，iteration/token 等停止条件和 Host admission 仍会限制是否真的产生下一项工作。</p>
-<p><code>parseGoalEvaluation</code> 解释输出，<code>processCompletion</code> 和 <code>GoalManager.settleTurn</code> 再按 owner、预算和准入条件消费它。解析出一个结果只是这条决策链的起点。</p>
-<h3 id="scheduledtask-的目标与配置身份">ScheduledTask 的目标与配置身份</h3>
+<p>这些控制器都需要处理状态（State）过期、重复触发和进程重启。已经启动的执行（Run）还可能留下 <a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章所述的未知工具（Tool）效果</a>，控制状态（State）恢复不能替它消除不确定性。</p>
+<span class="heading-alias" id="plan批准进度与实际结果各自说明什么" aria-hidden="true"></span><h3 id="计划plan批准进度与实际结果各自说明什么">计划（Plan）：批准、进度与实际结果各自说明什么</h3>
+<p>继续使用“读取配置 → 修改 README → 运行测试”的三步计划（Plan）。下面是教学轨迹，身份（Identity）和结果均是假设值，不是实际运行记录：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 计划（Plan）：批准、进度与实际结果各自说明什么"><table><caption>表 7 / Table 7 · 计划（Plan）：批准、进度与实际结果各自说明什么</caption><thead><tr><th scope="col">发生的动作</th><th scope="col">由谁保存什么</th><th scope="col">仍需检查什么</th></tr></thead><tbody><tr><td>R7 调用 <code>SubmitPlan</code></td><td><code>PlanStore</code> 保存待批准提案（Proposal），当前循环（Loop）交接结束</td><td>计划（Plan）尚未授权实施</td></tr>
+<tr><td>用户批准并启动</td><td>计划（Plan）状态（State）变为 <code>approved</code>/<code>active</code>，各步骤初始为 <code>pending</code>；宿主（Host）为新工作轮次（Turn）准入（Admission） R8</td><td>批准不说明文件已修改；源码另有单独的状态（State）控制入口</td></tr>
+<tr><td>R8 执行 <code>Edit</code>/<code>Bash</code></td><td>普通工具（Tool）与执行（Run）记录修改和测试观察（Observation）</td><td>这些观察（Observation）是否覆盖目标、是否来自最终代码状态（State）</td></tr>
+<tr><td>R8 调用 <code>update_plan</code></td><td>模型（Model）报告全部步骤的状态（State）；全部 <code>completed</code> 或 <code>skipped</code> 时计划（Plan）完成</td><td><code>PlanStore</code> 不重跑测试，也不检验模型（Model）是否误报</td></tr>
+<tr><td>R8 生成最终响应</td><td>普通执行（Run）随后形成自己的终态（Terminal State）</td><td>计划（Plan）完成、执行（Run）完成、目标满足需要分别判断</td></tr></tbody></table></div>
+<p>例如 <code>Bash</code> 明确返回测试失败，模型（Model）却把前两步标 <code>completed</code>、测试步骤标 <code>skipped</code>：在其他输入约束满足时，当前 <code>PlanStore</code> 会完成这份计划执行（Plan Execution）。这只反映收到的步骤报告，不能据此写“测试通过”。反向也成立：R8 已正常结束，但没有把全部步骤报告为 <code>completed</code>/<code>skipped</code>，计划（Plan）可以仍为 <code>active</code>。</p>
+<p>源码把两个入口分开：<code>plan.control</code> 控制状态（State），<code>plan.turn.start</code> 将 <code>approve</code> / <code>resume</code> 与新的宿主顶层工作轮次（Hosted Root Turn）组合；批准还会核对是否是最新待批准版本。不要把一个过时按钮或重复请求当成新的执行授权。若 R8 进入 <code>failed</code> / <code>cancelled</code>，或宿主（Host）在计划（Plan）仍为 <code>active</code> 时重启，计划（Plan）转为 <code>interrupted</code>；用户对这份计划执行（Plan Execution）合法恢复后，由新工作轮次（Turn）继续工作，旧执行（Run）不会复活。恢复时仍要读取已经发生的工具（Tool）效果，不能从原步骤列表推断文件没有改变。</p>
+<span class="heading-alias" id="plan-的工具返回与会话结束" aria-hidden="true"></span><h3 id="计划plan的工具tool返回与会话session结束">计划（Plan）的工具（Tool）返回与会话（Session）结束</h3>
+<p><code>update_plan</code> 更新步骤或结束计划执行（Plan Execution）只是工具边界（Tool Boundary），不意味着当前对话工作轮次（Conversational Turn）必须立即停止；模型（Model）仍可能读取工具结果（Tool Result）并给用户总结。</p>
+<span class="heading-alias" id="误区四goal-evaluator-说差不多了就能完成" aria-hidden="true"></span><span class="heading-alias" id="goal-evaluator-的当前失败策略" aria-hidden="true"></span><h3 id="目标goal评估器evaluator的当前失败策略">目标（Goal）评估器（Evaluator）的当前失败策略</h3>
+<span class="heading-alias" id="从-arm-到驱动先核对承载关系" aria-hidden="true"></span><span class="heading-alias" id="从-arm-到驱动的承载关系" aria-hidden="true"></span><h4 id="从目标goal设置arm到驱动的承载关系">从目标（Goal）设置（Arm）到驱动的承载关系</h4>
+<p><code>goal.arm</code> 即使返回 <code>active</code>，也可能还没有任何目标（Goal）驱动的执行。宿主（Host）在普通工作轮次（Turn）开始前绑定（Binding）当时的控制租约（Control Lease），完成后才按这份绑定（Binding）结算；如果先开始 T7、再从客户端（Client）设置 G1，T7 不会被事后归入 G1，后续工作轮次（Turn）才承载它。恢复同样区分“已开始驱动”和“仅保存目标（Goal）”：重启不会让从未被工作轮次（Turn）承载的仅已设置的目标（Goal）自动开跑。</p>
+<p>暂停后，客户端（Client）的 <code>goal.control(resume)</code> 会核对目标（Goal）身份（Identity）与修订（Revision），再恢复驱动意图；仍要经过普通顶层准入（Root Admission）。已经结束的模型调用（Model Query）不会复活，会话（Session）忙也不意味着可以越过准入（Admission）立即新开执行（Run）。</p>
+<span class="heading-alias" id="评估器真正能看到什么" aria-hidden="true"></span><h4 id="评估器evaluator真正能看到什么">评估器（Evaluator）真正能看到什么</h4>
+<p>当前宿主（Host）经 <code>SessionManager</code> 取得运行时事件（Runtime Event）派生的 <code>StoredMessage</code>，再筛选最近六条角色（Role）为 <code>user</code> / <code>assistant</code> 的消息（Message），逐条截断后组成近期对话，再与目标条件（Goal Condition）一起交给评估器（Evaluator）。它没有直接拿到完整运行时事件（Runtime Event）或原始工具结果（Tool Result），也不能读文件、执行 <code>Bash</code> 来补证据。假如 <code>assistant</code> 只写“测试没问题”，评估器（Evaluator）获得的就是这份报告；它不会凭空知道测试入口是否错误、失败行是否被省略。</p>
+<p>这是专门的目标（Goal）评估输入，不应与普通工作模型（Model）由运行时事件（Runtime Event）构造的模型服务历史（Provider History）混为一谈。当前辅助调用使用会话（Session）的连接与模型（Model）配置、输出上限为 1,024 词元（Token）；它有自己的调用记录，但不成为新的工作轮次（Turn）/执行（Run）。</p>
+<span class="heading-alias" id="为什么-evaluator-是关键边界" aria-hidden="true"></span><h4 id="为什么评估器evaluator是关键边界">为什么评估器（Evaluator）是关键边界</h4>
+<p>目标（Goal）是否继续由相应负责者（Owner）裁决；这项裁决权（Authority）不能交给任意模型（Model）字符串。负责者（Owner）需要检查评估器（Evaluator）结果的类型，并为未知结果设置预算和失败处理。Maka 拒绝非布尔标志字段（Flag）：字符串 <code>&quot;false&quot;</code> 与超时（Timeout）、调用错误或不可解析结果一样，进入 <code>evaluatorFailed</code> 的中性结果；采用 <strong>失败可继续（Fail-open）策略，允许在状态（State）、预算和准入（Admission）仍满足时继续</strong>。</p>
+<p>当前实现有迭代（Iteration）上限，评估器（Evaluator）持续失败时仍可能继续多轮。检查布尔类型也不等于完整结构约束（Schema）校验：缺字段仍有默认值，额外字段也未全面拒绝，需逐项看合同（Contract）。</p>
+<p>下面按当前解析器（Parser）和继续执行（Continuation）消费者（Consumer）推演。除特别写出的字段外，布尔字段均设为 <code>false</code>；表格不是实际模型（Model）输出或产品运行结果。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 为什么评估器（Evaluator）是关键边界"><table><caption>表 8 / Table 8 · 为什么评估器（Evaluator）是关键边界</caption><thead><tr><th scope="col">收到的评估结果</th><th scope="col">当前解码与处理</th><th scope="col">能否直接认定任务成功</th></tr></thead><tbody><tr><td>JavaScript 对象表示法（JavaScript Object Notation，JSON）中的布尔 <code>met: true</code></td><td><code>met</code> 为 <code>true</code>，当前控制租约（Control Lease）与检查点（Checkpoint）仍有效时按 <code>achieved</code> 结算</td><td>这是目标（Goal）判断；质量仍受输入证据与评估正确性限制</td></tr>
+<tr><td><code>met: false, progress: true</code></td><td>记录进展，按预算和状态（State）决定是否继续，后续工作仍要准入（Admission）</td><td>不能</td></tr>
+<tr><td><code>met: false, waiting: true</code></td><td>预算、轮数等限制仍允许时进入 <code>waiting</code>；否则按限制停止，不能解释为立即循环</td><td>不能</td></tr>
+<tr><td>字符串 <code>met: &quot;false&quot;</code></td><td>非布尔标志字段（Flag）被拒绝，返回 <code>evaluatorFailed: true</code>；不再直接得到 <code>met=true</code></td><td>不能；这是无效评估，不是任务完成或失败的证据</td></tr>
+<tr><td>可解析的空对象 <code>{}</code></td><td>缺失布尔字段转为 <code>false</code>，<code>evaluatorFailed</code> 仍为 <code>false</code>，可被当作没有进展</td><td>不能；这也不是严格结构约束（Schema）校验</td></tr>
+<tr><td>无法解析、调用错误或超时</td><td><code>evaluatorFailed: true</code>；不把本次失败计为进展或停滞，仍可能继续</td><td>不能；失败不是“已证明目标（Goal）未完成”</td></tr></tbody></table></div>
+<p>处理顺序也很重要：继续执行（Continuation）先检查当前目标（Goal）/检查点（Checkpoint）是否仍有效，再消费结果。错误或超时返回之后若目标（Goal）已暂停、清除或换代，旧评估不能据此继续。读取评估上下文（Context）本身失败则走暂停处理，不属于上表的模型调用（Model Query）失败可继续（Fail-open）。对有效的继续判断，迭代（Iteration）/词元（Token）等停止条件和宿主（Host）准入（Admission）仍会限制是否真的产生下一项工作。</p>
+<p><code>parseGoalEvaluation</code> 解释输出，<code>processCompletion</code> 复核当前控制状态（State），<code>GoalManager.settleTurn</code> 更新目标（Goal）状态（State）；继续意图随后还要经过宿主（Host）准入（Admission）。解析出一个结果只是这条决策链的起点。</p>
+<h4 id="同样没有完成结论为何计数不同">同样没有完成结论，为何计数不同</h4>
+<p>固定一个教学初态：G1 仍为 <code>active</code>，目标（Goal）身份（Identity）及修订（Revision）匹配；词元（Token）预算尚未耗尽且基线已经建立；已结算迭代（Iteration）数为2，上限为5；连续无进展计数为1，停滞阈值为2。下面每行都独立从这一初态出发，未列布尔字段为 <code>false</code>：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 9 / Table 9 · 同样没有完成结论，为何计数不同"><table><caption>表 9 / Table 9 · 同样没有完成结论，为何计数不同</caption><thead><tr><th scope="col">评估输入</th><th scope="col">交给结算者什么</th><th scope="col">结算后状态（State）</th></tr></thead><tbody><tr><td>有效的 <code>{}</code></td><td><code>madeProgress: false</code></td><td>迭代（Iteration）数变3，无进展计数变2，进入 <code>stalled</code></td></tr>
+<tr><td><code>met</code> 是字符串或评估超时</td><td>不传 <code>madeProgress</code></td><td>迭代（Iteration）数变3，无进展计数仍1，保持 <code>active</code>，仅形成可能继续的条件</td></tr>
+<tr><td>有效的 <code>progress: true</code></td><td><code>madeProgress: true</code></td><td>迭代（Iteration）数变3，无进展计数清零，保持 <code>active</code></td></tr>
+<tr><td>有效的 <code>waiting: true</code></td><td>传 <code>waiting: true</code>，不传进展值</td><td>迭代（Iteration）数变3，无进展计数仍1，进入 <code>waiting</code></td></tr></tbody></table></div>
+<p>这里的差别是“有效判断没有进展”和“未取得有效判断”。等待分支也不会顺带增加停滞计数。当前实现对继续分支先检查词元（Token）预算，再增加迭代（Iteration）数并检查轮数上限，然后在进展值存在时更新停滞计数，最后才进入等待；前一项已经停止，后面的条件不能把它改回活跃。若上表初态的迭代（Iteration）数改为4，同样一次评估失败也会到达5并进入 <code>max_iterations</code>，不会无限放行。</p>
+<p><code>met</code> 或 <code>impossible</code> 则先走各自目标（Goal）终态（Terminal State）分支，不与上表的继续计数流程混写。词元（Token）基线尚未建立时另有初始化路径，不能把上述已建立基线的例子当成所有首次结算。表是按源码条件手算的独立示例，不是四次真实模型（Model）运行。</p>
+<span class="heading-alias" id="scheduledtask-的目标与配置身份" aria-hidden="true"></span><h3 id="定时任务scheduled-task的目标会话target-session与配置身份identity">定时任务（Scheduled Task）的目标会话（Target Session）与配置身份（Identity）</h3>
 <h4 id="两类常见触发意图">两类常见触发意图</h4>
 <ul>
-<li><code>session_resume</code>：在既有 Session 中启动新的普通 root Run；</li>
-<li><code>agent_run</code>：按冻结配置创建或核对 fresh Session，再启动普通 root Run。</li>
+<li><code>session_resume</code>：在既有会话（Session）中启动新的普通顶层执行（Root Run）；</li>
+<li><code>agent_run</code>：按冻结配置创建或核对新建会话（Fresh Session），再启动普通顶层执行（Root Run）。</li>
 </ul>
-<p>当前新建 <code>agent_run</code> 会冻结 exact LLM connection identity。旧的 slug-only row（只保存可读名称、没有确切连接 ID 的记录）属于兼容数据，不能代表新路径的完整保证。</p>
-<h3 id="graph-从依赖图到持久调度">Graph 从依赖图到持久调度</h3>
-<span class="heading-alias" id="误区六dag-一旦创建就不能变" aria-hidden="true"></span><h4 id="第二步中间结果会推动动态-schedule-revision">第二步：中间结果会推动动态 Schedule Revision</h4>
-<p>Agent 工作通常不能在开始前把所有步骤一次性穷举。N1 可能发现测试命令由另一个 workspace 生成，N3 也可能证明平台差异其实不存在。此时 root Session 中的主 Agent 需要增加节点、替换旧路线、停止过时分支，或选定最终产物。</p>
-<p>因此，Maka 的 Graph 不是“一次写死后只会向前跑”的静态 DAG。主 Agent 通过 <code>update_agent_graph</code> 提交一份结构化 Schedule Revision；revision 描述要新增、替换、停止或采纳什么。它先进入持久控制面，成为可供恢复与审计读取的 <strong>durable intent</strong>，而不是工具一返回就直接等同于某个模型调用已经开始。</p>
-<p>这里的 durable 应谨慎理解为“调度意图先形成持久事实，恢复逻辑可以重新观察它”，不是脱离存储事务、claim、恢复实现和实际测试后仍可宣称的“绝不会丢失”。</p>
-<h4 id="第三步主-agentcoordinator-与-supervisor-不抢同一份职责">第三步：主 Agent、Coordinator 与 supervisor 不抢同一份职责</h4>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 第三步：主 Agent、Coordinator 与 supervisor 不抢同一份职责"><table><caption>表 5 / Table 5 · 第三步：主 Agent、Coordinator 与 supervisor 不抢同一份职责</caption><thead><tr><th scope="col">角色</th><th scope="col">主要职责</th><th scope="col">不负责什么</th></tr></thead><tbody><tr><td>根主代理（Root main Agent）</td><td>理解业务目标，提出和修订 Graph，选择或综合结果</td><td>不自己实现确定性的依赖扫描与去重调度</td></tr>
-<tr><td>协调者（Coordinator）</td><td>从 durable facts 重建快照，reconcile 计划，投影 readiness，取得 claim 并派发工作</td><td>不替模型判断两份结论在语义上谁更可信</td></tr>
-<tr><td>监督角色（Supervisor）</td><td>root main Agent 在检查点上的监督角色：审阅有界结果，决定重试、替换、继续或结束</td><td>不是另一套常驻模型 Runtime，也不靠保留旧调用栈等待</td></tr>
-<tr><td>子执行算子（Child Operator）</td><td>在自己的 Session 中执行一个普通 AgentRun，并形成结果与 terminal facts</td><td>不拥有全局拓扑修改权</td></tr></tbody></table></div>
-<p>main Agent 与 supervisor 可以是同一个 root Session 的主 Agent：它写入计划，在检查点后重新作语义决策；中间的确定性推进交给 Coordinator。</p>
-<h4 id="第四步从-durable-intent-到-reconcile">第四步：从 durable intent 到 reconcile</h4>
-<p><code>update_agent_graph</code> 的直接效果是追加 revision 并请求协调，不是亲自运行 child。Coordinator 被唤醒后，从持久状态重新折叠当前计划，并把它与已经提交的 child Run/RuntimeEvent facts 对齐：</p>
-<pre><code class="language-text">读取 durable revisions 与既有执行 facts
-  → 应用 stop / replace / finish 决策
-  → 补齐缺少的 child Operator 容器
-  → 重新计算哪些节点 Ready
-  → 检查或取得 exact execution claim
-  → 经共享 Host authority 派发普通 child AgentRun</code></pre>
-<p>这一步叫 <a href="glossary.html#reconcile%E5%AF%B9%E8%B4%A6--%E6%94%B6%E6%95%9B">reconcile</a>，因为 Coordinator 的工作不是相信一份长期驻留内存的 DAG，而是反复比较“持久意图”与“已经发生的执行事实”，再决定缺少哪一步。</p>
-<span class="heading-alias" id="误区七节点-ready-就证明对应-run-已经开始" aria-hidden="true"></span><h4 id="第五步readiness-projection-不等于-conditional-claimadmission">第五步：Readiness projection 不等于 conditional claim/admission</h4>
-<p>从依赖满足到执行开始，还经过两次状态转换：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 第五步：Readiness projection 不等于 conditional claim/admission"><table><caption>表 6 / Table 6 · 第五步：Readiness projection 不等于 conditional claim/admission</caption><thead><tr><th scope="col">阶段</th><th scope="col">性质</th><th scope="col">它能证明什么</th></tr></thead><tbody><tr><td>就绪投影（Readiness projection）</td><td>可重复计算的读侧投影</td><td>当前快照中，前置依赖已经满足</td></tr>
-<tr><td>条件认领（Conditional claim）</td><td>带前置条件写入的权威协调事实</td><td>某个 ready intent 已绑定到 exact child Session/Turn/Run，当前驱动应观察或推进这一次执行</td></tr>
-<tr><td>执行准入与启动（Admission / Start）</td><td>Host 与普通 Runtime 的执行边界</td><td>对应 Run 已被准入或开始；仍不证明它会成功 terminal</td></tr></tbody></table></div>
-<p>如果每次看到 Ready 都直接调用模型，重启或重复 wake 就可能制造重复工作。conditional claim 把无副作用的“看起来可运行”与有权产生执行效果的 admission 分开；已有 claim 时，Coordinator 应观察或恢复同一个 exact Run，而不是随手创建另一个。</p>
-<h4 id="同一个-stop为什么有三种结果">同一个 stop，为什么有三种结果</h4>
-<p>这里另设可写节点 W1：任务是修改 README 并运行测试，已获得该范围的实施授权；它使用 <code>implementation</code> profile，实际工具集合与 ExecutionBoundary 也允许相应的 Edit/Bash。W1 与前面的只读检查节点具有不同任务契约。主 Agent 后来发现 W1 这条分支已过时，提交停止它的 revision。下面固定这份任务和授权，只改变 stop 获得权威状态的时点：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 同一个 stop，为什么有三种结果"><table><caption>表 7 / Table 7 · 同一个 stop，为什么有三种结果</caption><thead><tr><th scope="col">stop 的时点</th><th scope="col">下一步发生什么</th><th scope="col">怎样判定</th></tr></thead><tbody><tr><td>Coordinator 看见 Ready，但还没取得 claim</td><td>原 revision 已过时，不能按旧快照认领</td><td>曾显示 Ready，不证明模型启动过</td></tr>
-<tr><td>claim 已持久化，但还没通过 Runtime admission</td><td>取消已有 claim，执行前再次检查并拒绝启动</td><td>有 claim，也可能没有一次 backend 调用</td></tr>
-<tr><td>child 已执行 Edit/Bash</td><td>请求停止对应 child Session，收敛实际状态；若本已 terminal，则保留该事实</td><td>不能把 stop 当作撤销已写文件或已运行命令</td></tr></tbody></table></div>
-<p>这不是仅靠 Prompt 告诉 child“别做了”。固定实现会在 claim 和执行 admission 两个位置核对 schedule revision，并优先处理 stop/replacement；停止失败会报告 failure，不当成已经停止。整图 stop 还要防止 supervisor 又被唤醒，等待当前协调工作收敛后重读节点列表，处理第一次扫描时尚未出现的 child。</p>
-<p>所以失败分支需要回答两个问题：<strong>还有没有权开始新工作，已经发生的工作如何收敛？</strong> child 的终态与结果仍回到普通 Run/RuntimeEvent 读取；是否保留已有结论、改派还是由主任务接手，是之后的语义判断。上述三种时序是故障推演，并非三次实际运行记录。</p>
-<span class="heading-alias" id="误区五graph-节点完成就等于整个-graph-完成" aria-hidden="true"></span><h4 id="第六步节点仍是普通-child-agentrun结果要-committed-且有界交接">第六步：节点仍是普通 child AgentRun，结果要 committed 且有界交接</h4>
-<p>Graph 不重新实现 Prompt/Context、provider adapter、ToolRuntime、Permission/Sandbox、RuntimeEvent 或 terminal。取得 claim 并完成 admission 后，节点在 linked child Session 中运行普通 AgentRun；输出与终态仍由普通 Run/RuntimeEvent ledger 拥有，不归 Graph callback 私藏。</p>
-<p>下游节点或 supervisor 通过 <strong>committed bounded handoff（已提交的有界结果交接）</strong> 消费结果：交接依据已经提交的 terminal/result facts，携带完成下一步所需的有界摘要、正文或 artifact reference，而不是把 UI 上看到的每条流式事件、child 的整段私有历史或一个尚未落盘的临时输出都当成 Graph 输入。</p>
-<span class="heading-alias" id="误区八supervisor-wake-会恢复原来的模型调用" aria-hidden="true"></span><h4 id="第七步checkpointwake-创建新的普通-root-run">第七步：checkpoint/wake 创建新的普通 root Run</h4>
-<p>当 Graph 到达需要语义判断的 checkpoint 或 <a href="glossary.html#quiescence%E9%9D%99%E6%AD%A2%E7%82%B9">quiescence（静止点）</a>，Coordinator 不代替模型做“是否改路线”的判断。系统先形成 durable supervisor wake，再由 Host 为 root Session 创建一个 <strong>新的普通 root Turn/AgentRun</strong>：</p>
-<p>下面把前述推进链闭合为一轮：监督审阅后可以修订或结束。回边产生新的控制意图，不复活旧模型调用。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第七步：checkpoint/wake 创建新的普通 root Run：可滚动示意图"><a href="../../../assets/diagrams/24-continuation-and-orchestration-3.svg"><img src="../../../assets/diagrams/24-continuation-and-orchestration-3.svg" alt="Graph 从调度修订形成持久意图，协调者对账与投影就绪，认领并准入子执行；已提交结果形成监督唤醒，新的根执行审阅后修订或结束。" width="720" height="1947" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这不是把先前暂停的模型请求或 JavaScript 调用栈“唤醒回来”。新 root Run 读取有界 Graph 快照和已提交结果，形成下一轮语义决定；如果计划改变，就再提交 revision，循环继续。</p>
-<h4 id="graph-与-mailbox协调状态放在哪里">Graph 与 Mailbox：协调状态放在哪里</h4>
-<p>沿用 第23章 介绍的 Operator 与 Participant 区分，可以比较下面两种协作设计。这个概念对照不表示 Maka 已经提供两套实现；它们都能创建多个 Agent，但控制流的落点不同：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · Graph 与 Mailbox：协调状态放在哪里"><table><caption>表 8 / Table 8 · Graph 与 Mailbox：协调状态放在哪里</caption><thead><tr><th scope="col">问题</th><th scope="col">Graph / Operator</th><th scope="col">Mailbox / Participant</th></tr></thead><tbody><tr><td>核心协调状态</td><td>显式 DAG、revision、claim、checkpoint</td><td>可寻址 Agent 的会话与私有消息队列</td></tr>
-<tr><td>依赖怎样表达</td><td>拓扑边与 readiness 规则</td><td>消息到达、follow-up 与 Agent 自身判断</td></tr>
-<tr><td>怎样动态调整</td><td>root main Agent 提交新的 Schedule Revision</td><td>participant 在多轮消息中补充、追问或横向协商</td></tr>
-<tr><td>child 间通信</td><td>Maka 路径不向 child 暴露共享 Mailbox 或持续横向协商通道</td><td>同一任务范围内的 Agent 可直接投递消息（取决于具体系统 contract）</td></tr>
-<tr><td>结果怎样交接</td><td>committed、bounded result/artifact 沿依赖关系被消费</td><td>消息在目标 Agent 的轮次边界进入其 Context</td></tr>
-<tr><td>全局审计视图</td><td>可从 Graph 控制面重建整体快照</td><td>常需结合多个 Agent 状态并重放消息吸收顺序</td></tr>
-<tr><td>主要优势</td><td>依赖显式、准入集中、较易审计与恢复</td><td>开放探索灵活、运行中易追加线索与协商</td></tr>
-<tr><td>主要代价</td><td>语义改道需要 root 提交 revision</td><td>控制流较分散，消息与 Context 可能膨胀</td></tr></tbody></table></div>
-<p>这张表不是在说 Graph 只能静态执行，也不是说 Mailbox 没有父子任务。真正的分水岭是：协调事实主要收拢在全局 Graph，还是分散在参与者的对话与消息流里。</p>
+<p>当前新建 <code>agent_run</code> 会冻结确切模型连接身份（Exact Model Connection Identity）。旧的仅名称记录（Slug-only Row），也就是只保存可读名称、没有确切连接 ID 的记录属于兼容数据，不能代表新路径的完整保证。</p>
+<span class="heading-alias" id="graph-从依赖图到持久调度" aria-hidden="true"></span><h3 id="任务图agent-graph从依赖图到持久调度">任务图（Agent Graph）从依赖图到持久调度</h3>
+<span class="heading-alias" id="误区六dag-一旦创建就不能变" aria-hidden="true"></span><span class="heading-alias" id="第二步中间结果会推动动态-schedule-revision" aria-hidden="true"></span><h4 id="第二步中间结果会推动动态调度修订schedule-revision">第二步：中间结果会推动动态调度修订（Schedule Revision）</h4>
+<p>智能代理（Agent）工作通常不能在开始前把所有步骤一次性穷举。N1 可能发现测试命令由另一个工作空间（Workspace）生成，N3 也可能证明平台差异其实不存在。此时根会话（Root Session）中的主代理（Main Agent）需要增加节点、替换旧路线、停止过时分支，或选定最终产物（Artifact）。</p>
+<p>因此，Maka 的任务图（Agent Graph）不是“一次写死后只会向前跑”的静态有向无环图（DAG）。主代理（Main Agent）通过 <code>update_agent_graph</code> 提交一份结构化调度修订（Schedule Revision）；修订（Revision）描述要新增、替换、停止或采纳什么。它先进入持久控制面，成为可供恢复与审计读取的 <strong>持久意图（Durable Intent）</strong>，而不是工具（Tool）一返回就直接等同于某个模型调用（Model Query）已经开始。</p>
+<p>这里的持久性（Durability）应谨慎理解为“调度意图先形成持久事实（Durable Fact），恢复逻辑可以重新观察它”，不是脱离存储事务、认领（Claim）、恢复实现和实际测试后仍可宣称的“绝不会丢失”。</p>
+<span class="heading-alias" id="第三步主-agentcoordinator-与-supervisor-不抢同一份职责" aria-hidden="true"></span><h4 id="第三步主代理main-agent协调器coordinator与监督者supervisor不抢同一份职责">第三步：主代理（Main Agent）、协调器（Coordinator）与监督者（Supervisor）不抢同一份职责</h4>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 10 / Table 10 · 第三步：主代理（Main Agent）、协调器（Coordinator）与监督者（Supervisor）不抢同一份职责"><table><caption>表 10 / Table 10 · 第三步：主代理（Main Agent）、协调器（Coordinator）与监督者（Supervisor）不抢同一份职责</caption><thead><tr><th scope="col">角色</th><th scope="col">主要职责</th><th scope="col">不负责什么</th></tr></thead><tbody><tr><td>根主代理（Root Main Agent）</td><td>理解业务目标，提出和修订任务图（Agent Graph），选择或综合结果</td><td>不自己实现确定性的依赖扫描与去重调度</td></tr>
+<tr><td>协调器（Coordinator）</td><td>从持久事实（Durable Fact）重建快照，对账（Reconcile）计划，生成就绪投影（Readiness Projection），取得认领（Claim）并派发工作</td><td>不替模型（Model）判断两份结论在语义上谁更可信</td></tr>
+<tr><td>监督者（Supervisor）</td><td>根主代理（Root Main Agent）在检查点（Checkpoint）上的监督者（Supervisor）：审阅有界结果，决定重试、替换、继续或结束</td><td>不是另一套常驻模型（Model）运行时（Runtime），也不靠保留旧调用栈等待</td></tr>
+<tr><td>子执行算子（Child Operator）</td><td>在自己的会话（Session）中执行一个普通代理执行（AgentRun），并形成结果与终态事实（Terminal Fact）</td><td>不拥有全局拓扑（Topology）修改权</td></tr></tbody></table></div>
+<p>主代理（Main Agent）与监督者（Supervisor）可以是同一个根会话（Root Session）的主代理（Main Agent）：它写入计划，在检查点（Checkpoint）后重新作语义决策；中间的确定性推进交给协调器（Coordinator）。</p>
+<span class="heading-alias" id="第四步从-durable-intent-到-reconcile" aria-hidden="true"></span><h4 id="第四步从持久意图durable-intent到对账reconcile">第四步：从持久意图（Durable Intent）到对账（Reconcile）</h4>
+<p><code>update_agent_graph</code> 的直接效果是追加修订（Revision）并请求协调，不是亲自运行子代理（Subagent）。协调器（Coordinator）被唤醒后，从持久状态（State）重新折叠当前计划，并把它与已经提交的子执行与运行时事件事实（Child Run / Runtime Event Fact）对齐：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 11 / Table 11 · 第四步：从持久意图（Durable Intent）到对账（Reconcile）"><table><caption>表 11 / Table 11 · 第四步：从持久意图（Durable Intent）到对账（Reconcile）</caption><thead><tr><th scope="col">对账（Reconcile）步骤</th><th scope="col">读取与改变的对象</th><th scope="col">为什么不能省略</th></tr></thead><tbody><tr><td>读取持久修订与既有执行事实</td><td>重建当前图意图，优先处理停止、替换与结束</td><td>旧内存中的路线可能已经失效</td></tr>
+<tr><td>补齐节点容器，重算就绪（Ready）</td><td>组织子执行算子（Operator），生成读侧投影（Projection）</td><td>容器存在或依赖满足仍不等于已经启动</td></tr>
+<tr><td>核对并认领（Claim）确切执行</td><td>固定子会话（Child Session）、工作轮次（Turn）与执行身份（Execution Identity）</td><td>重复唤醒应找回同一份工作</td></tr>
+<tr><td>经宿主（Host）准入（Admission）派发</td><td>普通子代理（Subagent）执行进入共享执行链（Execution Chain）</td><td>图的控制状态（State）不自行越过执行许可</td></tr></tbody></table></div>
+<p>这一步叫 <a href="glossary.html#reconcile%E5%AF%B9%E8%B4%A6--%E6%94%B6%E6%95%9B">对账（Reconcile）</a>，因为协调器（Coordinator）的工作不是相信一份长期驻留内存的有向无环图（DAG），而是反复比较“持久意图（Durable Intent）”与“已经发生的执行事实”，再决定缺少哪一步。</p>
+<span class="heading-alias" id="误区七节点-ready-就证明对应-run-已经开始" aria-hidden="true"></span><span class="heading-alias" id="第五步readiness-projection-不等于-conditional-claimadmission" aria-hidden="true"></span><h4 id="第五步就绪投影readiness-projection不等于条件认领conditional-claim准入admission">第五步：就绪投影（Readiness Projection）不等于条件认领（Conditional Claim）/准入（Admission）</h4>
+<p>从依赖满足到执行开始，还经过两次状态（State）转换：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 12 / Table 12 · 第五步：就绪投影（Readiness Projection）不等于条件认领（Conditional Claim）/准入（Admission）"><table><caption>表 12 / Table 12 · 第五步：就绪投影（Readiness Projection）不等于条件认领（Conditional Claim）/准入（Admission）</caption><thead><tr><th scope="col">阶段</th><th scope="col">性质</th><th scope="col">它能证明什么</th></tr></thead><tbody><tr><td>就绪投影（Readiness Projection）</td><td>可重复计算的读侧投影（Projection）</td><td>当前快照中，前置依赖已经满足</td></tr>
+<tr><td>条件认领（Conditional Claim）</td><td>带前置条件写入的权威协调事实</td><td>某个就绪意图（Ready Intent）已绑定（Binding）到确切的子会话（Child Session）/工作轮次（Turn）/执行（Run），当前驱动应观察或推进这一次执行</td></tr>
+<tr><td>执行准入与启动（Admission / Start）</td><td>宿主（Host）与普通运行时（Runtime）的执行边界（Execution Boundary）</td><td>对应执行（Run）已被准入（Admission）或开始；仍不证明它会以成功状态（State）结束</td></tr></tbody></table></div>
+<p>如果每次看到就绪（Ready）都直接调用模型（Model），重启或重复唤醒（Wake）就可能制造重复工作。条件认领（Conditional Claim）把无副作用的“看起来可运行”与有权产生执行效果的准入（Admission）分开；已有认领（Claim）时，协调器（Coordinator）应观察或恢复同一个确切执行（Exact Run），而不是随手创建另一个。</p>
+<span class="heading-alias" id="同一个-stop为什么有三种结果" aria-hidden="true"></span><h4 id="同一个停止请求stop为什么有三种结果">同一个停止请求（Stop），为什么有三种结果</h4>
+<p>这里另设可写节点 W1：任务是修改 README 并运行测试，已获得该范围的实施授权；它使用 <code>implementation</code> 配置（Profile），实际工具（Tool）集合与执行边界（Execution Boundary）也允许相应的 <code>Edit</code>/<code>Bash</code>。W1 与前面的只读检查节点具有不同任务契约。主代理（Main Agent）后来发现 W1 这条分支已过时，提交停止它的修订（Revision）。下面固定这份任务和授权，只改变停止请求（Stop）形成有效控制状态（State）的时点：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 13 / Table 13 · 同一个停止请求（Stop），为什么有三种结果"><table><caption>表 13 / Table 13 · 同一个停止请求（Stop），为什么有三种结果</caption><thead><tr><th scope="col">停止请求（Stop）的时点</th><th scope="col">下一步发生什么</th><th scope="col">怎样判定</th></tr></thead><tbody><tr><td>协调器（Coordinator）看见就绪（Ready），但还没取得认领（Claim）</td><td>原修订（Revision）已过时，不能按旧快照认领（Claim）</td><td>曾显示就绪（Ready），不证明模型（Model）启动过</td></tr>
+<tr><td>认领（Claim）已持久化，但还没通过运行时（Runtime）准入（Admission）</td><td>取消已有认领（Claim），执行前再次检查并拒绝启动</td><td>有认领（Claim），也可能没有一次执行后端（Agent Backend）调用</td></tr>
+<tr><td>子代理（Subagent）已执行 <code>Edit</code>/<code>Bash</code></td><td>请求停止对应子会话（Child Session），收敛实际状态（State）；若本已终态（Terminal State），则保留该事实</td><td>不能把停止请求（Stop）当作撤销已写文件或已运行命令</td></tr></tbody></table></div>
+<p>这不是仅靠提示词（Prompt）告诉子代理（Subagent）“别做了”。固定实现会在认领（Claim）和执行准入（Admission）两个位置核对调度修订（Schedule Revision），并优先处理停止（Stop）与替换（Replacement）；停止失败会报告失败（Failure），不当成已经停止。整图停止（Stop）还要防止监督者（Supervisor）又被唤醒，等待当前协调工作收敛后重读节点列表，处理第一次扫描时尚未出现的子代理（Subagent）。</p>
+<p>所以失败分支需要回答两个问题：<strong>还有没有权开始新工作，已经发生的工作如何收敛？</strong> 子代理（Subagent）的终态（Terminal State）与结果仍回到普通执行（Run）/运行时事件（Runtime Event）读取；是否保留已有结论、改派还是由主任务（Main Task）接手，是之后的语义判断。上述三种时序是故障推演，并非三次实际运行记录。</p>
+<span class="heading-alias" id="误区五graph-节点完成就等于整个-graph-完成" aria-hidden="true"></span><span class="heading-alias" id="第六步节点仍是普通-child-agentrun结果要-committed-且有界交接" aria-hidden="true"></span><h4 id="第六步节点仍是子代理subagent的普通代理执行agentrun结果先提交commit再有界交接">第六步：节点仍是子代理（Subagent）的普通代理执行（AgentRun），结果先提交（Commit）再有界交接</h4>
+<p>任务图（Agent Graph）不重新实现提示词（Prompt）/上下文（Context）、模型协议适配器（Model Adapter）、工具运行时（ToolRuntime）、权限（Permission）/沙箱（Sandbox）、运行时事件（Runtime Event）或终态（Terminal State）。取得认领（Claim）并完成准入（Admission）后，节点在关联子会话（Linked Child Session）中运行普通代理执行（AgentRun）；输出与终态（Terminal State）仍由普通执行与运行时事件账本（Run / Runtime Event Ledger）拥有，不归任务图（Agent Graph）回调函数（Callback）私藏。</p>
+<p>下游节点或监督者（Supervisor）通过 <strong>已提交的有界结果交接（Committed Bounded Handoff）</strong> 消费结果：交接依据已经提交的终态与结果事实（Terminal / Result Fact），携带完成下一步所需的有界摘要（Summary）、正文或产物引用（Artifact Reference），而不是把用户界面（User Interface，UI）上看到的每条流式事件、子代理（Subagent）的整段私有历史（History）或一个尚未落盘的临时输出都当成任务图（Agent Graph）输入。</p>
+<span class="heading-alias" id="误区八supervisor-wake-会恢复原来的模型调用" aria-hidden="true"></span><span class="heading-alias" id="第七步checkpointwake-创建新的普通-root-run" aria-hidden="true"></span><h4 id="第七步检查点checkpoint唤醒wake创建新的普通顶层执行root-run">第七步：检查点（Checkpoint）/唤醒（Wake）创建新的普通顶层执行（Root Run）</h4>
+<p>当任务图（Agent Graph）到达需要语义判断的检查点（Checkpoint）或 <a href="glossary.html#quiescence%E9%9D%99%E6%AD%A2%E7%82%B9">静止点（Quiescence）</a>，协调器（Coordinator）不代替模型（Model）做“是否改路线”的判断。系统先形成持久监督唤醒（Durable Supervisor Wake），再由宿主（Host）为根会话（Root Session）创建一个 <strong>新的普通顶层工作轮次（Root Turn）/代理执行（AgentRun）</strong>：</p>
+<p>下面把前述推进链闭合为一轮：监督审阅后可以修订或结束。回边产生新的控制意图，不复活旧模型调用（Model Query）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="调度与监督 · Scheduling and Supervision：可滚动示意图"><a href="../../../assets/diagrams/24-continuation-and-orchestration-3.svg"><img src="../../../assets/diagrams/24-continuation-and-orchestration-3.svg" alt="任务图（Agent Graph）的持久意图（Durable Intent）经对账（Reconcile）、就绪投影（Readiness Projection）、认领（Claim）与准入（Admission）派发子执行；已提交交接（Committed Handoff）形成监督唤醒（Supervisor Wake），由新顶层执行审阅并修订或结束。" width="720" height="1975" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这不是把先前暂停的模型（Model）请求或 JavaScript 调用栈“唤醒回来”。新顶层执行（Root Run）读取有界任务图（Agent Graph）快照和已提交结果，形成下一轮语义决定；如果计划改变，就再提交修订（Revision），循环继续。</p>
+<span class="heading-alias" id="graph-与-mailbox协调状态放在哪里" aria-hidden="true"></span><h4 id="任务图agent-graph与邮箱mailbox协调状态state放在哪里">任务图（Agent Graph）与邮箱（Mailbox）：协调状态（State）放在哪里</h4>
+<p>沿用第23章介绍的算子（Operator）与参与者（Participant）区分，可以比较下面两种协作设计。这个概念对照不表示 Maka 已经提供两套实现；它们都能创建多个智能代理（Agent），但控制流的落点不同：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 14 / Table 14 · 任务图（Agent Graph）与邮箱（Mailbox）：协调状态（State）放在哪里"><table><caption>表 14 / Table 14 · 任务图（Agent Graph）与邮箱（Mailbox）：协调状态（State）放在哪里</caption><thead><tr><th scope="col">问题</th><th scope="col">任务图（Agent Graph） / 算子（Operator）</th><th scope="col">邮箱（Mailbox） / 参与者（Participant）</th></tr></thead><tbody><tr><td>核心协调状态（State）</td><td>显式有向无环图（DAG）、修订（Revision）、认领（Claim）、检查点（Checkpoint）</td><td>可寻址智能代理（Agent）的会话（Session）与私有消息（Message）队列</td></tr>
+<tr><td>依赖怎样表达</td><td>拓扑（Topology）边与就绪投影（Readiness Projection）规则</td><td>消息（Message）到达、后续工作请求（Follow-up）与智能代理（Agent）自身判断</td></tr>
+<tr><td>怎样动态调整</td><td>根主代理（Root Main Agent）提交新的调度修订（Schedule Revision）</td><td>参与者（Participant）在多轮消息（Message）中补充、追问或横向协商</td></tr>
+<tr><td>子代理（Subagent）间通信</td><td>Maka 路径不向子代理（Subagent）暴露共享邮箱（Mailbox）或持续横向协商通道</td><td>同一任务范围内的智能代理（Agent）可直接投递消息（Message）（取决于具体系统合同（Contract））</td></tr>
+<tr><td>结果怎样交接</td><td>已提交的有界结果（Bounded Result）与产物（Artifact）沿依赖关系被消费</td><td>消息（Message）在目标智能代理（Agent）的轮次边界进入其上下文（Context）</td></tr>
+<tr><td>全局审计视图</td><td>可从任务图（Agent Graph）控制面重建整体快照</td><td>常需结合多个智能代理（Agent）状态（State）并重放消息（Message）吸收顺序</td></tr>
+<tr><td>主要优势</td><td>依赖显式、准入（Admission）集中、较易审计与恢复</td><td>开放探索灵活、运行中易追加线索与协商</td></tr>
+<tr><td>主要代价</td><td>语义改道需要根主代理（Root Main Agent）提交修订（Revision）</td><td>控制流较分散，消息（Message）与上下文（Context）可能膨胀</td></tr></tbody></table></div>
+<p>这张表不是在说任务图（Agent Graph）只能静态执行，也不是说邮箱（Mailbox）没有父任务（Parent Task）与子任务（Child Task）。真正的分水岭是：协调事实主要收拢在全局任务图（Agent Graph），还是分散在参与者（Participant）的对话与消息（Message）流里。</p>
 <h3 id="一次定时触发在崩溃前后还能对应同一份工作吗">一次定时触发，在崩溃前后还能对应同一份工作吗</h3>
-<p>让 README 检查明早再做一次，看似只要设置 timer 并保存 prompt。真正的问题是：时钟可以重复提醒“到点了”，但系统如何知道已经接纳了哪一次执行？下面以 <code>session_resume</code> 的一次 fire 为主，身份和故障时点都是教学假设，没有运行定时器。</p>
-<p>把这一火次写为四层对象，而不是一个 running 布尔值：</p>
-<pre><code class="language-text">F = (task, fire claim, exact Session/Turn/Run/message)
-A = Host 是否接纳这组身份与工作内容
-S = 该 Run 的 start 是否已稳定
-T = 该 Run 是否已有合法 terminal，以及它的结果</code></pre>
-<p>F 是“哪次触发、准备交给谁”，A 是执行准入，S 是启动边界，T 才是执行结束。任务验收又比 T 更进一步：正常结束仍需检查 README 和测试证据。这个对象用于推演，没有新增一份与源码竞争的状态库。</p>
-<p>这里的 message 指这次定时输入的 <code>userMessageId</code>，如 U8，不是其完整正文或后续全部消息。<code>bindFireExecution</code> 对 sessionId、turnId、runId、userMessageId 四字段逐一比较；即使 S/T/R 不变，换成 U9 也冲突。内容一致性另由 Host admission 校验，不能仅靠 ID 相同推断正文相同。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 9 / Table 9 · 一次定时触发，在崩溃前后还能对应同一份工作吗"><table><caption>表 9 / Table 9 · 一次定时触发，在崩溃前后还能对应同一份工作吗</caption><thead><tr><th scope="col">崩溃/观察位置</th><th scope="col">新 Host 读取什么</th><th scope="col">当前 Maka 的限定处理</th></tr></thead><tbody><tr><td>已有 pending fire，尚未绑定 execution identity</td><td>有 claim，没有可核对的那组 IDs</td><td>恢复把该 fire 失败结算，不凭 prompt 重新猜一次 Run</td></tr>
-<tr><td>claim 已绑定 S1/T8/R8/U8，尚未形成新结果</td><td>同一组冻结身份和输入</td><td>沿该组身份进入恢复/准入核对，不能换成R9规避原记录</td></tr>
-<tr><td>R8 已获准并稳定开始，fire 尚未结算</td><td>claim 与 root admission / invocation facts</td><td>由 Host 核对原执行，fire随后可结算；不是把模型请求重新发一遍</td></tr>
-<tr><td>UI 已显示 fired，R8 仍在运行</td><td>触发边界已结束，Run尚无terminal</td><td>只能报告已启动；继续观察实际工作</td></tr>
-<tr><td>R8 后来 failed，或工具仍有未知范围</td><td>Run/工具各自记录</td><td>不能把旧fired重解释为任务成功，也不能用新火次抹去旧效果未知</td></tr></tbody></table></div>
-<p>以一个重复到点信号为例：pending claim FC1 已绑定 R8（FC1 是火次认领，与 第23章 的 child Session C1 无关）；第二次扫描发现该 task 仍有 pending claim，所以本次不再认领第二份。<code>bindFireExecution(FC1, S1/T8/R8/U8)</code> 重复提交相同身份可接受；试图改成 R9 或 U9 则拒绝。这里固定的是<strong>同一火次的执行身份</strong>，不是给所有以后到期的火次使用一个 Run，也不证明 Run 内每个外部操作都 exactly-once。</p>
-<p>真实消费者是 Host coordinator：恢复读 claim 后，<code>#fulfill</code> 确认 Session，再交 <code>#admitAgentRun</code>；root admission 的 start callback 把四个身份和 required durability 交给 <code>SessionManager.sendMessage</code>，检查实际 started Run 一致，稳定后再结算 fire。Store 保存身份，Host 决定准入，Runtime 执行工作，不能让 timer 跳过中间两层。</p>
-<p>如果换成创建 fresh Session 的 <code>agent_run</code>，还多一项重要前提：模型 Connection 的 ID 与 slug 在模板中冻结，创建 Session 和紧邻 admission 时都检查。即使新 Connection 的显示名称、slug 或模型名一样，也不能据此继承旧实体的身份；旧模板缺少 exact ID 时当前实现失败关闭。这说明“执行意图持久化”还必须保存它实际绑定的资源身份。</p>
-<h3 id="什么时候需要更强的工作流恢复">什么时候需要更强的工作流恢复</h3>
-<p>四类 domain 分别处理不同触发：Plan 等合法批准，Goal 消费评估与预算，Schedule 消费时间和 fire，Graph 消费依赖与结果。共同底层不是“不断调用模型”，而是<strong>先保存允许继续的理由，再由执行 owner 接纳确切工作</strong>。故障重试、观察恢复和新的业务意图应分别命名；一套通用 <code>resume(prompt)</code> 无法自动补齐这些条件。</p>
-<p>相邻领域的 Temporal 提供另一种恢复单位：Workflow 是可重放的控制逻辑，Activity 是工作进程执行的动作单元。事件历史记录 Workflow command 与 Activity 的结果；控制代码重放到已完成的 Activity 时复用历史结果，未取得完成结果的 Activity 则有其等待/重试语义。它比一个 fire claim 管得更深入控制程序，但要求确定性命令与代码版本兼容；外部效果已发生、Activity完成回执未到时仍可能重复。可以在 <a href="44-checkpoints-and-replay.html#5-temporal%E4%BF%9D%E5%AD%98%E4%BA%8B%E4%BB%B6%E8%AE%A9%E6%8E%A7%E5%88%B6%E4%BB%A3%E7%A0%81%E9%87%8D%E6%96%B0%E8%B5%B0%E5%88%B0%E5%90%8C%E4%B8%80%E4%BD%8D%E7%BD%AE">Temporal 原理与失败例</a>中继续追踪重放时的判断。</p>
-<p>恢复单位决定机制选择：只要未来启动一次普通 Agent 工作，可用具有身份与恢复规则的 Schedule；如果要跨多个服务、长时间等待并复用控制程序中的已完成结果，再考虑持久 Workflow。外层 Activity 包住整个 Agent 时，Activity 重试可能重新做整段调查，所以内外两层必须分配重试预算和效果身份，不能让每层各自认为可以无限再试。涉及付款、发布或长期浏览器状态时，更要回到 第18章 核效果回执，不能从 timer 或 Workflow 名字直接推导安全。</p>
-<p>还要定义 wrapper 怎样映射结果：Agent Run 为 failed，既可能让 Activity 报失败，也可能作为 <code>{status:failed}</code> 的正常返回值被记录为 Activity completed。只有前一种且重试政策允许时，才能继续讨论失败重试；后一种的控制重放会复用这个返回值。不能由 Run failed 单独推断 Activity 没有完成记录，两种映射都不替原工具消除效果未知。</p>
-<p><strong>变式一：恢复时只有 fire claim，没有 execution identity。为了不漏任务，能否创建R9；如果已有R8，能否给同一claim换R9？</strong></p>
+<p>让 README 检查明早再做一次，看似只要设置定时器（Timer）并保存提示词（Prompt）。真正的问题是：时钟可以重复提醒“到点了”，但系统如何知道已经接纳了哪一次执行（Run）？下面以 <code>session_resume</code> 的一次火次（Fire）为主，身份（Identity）和故障时点都是教学假设，没有运行定时器（Timer）。</p>
+<p>把这一火次（Fire）写为四层对象，而不是一个 <code>running</code> 布尔值：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 15 / Table 15 · 一次定时触发，在崩溃前后还能对应同一份工作吗"><table><caption>表 15 / Table 15 · 一次定时触发，在崩溃前后还能对应同一份工作吗</caption><thead><tr><th scope="col">教学符号</th><th scope="col">对象与判断</th><th scope="col">实际消费者（Consumer）</th></tr></thead><tbody><tr><td>F：火次（Fire）及绑定（Binding）</td><td>哪项定时任务（Scheduled Task）、哪个火次认领（Fire Claim）、确切会话（Session）/工作轮次（Turn）/执行（Run）/输入消息（Message）身份（Identity）</td><td>定时协调器（Schedule Coordinator）读取火次（Fire）记录</td></tr>
+<tr><td>A：执行准入（Admission）</td><td>宿主（Host）是否接纳这组身份（Identity）与工作内容</td><td>普通执行（Run）主干消费准入（Admission）结果</td></tr>
+<tr><td>S：启动边界</td><td>这次执行（Run）的开始是否已稳定</td><td>定时协调器（Schedule Coordinator）据此结算火次（Fire）</td></tr>
+<tr><td>T：执行终态（Terminal State）</td><td>是否已有合法结束记录及相应结果</td><td>客户端（Client）、目标（Goal）控制器或后续任务分别读取</td></tr></tbody></table></div>
+<p>F 是“哪次触发、准备交给谁”，A 是执行准入（Admission），S 是启动边界，T 才是执行结束。任务验收（Acceptance）又比 T 更进一步：正常结束仍需检查 README 和测试证据。这个对象用于推演，没有新增一份与源码竞争的状态（State）库。</p>
+<p>这里的消息（Message）指这次定时输入的 <code>userMessageId</code>，如 U8，不是其完整正文或后续全部消息（Message）。<code>bindFireExecution</code> 对 <code>sessionId</code>、<code>turnId</code>、<code>runId</code>、<code>userMessageId</code> 四字段逐一比较；即使会话、工作轮次与执行的三个身份不变，换成 U9 也冲突。内容一致性另由宿主（Host）准入（Admission）校验，不能仅靠 ID 相同推断正文相同。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 16 / Table 16 · 一次定时触发，在崩溃前后还能对应同一份工作吗"><table><caption>表 16 / Table 16 · 一次定时触发，在崩溃前后还能对应同一份工作吗</caption><thead><tr><th scope="col">崩溃/观察（Observation）位置</th><th scope="col">新宿主（Host）读取什么</th><th scope="col">当前 Maka 的限定处理</th></tr></thead><tbody><tr><td>已有 <code>pending</code> 火次（Fire），尚未绑定（Binding）执行身份（Execution Identity）</td><td>有认领（Claim），没有可核对的那组标识（ID）</td><td>恢复把该火次（Fire）失败结算，不凭提示词（Prompt）重新猜一次执行（Run）</td></tr>
+<tr><td>认领（Claim）已绑定（Binding） S1/T8/R8/U8，尚未形成新结果</td><td>同一组冻结身份（Identity）和输入</td><td>沿该组身份（Identity）进入恢复/准入（Admission）核对，不能换成R9规避原记录</td></tr>
+<tr><td>R8 已获准并稳定开始，火次（Fire）尚未结算</td><td>认领（Claim）与顶层准入（Root Admission） / 调用事实（Invocation Fact）</td><td>由宿主（Host）核对原执行，火次（Fire）随后可结算；不是把模型（Model）请求重新发一遍</td></tr>
+<tr><td>UI 已显示 <code>fired</code>，R8 仍在运行</td><td>触发边界已结束，执行（Run）尚无终态（Terminal State）</td><td>只能报告已启动；继续观察实际工作</td></tr>
+<tr><td>R8 后来 <code>failed</code>，或工具（Tool）仍有未知范围</td><td>执行（Run）/工具（Tool）各自记录</td><td>不能把旧<code>fired</code>重解释为任务成功，也不能用新火次（Fire）抹去旧效果未知</td></tr></tbody></table></div>
+<p>以一个重复到点信号为例：<code>pending</code> 认领（Claim） FC1 已绑定（Binding） R8（FC1 是火次认领（Fire Claim），与第23章的子会话（Child Session） C1 无关）；第二次扫描发现该定时任务（Scheduled Task）仍有 <code>pending</code> 认领（Claim），所以本次不再认领（Claim）第二份。<code>bindFireExecution(FC1, S1/T8/R8/U8)</code> 重复提交相同身份（Identity）可接受；试图改成 R9 或 U9 则拒绝。这里固定的是<strong>同一火次（Fire）的执行身份（Execution Identity）</strong>，不是给所有以后到期的火次（Fire）使用一个执行（Run），也不证明执行（Run）内每个外部操作都恰好一次（Exactly-once）。</p>
+<p>真实消费者（Consumer）是宿主协调器（Host Coordinator）：恢复读认领（Claim）后，<code>#fulfill</code> 确认会话（Session），再交 <code>#admitAgentRun</code>；顶层准入（Root Admission）的启动回调函数（Start Callback）把四个身份（Identity）和必需持久化（Required Durability）交给 <code>SessionManager.sendMessage</code>，检查实际已启动执行（Run）的身份一致，稳定后再结算火次（Fire）。存储层（Store）保存身份（Identity），宿主（Host）决定准入（Admission），运行时（Runtime）执行工作，不能让定时器（Timer）跳过中间两层。</p>
+<p>如果换成创建新会话（Fresh Session）的 <code>agent_run</code>，还多一项重要前提：模型（Model）连接（Connection）的 ID 与可读名称（Slug）在模板中冻结，创建会话（Session）和紧邻准入（Admission）时都检查。即使新连接（Connection）的显示名称、可读名称（Slug）或模型（Model）名一样，也不能据此继承旧实体的身份（Identity）；旧模板缺少确切标识（Exact ID）时当前实现失败关闭。这说明“执行意图持久化”还必须保存它实际绑定（Binding）的资源身份（Identity）。</p>
+<span class="heading-alias" id="什么时候需要更强的工作流恢复" aria-hidden="true"></span><h3 id="什么时候需要更强的工作流workflow恢复">什么时候需要更强的工作流（Workflow）恢复</h3>
+<p>四类业务域（Domain）分别处理不同触发：计划（Plan）等合法批准，目标（Goal）消费评估与预算，定时任务（Scheduled Task）消费时间和火次（Fire），任务图（Agent Graph）消费依赖与结果。共同底层不是“不断调用模型（Model）”，而是<strong>先保存允许继续的理由，再由执行负责者（Owner）接纳确切工作</strong>。故障重试、观察（Observation）恢复和新的业务意图应分别命名；一套通用 <code>resume(prompt)</code> 无法自动补齐这些条件。</p>
+<p>相邻领域的 Temporal 提供另一种恢复单位：工作流（Workflow）是可重放的控制逻辑，活动（Activity）是工作进程执行的动作单元。事件历史（History）记录工作流命令（Workflow Command）与活动（Activity）的结果；控制代码重放到已完成的活动（Activity）时复用历史（History）结果，未取得完成结果的活动（Activity）则有其等待/重试语义。它比一个火次认领（Fire Claim）管得更深入控制程序，但要求确定性命令与代码版本兼容；外部效果已发生、活动（Activity）完成回执未到时仍可能重复。可以在 <a href="44-checkpoints-and-replay.html#5-temporal%E4%BF%9D%E5%AD%98%E4%BA%8B%E4%BB%B6%E8%AE%A9%E6%8E%A7%E5%88%B6%E4%BB%A3%E7%A0%81%E9%87%8D%E6%96%B0%E8%B5%B0%E5%88%B0%E5%90%8C%E4%B8%80%E4%BD%8D%E7%BD%AE">Temporal 原理与失败例</a>中继续追踪重放时的判断。</p>
+<p>恢复单位决定机制选择：只要未来启动一次普通智能代理（Agent）工作，可用具有身份（Identity）与恢复规则的定时任务（Scheduled Task）；如果要跨多个服务、长时间等待并复用控制程序中的已完成结果，再考虑持久工作流（Workflow）。外层活动（Activity）包住整个智能代理（Agent）时，活动（Activity）重试可能重新做整段调查，所以内外两层必须分配重试预算和效果身份（Identity），不能让每层各自认为可以无限再试。涉及付款、发布或长期浏览器状态（State）时，更要回到第18章核效果回执，不能从定时器（Timer）或工作流（Workflow）名字直接推导安全。</p>
+<p>还要定义包装器（Wrapper）怎样映射结果：智能代理（Agent）执行（Run）为 <code>failed</code>，既可能让活动（Activity）报失败，也可能作为 <code>{status:failed}</code> 的正常返回值被记录为活动（Activity） <code>completed</code>。只有前一种且重试政策允许时，才能继续讨论失败重试；后一种的控制重放会复用这个返回值。不能由执行（Run） <code>failed</code> 单独推断活动（Activity）没有完成记录，两种映射都不替原工具（Tool）消除效果未知。</p>
+<p><strong>变式一：恢复时只有火次认领（Fire Claim），没有执行身份（Execution Identity）。为了不漏任务，能否创建R9；如果已有R8，能否给同一认领（Claim）换R9？</strong></p>
 <p class="answer-label"><strong>参考答案</strong></p>
-<p>按当前实现，第一种失败结算，不在恢复中猜新身份；第二种也不能换，绑定相同值可以重复，不同值会冲突。产品若要改变“尚未绑定就失败”的策略，需要显式定义新业务触发和授权/去重边界，而不是把改策略叫作透明恢复。已有R8还必须由其owner核对，避免制造第二份副作用。</p>
-<p><strong>变式二：fired已保存，R8的Edit出现outcome_unknown；现在改用外层Workflow自动重试整个Agent。是否就能省去文件对账？</strong></p>
+<p>按当前实现，第一种失败结算，不在恢复中猜新身份（Identity）；第二种也不能换，绑定（Binding）相同值可以重复，不同值会冲突。产品若要改变“尚未绑定（Binding）就失败”的策略，需要显式定义新业务触发和授权/去重边界，而不是把改策略叫作透明恢复。已有R8还必须由其负责者（Owner）核对，避免制造第二份副作用。</p>
+<p><strong>变式二：<code>fired</code>已保存，R8的<code>Edit</code>出现<code>outcome_unknown</code>；现在改用外层工作流（Workflow）自动重试整个智能代理（Agent）。是否就能省去文件对账（Reconcile）？</strong></p>
 <p class="answer-label"><strong>参考答案</strong></p>
-<p>不能。fired只证明触发/启动，未知工具效果还在。外层重试可能创建新调用并重复已经发生的编辑；Workflow复用的是已记录的完成结果，缺少完成回执的效果仍需资源方幂等或对账。应先核原Run、工具记录与当前文件，明确能复用什么、谁决定新尝试，再继续验收。两层恢复合同不能互相当作对方已经处理过。</p>
-<h3 id="deep-research-与-swarm-放在哪里">Deep Research 与 Swarm 放在哪里</h3>
-<h4 id="deep-research">Deep Research</h4>
-<p>Maka 当前的 Deep Research 更接近受限 Session mode：执行仍由普通 AgentRun 承担，工具白名单偏只读，并维护研究 artifacts/checklist。</p>
-<h4 id="swarm">Swarm</h4>
-<p>Maka 当前的 Swarm 更像 Graph 上层的薄策略：帮助决定怎样生成或组织拓扑。它不应被描述成与 Graph、Runtime 并列的完整执行系统。</p>
-<p>Deep Research 的执行仍属于普通 AgentRun，Swarm 的推进仍依赖 Graph；产品功能名并不另建执行 owner。</p>
-<h4 id="workhub从协调会话接续指定委派">WorkHub：从协调会话接续指定委派</h4>
-<p>WorkHub 是处理用户委派的协调会话入口，也沿用“模型提出、Host 准入”的分工。它不另建一套 Agent 执行器。假设用户要求“继续此前委派的文档检查”，接续过程是：</p>
+<p>不能。<code>fired</code>只证明触发/启动，未知工具（Tool）效果还在。外层重试可能创建新调用并重复已经发生的编辑；工作流（Workflow）复用的是已记录的完成结果，缺少完成回执的效果仍需资源方幂等或对账（Reconcile）。应先核原执行（Run）、工具（Tool）记录与当前文件，明确能复用什么、谁决定新尝试，再继续验收（Acceptance）。两层恢复合同不能互相当作对方已经处理过。</p>
+<span class="heading-alias" id="deep-research-与-swarm-放在哪里" aria-hidden="true"></span><h3 id="深度研究deep-research与群体协作swarm放在哪里">深度研究（Deep Research）与群体协作（Swarm）放在哪里</h3>
+<span class="heading-alias" id="deep-research" aria-hidden="true"></span><h4 id="深度研究deep-research">深度研究（Deep Research）</h4>
+<p>Maka 当前的深度研究（Deep Research）更接近受限会话模式（Session Mode）：执行仍由普通代理执行（AgentRun）承担，工具（Tool）白名单偏只读，并维护研究产物（Artifact）与检查清单（Checklist）。</p>
+<span class="heading-alias" id="swarm" aria-hidden="true"></span><h4 id="群体协作swarm">群体协作（Swarm）</h4>
+<p>Maka 当前的群体协作（Swarm）更像任务图（Agent Graph）上层的薄策略：帮助决定怎样生成或组织拓扑（Topology）。它不应被描述成与任务图（Agent Graph）、运行时（Runtime）并列的完整执行系统。</p>
+<p>深度研究（Deep Research）的执行仍属于普通代理执行（AgentRun），群体协作（Swarm）的推进仍依赖任务图（Agent Graph）；产品功能名并不另建执行负责者（Owner）。</p>
+<span class="heading-alias" id="workhub从协调会话接续指定委派" aria-hidden="true"></span><h4 id="workhub从协调会话session接续指定委派">WorkHub：从协调会话（Session）接续指定委派</h4>
+<p>WorkHub 是处理用户委派的协调会话（Session）入口，也沿用“模型（Model）提出、宿主（Host）准入（Admission）”的分工。它不另建一套智能代理（Agent）执行器（Executor）。假设用户要求“继续此前委派的文档检查”，接续过程是：</p>
 <ol>
-<li>用户要求先进入专用 Runtime Turn，协调模型据此提出接续操作；提案本身不提供用户权限。</li>
-<li>Host 回读已准入的用户内容，找回指定委派的来源，核对本次请求是否确实指向那份工作。</li>
-<li>Host 检查安全接续边界（safe-boundary），也就是必须能证明当前条件允许从指定位置继续。相关开关未启用或条件不足时，不猜测原工作已经安全结束，也不擅自重发。</li>
-<li>条件成立，Host 才创建新的 Turn 承担后续工作。旧执行及其结果保持原记录，不会因此复活旧请求或抹去已发生的效果。</li>
+<li>用户要求先进入专用运行时工作轮次（Runtime Turn），协调模型（Model）据此提出接续操作；提案本身不提供用户权限（Permission）。</li>
+<li>宿主（Host）回读已准入（Admission）的用户内容，找回指定委派的来源，核对本次请求是否确实指向那份工作。</li>
+<li>宿主（Host）检查安全接续边界（Safe Boundary），也就是必须能证明当前条件允许从指定位置继续。相关开关未启用或条件不足时，不猜测原工作已经安全结束，也不擅自重发。</li>
+<li>条件成立，宿主（Host）才创建新的工作轮次（Turn）承担后续工作。旧执行（Run）及其结果保持原记录，不会因此复活旧请求或抹去已发生的效果。</li>
 </ol>
-<p>这个例子把“用户要继续什么”“模型提议什么”和“Host 可以接纳什么”分开。若操作回复丢失，重复请求仍须对应原来那次接续，不能碰巧继续后来另一场中断。</p>
-<span class="heading-alias" id="失败时应该问什么" aria-hidden="true"></span><h3 id="恢复判断需要哪些状态">恢复判断需要哪些状态</h3>
-<p>一个 running 状态不足以决定恢复动作。以定时 fire 已绑定 R8、但客户端看不到完成结果为例，各层事实分别回答不同问题：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 10 / Table 10 · 恢复判断需要哪些状态"><table><caption>表 10 / Table 10 · 恢复判断需要哪些状态</caption><thead><tr><th scope="col">必须区分的状态</th><th scope="col">本场景中的解释</th></tr></thead><tbody><tr><td>持久意图（Durable intent）</td><td>task 和 fire 记录说明存在待处理的业务意图，不说明已经执行</td></tr>
-<tr><td>触发与认领（Trigger / Claim）</td><td>原 fire claim 决定本次机会属于哪一次工作，重复时钟信号不能另造一份认领</td></tr>
-<tr><td>确切执行准入（Exact Run admission）</td><td>原绑定与 root admission 用于核对是否已接纳 R8；不能换 R9 绕过原结果未知</td></tr>
-<tr><td>执行终态（Run terminal）</td><td>有合法终态才说明这次执行如何结束；没有终态不能凭 UI 猜成功</td></tr>
-<tr><td>domain 结算</td><td>fire 的启动结算与 Run 的任务结果分别存在，fired 不等于测试通过</td></tr>
-<tr><td>恢复负责者（Recovery owner）</td><td>Host coordinator 按 claim 与准入事实推进；工具效果未知仍交相应恢复合同处理</td></tr></tbody></table></div>
-<p>这组区分阻止了两种误判：把触发完成当作任务完成，以及把观察缺口当作重新执行的理由。</p>
+<p>这个例子把“用户要继续什么”“模型（Model）提议什么”和“宿主（Host）可以接纳什么”分开。若操作回复丢失，重复请求仍须对应原来那次接续，不能碰巧继续后来另一场中断。</p>
+<span class="heading-alias" id="失败时应该问什么" aria-hidden="true"></span><span class="heading-alias" id="恢复判断需要哪些状态" aria-hidden="true"></span><h3 id="恢复判断需要哪些状态state">恢复判断需要哪些状态（State）</h3>
+<p>一个 <code>running</code> 状态（State）不足以决定恢复动作。以定时火次（Fire）已绑定（Binding） R8、但客户端（Client）看不到完成结果为例，各层事实分别回答不同问题：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 17 / Table 17 · 恢复判断需要哪些状态（State）"><table><caption>表 17 / Table 17 · 恢复判断需要哪些状态（State）</caption><thead><tr><th scope="col">必须区分的状态（State）</th><th scope="col">本场景中的解释</th></tr></thead><tbody><tr><td>持久意图（Durable Intent）</td><td>定时任务（Scheduled Task）和火次（Fire）记录说明存在待处理的业务意图，不说明已经执行</td></tr>
+<tr><td>触发与认领（Trigger / Claim）</td><td>原火次认领（Fire Claim）决定本次机会属于哪一次工作，重复时钟信号不能另造一份认领（Claim）</td></tr>
+<tr><td>确切执行准入（Exact Run Admission）</td><td>原绑定（Binding）与顶层准入（Root Admission）用于核对是否已接纳 R8；不能换 R9 绕过原结果未知</td></tr>
+<tr><td>执行终态（Run Terminal State）</td><td>有合法终态（Terminal State）才说明这次执行如何结束；没有终态（Terminal State）不能凭 UI 猜成功</td></tr>
+<tr><td>业务域（Domain）结算</td><td>火次（Fire）的启动结算与执行（Run）的任务结果分别存在，<code>fired</code> 不等于测试通过</td></tr>
+<tr><td>恢复负责者（Recovery Owner）</td><td>宿主协调器（Host Coordinator）按认领（Claim）与准入（Admission）事实推进；工具（Tool）效果未知仍交相应恢复合同处理</td></tr></tbody></table></div>
+<p>这组区分阻止了两种误判：把触发完成当作任务完成，以及把观察（Observation）缺口当作重新执行的理由。</p>
 <span class="heading-alias" id="深化自测" aria-hidden="true"></span><h3 id="机制问题解析">机制问题解析</h3>
-<p><strong>问题 1。</strong> Graph 与 child Session 分别拥有哪些状态？</p>
-<p><strong>解释。</strong> Graph 拥有 schedule/topology/revision/claim/wake；child 的执行过程与终态仍由普通 Run/RuntimeEvent 记录。</p>
-<p><strong>问题 2。</strong> 系统重启后看到 running domain row，还必须核对什么？</p>
-<p><strong>解释。</strong> 冻结身份、admission、invocation opening/terminal、工具边界与 domain claim 等事实，不以单个状态字替代完整判断。</p>
-<p><strong>问题 3。</strong> 为什么 readiness 可以重算，而 claim/admission 不能任意重复创建？</p>
-<p><strong>解释。</strong> readiness 是读侧推导；claim 是对指定意图与 exact execution 身份的条件持久提交，重复派发可能产生第二份效果。</p>
-<p><strong>问题 4。</strong> supervisor wake 怎样回到普通 root Run？</p>
-<p><strong>解释。</strong> 已提交结果形成检查点与 durable wake，再由 Host 创建新的 root Turn/Run；不是复活旧模型请求或调用栈。</p>
-<p><strong>问题 5。</strong> T7 开始后才从 Client arm G1，T7 的完成是否自动启动 G1？单纯重启能否启动从未承载的 Goal？</p>
-<p><strong>解释。</strong> 不会。T7 开始时的绑定没有 G1；后续承载 Turn 或合法 resume 才驱动它。恢复不会把仅 armed、从未承载的 Goal 当成已经开始的循环。</p>
-<p><strong>问题 6。</strong> evaluator 返回 <code>{&quot;met&quot;:&quot;false&quot;}</code> 与超时，当前分别怎样处理？为什么都不能当作可靠的测试结果？</p>
-<p><strong>解释。</strong> 字符串 flag 与超时都标为 evaluatorFailed，不计真实进展或停滞，仍可能在条件允许时继续。两者都不能证明真实测试结果，且 evaluator 只能评估近期对话文字，不能独立重跑测试。目标已失效时，旧评估也不能越过 control/checkpoint 检查。</p>
-<p><strong>问题 7。</strong> 三步 Plan 的测试失败，模型却把前两步标 completed、测试标 skipped，Plan 会怎样？如果 Run 先 failed，恢复后应继续旧 Run 吗？</p>
-<p><strong>解释。</strong> 在输入合法且 execution 仍 active 时，全部 completed/skipped 会使 Plan completed，不能推断测试通过。若 Run failed 时 Plan 仍 active，会进入 interrupted；合法 resume 通过新 Turn 继续，不复活旧 Run，也不撤销先前工具效果。</p>
-<p><strong>问题 8。</strong> 上述已获准修改与测试的 W1 曾显示 Ready，stop 分别赢在 claim 前、claim 后 admission 前、Edit 已执行后；哪两种仍能阻止 backend 启动？第三种能否抹去修改？</p>
-<p><strong>解释。</strong> 前两种由 expected revision 检查与 durable cancel 阻止开始；第三种只能停止并收敛已经执行的 child。已发生的修改仍要检查与处理，stop 不等于 rollback。</p>
+<p><strong>问题 1。</strong> 任务图（Agent Graph）与子会话（Child Session）分别拥有哪些状态（State）？</p>
+<p><strong>解释。</strong> 任务图（Agent Graph）拥有调度（Scheduling）/拓扑（Topology）/修订（Revision）/认领（Claim）/唤醒（Wake）；子代理（Subagent）的执行过程与终态（Terminal State）仍由普通执行（Run）/运行时事件（Runtime Event）记录。</p>
+<p><strong>问题 2。</strong> 系统重启后看到业务域（Domain）中标为 <code>running</code> 的记录，还必须核对什么？</p>
+<p><strong>解释。</strong> 冻结身份（Identity）、准入（Admission）、调用开始与终态（Invocation Opening / Terminal State）、工具（Tool）边界与业务域（Domain）认领（Claim）等事实，不以单个状态（State）字替代完整判断。</p>
+<p><strong>问题 3。</strong> 为什么就绪投影（Readiness Projection）可以重算，而认领（Claim）/准入（Admission）不能任意重复创建？</p>
+<p><strong>解释。</strong> 就绪投影（Readiness Projection）是读侧推导；认领（Claim）是对指定意图与确切执行身份（Exact Execution Identity）的条件持久提交，重复派发可能产生第二份效果。</p>
+<p><strong>问题 4。</strong> 监督唤醒（Supervisor Wake）怎样回到普通顶层执行（Root Run）？</p>
+<p><strong>解释。</strong> 已提交结果形成检查点（Checkpoint）与持久唤醒（Durable Wake），再由宿主（Host）创建新的顶层工作轮次（Root Turn）/执行（Run）；不是复活旧模型（Model）请求或调用栈。</p>
+<p><strong>问题 5。</strong> T7 开始后才从客户端（Client）设置 G1，T7 的完成是否自动启动 G1？单纯重启能否启动从未承载的目标（Goal）？</p>
+<p><strong>解释。</strong> 不会。T7 开始时的绑定（Binding）没有 G1；后续承载工作轮次（Turn）或合法恢复（Resume）才驱动它。恢复不会把仅已设置（Armed）、从未承载的目标（Goal）当成已经开始的循环。</p>
+<p><strong>问题 6。</strong> 评估器（Evaluator）返回 <code>{&quot;met&quot;:&quot;false&quot;}</code> 与超时，当前分别怎样处理？为什么都不能当作可靠的测试结果？</p>
+<p><strong>解释。</strong> 字符串标志字段（Flag）与超时都标为 <code>evaluatorFailed</code>，不计真实进展或停滞，仍可能在条件允许时继续。两者都不能证明真实测试结果，且评估器（Evaluator）只能评估近期对话文字，不能独立重跑测试。目标（Goal）已失效时，旧评估也不能越过控制状态（Control State）与检查点（Checkpoint）检查。</p>
+<p><strong>问题 7。</strong> 三步计划（Plan）的测试失败，模型（Model）却把前两步标 <code>completed</code>、测试标 <code>skipped</code>，计划（Plan）会怎样？如果执行（Run）先 <code>failed</code>，恢复后应继续旧执行（Run）吗？</p>
+<p><strong>解释。</strong> 在输入合法且计划执行（Plan Execution）仍为 <code>active</code> 时，全部 <code>completed</code>/<code>skipped</code> 会使计划（Plan） <code>completed</code>，不能推断测试通过。若执行（Run） <code>failed</code> 时计划（Plan）仍 <code>active</code>，会进入 <code>interrupted</code>；合法恢复（Resume）通过新工作轮次（Turn）继续，不复活旧执行（Run），也不撤销先前工具（Tool）效果。</p>
+<p><strong>问题 8。</strong> 上述已获准修改与测试的 W1 曾显示就绪（Ready），停止请求（Stop）分别赢在认领（Claim）前、认领（Claim）后准入（Admission）前、<code>Edit</code> 已执行后；哪两种仍能阻止执行后端（Agent Backend）启动？第三种能否抹去修改？</p>
+<p><strong>解释。</strong> 前两种由预期修订（Expected Revision）检查与持久取消（Durable Cancel）阻止开始；第三种只能停止并收敛已经执行的子代理（Subagent）。已发生的修改仍要检查与处理，停止（Stop）不等于回滚（Rollback）。</p>
 <h3 id="继续阅读">继续阅读</h3>
 <ul>
-<li>相关机制：<a href="23-skills-and-subagents.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第23章｜Skills、插件与子 Agent</a>；<a href="25-host-and-client.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第25章｜Host、Client 与连接连续性</a></li>
-<li>结果判断：<a href="26-evaluation-and-design.html#%E4%B8%80%E6%AC%A1%E5%AE%8C%E6%95%B4%E4%BF%AE%E5%A4%8D%E7%9A%84%E4%BA%94%E9%A1%B9%E5%88%A4%E6%96%AD">第26章｜任务评价与综合设计</a> 或 <a href="26-evaluation-and-design.html#%E7%BB%BC%E5%90%88%E8%AE%BE%E8%AE%A1%E8%A7%A3%E9%87%8A%E6%AF%94%E8%BE%83%E4%B8%8E%E9%99%90%E5%AE%9A%E7%BB%93%E8%AE%BA">综合设计</a></li>
-<li>总导航：<a href="README.html">从零学习 Maka Agent</a></li>
+<li>相关机制：<a href="23-skills-and-subagents.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第23章｜技能说明包（Skill）、插件（Plugin）与子代理（Subagent）</a>；<a href="25-host-and-client.html#1-%E6%B5%8B%E8%AF%95%E6%AD%A3%E5%9C%A8%E8%BF%90%E8%A1%8C%E5%85%B3%E9%97%AD%E7%AA%97%E5%8F%A3%E4%BC%9A%E5%8F%91%E7%94%9F%E4%BB%80%E4%B9%88">第25章｜宿主（Host）、客户端（Client）与连接连续性</a></li>
+<li>结果判断：<a href="26-evaluation-and-design.html#%E4%B8%80%E6%AC%A1%E5%AE%8C%E6%95%B4%E4%BF%AE%E5%A4%8D%E9%9C%80%E8%A6%81%E5%93%AA%E5%87%A0%E7%A7%8D%E8%A7%82%E5%AF%9F">第26章｜任务评价与综合设计</a> 或 <a href="26-evaluation-and-design.html#8-%E9%87%87%E7%94%A8%E4%B8%80%E4%B8%AA%E6%96%B0%E8%AE%BE%E8%AE%A1%E6%97%B6%E6%80%8E%E6%A0%B7%E5%90%8C%E6%97%B6%E6%AF%94%E8%BE%83%E6%94%B6%E7%9B%8A%E4%B8%8E%E4%BB%A3%E4%BB%B7">综合设计</a></li>
+<li>总导航：<a href="README.html">从零学习 Maka 智能代理（Agent）</a></li>
 </ul>
 <h3 id="延伸阅读">延伸阅读</h3>
-<p><a href="../../../extended-reading.html#reference-12" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/orchestration-system.md">编排系统分析</a>汇集各类触发的状态机与恢复分支；<a href="../../../extended-reading.html#reference-12" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/orchestration-system.md#workhub从协调会话接续指定委派">WorkHub 的接续条件</a>进一步展开指定委派的来源与重复请求如何绑定。</p>
+<p><a href="../../../extended-reading.html#reference-13" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/orchestration-system.md">编排系统分析</a>汇集各类触发的状态（State）机与恢复分支；<a href="../../../extended-reading.html#reference-13" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/orchestration-system.md#workhub从协调会话接续指定委派">WorkHub 的接续条件</a>进一步展开指定委派的来源与重复请求如何绑定（Binding）。</p>
 <hr>
-<p><a href="23-skills-and-subagents.html">上一章：第 23 章｜Skills、插件与子 Agent</a> · <a href="25-host-and-client.html">下一章：第 25 章｜Host、Client 与连接连续性</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="23-skills-and-subagents.html"><span>← 上一章</span><strong>第 23 章｜Skills、插件与子 Agent</strong></a><a href="25-host-and-client.html"><span>下一章 →</span><strong>第 25 章｜Host、Client 与连接连续性</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E7%BB%A7%E7%BB%AD%E5%B7%A5%E4%BD%9C%E7%9A%84%E5%9B%9B%E7%A7%8D%E8%A7%A6%E5%8F%91">继续工作的四种触发</a></li><li class="toc-level-3"><a href="#readme-%E4%BB%BB%E5%8A%A1%E7%9A%84%E5%9B%9B%E7%A7%8D%E5%90%8E%E7%BB%AD%E9%9C%80%E6%B1%82">README 任务的四种后续需求</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E5%BC%A0%E5%90%8E%E5%8F%B0%E4%BB%BB%E5%8A%A1%E8%A1%A8%E7%BC%BA%E5%B0%91%E5%93%AA%E4%BA%9B%E6%8E%A7%E5%88%B6%E7%8A%B6%E6%80%81">一张后台任务表缺少哪些控制状态</a></li><li class="toc-level-3"><a href="#%E5%9B%9B%E4%B8%AA-domain-%E7%9A%84%E8%A7%A6%E5%8F%91%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%81%8C%E8%B4%A3">四个 domain 的触发与执行职责</a></li><li class="toc-level-3"><a href="#plan%E7%94%B1%E7%94%A8%E6%88%B7%E6%8E%A7%E5%88%B6%E7%9A%84-durable-workflow">Plan：由用户控制的 durable workflow</a></li><li class="toc-level-3"><a href="#goal%E7%94%B1%E5%AE%8C%E6%88%90%E5%88%A4%E6%96%AD%E9%A9%B1%E5%8A%A8%E7%9A%84%E8%87%AA%E4%B8%BB-continuation">Goal：由完成判断驱动的自主 continuation</a></li><li class="toc-level-3"><a href="#scheduledtask%E6%97%B6%E9%92%9F%E5%8F%AA%E8%B4%9F%E8%B4%A3%E5%88%B0%E7%82%B9%E4%B8%8D%E8%B4%9F%E8%B4%A3%E5%AE%8C%E6%88%90%E5%B7%A5%E4%BD%9C">ScheduledTask：时钟只负责到点，不负责完成工作</a></li><li class="toc-level-3"><a href="#agent-graph%E4%BE%9D%E8%B5%96%E4%B8%8E%E5%94%A4%E9%86%92%E7%9A%84%E6%8C%81%E4%B9%85%E6%8E%A7%E5%88%B6%E5%B9%B3%E9%9D%A2">Agent Graph：依赖与唤醒的持久控制平面</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E4%B8%9A%E5%8A%A1%E7%BB%A7%E7%BB%AD%E4%B8%8E%E6%81%A2%E5%A4%8D%E8%A7%82%E5%AF%9F%E6%94%BE%E5%9C%A8%E4%B8%80%E8%B5%B7%E5%88%A4%E6%96%AD">把业务继续与恢复观察放在一起判断</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#plan%E6%89%B9%E5%87%86%E8%BF%9B%E5%BA%A6%E4%B8%8E%E5%AE%9E%E9%99%85%E7%BB%93%E6%9E%9C%E5%90%84%E8%87%AA%E8%AF%B4%E6%98%8E%E4%BB%80%E4%B9%88">Plan：批准、进度与实际结果各自说明什么</a></li><li class="toc-level-3"><a href="#plan-%E7%9A%84%E5%B7%A5%E5%85%B7%E8%BF%94%E5%9B%9E%E4%B8%8E%E4%BC%9A%E8%AF%9D%E7%BB%93%E6%9D%9F">Plan 的工具返回与会话结束</a></li><li class="toc-level-3"><a href="#goal-evaluator-%E7%9A%84%E5%BD%93%E5%89%8D%E5%A4%B1%E8%B4%A5%E7%AD%96%E7%95%A5">Goal evaluator 的当前失败策略</a></li><li class="toc-level-3"><a href="#scheduledtask-%E7%9A%84%E7%9B%AE%E6%A0%87%E4%B8%8E%E9%85%8D%E7%BD%AE%E8%BA%AB%E4%BB%BD">ScheduledTask 的目标与配置身份</a></li><li class="toc-level-3"><a href="#graph-%E4%BB%8E%E4%BE%9D%E8%B5%96%E5%9B%BE%E5%88%B0%E6%8C%81%E4%B9%85%E8%B0%83%E5%BA%A6">Graph 从依赖图到持久调度</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1%E5%AE%9A%E6%97%B6%E8%A7%A6%E5%8F%91%E5%9C%A8%E5%B4%A9%E6%BA%83%E5%89%8D%E5%90%8E%E8%BF%98%E8%83%BD%E5%AF%B9%E5%BA%94%E5%90%8C%E4%B8%80%E4%BB%BD%E5%B7%A5%E4%BD%9C%E5%90%97">一次定时触发，在崩溃前后还能对应同一份工作吗</a></li><li class="toc-level-3"><a href="#%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E9%9C%80%E8%A6%81%E6%9B%B4%E5%BC%BA%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%B5%81%E6%81%A2%E5%A4%8D">什么时候需要更强的工作流恢复</a></li><li class="toc-level-3"><a href="#deep-research-%E4%B8%8E-swarm-%E6%94%BE%E5%9C%A8%E5%93%AA%E9%87%8C">Deep Research 与 Swarm 放在哪里</a></li><li class="toc-level-3"><a href="#%E6%81%A2%E5%A4%8D%E5%88%A4%E6%96%AD%E9%9C%80%E8%A6%81%E5%93%AA%E4%BA%9B%E7%8A%B6%E6%80%81">恢复判断需要哪些状态</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E7%BB%A7%E7%BB%AD%E9%98%85%E8%AF%BB">继续阅读</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="23-skills-and-subagents.html">上一章：第 23 章｜技能说明包（Skill）、插件（Plugin）与子代理（Subagent）</a> · <a href="25-host-and-client.html">下一章：第 25 章｜宿主（Host）、客户端（Client）与连接连续性</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="23-skills-and-subagents.html"><span>← 上一章</span><strong>第 23 章｜技能说明包（Skill）、插件（Plugin）与子代理（Subagent）的职责边界</strong></a><a href="25-host-and-client.html"><span>下一章 →</span><strong>第 25 章｜宿主（Host）、客户端（Client）与连接连续性（Connection Continuity）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E5%85%88%E6%89%BE%E5%88%B0%E7%BB%A7%E7%BB%AD%E7%90%86%E7%94%B1%E5%86%8D%E6%8E%A5%E5%9B%9E%E6%99%AE%E9%80%9A%E6%89%A7%E8%A1%8C">前情回顾：先找到继续理由，再接回普通执行</a></li><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E7%BB%A7%E7%BB%AD%E5%B7%A5%E4%BD%9C%E7%9A%84%E5%9B%9B%E7%A7%8D%E8%A7%A6%E5%8F%91">继续工作的四种触发</a></li><li class="toc-level-3"><a href="#readme-%E4%BB%BB%E5%8A%A1%E7%9A%84%E5%9B%9B%E7%A7%8D%E5%90%8E%E7%BB%AD%E9%9C%80%E6%B1%82">README 任务的四种后续需求</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E5%BC%A0%E5%90%8E%E5%8F%B0%E4%BB%BB%E5%8A%A1%E8%A1%A8%E7%BC%BA%E5%B0%91%E5%93%AA%E4%BA%9B%E6%8E%A7%E5%88%B6%E7%8A%B6%E6%80%81state">一张后台任务表缺少哪些控制状态（State）</a></li><li class="toc-level-3"><a href="#%E5%9B%9B%E4%B8%AA%E4%B8%9A%E5%8A%A1%E5%9F%9Fdomain%E7%9A%84%E8%A7%A6%E5%8F%91%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%81%8C%E8%B4%A3">四个业务域（Domain）的触发与执行职责</a></li><li class="toc-level-3"><a href="#%E8%AE%A1%E5%88%92plan%E7%94%B1%E7%94%A8%E6%88%B7%E6%8E%A7%E5%88%B6%E7%9A%84%E6%8C%81%E4%B9%85%E5%B7%A5%E4%BD%9C%E6%B5%81durable-workflow">计划（Plan）：由用户控制的持久工作流（Durable Workflow）</a></li><li class="toc-level-3"><a href="#%E7%9B%AE%E6%A0%87goal%E7%94%B1%E5%AE%8C%E6%88%90%E5%88%A4%E6%96%AD%E9%A9%B1%E5%8A%A8%E7%9A%84%E8%87%AA%E4%B8%BB%E7%BB%A7%E7%BB%AD%E6%89%A7%E8%A1%8Ccontinuation">目标（Goal）：由完成判断驱动的自主继续执行（Continuation）</a></li><li class="toc-level-3"><a href="#%E5%AE%9A%E6%97%B6%E4%BB%BB%E5%8A%A1scheduled-task%E6%97%B6%E9%92%9F%E5%8F%AA%E8%B4%9F%E8%B4%A3%E5%88%B0%E7%82%B9%E4%B8%8D%E8%B4%9F%E8%B4%A3%E5%AE%8C%E6%88%90%E5%B7%A5%E4%BD%9C">定时任务（Scheduled Task）：时钟只负责到点，不负责完成工作</a></li><li class="toc-level-3"><a href="#%E4%BB%BB%E5%8A%A1%E5%9B%BEagent-graph%E4%BE%9D%E8%B5%96%E4%B8%8E%E5%94%A4%E9%86%92%E7%9A%84%E6%8C%81%E4%B9%85%E6%8E%A7%E5%88%B6%E5%B9%B3%E9%9D%A2">任务图（Agent Graph）：依赖与唤醒的持久控制平面</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E4%B8%9A%E5%8A%A1%E7%BB%A7%E7%BB%AD%E4%B8%8E%E6%81%A2%E5%A4%8D%E8%A7%82%E5%AF%9F%E6%94%BE%E5%9C%A8%E4%B8%80%E8%B5%B7%E5%88%A4%E6%96%AD">把业务继续与恢复观察放在一起判断</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E8%AE%A1%E5%88%92plan%E6%89%B9%E5%87%86%E8%BF%9B%E5%BA%A6%E4%B8%8E%E5%AE%9E%E9%99%85%E7%BB%93%E6%9E%9C%E5%90%84%E8%87%AA%E8%AF%B4%E6%98%8E%E4%BB%80%E4%B9%88">计划（Plan）：批准、进度与实际结果各自说明什么</a></li><li class="toc-level-3"><a href="#%E8%AE%A1%E5%88%92plan%E7%9A%84%E5%B7%A5%E5%85%B7tool%E8%BF%94%E5%9B%9E%E4%B8%8E%E4%BC%9A%E8%AF%9Dsession%E7%BB%93%E6%9D%9F">计划（Plan）的工具（Tool）返回与会话（Session）结束</a></li><li class="toc-level-3"><a href="#%E7%9B%AE%E6%A0%87goal%E8%AF%84%E4%BC%B0%E5%99%A8evaluator%E7%9A%84%E5%BD%93%E5%89%8D%E5%A4%B1%E8%B4%A5%E7%AD%96%E7%95%A5">目标（Goal）评估器（Evaluator）的当前失败策略</a></li><li class="toc-level-3"><a href="#%E5%AE%9A%E6%97%B6%E4%BB%BB%E5%8A%A1scheduled-task%E7%9A%84%E7%9B%AE%E6%A0%87%E4%BC%9A%E8%AF%9Dtarget-session%E4%B8%8E%E9%85%8D%E7%BD%AE%E8%BA%AB%E4%BB%BDidentity">定时任务（Scheduled Task）的目标会话（Target Session）与配置身份（Identity）</a></li><li class="toc-level-3"><a href="#%E4%BB%BB%E5%8A%A1%E5%9B%BEagent-graph%E4%BB%8E%E4%BE%9D%E8%B5%96%E5%9B%BE%E5%88%B0%E6%8C%81%E4%B9%85%E8%B0%83%E5%BA%A6">任务图（Agent Graph）从依赖图到持久调度</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1%E5%AE%9A%E6%97%B6%E8%A7%A6%E5%8F%91%E5%9C%A8%E5%B4%A9%E6%BA%83%E5%89%8D%E5%90%8E%E8%BF%98%E8%83%BD%E5%AF%B9%E5%BA%94%E5%90%8C%E4%B8%80%E4%BB%BD%E5%B7%A5%E4%BD%9C%E5%90%97">一次定时触发，在崩溃前后还能对应同一份工作吗</a></li><li class="toc-level-3"><a href="#%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E9%9C%80%E8%A6%81%E6%9B%B4%E5%BC%BA%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%B5%81workflow%E6%81%A2%E5%A4%8D">什么时候需要更强的工作流（Workflow）恢复</a></li><li class="toc-level-3"><a href="#%E6%B7%B1%E5%BA%A6%E7%A0%94%E7%A9%B6deep-research%E4%B8%8E%E7%BE%A4%E4%BD%93%E5%8D%8F%E4%BD%9Cswarm%E6%94%BE%E5%9C%A8%E5%93%AA%E9%87%8C">深度研究（Deep Research）与群体协作（Swarm）放在哪里</a></li><li class="toc-level-3"><a href="#%E6%81%A2%E5%A4%8D%E5%88%A4%E6%96%AD%E9%9C%80%E8%A6%81%E5%93%AA%E4%BA%9B%E7%8A%B6%E6%80%81state">恢复判断需要哪些状态（State）</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E7%BB%A7%E7%BB%AD%E9%98%85%E8%AF%BB">继续阅读</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

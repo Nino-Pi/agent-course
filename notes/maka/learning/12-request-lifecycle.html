@@ -15,7 +15,7 @@
 <blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，更新 README 的测试步骤，运行测试，检查改动范围，最后用中文总结；以后也请记住我希望使用中文解释。</p>
 </blockquote>
 <p>条件与第11章相同：函数已经正确，四个既有测试（Test）原本通过；README却写着 <code>npm run check</code>，配置只提供 <code>&quot;test&quot;: &quot;node --test&quot;</code>，所以真正入口是 <code>npm test</code>。本章只允许修改README，保留函数、测试（Test）与配置。这与<a href="04-code-repair.html">第04章</a>仍含 <code>% 100</code> 函数缺陷的原始样例不同。</p>
-<p>S1、T7、R7以及后面的四个模型步骤（Model Step）都是教学记号，不是新运行记录。<a href="22-agent-cases.html#2-maka%E5%90%8C%E4%B8%80%E4%BB%B6%E5%B7%A5%E4%BD%9C%E6%8D%A2%E4%B8%80%E7%A7%8D%E5%B7%A5%E5%85%B7%E8%A1%A8%E8%BE%BE">第22章的真实 Maka 案例</a>包含函数修复，其模型（Model）可采用不同的读取、编辑与检查顺序。本章不把示意步骤补进那份真实执行轨迹（Trajectory）。</p>
+<p>S1、T7、R7以及后面的四个模型步骤（Model Step）都是教学记号，不是新运行记录。<a href="22-agent-cases.html#2-maka%E7%9B%B8%E5%90%8C%E4%BB%BB%E5%8A%A1%E5%8F%A6%E4%B8%80%E6%9D%A1%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82action%E8%B7%AF%E5%BE%84">第22章的真实 Maka 案例</a>包含函数修复，其模型（Model）可采用不同的读取、编辑与检查顺序。本章不把示意步骤补进那份真实执行轨迹（Trajectory）。</p>
 <span class="heading-alias" id="先看全景" aria-hidden="true"></span><span class="heading-alias" id="准入执行与展示的完整链路" aria-hidden="true"></span><h3 id="准入admission执行run与展示的完整链路">准入（Admission）、执行（Run）与展示的完整链路</h3>
 <p>本章使用当前普通宿主（Host）和默认 <code>ai-sdk</code> 执行后端（Agent Backend）路径，并限定工具（Tool）走已接入持久结果接收端的普通调用链。运行时（Runtime）是驱动模型（Model）与工具（Tool）的程序部分；外层运行时宿主（Runtime Host）在本文简称宿主（Host），负责连接、准入（Admission）和生命周期（Lifecycle）协调。</p>
 <figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="准入、执行与回读 · Admission, Execution, Readback：可滚动示意图"><a href="../../../assets/diagrams/12-request-lifecycle-1.svg"><img src="../../../assets/diagrams/12-request-lifecycle-1.svg" alt="客户端（Client）提交会话（Session）S1与工作轮次（Turn）T7；宿主（Host）准入（Admission）并固定执行（Run）R7，保存成功再启动。运行时（Runtime）在模型步骤（Model Step）、工具调用（Tool Call）和已保存工具结算（Tool Settlement）之间循环。终态（Terminal State）提交后，宿主回读事实构造快照（Snapshot），客户端显示或重连回读；虚线回读不代表记录库主动触发执行。" width="1078" height="1949" loading="lazy" style="width:1078px;min-width:917px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中的循环由运行时（Runtime）推进，记录库的虚线只提供回读材料，不会主动启动下一步。准入记录说明工作被接纳，持久执行记录说明后续发生了什么。普通工具（Tool）结算成功且控制条件允许时，结果才成为后续判断的依据。</p>
@@ -73,7 +73,7 @@ exit status: 0</code></pre>
 <pre><code class="language-text">Tests: 1 failed
 exit status: 1</code></pre>
 <p>它们应导向不同结论。第一块还需要确认确实运行了目标测试（Test），不能只打印一句“passed”；第二块不能因为工具调用（Tool Call）本身正常返回，就被写成“检查通过”。本例还需要查看文件差异（Diff），证明修改没有扩出README目标位置。</p>
-<p><code>4 passed</code>依赖本章函数原本正确的初态。若沿用第04章的 <code>% 100</code> 缺陷，只改README仍会得到2项通过、2项失败，<a href="22-agent-cases.html#3-%E5%8F%AA%E4%BF%AE-readme%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B5%8B%E8%AF%95%E4%BB%8D%E7%BA%A2%E4%B9%9F%E8%83%BD%E5%AE%8C%E6%88%90%E8%BF%99%E9%A1%B9%E4%BB%BB%E5%8A%A1">第22章的只修README案例</a>保留了该区别。不能把两个初态合并为一次运行。</p>
+<p><code>4 passed</code>依赖本章函数原本正确的初态。若沿用第04章的 <code>% 100</code> 缺陷，只改README仍会得到2项通过、2项失败，<a href="22-agent-cases.html#3-%E4%BB%BB%E5%8A%A1%E8%8C%83%E5%9B%B4task-scope%E5%8F%AA%E4%BF%AE%E6%96%87%E6%A1%A3%E4%BF%9D%E7%95%99%E6%BA%90%E7%A0%81%E5%A4%B1%E8%B4%A5">第22章的只修README案例</a>保留了该区别。不能把两个初态合并为一次运行。</p>
 <span class="heading-alias" id="第-8-站模型-step-4-生成中文总结" aria-hidden="true"></span><h3 id="第8站第四个模型步骤model-step生成中文总结">第8站：第四个模型步骤（Model Step）生成中文总结</h3>
 <p>现在模型（Model）已取得读取内容、编辑结果、测试（Test）输出及差异（Diff）检查，才有材料说明当前结果。给定所有检查都符合本章条件时，可以形成下面的教学回答：</p>
 <pre><code class="language-text">已根据 package.json 中的实际命令更新 README，并运行测试。

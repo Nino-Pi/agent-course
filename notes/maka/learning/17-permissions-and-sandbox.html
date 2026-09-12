@@ -99,7 +99,7 @@
 <pre><code class="language-text">已更新 README。测试需要访问网络，但该权限未获批准，因此本次没有完成测试验证。</code></pre>
 <p>最终回答分别报告文件修改与测试（Test）结果，保留未完成验证的原因。</p>
 <span class="heading-alias" id="真实补例任务完成测试仍有失败" aria-hidden="true"></span><h3 id="真实补例任务完成测试test仍有失败">真实补例：任务完成，测试（Test）仍有失败</h3>
-<p>下面先摘取后续第22章的<a href="22-agent-cases.html#3-%E5%8F%AA%E4%BF%AE-readme%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B5%8B%E8%AF%95%E4%BB%8D%E7%BA%A2%E4%B9%9F%E8%83%BD%E5%AE%8C%E6%88%90%E8%BF%99%E9%A1%B9%E4%BB%BB%E5%8A%A1">只修 README 案例</a>。这里改变一个初始条件：函数缺陷仍存在，但用户明确只允许改文档。Maka 修正测试（Test）入口后，实际跑出 2 通过、2 失败；它准确解释 <code>% 100</code> 的问题，并保留源码。外部文件检查确认只有 README 改变。</p>
+<p>下面先摘取后续第22章的<a href="22-agent-cases.html#3-%E4%BB%BB%E5%8A%A1%E8%8C%83%E5%9B%B4task-scope%E5%8F%AA%E4%BF%AE%E6%96%87%E6%A1%A3%E4%BF%9D%E7%95%99%E6%BA%90%E7%A0%81%E5%A4%B1%E8%B4%A5">只修 README 案例</a>。这里改变一个初始条件：函数缺陷仍存在，但用户明确只允许改文档。Maka 修正测试（Test）入口后，实际跑出 2 通过、2 失败；它准确解释 <code>% 100</code> 的问题，并保留源码。外部文件检查确认只有 README 改变。</p>
 <p>这一段让“能想到修复”和“本次获准修复”变得具体。它展示模型（Model）遵守任务范围（Task Scope）、如实报告剩余问题；实验使用独立操作系统（OS）沙箱（Sandbox），但这次没有发生权限（Permission）弹窗或源码写入被操作系统（OS）拒绝，因此不能拿它替代前面权限策略（Permission Policy）/批准（Approval）/强制执行（Enforcement）三层的解释。</p>
 <span class="heading-alias" id="基础完成条件" aria-hidden="true"></span><span class="heading-alias" id="基础自测能否判断任务被什么阻止" aria-hidden="true"></span><h4 id="任务受阻的原因解析">任务受阻的原因解析</h4>
 <p><strong>问题 1。</strong> 模型（Model）说“这个命令只读”，为何不是授权（Authorization）证据？</p>
@@ -113,7 +113,7 @@
 <p><strong>问题 5。</strong> 同一小仓库的 <code>npm run check</code> 报 <code>Missing script</code>，应申请网络权限（Permission）吗？</p>
 <p><strong>参考答案。</strong> 不应。先读取项目脚本配置并使用实际测试（Test）入口；扩大网络不能修复错误的命令名。</p>
 <h2 id="实现深化">实现深化</h2>
-<p>并发工具（Tool）和客户端（Client）可能持有不同版本的边界，因此一次批准（Approval）必须关联确定的执行身份（Identity）与修订号（Revision）。授权（Authorization）链与 <a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章的持久调用记录</a>、<a href="25-host-and-client.html#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">第25章的客户端（Client）执行边界（Execution Boundary）</a>相接，但三者各自保存不同状态（State）。</p>
+<p>并发工具（Tool）和客户端（Client）可能持有不同版本的边界，因此一次批准（Approval）必须关联确定的执行身份（Identity）与修订号（Revision）。授权（Authorization）链与 <a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章的持久调用记录</a>、<a href="25-host-and-client.html#2-%E8%AF%B7%E6%B1%82%E8%BF%94%E5%9B%9E%E4%BB%A5%E5%90%8E%E8%B0%81%E7%BB%A7%E7%BB%AD%E6%B6%88%E8%B4%B9%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BA%8B%E4%BB%B6runtime-event">第25章的客户端（Client）执行边界（Execution Boundary）</a>相接，但三者各自保存不同状态（State）。</p>
 <h3 id="扩边应是最小明确可版本化的">扩边应是最小、明确、可版本化的</h3>
 <p>沿前面的网络申请，宿主（Host）还需要知道它属于哪次执行，以及决定针对哪一版边界。教学记录可以写成：</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 扩边应是最小、明确、可版本化的"><table><caption>表 5 / Table 5 · 扩边应是最小、明确、可版本化的</caption><thead><tr><th scope="col">申请材料</th><th scope="col">教学值</th><th scope="col">它帮助确定什么</th></tr></thead><tbody><tr><td>所缺能力</td><td><code>network = enabled</code></td><td>当前申请要改变的资源能力</td></tr>

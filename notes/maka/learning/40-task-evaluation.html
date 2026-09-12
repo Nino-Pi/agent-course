@@ -5,7 +5,7 @@
 <p><strong>关键概念</strong>：试次是预先安排的一次任务执行；判定器按规则检查产物；未知表示尚无有效任务评分；配对比较对齐同一任务实例；确认交付统计截止前已验证的成功；总成本覆盖执行、失败、重试与协调。</p>
 <p><strong>关系主线</strong>：先固定任务与比较规则，再执行和选择结果；用协作与 Skill 对照分开报告有效评分、未知和按时交付，最后结合制作、运行费用及通知质量判断收益。</p>
 </blockquote>
-<p>在<a href="26-evaluation-and-design.html#%E8%AF%84%E4%BB%B7%E6%9C%80%E5%B0%8F%E6%A8%A1%E5%9E%8B">第26章的评价最小模型</a>中，一次工具调用成功、Agent停止与整项任务达标已经分开；试次没有有效评分时，应保留未知。<a href="39-orchestration-and-continuation.html#1-%E5%85%88%E5%8C%BA%E5%88%86%E5%A4%8D%E7%94%A8%E6%AD%A5%E9%AA%A4%E5%92%8C%E5%A7%94%E6%B4%BE%E5%B7%A5%E4%BD%9C">第39章</a>又说明，委派出去的工作仍需要整合与复测。本章接着问：把这些结果放在一起，怎样比较两个方案，才不会用更有利的分母或漏掉的费用制造提升？</p>
+<p>在<a href="26-evaluation-and-design.html#%E6%AD%A3%E7%A1%AE%E6%80%A7%E6%A0%87%E5%87%86oracle%E4%B8%8E%E5%88%A4%E5%AE%9A%E5%99%A8grader%E5%90%84%E5%81%9A%E4%BB%80%E4%B9%88">第26章的评价最小模型</a>中，一次工具调用成功、Agent停止与整项任务达标已经分开；试次没有有效评分时，应保留未知。<a href="39-orchestration-and-continuation.html#1-%E5%85%88%E5%8C%BA%E5%88%86%E5%A4%8D%E7%94%A8%E6%AD%A5%E9%AA%A4%E5%92%8C%E5%A7%94%E6%B4%BE%E5%B7%A5%E4%BD%9C">第39章</a>又说明，委派出去的工作仍需要整合与复测。本章接着问：把这些结果放在一起，怎样比较两个方案，才不会用更有利的分母或漏掉的费用制造提升？</p>
 <p>下文先固定比较规则，追踪Maka和Harbor怎样生成并采用评分，再让同一张四任务表依次回答质量、交付和成本三个问题。它们使用不同口径，是因为各自要回答的事情不同。</p>
 <h2 id="1-先固定比较单位与完整成本">1. 先固定比较单位与完整成本</h2>
 <p>这里的“父任务”是接收用户目标并负责整合的工作；“子任务”是它委派出去的独立工作。三个子任务分别交回结果，还需要父任务检查和整体复测，不能把这些开销从比较中删除。委派与共享状态的设计见<a href="39-orchestration-and-continuation.html#1-%E5%85%88%E5%8C%BA%E5%88%86%E5%A4%8D%E7%94%A8%E6%AD%A5%E9%AA%A4%E5%92%8C%E5%A7%94%E6%B4%BE%E5%B7%A5%E4%BD%9C">第39章</a>。</p>
@@ -109,7 +109,7 @@ G 的方法片段：先扫描全部 Markdown，收集命令；优先沿用 READM
 <p>没有发送提醒时，有用占比的分母为零，应标为不适用，不记为 100%。发送队列接纳不是送达，送达也不证明用户已经读过。</p>
 <p>完整状态推演与指标手算见 <a href="47-integrated-design.html#%E4%B8%83%E5%A4%A9%E8%B4%AD%E4%B9%B0%E5%A7%94%E6%89%98%E5%90%8C%E4%B8%80%E5%90%88%E5%90%8C%E5%9C%A8%E8%B7%A8%E5%BA%94%E7%94%A8%E4%BB%BB%E5%8A%A1%E4%B8%AD%E7%9A%84%E5%AE%8C%E6%95%B4%E6%8E%A8%E6%BC%94">第47章 个人助理设计示例</a>。这组评价不要求增加子Agent；单Agent也必须回答这些问题。</p>
 <h2 id="6-完成判断与任务评分各自依据什么">6. 完成判断与任务评分各自依据什么</h2>
-<p><a href="../../../extended-reading.html#reference-14" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/evaluation/agent-evaluation-and-feedback.md">Agent 完成判断与评估</a>进一步区分两类判断。Maka Goal 的这条 Host 判断路径从最近六条 user/assistant 文本构造 context，经辅助模型判断、解析和 revision 复核，最后交给 <code>settleTurn</code>；这份观测并不等于当前文件或完整工具日志。Maka Eval 则把 subject 执行与 executor verifier 分开；Harbor 的公开实现再示范测试脚本到 reward 文件的实际链。两类判断不能合并成“再找一个模型确认”。</p>
+<p><a href="../../../extended-reading.html#reference-15" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/evaluation/agent-evaluation-and-feedback.md">Agent 完成判断与评估</a>进一步区分两类判断。Maka Goal 的这条 Host 判断路径从最近六条 user/assistant 文本构造 context，经辅助模型判断、解析和 revision 复核，最后交给 <code>settleTurn</code>；这份观测并不等于当前文件或完整工具日志。Maka Eval 则把 subject 执行与 executor verifier 分开；Harbor 的公开实现再示范测试脚本到 reward 文件的实际链。两类判断不能合并成“再找一个模型确认”。</p>
 <p>专题用这两条 Agent 链解释相邻原理：有限观测为什么可能无法辨别真实状态；后置条件为什么需要独立证据；基础设施重试为什么不能替换明确的失败样本；pass@k 为什么不是一次任务可靠性。无进展计数、三次 attempt 和组合概率均给出手算。</p>
 <h2 id="7-增加子agent怎样才算更可靠">7. 增加子Agent，怎样才算更可靠</h2>
 <p><strong>问题：怎样验证“增加子 Agent 让修复更可靠”？</strong></p>

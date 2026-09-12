@@ -73,7 +73,7 @@
 <li><strong>选择和授权。</strong> 查询要带任务与代码范围，返回候选的来源、覆盖缺口和截断边界；检索与回读都须服从当前可读范围，不能让已失去访问权的内容通过缓存摘要泄露。提高 top-k 只解决候选截断，修正错误 scope、语言过滤或失效项需要改变生产/查询合同。</li>
 <li><strong>消费和代价。</strong> 指定哪个入口把候选变成回读、哪一层分配最终输入预算，保留路径出处和读取时点；以任务完成、证据覆盖、无关输入、调用延迟及索引维护成本共同评估。不能用近似搜索找回精确向量近邻的比例（ANN recall）代替任务证据召回，更不能只因返回了相近段落就称为有材料支持的回答。</li>
 </ul>
-<p>稀疏/稠密、ANN、融合与重排的结构推导见<a href="../../../extended-reading.html#reference-18" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/retrieval/agent-retrieval-and-search.md#1-agent-实际做了什么先画到消费者">通用检索专题</a>；候选预算与最终证据覆盖的完整演算见其<a href="../../../extended-reading.html#reference-18" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/retrieval/agent-retrieval-and-search.md#7-一个完整数值例子排名好看证据仍可能不够">数值例子</a>。</p>
+<p>稀疏/稠密、ANN、融合与重排的结构推导见<a href="../../../extended-reading.html#reference-19" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/retrieval/agent-retrieval-and-search.md#1-agent-实际做了什么先画到消费者">通用检索专题</a>；候选预算与最终证据覆盖的完整演算见其<a href="../../../extended-reading.html#reference-19" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/retrieval/agent-retrieval-and-search.md#7-一个完整数值例子排名好看证据仍可能不够">数值例子</a>。</p>
 <span class="heading-alias" id="6-怎样判断这段机制是否理解了" aria-hidden="true"></span><h2 id="6-图排序与检索失败的参考结论">6. 图排序与检索失败的参考结论</h2>
 <p><strong>图的节点与边分别表示什么？</strong></p>
 <p>本章 Aider 链中的排序图以文件为节点，引用方指向定义方，让引用文件的分数沿依赖关系传给定义所在文件。它不是直接对所有函数建立调用图；动态派发等关系也可能缺失。</p>
