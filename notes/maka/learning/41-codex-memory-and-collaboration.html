@@ -1,69 +1,84 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 41 章｜Codex：记忆、Skills 与协作 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 41 / 62</div><article id="main-content"><span class="heading-alias" id="codex-深度四memoryskills-与子任务怎样延续工作能力" aria-hidden="true"></span><span class="heading-alias" id="cx04codex记忆skills-与协作" aria-hidden="true"></span><span class="heading-alias" id="第-38-章codex记忆skills-与协作" aria-hidden="true"></span><span class="heading-alias" id="第-40-章codex记忆skills-与协作" aria-hidden="true"></span><h1 id="第-41-章codex记忆skills-与协作">第 41 章｜Codex：记忆、Skills 与协作</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 41 章｜Codex：长期记忆（Long-Term Memory）、技能说明包（Skill）与协作（Collaboration） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 41 / 62</div><article id="main-content"><span class="heading-alias" id="codex-深度四memoryskills-与子任务怎样延续工作能力" aria-hidden="true"></span><span class="heading-alias" id="cx04codex记忆skills-与协作" aria-hidden="true"></span><span class="heading-alias" id="第-38-章codex记忆skills-与协作" aria-hidden="true"></span><span class="heading-alias" id="第-40-章codex记忆skills-与协作" aria-hidden="true"></span><span class="heading-alias" id="第-41-章codex记忆skills-与协作" aria-hidden="true"></span><h1 id="第-41-章codex长期记忆long-term-memory技能说明包skill与协作collaboration">第 41 章｜Codex：长期记忆（Long-Term Memory）、技能说明包（Skill）与协作（Collaboration）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：Codex 的经验、方法与子任务结果，怎样从已保存或已返回变成后续可用信息？</p>
-<p><strong>关键概念</strong>：Memory（长期记忆）：从旧执行记录提取整合的材料；claim（认领）：约束后台工作归属；Skills（技能说明包）：按需读取的方法；authority（资源归属环境）：区分编排端与执行环境的读取位置；child Thread（子会话）：独立工作单元；消息唤醒：按目标状态接纳后续输入。</p>
-<p><strong>关系主线</strong>：记忆写入与读侧装配分开，Skill 目录经正文读取成为方法；子任务按背景和能力执行，消息、产物与父任务验收再分别闭合。</p>
+<p><strong>核心问题</strong>：旧经验、复用方法与子任务（Subtask）结果，怎样成为后续决策可用的材料？</p>
+<p><strong>关键概念</strong>：长期记忆（Long-Term Memory）保存跨任务经验；认领（Claim）和租约（Lease）约束后台写入归属；技能说明包（Skill）提供按需方法；任务线程（Thread）承载独立工作；消费者（Consumer）决定材料在哪里起作用。</p>
+<p><strong>关系主线</strong>：长期记忆（Long-Term Memory）经提取和整合形成材料，读侧装配模型输入（Model Input）；方法装载与子任务（Subtask）执行分别闭合，父任务（Parent Task）仍承担验收（Acceptance）。</p>
 </blockquote>
-<p>所属主题：第 1–4 节对应 <a href="36-context-and-memory.html">第36章 Memory</a>，第 5 节起对应 Skills 与 <a href="39-orchestration-and-continuation.html">第39章 协作</a>。</p>
-<p><a href="38-codex-context-compaction.html">第38章的同一 rollout 窗口恢复资料</a>用于当前任务连续性，与本章的跨 rollout 长期 Memory 管线分开。</p>
-<p>把贯穿案例推进到一次修复完成之后，再设一项新的同类检查器修复任务。新任务也许会受益于“项目使用 pytest”“测试夹具路径包含空格”“用户要求先做相关测试”的旧经验；另一个 Agent 可以独立检查回归案例；一个 Skill 可以提供项目验证流程。这是本章设定的新起点，不表示第38章尚未验收的任务已经取得通过结果。下面分别追踪这些材料怎样变成有效行为。</p>
-<p>本文提出的任务卡、冲突处理和质量验收是教学建议，不把它们冒充为已验证的产品保证。</p>
-<h2 id="1-记忆不是聊天记录自动追加到下一次-prompt">1. 记忆不是聊天记录自动追加到下一次 prompt</h2>
-<p>如果每次对话结束都把全文附加到一个文件，再在下一轮完整读入，只是把窗口问题搬到了文件系统。Memory 必须先决定：哪段经历适合提取，什么信息值得保留，重复或过时的信息怎样处理，以及未来什么时候读它。</p>
-<p>本地 Codex 的生成路径分成两阶段：先对满足条件的 rollout 提取，再把有界候选整合到 Memory 工作区。读取则是另一条独立装配的路径。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 记忆不是聊天记录自动追加到下一次 prompt"><table><caption>表 1 / Table 1 · 1. 记忆不是聊天记录自动追加到下一次 prompt</caption><thead><tr><th scope="col">阶段</th><th scope="col">输入（Input）</th><th scope="col">核心处理（Processing）</th><th scope="col">输出（Output）</th></tr></thead><tbody><tr><td>资格与调度（Eligibility / Scheduling）</td><td>Thread 来源、配置、DB、额度等</td><td>跳过不适用会话，认领候选</td><td>可执行提取工作</td></tr>
-<tr><td>提取阶段（Extraction）</td><td>一段候选 rollout</td><td>过滤、脱敏、按版本结构化提取</td><td>原始记忆与摘要，或仅摘要；两种分支有不同结构</td></tr>
-<tr><td>整合阶段（Consolidation）</td><td>多段提取结果与已有工作区</td><td>同步、比较变化、必要时整合</td><td>经校验的长期材料</td></tr>
-<tr><td>读侧（Read path）</td><td>摘要文件、工具配置与当前任务</td><td>注入有界摘要，按需读取细节</td><td>本次可用的记忆上下文</td></tr>
-<tr><td>使用（Use）</td><td>记忆与用户最新要求、实际文件</td><td>判断相关性并验证</td><td>更合适的行动</td></tr></tbody></table></div>
-<p>Memory 总开关默认关闭；下面先假定该功能已启用。app-server 的触发条件并非“任何新建会话都生成记忆”：请求含输入、实际开始而非 steering，并已配置主执行环境时，才进入该启动调用；启动函数还会检查是否为临时会话（ephemeral）、功能开关（feature）、是否非 root agent、状态数据库（state DB）和额度等条件。因此不能用一张没有条件的“每轮结束 → 写 Memory”图解释它。</p>
-<h2 id="2-提取把一次经历变成可处理候选">2. 提取：把一次经历变成可处理候选</h2>
-<p>系统首先从 DB 认领满足来源、时间、数量等约束的 rollout jobs。认领包含 ownership token 与 lease 信息，避免多个后台任务都把同一候选当成无主工作。随后在有界并发下执行提取。</p>
-<p>每个 job 的模型输入先经过过滤与敏感信息遮蔽（secret redaction）。提取有两种分支：默认分支（配置称 V1）保留 <code>raw_memory</code>、<code>rollout_summary</code> 和可空短名称 slug；仅摘要分支（V2）输出摘要与字符串 slug，并先区分用户、Agent、上下文和工具来源，再按预算选择输入。两者的生成字段都会再次脱敏，仅摘要分支还限制摘要长度。结构约束让下游知道怎样解析，脱敏降低特定泄漏风险，但两者都不证明语义正确。</p>
-<p>对于贯穿案例，可以把提取目标理解为：区分通用有效经验和一次性细节。“测试目录中包含带空格路径，修改路径解析要覆盖这一边界”可能值得作为项目经验；“刚才命令用了某个临时文件名”通常没有长期价值。“用户本次不要改 README”则需要明确任务作用域，不能直接变成所有未来任务永不改 README 的偏好。</p>
-<p>提取阶段把“没有值得保留的信息”与“提取失败”分开记录：如果空输出一律当失败，系统可能反复花费模型调用，直到编造出一条看似有用的记忆。若任何空输出都当成功，又会掩盖解析错误。因此要用明确结果分类承载其含义。</p>
-<h2 id="3-整合多份候选怎样更新同一个工作区">3. 整合：多份候选怎样更新同一个工作区</h2>
-<p>整合阶段需要将多份候选写入同一个长期工作区。它先取得所选版本 store 中的全局 claim，再准备带 Git 基线的工作区，加载有界候选，并同步 rollout 摘要；原始记忆分支还重建 raw-memory 材料，仅摘要分支跳过这一步。然后通过工作区 diff 判断是否真的有变化。下图的 ownership 是当前认领归属，heartbeat 是运行期间维持这份归属的周期性心跳。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="整合：多份候选怎样更新同一个工作区：可滚动示意图"><a href="../../../assets/diagrams/41-codex-memory-and-collaboration-1.svg"><img src="../../../assets/diagrams/41-codex-memory-and-collaboration-1.svg" alt="符合条件的 rollout 经认领和有界提取成为候选；整合阶段取得全局 claim，按工作区变化选择快路径或整合 Agent，关闭并校验 worker 后复核归属，再发布基线与完成记录。" width="747" height="2488" loading="lazy" style="width:747px;min-width:635px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这个流程中的每一关都有具体作用。没有输入变化且已有产物有效时，可以走无模型整合的快路径；有变化时，整合 Agent 应基于实际差异工作。背景任务运行期间需要 heartbeat 维持 ownership。worker 到达终态后，还要关闭它、校验产物，再确认仍持有 claim，才更新基线与成功记录。</p>
-<p>为什么“模型说完成”后还要关闭 worker？如果它仍可能继续写文件，后面的产物校验与基线更新就会和在途写入竞争。为什么重置基线前要重新确认 ownership？慢任务可能已经失去租约，不能凭旧认领继续宣布自己拥有发布权。</p>
-<p>这条控制流没有把 DB 和文件系统变成单一事务。比如基线更新成功、后续 DB 成功标记失败时，代码还需要表达这个窗口；Git baseline 不提供全局 exactly-once 保证。</p>
-<p>整合 worker 会关闭多种不需要的能力，并设为 ephemeral，以减少递归产生新记忆和进一步委派的路径。权限还存在父环境分支：Managed 情况使用仅 Memory root 写入、禁网的配置；Disabled 或 External 保留相应选择。不能仅凭“后台整合”这个名称假设所有环境都具有同一种 OS 隔离。</p>
-<h2 id="4-读侧短摘要做入口细节按需取">4. 读侧：短摘要做入口，细节按需取</h2>
-<p>写读两边还要对齐存储空间。两种提取分支各自使用独立空间；可选 <code>dual_write</code> 分别运行两条写入管道，默认关闭，并不表示读侧会合并它们。运行中更新配置时，Memory extension 保留该 Thread 初始的分支，让已注入摘要与后续读取工具指向同一空间。所选分支缺少摘要，也不自动用另一空间填补。这是在保持来源一致与尽可能找到材料之间的取舍。</p>
-<p>写入完成不代表下次任务自动用对。读取扩展由 Memory feature 和 <code>use_memories</code> 控制；专门读取工具还受 <code>dedicated_tools</code> 控制。专用 Memory 读取工具默认关闭，摘要装配不以它们开启为前提。读侧读取 <code>memory_summary.md</code>，在 token 限制内构造上下文片段。这个摘要更适合承担导航与高价值提示，详细经验再通过相关读取路径获得。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="读侧：短摘要做入口，细节按需取：可滚动示意图"><a href="../../../assets/diagrams/41-codex-memory-and-collaboration-2.svg"><img src="../../../assets/diagrams/41-codex-memory-and-collaboration-2.svg" alt="Memory 摘要按预算进入当前请求；需要细节时通过可用文本搜索与范围读取补充，核对作用域和当前事实后才行动与验证。" width="720" height="1666" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>上图的列举、搜索和范围读取假定相应工具可用，不能从摘要进入请求推出这些动作必然发生。专用 read 路径支持行偏移、行数、token 限制以及 truncated 信息；search 路径是文本匹配，排序后以 cursor 分页。不能把它称为向量检索。返回值里的截断和游标也不是装饰：如果只读了前一页就宣布“没有其他相关记忆”，结论可能来自未读完资料。</p>
-<p>对于“项目使用 pytest”这条记忆，当前任务仍应检查项目文件或现有说明。项目可能已迁移测试框架，旧经验只能减少寻找成本，不能替代最新事实。对于用户偏好，当前明确要求同样需要优先解释；记忆应帮助完成任务，而不是把历史偏好僵化成无法修改的规则。</p>
-<p>完整 Memory 评价至少包括：写入精度、无价值信息比例、作用域错误、旧知识失效、读取命中、实际采纳和任务收益。只统计“生成了多少条”会鼓励系统保存噪声。只统计“读工具调用成功”又会漏掉正确材料被忽略或误用的问题。</p>
-<h2 id="5-skills目录可以常见正文应按需读取">5. Skills：目录可以常见，正文应按需读取</h2>
-<p>Codex 的 Skills 扩展区分目录和正文：目录有 metadata 预算，读取从已启用的目录（enabled catalog）选择技能包（package），再按资源归属环境（authority）和资源标识（resource）找到实际内容。</p>
-<p>为什么要保留 authority？一个资源可能属于编排端，也可能属于实际执行环境。相同的路径文字在不同环境里不一定指向同一个文件。读取合同需要知道“谁拥有这个 package，这个 resource 是否属于它，返回的身份是否仍是请求的资源”。这比让模型任意拼接路径更可靠。</p>
-<p>图末还保留一个教学判断：读到的方法足够才采用；必要内容缺失时说明缺口。读完页数不证明方法完整，这也不是一项新增的产品状态。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Skills：目录可以常见，正文应按需读取：可滚动示意图"><a href="../../../assets/diagrams/41-codex-memory-and-collaboration-3.svg"><img src="../../../assets/diagrams/41-codex-memory-and-collaboration-3.svg" alt="Skills 从有界目录选择启用包，解析资源归属与标识，验证身份和环境边界后读取；需要后续页时沿缓存快照继续，信息足够才采用，缺必要内容则说明缺口。" width="874" height="1847" loading="lazy" style="width:874px;min-width:743px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>目录可见、正文已读、方法已执行，是三个状态。一个 Skill 声明了测试步骤，并不表示模型已读取正文，更不表示测试已经运行；资源里写了命令，也不会自动扩大调用者权限。真正动作仍要经过<a href="32-codex-tools-and-permissions.html">第32章的工具与环境边界</a>。</p>
-<h3 id="分页快照保持哪一次读取的一致性">分页快照保持哪一次读取的一致性</h3>
-<p>本地 executor-backed Skills 读取可以复用分页快照。继续页命中缓存时不会探测文件编辑，因此能读到同一旧正文的后续内容；重新读取时可不带 cursor。这样的快照避免一份长文档前半段来自旧版、后半段来自新版，但也带来时效性取舍。设计时要决定“分页一致”与“每页最新”哪一个更符合任务，不能默认二者同时成立。</p>
-<p><a href="23-skills-and-subagents.html#%E6%8A%80%E8%83%BD%E8%AF%B4%E6%98%8E%E5%8C%85skill%E7%9A%84%E5%8F%91%E7%8E%B0%E4%B8%8E%E8%AF%BB%E5%8F%96%E5%BF%AB%E7%85%A7">第23章的对照</a>讨论发现目录与加载正文之间的变化；本节讨论的是一次读取开始后、继续取得后续页的范围。普通 Host Skill 的来源是否可变、文件是否来自不可变 plugin generation，以及分页是否命中缓存，仍需分别判断，不能把一种快照推广到所有 Skills 路径。</p>
-<h2 id="6-子任务新的执行单元需要任务输入不只是角色名字">6. 子任务：新的执行单元需要任务输入，不只是角色名字</h2>
-<p>本章选择的 spawn 协作路径会解析角色、模型与历史分叉参数，并创建真实 child Thread。它还传递父/根工作身份和选定执行环境等信息，保留协作关系所需的上下文。</p>
-<p>历史 fork 接受 <code>none</code>、<code>all</code> 或正整数所表示的最近若干轮。本地这条路径省略参数默认 <code>all</code>。因此“最小上下文通常更节约”属于设计建议，不能写成这里的默认行为。Full-history fork 还要处理父历史、上下文基线和新子任务指令之间的关系；不是把父聊天字符串直接复制到一个新 prompt 即告完成。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 6. 子任务：新的执行单元需要任务输入，不只是角色名字"><table><caption>表 2 / Table 2 · 6. 子任务：新的执行单元需要任务输入，不只是角色名字</caption><thead><tr><th scope="col">输入模式（Input mode）</th><th scope="col">优点</th><th scope="col">风险与适用判断</th></tr></thead><tbody><tr><td>不复制历史</td><td>任务边界短，噪声少</td><td>父任务必须明确提供约束与材料</td></tr>
-<tr><td>复制最近若干轮</td><td>保留近期细节，控制体积</td><td>可能漏掉更早的关键用户约束</td></tr>
-<tr><td>复制全部允许历史</td><td>减少手写背景，保留更多上下文</td><td>成本和干扰更大，仍需明确子任务目标</td></tr></tbody></table></div>
-<p>对于文档检查器，父任务可以让子任务只审查“带空格路径的回归测试是否覆盖正确”。它应提供具体文件、允许动作、预期产物和验收标准；一句“你是资深测试专家”没有交代工作接口。</p>
-<p>只读审查的完整参考任务卡如下：</p>
+<h2 id="前情回顾保存装载与执行各改变什么">前情回顾：保存、装载与执行各改变什么？</h2>
+<p><a href="20-memory.html">第20章</a>与<a href="36-context-and-memory.html">第36章</a>已经把长期记忆（Long-Term Memory）的写入、读取和实际使用分开：文件存在，只能说明材料留在某个位置；模型输入（Model Input）必须包含相关内容，后续决策才有机会受它影响。本章会沿 Codex 的两阶段写入与独立读侧，找到这三个环节的具体消费者（Consumer）。</p>
+<p><a href="23-skills-and-subagents.html">第23章</a>区分了技能说明包（Skill）与子代理（Subagent）：前者提供一套方法，后者接收有边界的子任务（Subtask），建立自己的调查过程并返回结果。<a href="39-orchestration-and-continuation.html">第39章</a>进一步区分返回、采纳与验收（Acceptance）。因此，本章读到“正文已装载”或“子任务（Subtask）已完成”时，还要追问实际执行和最终结果。</p>
+<p>本章设定一项<strong>修复完成之后新开的同类检查器任务（Task）</strong>。检查器读取文档并检查链接，问题涉及含空格路径；旧经验包括“项目使用 pytest”“测试夹具路径包含空格”“用户要求先做相关测试”。父任务（Parent Task）可以自行修复，让子任务（Subtask）只读审查回归测试（Regression Test），再用技能说明包（Skill）复用验证步骤。这里不是替<a href="38-codex-context-compaction.html">第38章</a>尚未验收（Acceptance）的长任务（Task）宣布通过；该章的同一次过程记录（Rollout）窗口恢复仍服务当前工作连续性。</p>
+<p>以下任务卡、冲突处理和质量判定是完整教学设计，未作为一次真实 Codex 执行。先看后台怎样形成经验，再看当前任务怎样读取、使用和验收（Acceptance）。</p>
+<span class="heading-alias" id="1-记忆不是聊天记录自动追加到下一次-prompt" aria-hidden="true"></span><h2 id="1-长期记忆long-term-memory先分清五个状态">1. 长期记忆（Long-Term Memory）：先分清五个状态</h2>
+<p>如果把每次对话全文追加到文件，再在下次完整读入，只是把窗口问题搬到了文件系统。长期记忆（Long-Term Memory）需要决定哪些经历值得提取、哪些内容具有未来用途，以及何时重新读取。</p>
+<p>Codex 的写入分两阶段：对符合条件的过程记录（Rollout）提取候选，再将有界候选整合到长期工作区。读侧是另一条装配路径，不以“后台成功”作为模型（Model）已经使用的证据。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 长期记忆（Long-Term Memory）：先分清五个状态"><table><caption>表 1 / Table 1 · 1. 长期记忆（Long-Term Memory）：先分清五个状态</caption><thead><tr><th scope="col">阶段</th><th scope="col">输入（Input）</th><th scope="col">负责处理的部分</th><th scope="col">输出及实际消费者（Consumer）</th></tr></thead><tbody><tr><td>资格与调度（Eligibility / Scheduling）</td><td>任务线程（Thread）来源、配置、数据库与额度</td><td>启动入口筛选并认领（Claim）候选</td><td>提取作业（Extraction Job）获得可处理记录</td></tr>
+<tr><td>提取（Extraction）</td><td>一段候选过程记录（Rollout）</td><td>过滤、脱敏、结构化提取</td><td>候选与摘要交给整合阶段</td></tr>
+<tr><td>整合（Consolidation）</td><td>多段候选与已有工作区</td><td>同步、比较变化、必要时整合</td><td>经校验的长期材料，供后续读侧使用</td></tr>
+<tr><td>读侧（Read Path）</td><td>摘要文件、配置与当前任务（Task）</td><td>注入有界摘要，按需读取细节</td><td>模型输入（Model Input）得到可用背景</td></tr>
+<tr><td>使用（Use）</td><td>旧材料、最新要求与实际文件</td><td>判断相关性并核对当前事实</td><td>影响行动请求（Action）与结果验证</td></tr></tbody></table></div>
+<p>本地长期记忆（Long-Term Memory）总开关默认关闭；下面假定已启用。应用服务入口 <code>app-server</code> 也不是每轮结束就写入：请求含输入、实际开始而非向运行中追加引导消息（Steering），并已配置主执行环境（Environment），才进入启动调用。启动函数还检查临时会话（Ephemeral Session）、功能开关（Feature Flag）、是否为根智能代理（Root Agent）、状态数据库（State Database，DB）和额度。因此，没有条件的“每轮结束 → 保存经验”会误画触发时点与候选范围。</p>
+<span class="heading-alias" id="2-提取把一次经历变成可处理候选" aria-hidden="true"></span><h2 id="2-提取extraction候选有结构内容仍需判断">2. 提取（Extraction）：候选有结构，内容仍需判断</h2>
+<h3 id="认领claim把处理责任交给谁">认领（Claim）把处理责任交给谁</h3>
+<p>系统从数据库认领（Claim）满足来源、时间和数量限制的过程记录作业（Rollout Job）。认领（Claim）带有归属令牌（Ownership Token）与租约（Lease）：前者标识这次持有资格，后者限制有效时间。随后才在有界并发下提取。它们解决重复竞争同一候选的问题，不替模型（Model）判断什么值得记住。</p>
+<p>每个作业（Job）的模型输入（Model Input）先经过过滤与敏感信息遮蔽（Secret Redaction）。输出存在两个分支：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 认领（Claim）把处理责任交给谁"><table><caption>表 2 / Table 2 · 认领（Claim）把处理责任交给谁</caption><thead><tr><th scope="col">分支</th><th scope="col">生成字段</th><th scope="col">输入和输出的区别</th></tr></thead><tbody><tr><td>默认分支 <code>V1</code></td><td><code>raw_memory</code>、<code>rollout_summary</code>、可空的短名称 <code>rollout_slug</code></td><td>保留原始记忆材料与摘要</td></tr>
+<tr><td>仅摘要分支 <code>V2</code></td><td><code>rollout_summary</code>、字符串 <code>rollout_slug</code></td><td>先区分用户、智能代理（Agent）、上下文（Context）和工具（Tool）来源，按预算（Budget）选择输入；输出不包含原始记忆字段</td></tr></tbody></table></div>
+<p>生成字段还会再次脱敏，仅摘要分支限制摘要长度。结构约束让下游可以解析，脱敏降低特定泄漏风险；两者都不能证明语义正确。例如，格式完全合法的一句“这个项目永远不能改 README”，仍可能错误扩大用户仅对本次任务（Task）提出的限制。</p>
+<h3 id="从一次性细节中提取适用条件applicability">从一次性细节中提取适用条件（Applicability）</h3>
+<p>对检查器而言，“测试目录中包含带空格路径，修改路径解析要覆盖这一边界”可能是项目经验；某次临时文件名通常没有长期价值。“用户本次不要改 README”必须保留任务范围（Task Scope），不能变成未来所有任务（Task）的永久禁令。</p>
+<p>提取也需要区分<strong>成功但无输出（No Output）<strong>和</strong>提取失败（Extraction Failure）</strong>。解析成功后没有值得保留的材料，可以有明确空结果；请求或解析失败则不能用空结果掩盖。否则，空结果全算失败会鼓励无效重试，空结果全算成功又会掩盖故障。结果分类让后续消费者（Consumer）知道应当跳过、重试还是接受候选，而不是从一段空字符串猜原因。</p>
+<span class="heading-alias" id="3-整合多份候选怎样更新同一个工作区" aria-hidden="true"></span><h2 id="3-整合consolidation关闭写入者后才能验收acceptance">3. 整合（Consolidation）：关闭写入者后才能验收（Acceptance）</h2>
+<p>多份候选要更新同一长期工作区，首先需要明确本次写入的负责者（Owner）。整合阶段先取得所选版本存储中的全局认领（Claim），再准备带 Git 基线（Baseline）的工作区、选择有界候选并同步过程记录摘要（Rollout Summary）。默认分支还重建原始记忆材料，仅摘要分支跳过它，然后比较工作区差异（Diff）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="记忆整合与验收 · Memory Consolidation：可滚动示意图"><a href="../../../assets/diagrams/41-codex-memory-and-collaboration-1.svg"><img src="../../../assets/diagrams/41-codex-memory-and-collaboration-1.svg" alt="符合条件的过程记录（Rollout）经认领（Claim）与提取成为候选；全局整合保留无变化快路径。整合模型终态后还要关闭、校验并重新确认认领，再发布基线与完成记录；关闭失败和跨存储窗口由图旁正文说明。" width="807" height="2573" loading="lazy" style="width:807px;min-width:686px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中的归属心跳（Ownership Heartbeat）用于维持租约（Lease）。流程有两条成功路径：没有变化且已有产物有效时，可以直接更新完成记录，不再调用整合模型（Model）；需要改动或修复产物时，才启动整合智能代理（Consolidation Agent）。后者进入终态之后，仍要经过关闭执行者（Worker）、产物校验（Artifact Validation）和认领复核（Claim Check）。</p>
+<p>这些检查回答不同问题：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 3. 整合（Consolidation）：关闭写入者后才能验收（Acceptance）"><table><caption>表 3 / Table 3 · 3. 整合（Consolidation）：关闭写入者后才能验收（Acceptance）</caption><thead><tr><th scope="col">检查</th><th scope="col">要排除的反例</th><th scope="col">失败后不能作出的声明</th></tr></thead><tbody><tr><td>关闭执行者（Worker Shutdown）</td><td>模型（Model）已报告完成，但后台仍可能继续写</td><td>不能说待校验文件已稳定</td></tr>
+<tr><td>产物校验（Artifact Validation）</td><td>终态正常，但文件缺失或不满足结构合同</td><td>不能说长期材料已经合格</td></tr>
+<tr><td>认领复核（Claim Check）</td><td>慢执行者（Worker）失去租约（Lease），仍拿旧资格发布</td><td>不能凭旧令牌宣布当前归属</td></tr></tbody></table></div>
+<p>特别是关闭失败时，当前路径保留租约（Lease）直到过期，避免立即释放后另一个执行者（Worker）与仍在写入的旧执行者（Worker）竞争。产物校验后的认领复核（Claim Check）返回不再持有资格时，这条路径只记录相应日志，不更新基线（Baseline）或标记成功；这不等于一定写出了失败状态。图概括主要路径，不能把所有失败都理解成“立即释放认领（Claim）并重跑”。</p>
+<p>最后的 Git 基线（Baseline）更新与数据库成功标记也<strong>不是单一事务（Transaction）</strong>。基线更新成功、数据库标记失败的窗口仍存在，不能由此推得全局恰好一次（Exactly Once）保证。这里需要的是如实表达哪些步骤已发生，而不是把一条“成功”边当成跨存储原子性。</p>
+<p>整合执行者（Worker）设为临时会话（Ephemeral Session），关闭多种不需要的能力，减少递归生成经验和继续委派的路径。权限（Permission）还受父环境分支影响：托管分支（Managed）使用仅长期记忆（Long-Term Memory）根目录可写、禁止网络的配置；禁用分支（Disabled）或外部分支（External）保留相应选择。不能凭“后台整合”这个名字假定所有执行环境（Environment）都有同一种操作系统（Operating System，OS）层隔离（Isolation）。</p>
+<span class="heading-alias" id="4-读侧短摘要做入口细节按需取" aria-hidden="true"></span><h2 id="4-读侧read-path来源一致读取命中和正确使用分别闭合">4. 读侧（Read Path）：来源一致、读取命中和正确使用分别闭合</h2>
+<p>两种写入分支使用独立存储空间。<code>dual_write</code> 默认关闭；打开时分别运行两条写入管道，不让读侧合并两个版本。运行中修改配置，记忆扩展（Memory Extension）仍保留该任务线程（Thread）初始选择的分支，让已经注入的摘要与后续读取工具（Tool）指向同一空间。所选分支缺摘要时，也不自动借另一分支补齐。</p>
+<p>这项选择保护的是来源一致性（Source Consistency）。假如摘要来自一套经验、详细读取却突然切到另一套，模型（Model）可能把互不对应的材料拼在一起。宁可明确缺失，也不能悄悄改变当前材料的来源。</p>
+<p>读取扩展由记忆功能（Memory Feature）与 <code>use_memories</code> 控制；专用工具（Tool）还受 <code>dedicated_tools</code> 控制，后者默认关闭。摘要装配不要求专用工具（Tool）已开启：读侧读取 <code>memory_summary.md</code>，按词元（Token）限制构造模型输入（Model Input）片段；细节再由实际可用的读取路径取得。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从读取到使用 · Read and Use：可滚动示意图"><a href="../../../assets/diagrams/41-codex-memory-and-collaboration-2.svg"><img src="../../../assets/diagrams/41-codex-memory-and-collaboration-2.svg" alt="记忆摘要（Memory Summary）和当前要求共同进入模型输入（Model Input）；需要细节时通过可用工具取得资料，再核对作用域（Scope）和当前事实，最后行动与验证。列举和搜索以工具实际可用为前提。" width="720" height="1748" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中列举、搜索和范围读取假定相应工具（Tool）可用，不能从“摘要已进入输入”推出这些操作必然发生。专用读取支持行偏移、行数、词元（Token）限制和 <code>truncated</code>；搜索是文本匹配（Text Matching），排序后用游标（Cursor）分页，不是向量检索（Vector Retrieval）。截断和游标（Cursor）告诉消费者（Consumer）资料尚未读完，不能只看第一页就宣布没有其他相关内容。</p>
+<p>“项目使用 pytest”这条长期记忆（Long-Term Memory）可以降低寻找入口的成本，当前任务（Task）仍要核对项目文件：测试框架可能已迁移。用户偏好也要结合当前明确要求解释，不能把历史（History）中某次约定僵化成无法修改的规则。</p>
+<p>因此，评价至少要看写入精度、无价值信息比例、作用域（Scope）错误、旧知识失效、读取命中、实际采纳与任务收益。只数生成条数会奖励噪声，只数读取成功又会漏掉“读对了却没用”或“用到了错误任务”两种失败。</p>
+<span class="heading-alias" id="5-skills目录可以常见正文应按需读取" aria-hidden="true"></span><h2 id="5-技能说明包skill目录正文与执行是三个状态">5. 技能说明包（Skill）：目录、正文与执行是三个状态</h2>
+<p><a href="23-skills-and-subagents.html">第23章</a>说明了方法怎样从发现线索进入当前工作。Codex 的技能说明包（Skill）扩展也区分目录（Catalog）和正文：目录有元数据（Metadata）预算（Budget），读取从已启用目录选择包（Package），再按资源归属环境（Authority）和资源标识（Resource ID）取得内容。</p>
+<p>这里的资源归属环境（Authority）回答“这个包在哪里、由哪个环境提供”，不是权限（Permission）批准。相同路径文字在编排端（Orchestrator）和执行环境（Environment）可能指向不同文件；读取合同需要核对包（Package）、资源身份（Resource Identity）与环境边界（Environment Boundary），并确认返回身份仍是请求的资源。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="方法资源的读取 · Skill Resource Loading：可滚动示意图"><a href="../../../assets/diagrams/41-codex-memory-and-collaboration-3.svg"><img src="../../../assets/diagrams/41-codex-memory-and-collaboration-3.svg" alt="从已启用技能说明包（Skill）解析资源归属与标识，核对身份及环境边界后读取；后续分页（Pagination）沿同一缓存快照（Cached Snapshot）继续，必要内容不足时明确缺口，不把目录发现当作已读完整正文。" width="956" height="1901" loading="lazy" style="width:956px;min-width:813px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>目录可见、正文已读、方法已执行是三个状态。技能说明包（Skill）列出测试步骤，不等于模型（Model）已读正文，更不等于测试已经运行。资源内的命令也不会扩大调用者权限（Permission）；实际行动请求（Action）仍要经过<a href="32-codex-tools-and-permissions.html">第32章</a>的工具（Tool）与环境边界（Environment Boundary）。</p>
+<p>图末“是否足够”是教学判断：读到足以解决本题的部分才采用；无后续页却仍缺必要内容时，应说明缺口。页数读完只证明取得了这份材料，不能证明方法能解决当前问题。</p>
+<span class="heading-alias" id="分页快照保持哪一次读取的一致性" aria-hidden="true"></span><h3 id="分页快照pagination-snapshot一致性与新鲜度freshness分别判断">分页快照（Pagination Snapshot）：一致性与新鲜度（Freshness）分别判断</h3>
+<p>执行器提供的技能说明包（Executor-backed Skill）存在复用分页快照（Pagination Snapshot）的路径。继续页命中缓存（Cache）时不探测文件编辑，因此可能返回旧正文的后半段；重新读取可不带游标（Cursor）。缓存（Cache）匹配还涉及包（Package）、资源、环境（Environment）与沙箱（Sandbox），并非任意游标都能复用任意文档。</p>
+<p>这种选择有实际理由：若第一部分基于旧参数解释步骤，第二部分却来自新版，整份方法可能自相矛盾。同一次阅读保持一致，仍不等于每页都是最新内容。任务（Task）依赖最新规则时，要在适当边界重新读，不能让缓存（Cache）命中替代新鲜度（Freshness）判断。</p>
+<p><a href="23-skills-and-subagents.html#%E6%8A%80%E8%83%BD%E8%AF%B4%E6%98%8E%E5%8C%85skill%E7%9A%84%E5%8F%91%E7%8E%B0%E4%B8%8E%E8%AF%BB%E5%8F%96%E5%BF%AB%E7%85%A7">第23章的读取快照</a>讨论发现目录与加载正文之间的变化；本节讨论一次读取开始后的继续页。普通宿主技能说明包（Host Skill）的来源是否可变、是否来自不可变插件代次（Plugin Generation）、分页是否命中缓存（Cache），要分别判断，不能推广成所有路径统一的快照保证。</p>
+<span class="heading-alias" id="6-子任务新的执行单元需要任务输入不只是角色名字" aria-hidden="true"></span><h2 id="6-子任务subtask先交付自足输入再选择历史分叉history-fork">6. 子任务（Subtask）：先交付自足输入，再选择历史分叉（History Fork）</h2>
+<p>委派（Delegation）增加的是独立调查和决策过程。所选协作路径 <code>spawn</code> 解析角色（Role）、模型（Model）与历史分叉（History Fork）参数，创建真实子任务线程（Child Thread），并传递父级、根级工作身份（Work Identity）和选定执行环境（Environment）。任务线程（Thread）在此是工作组织单元，不是操作系统（OS）线程；执行内核的会话（Session）负责承接其中的工作轮次（Turn）。</p>
+<p>历史分叉（History Fork）接受 <code>none</code>、<code>all</code> 或正整数表示的最近若干轮，省略参数默认 <code>all</code>。完整历史分叉（Full-history Fork）还要处理父历史（Parent History）、上下文基线（Context Baseline）和新子任务（Subtask）指令，并非直接复制聊天字符串。较小输入通常更节约，是设计建议，不能写成这里的默认配置。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 6. 子任务（Subtask）：先交付自足输入，再选择历史分叉（History Fork）"><table><caption>表 4 / Table 4 · 6. 子任务（Subtask）：先交付自足输入，再选择历史分叉（History Fork）</caption><thead><tr><th scope="col">输入模式（Input Mode）</th><th scope="col">收益</th><th scope="col">缺失与干扰风险</th></tr></thead><tbody><tr><td>不复制历史（History）</td><td>子任务（Subtask）边界短、噪声少</td><td>父任务（Parent Task）必须提供约束与材料</td></tr>
+<tr><td>复制最近若干轮</td><td>保留近期细节，控制体积</td><td>可能漏掉更早的关键用户要求</td></tr>
+<tr><td>复制全部允许历史（History）</td><td>减少手工整理背景</td><td>成本与干扰更大，仍需明确目标</td></tr></tbody></table></div>
+<h3 id="完整任务卡谁读什么交回什么">完整任务卡：谁读什么，交回什么</h3>
+<p>本例让子代理（Subagent）只读审查 <code>tests/test_checker.py</code>，判断含空格路径的回归测试（Regression Test）是否覆盖真实故障。角色（Role）名“资深测试专家”没有说明工作接口（Interface）；任务卡要提供目标、输入、写入范围、交付与验收（Acceptance）。下面先定义合同形状，再给出完整实例；它是课程自拟 TypeScript，不是产品参数类型。</p>
 <pre><code class="language-typescript">type ChildTask = {
   objective: string;
+  // 输入（Input）：材料位置与阅读目的。
   inputs: Array&lt;{ path: string; purpose: string }&gt;;
+  // 写入范围只是任务（Task）合同，仍需执行层约束。
   allowedWrites: string[];
   forbiddenActions: string[];
+  // 交付与验收（Acceptance）分别表达。
   deliverable: {
     reportPath?: string;
     requiredFields: string[];
   };
   acceptance: string[];
-};
-
-const reviewTask: ChildTask = {
+};</code></pre>
+<p><code>inputs</code> 让消费者（Consumer）知道每份材料为何需要；<code>allowedWrites</code> 与 <code>forbiddenActions</code> 表达任务（Task）约束，不自动建立执行器权限（Permission）。<code>deliverable</code> 定义返回哪些字段，<code>acceptance</code> 说明这些字段怎样支持判断；只填齐字段仍不等于内容通过验收（Acceptance）。</p>
+<pre><code class="language-typescript">const reviewTask: ChildTask = {
   objective: &quot;检查带空格路径的回归测试是否覆盖实际故障&quot;,
   inputs: [{ path: &quot;tests/test_checker.py&quot;, purpose: &quot;阅读测试断言&quot; }],
   allowedWrites: [],
@@ -71,33 +86,38 @@ const reviewTask: ChildTask = {
   deliverable: { requiredFields: [&quot;结论&quot;, &quot;缺失场景&quot;, &quot;建议断言&quot;] },
   acceptance: [&quot;结论对应具体测试行为&quot;, &quot;区分实际执行与静态判断&quot;]
 };</code></pre>
-<p>再给定一个审查场景：测试只检查启动命令中的引号，没有覆盖程序内部再次按空格切分参数的分支；子任务只读了文件，没有运行测试。相应参考交付为：结论“现有断言不足以覆盖内部 split 的故障”；缺失场景“含空格的路径作为一个参数进入内部处理后仍保持完整”；建议断言“内部文件读取收到完整路径，且得到预期文件内容”；检查状态“静态判断，测试未运行”。父任务随后核对实际调用点，在自己的写入范围内补齐回归与修复，并依据真实测试结果结算。报告满足字段合同，也没有把静态审查冒充通过结果。</p>
-<h2 id="7-发消息要求继续交付文件分别需要什么合同">7. 发消息、要求继续、交付文件分别需要什么合同</h2>
-<p>本地 <code>send_message</code> 使用 QueueOnly，<code>followup_task</code> 使用 TriggerTurn。前者是传递信息；后者表达需要继续工作的意图。普通空闲 child 收到材料，与被要求开启新 Turn，是不同状态转换。还有第三种状态：Thread 没有活跃 Turn，但保留尚未结束的持久等待（outstanding durable sleep）记录时，QueueOnly 消息也能触发一个新的普通 Turn 来处理等待中的工作。它不会恢复原来已经结束的模型调用；“消息没有要求新任务”不等于绝不新开执行。活跃任务则在可处理的边界吸收消息。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="发消息、要求继续、交付文件分别需要什么合同：可滚动示意图"><a href="../../../assets/diagrams/41-codex-memory-and-collaboration-4.svg"><img src="../../../assets/diagrams/41-codex-memory-and-collaboration-4.svg" alt="父任务 Spawn 交付目标与边界，子任务读材料并接收补充消息，交回后父任务核对实际产物；缺内容时 Followup 产生后续结果，通过后整合结论。" width="853" height="989" loading="lazy" style="width:853px;min-width:726px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>父子关系可以写入持久图边，但不满足条件时会跳过，写入失败会记录 warning。存在父子 edge 不证明所有消息具有事务性持久投递，也不证明它是一套任意 DAG 调度器。冷恢复、完整权限继承和投递语义要沿对应路径进一步验证。</p>
-<p>文件交付尤其容易被混淆。child Thread 是独立执行单元；它不自动意味着独立文件副本。spawn 会传递环境选择，不能据此认定每个 child 都拥有隔离 worktree。若两个任务共享目录，文件变化可能立即互相可见；若位于独立副本，父任务又必须有明确的合并或读取路径。</p>
-<p>所以父任务至少要说明：谁拥有哪几个可写文件；结果是正文消息、文件路径还是补丁；父任务如何确认文件存在且内容正确；并发改同一文件时怎样处理。一个子任务返回“已完成”只能说明其报告或终态，父任务仍要对最终产物负责。</p>
-<h2 id="8-将四种信息流放回同一任务">8. 将四种信息流放回同一任务</h2>
-<p>现在把案例串起来：Memory 提示项目曾使用 pytest；父任务读取当前项目确认这一点；Skill 给出验证步骤；父任务分配一个只读回归审查子任务；自己修复检查器并运行测试；收到 child 报告后核对断言，再交付最终 diff。若窗口不足，第38章的上下文机制负责继续当前工作。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 8. 将四种信息流放回同一任务"><table><caption>表 3 / Table 3 · 8. 将四种信息流放回同一任务</caption><thead><tr><th scope="col">机制</th><th scope="col">它提供的帮助</th><th scope="col">父任务仍要承担的责任</th></tr></thead><tbody><tr><td>长期记忆（Memory）</td><td>降低重复探索成本</td><td>检查时效、作用域与当前事实</td></tr>
-<tr><td>当前任务恢复资料（Continuation context）</td><td>继续窗口前的工作</td><td>找回最新约束与已发生动作</td></tr>
+<p>本卡的写入列表为空，也没有要求写报告文件。现在给定完整审查条件：现有测试只检查启动命令里的引号，没有覆盖程序内部再次按空格切分参数的分支；子代理（Subagent）只读文件，没有运行测试。参考交付如下：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 完整任务卡：谁读什么，交回什么"><table><caption>表 5 / Table 5 · 完整任务卡：谁读什么，交回什么</caption><thead><tr><th scope="col">交付字段</th><th scope="col">本例完整参考内容</th></tr></thead><tbody><tr><td>结论</td><td>现有断言不足以覆盖内部 <code>split</code> 的故障</td></tr>
+<tr><td>缺失场景</td><td>含空格路径作为一个参数进入内部处理后仍保持完整</td></tr>
+<tr><td>建议断言</td><td>内部文件读取收到完整路径，并得到预期文件内容</td></tr>
+<tr><td>检查状态</td><td>静态判断，测试未运行</td></tr></tbody></table></div>
+<p>父任务（Parent Task）随后核对实际调用点，在自己的写入范围内补齐回归测试（Regression Test）与修复，再按真实测试结果结算。完整报告既指出缺口，也保留未运行边界；不能把这份静态审查转换成测试通过。</p>
+<span class="heading-alias" id="7-发消息要求继续交付文件分别需要什么合同" aria-hidden="true"></span><h2 id="7-消息message续做与文件交付各有合同">7. 消息（Message）、续做与文件交付各有合同</h2>
+<p><code>send_message</code> 使用仅入队模式 <code>QueueOnly</code>，<code>followup_task</code> 使用请求工作轮次（Turn）模式 <code>TriggerTurn</code>。前者传递材料，后者表达继续工作的意图。普通空闲子任务线程（Child Thread）收到材料，与被要求开启新工作轮次（Turn），是不同状态转换；活跃任务（Task）则在能够处理的边界吸收消息（Message）。</p>
+<p>还有一个必须单独判断的状态：任务线程（Thread）没有活跃工作轮次（Turn），但保留尚未结束的持久等待（Outstanding Durable Sleep）记录。此时 <code>QueueOnly</code> 消息（Message）也会进入启动新普通工作轮次（Turn）的调度判断，处理等待中的工作。它不复活已结束的模型调用（Model Query）或调用栈；“这条消息（Message）没有请求续做”不能被简化为绝不会启动执行（Run）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="子任务与验收 · Subtask and Acceptance：可滚动示意图"><a href="../../../assets/diagrams/41-codex-memory-and-collaboration-4.svg"><img src="../../../assets/diagrams/41-codex-memory-and-collaboration-4.svg" alt="父任务（Parent Task）交付目标与边界，子任务（Subtask）读取材料并接收补充消息，返回后由父任务核对实际产物（Artifact）。缺内容时发送后续任务（Follow-up），通过后整合；消息箭头不表示事务投递保证。" width="947" height="1209" loading="lazy" style="width:947px;min-width:805px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图强调父任务（Parent Task）实际核对产物后才整合。父子关系可以写入持久图边（Persistent Edge），但不满足条件会跳过，写入失败会记录警告。例如临时子任务线程（Ephemeral Child Thread）不会按该路径保存关系。图边（Edge）存在不证明消息（Message）具有事务性持久投递，也不证明系统是任意有向无环图（Directed Acyclic Graph，DAG）的调度器；冷恢复（Cold Recovery）、完整权限继承（Permission Inheritance）与投递语义仍需沿相应路径判断。</p>
+<p>独立子任务线程（Child Thread）也不自动意味着独立工作副本（Working Copy）。<code>spawn</code> 传递环境选择，不能据此认定每个子代理（Subagent）都有隔离工作树（Worktree）。共享目录中的文件变化可能立即互相可见；独立工作副本（Working Copy）则需要明确合并或读取路径。</p>
+<p>因此，父任务（Parent Task）要说明可写文件各自的负责者（Owner），约定结果是消息（Message）、文件还是补丁，并核对当前产物与验证范围。并发修改可能使旧结果失效；子任务（Subtask）报告完成，仍不能替父任务（Parent Task）承担最终验收（Acceptance）。</p>
+<span class="heading-alias" id="8-将四种信息流放回同一任务" aria-hidden="true"></span><h2 id="8-四种信息流怎样共同完成检查器任务task">8. 四种信息流怎样共同完成检查器任务（Task）</h2>
+<p>把完整案例按消费顺序接起来：长期记忆（Long-Term Memory）提示旧项目使用 pytest，父任务（Parent Task）读取当前项目确认；技能说明包（Skill）提供验证方法；只读子任务（Subtask）审查回归测试（Regression Test）；父任务（Parent Task）修复、运行测试、核对审查结论并交付差异（Diff）。若窗口不足，第38章的恢复资料继续当前工作。这是一条教学参考过程，不是新增的产品运行记录。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 8. 四种信息流怎样共同完成检查器任务（Task）"><table><caption>表 6 / Table 6 · 8. 四种信息流怎样共同完成检查器任务（Task）</caption><thead><tr><th scope="col">机制</th><th scope="col">提供的帮助</th><th scope="col">父任务（Parent Task）保留的责任</th></tr></thead><tbody><tr><td>长期记忆（Long-Term Memory）</td><td>减少重复探索</td><td>检查时效、作用域（Scope）与当前事实</td></tr>
+<tr><td>当前任务恢复资料（Continuation Context）</td><td>接上窗口前的工作</td><td>找回最新约束与已发生的行动请求（Action）及其结果</td></tr>
 <tr><td>技能说明包（Skill）</td><td>复用有组织的方法</td><td>读取适用部分并实际执行</td></tr>
-<tr><td>子会话（Child Thread）</td><td>并行推进可独立子问题</td><td>划边界、收结果、验收与整合</td></tr></tbody></table></div>
-<p>比较 Codex 与 Maka 时，可以固定表中的一种信息流，检查它的来源、消费条件和任务收益。管线长度、工具数量与 child 数量都不能单独证明收益。</p>
+<tr><td>子任务线程（Child Thread）</td><td>并行推进独立子问题</td><td>交代边界、收取结果、验收（Acceptance）与整合</td></tr></tbody></table></div>
+<p>比较 Codex 与 Maka 时，可以固定一种信息流，检查来源、消费条件和任务收益。管道长度、工具（Tool）数量或子代理（Subagent）数量，都不能单独证明最终工作更好。</p>
 <span class="heading-alias" id="9-自测与参考答案" aria-hidden="true"></span><h2 id="9-常见场景与参考结论">9. 常见场景与参考结论</h2>
-<p><strong>题一：为什么 提取阶段 要允许“成功但无输出”？</strong></p>
-<p>参考答案：不是每段经历都值得形成长期记忆。明确空结果能减少无效重试和噪声积累，同时把它与解析或模型请求失败分开。</p>
-<p><strong>题二：整合 Agent 已完成，为什么还要校验 artifact 和 ownership？</strong></p>
-<p>参考答案：模型终态不能证明文件形状和内容满足合同；执行期间可能失去 claim。关闭 worker、校验产物、确认 ownership 有助于避免在途写竞争和过期 worker 宣布成功，但没有自动构成跨存储事务。</p>
-<p><strong>题三：Memory 写成功，但下一次仍重复探索，可能缺在哪？</strong></p>
-<p>参考答案：检查读侧是否启用、摘要是否提供入口、检索是否命中、结果是否截断，以及模型是否把相关材料用于当前任务。写成功只是闭环中的一环。</p>
-<p><strong>题四：Skills 翻到第二页时读到旧内容，是一定的 bug 吗？</strong></p>
-<p>参考答案：要看合同。本地读取有复用分页快照的路径，优先保持同一次阅读一致性；文件修改不一定在续页命中缓存时可见。需要最新内容应按相应重新读取机制处理。</p>
-<p><strong>题五：<code>send_message</code> 与 <code>followup_task</code> 为什么要分开？</strong></p>
-<p>参考答案：传递材料与请求新 Turn 是不同意图。普通空闲目标仅收到 QueueOnly 材料，不等于已安排新工作；TriggerTurn 还需满足目标状态等启动条件。若空闲 Thread 保留 outstanding durable sleep，QueueOnly 也会触发新的普通 Turn 来处理这份等待；它不重开旧 Turn，也不复活旧调用栈。</p>
-<p><strong>题六：子任务说测试通过，父任务能直接汇报吗？</strong></p>
-<p>参考答案：先检查其验证范围、实际命令、对应产物与当前文件是否一致。对子任务未覆盖的部分保留未验证状态；同一共享目录还要考虑后续并发修改使旧结果失效。</p>
-<p>更多完整场景见 <a href="60-codex.html">第60章｜Codex 的机制与设计取舍</a>。</p>
+<p><strong>题一：为什么提取（Extraction）允许成功但无输出（No Output）？</strong></p>
+<p>参考答案：并非每段经历都有长期价值。明确空结果可减少无效重试与噪声积累，并把它与解析失败、模型请求失败分开。消费者（Consumer）应依据结果类别处理，不能只看文本是否为空。</p>
+<p><strong>题二：整合智能代理（Consolidation Agent）已完成，为什么还要校验产物与认领（Claim）？</strong></p>
+<p>参考答案：终态不证明产物满足合同，执行期间也可能失去租约（Lease）。关闭执行者（Worker）、校验产物并重新确认归属，可避免在途写入和过期持有者宣布成功；关闭失败仍有保留租约（Lease）的处理。这些检查没有把文件系统与数据库变成一个事务（Transaction）。</p>
+<p><strong>题三：长期记忆（Long-Term Memory）写成功，为什么下次仍重复探索？</strong></p>
+<p>参考答案：逐项检查读侧是否启用、所选空间是否有摘要、检索是否命中、内容是否截断，以及模型（Model）是否用到相关材料。保存、进入模型输入（Model Input）和实际使用是不同状态。</p>
+<p><strong>题四：技能说明包（Skill）翻到第二页仍读到旧内容，一定是故障吗？</strong></p>
+<p>参考答案：不一定。执行器提供的继续页在缓存（Cache）命中时复用分页快照（Pagination Snapshot），优先保持本次阅读一致。文件修改不一定在续页可见；需要最新内容时，应通过重新读取处理新鲜度（Freshness）。</p>
+<p><strong>题五：<code>send_message</code> 与 <code>followup_task</code> 为什么分开？</strong></p>
+<p>参考答案：传递材料与请求新工作轮次（Turn）是不同意图，目标状态也影响启动。普通空闲目标的 <code>QueueOnly</code> 材料不等于已安排新工作；保留持久等待（Outstanding Durable Sleep）的空闲目标则可能由它触发新普通工作轮次（Turn）。这不重开旧模型调用（Model Query），也不恢复旧调用栈。</p>
+<p><strong>题六：子任务（Subtask）说测试通过，父任务（Parent Task）能直接汇报吗？</strong></p>
+<p>参考答案：应核对实际命令、验证范围、产物与当前文件是否一致。静态判断、未覆盖部分及后续并发修改都要保留，最终结论不能超过已有检查。更多完整场景见<a href="60-codex.html">第60章</a>。</p>
 <hr>
-<p><a href="40-task-evaluation.html">上一章：第 40 章｜整项任务评价与成本比较</a> · <a href="42-claude-code-memory-and-skills.html">下一章：第 42 章｜Claude Code：记忆、规则与 Skills</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="40-task-evaluation.html"><span>← 上一章</span><strong>第 40 章｜整项任务评价与成本比较</strong></a><a href="42-claude-code-memory-and-skills.html"><span>下一章 →</span><strong>第 42 章｜Claude Code：记忆、规则与 Skills</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E8%AE%B0%E5%BF%86%E4%B8%8D%E6%98%AF%E8%81%8A%E5%A4%A9%E8%AE%B0%E5%BD%95%E8%87%AA%E5%8A%A8%E8%BF%BD%E5%8A%A0%E5%88%B0%E4%B8%8B%E4%B8%80%E6%AC%A1-prompt">1. 记忆不是聊天记录自动追加到下一次 prompt</a></li><li class="toc-level-2"><a href="#2-%E6%8F%90%E5%8F%96%E6%8A%8A%E4%B8%80%E6%AC%A1%E7%BB%8F%E5%8E%86%E5%8F%98%E6%88%90%E5%8F%AF%E5%A4%84%E7%90%86%E5%80%99%E9%80%89">2. 提取：把一次经历变成可处理候选</a></li><li class="toc-level-2"><a href="#3-%E6%95%B4%E5%90%88%E5%A4%9A%E4%BB%BD%E5%80%99%E9%80%89%E6%80%8E%E6%A0%B7%E6%9B%B4%E6%96%B0%E5%90%8C%E4%B8%80%E4%B8%AA%E5%B7%A5%E4%BD%9C%E5%8C%BA">3. 整合：多份候选怎样更新同一个工作区</a></li><li class="toc-level-2"><a href="#4-%E8%AF%BB%E4%BE%A7%E7%9F%AD%E6%91%98%E8%A6%81%E5%81%9A%E5%85%A5%E5%8F%A3%E7%BB%86%E8%8A%82%E6%8C%89%E9%9C%80%E5%8F%96">4. 读侧：短摘要做入口，细节按需取</a></li><li class="toc-level-2"><a href="#5-skills%E7%9B%AE%E5%BD%95%E5%8F%AF%E4%BB%A5%E5%B8%B8%E8%A7%81%E6%AD%A3%E6%96%87%E5%BA%94%E6%8C%89%E9%9C%80%E8%AF%BB%E5%8F%96">5. Skills：目录可以常见，正文应按需读取</a></li><li class="toc-level-3"><a href="#%E5%88%86%E9%A1%B5%E5%BF%AB%E7%85%A7%E4%BF%9D%E6%8C%81%E5%93%AA%E4%B8%80%E6%AC%A1%E8%AF%BB%E5%8F%96%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7">分页快照保持哪一次读取的一致性</a></li><li class="toc-level-2"><a href="#6-%E5%AD%90%E4%BB%BB%E5%8A%A1%E6%96%B0%E7%9A%84%E6%89%A7%E8%A1%8C%E5%8D%95%E5%85%83%E9%9C%80%E8%A6%81%E4%BB%BB%E5%8A%A1%E8%BE%93%E5%85%A5%E4%B8%8D%E5%8F%AA%E6%98%AF%E8%A7%92%E8%89%B2%E5%90%8D%E5%AD%97">6. 子任务：新的执行单元需要任务输入，不只是角色名字</a></li><li class="toc-level-2"><a href="#7-%E5%8F%91%E6%B6%88%E6%81%AF%E8%A6%81%E6%B1%82%E7%BB%A7%E7%BB%AD%E4%BA%A4%E4%BB%98%E6%96%87%E4%BB%B6%E5%88%86%E5%88%AB%E9%9C%80%E8%A6%81%E4%BB%80%E4%B9%88%E5%90%88%E5%90%8C">7. 发消息、要求继续、交付文件分别需要什么合同</a></li><li class="toc-level-2"><a href="#8-%E5%B0%86%E5%9B%9B%E7%A7%8D%E4%BF%A1%E6%81%AF%E6%B5%81%E6%94%BE%E5%9B%9E%E5%90%8C%E4%B8%80%E4%BB%BB%E5%8A%A1">8. 将四种信息流放回同一任务</a></li><li class="toc-level-2"><a href="#9-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">9. 常见场景与参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="40-task-evaluation.html">上一章：第 40 章｜整项任务评价与成本比较</a> · <a href="42-claude-code-memory-and-skills.html">下一章：第 42 章｜Claude Code：自动记忆（Auto Memory）、规则（Rule）与技能说明包（Skill）</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="40-task-evaluation.html"><span>← 上一章</span><strong>第 40 章｜整项任务评价（Task Evaluation）与成本（Cost）比较</strong></a><a href="42-claude-code-memory-and-skills.html"><span>下一章 →</span><strong>第 42 章｜Claude Code：自动记忆（Auto Memory）、规则（Rule）与技能说明包（Skill）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E4%BF%9D%E5%AD%98%E8%A3%85%E8%BD%BD%E4%B8%8E%E6%89%A7%E8%A1%8C%E5%90%84%E6%94%B9%E5%8F%98%E4%BB%80%E4%B9%88">前情回顾：保存、装载与执行各改变什么？</a></li><li class="toc-level-2"><a href="#1-%E9%95%BF%E6%9C%9F%E8%AE%B0%E5%BF%86long-term-memory%E5%85%88%E5%88%86%E6%B8%85%E4%BA%94%E4%B8%AA%E7%8A%B6%E6%80%81">1. 长期记忆（Long-Term Memory）：先分清五个状态</a></li><li class="toc-level-2"><a href="#2-%E6%8F%90%E5%8F%96extraction%E5%80%99%E9%80%89%E6%9C%89%E7%BB%93%E6%9E%84%E5%86%85%E5%AE%B9%E4%BB%8D%E9%9C%80%E5%88%A4%E6%96%AD">2. 提取（Extraction）：候选有结构，内容仍需判断</a></li><li class="toc-level-3"><a href="#%E8%AE%A4%E9%A2%86claim%E6%8A%8A%E5%A4%84%E7%90%86%E8%B4%A3%E4%BB%BB%E4%BA%A4%E7%BB%99%E8%B0%81">认领（Claim）把处理责任交给谁</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E4%B8%80%E6%AC%A1%E6%80%A7%E7%BB%86%E8%8A%82%E4%B8%AD%E6%8F%90%E5%8F%96%E9%80%82%E7%94%A8%E6%9D%A1%E4%BB%B6applicability">从一次性细节中提取适用条件（Applicability）</a></li><li class="toc-level-2"><a href="#3-%E6%95%B4%E5%90%88consolidation%E5%85%B3%E9%97%AD%E5%86%99%E5%85%A5%E8%80%85%E5%90%8E%E6%89%8D%E8%83%BD%E9%AA%8C%E6%94%B6acceptance">3. 整合（Consolidation）：关闭写入者后才能验收（Acceptance）</a></li><li class="toc-level-2"><a href="#4-%E8%AF%BB%E4%BE%A7read-path%E6%9D%A5%E6%BA%90%E4%B8%80%E8%87%B4%E8%AF%BB%E5%8F%96%E5%91%BD%E4%B8%AD%E5%92%8C%E6%AD%A3%E7%A1%AE%E4%BD%BF%E7%94%A8%E5%88%86%E5%88%AB%E9%97%AD%E5%90%88">4. 读侧（Read Path）：来源一致、读取命中和正确使用分别闭合</a></li><li class="toc-level-2"><a href="#5-%E6%8A%80%E8%83%BD%E8%AF%B4%E6%98%8E%E5%8C%85skill%E7%9B%AE%E5%BD%95%E6%AD%A3%E6%96%87%E4%B8%8E%E6%89%A7%E8%A1%8C%E6%98%AF%E4%B8%89%E4%B8%AA%E7%8A%B6%E6%80%81">5. 技能说明包（Skill）：目录、正文与执行是三个状态</a></li><li class="toc-level-3"><a href="#%E5%88%86%E9%A1%B5%E5%BF%AB%E7%85%A7pagination-snapshot%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E6%96%B0%E9%B2%9C%E5%BA%A6freshness%E5%88%86%E5%88%AB%E5%88%A4%E6%96%AD">分页快照（Pagination Snapshot）：一致性与新鲜度（Freshness）分别判断</a></li><li class="toc-level-2"><a href="#6-%E5%AD%90%E4%BB%BB%E5%8A%A1subtask%E5%85%88%E4%BA%A4%E4%BB%98%E8%87%AA%E8%B6%B3%E8%BE%93%E5%85%A5%E5%86%8D%E9%80%89%E6%8B%A9%E5%8E%86%E5%8F%B2%E5%88%86%E5%8F%89history-fork">6. 子任务（Subtask）：先交付自足输入，再选择历史分叉（History Fork）</a></li><li class="toc-level-3"><a href="#%E5%AE%8C%E6%95%B4%E4%BB%BB%E5%8A%A1%E5%8D%A1%E8%B0%81%E8%AF%BB%E4%BB%80%E4%B9%88%E4%BA%A4%E5%9B%9E%E4%BB%80%E4%B9%88">完整任务卡：谁读什么，交回什么</a></li><li class="toc-level-2"><a href="#7-%E6%B6%88%E6%81%AFmessage%E7%BB%AD%E5%81%9A%E4%B8%8E%E6%96%87%E4%BB%B6%E4%BA%A4%E4%BB%98%E5%90%84%E6%9C%89%E5%90%88%E5%90%8C">7. 消息（Message）、续做与文件交付各有合同</a></li><li class="toc-level-2"><a href="#8-%E5%9B%9B%E7%A7%8D%E4%BF%A1%E6%81%AF%E6%B5%81%E6%80%8E%E6%A0%B7%E5%85%B1%E5%90%8C%E5%AE%8C%E6%88%90%E6%A3%80%E6%9F%A5%E5%99%A8%E4%BB%BB%E5%8A%A1task">8. 四种信息流怎样共同完成检查器任务（Task）</a></li><li class="toc-level-2"><a href="#9-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">9. 常见场景与参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
