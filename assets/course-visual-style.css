@@ -25,3 +25,16 @@ tbody code{font-size:14px;line-height:1.65;background:#f0f0f3;color:#32333c}
 .answer-label{color:#a30f32;border-left-color:#da5171;background:#fff8fa}
 @media(max-width:700px){.table-scroll table{font-size:15px;min-width:580px}thead th,tbody td{padding:13px 14px}caption{padding:13px 14px;font-size:13px}.diagram-scroll{border-radius:12px}}
 @media print{.table-scroll{overflow:visible;border-color:#aaa}thead{display:table-header-group}thead th{background:#f5e5e9!important;color:#111!important}tbody td{color:#111}figure{break-inside:avoid}.diagram-scroll{overflow:visible}}
+/* Readable cells can wrap; only genuinely wide comparisons need local scrolling. */
+.table-scroll table{min-width:0;table-layout:auto}
+.table-scroll th,.table-scroll td{overflow-wrap:anywhere;word-break:normal}
+.table-scroll[data-columns="2"] th,.table-scroll[data-columns="2"] td{min-width:0}
+@media(max-width:700px){
+  .table-scroll th,.table-scroll td{padding:10px 12px}
+  .table-scroll[data-columns="2"] table{table-layout:fixed}
+  .table-scroll[data-columns="2"] th:first-child{width:34%}
+  .table-scroll[data-columns="2"] th,.table-scroll[data-columns="2"] td{min-width:0}
+  .table-scroll[data-columns="3"] table{min-width:480px}
+  .table-scroll[data-columns="4"] table{min-width:620px}
+  .table-scroll[data-columns="5"] table,.table-scroll[data-columns="6"] table{min-width:760px}
+}
