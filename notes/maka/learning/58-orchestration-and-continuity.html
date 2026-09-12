@@ -1,97 +1,152 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 58 章｜设计编排与连续执行 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 58 / 62</div><article id="main-content"><span class="heading-alias" id="i10谁让下一轮开始断线后怎样继续" aria-hidden="true"></span><span class="heading-alias" id="i10设计编排与连续执行" aria-hidden="true"></span><span class="heading-alias" id="第-55-章设计编排与连续执行" aria-hidden="true"></span><span class="heading-alias" id="第-57-章设计编排与连续执行" aria-hidden="true"></span><h1 id="第-58-章设计编排与连续执行">第 58 章｜设计编排与连续执行</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 58 章｜设计编排（Orchestration）与连续执行（Execution Continuity） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script><link rel="stylesheet" href="../../../assets/katex/katex.min.css"><link rel="stylesheet" href="../../../assets/course-math.css"></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 58 / 62</div><article id="main-content"><span class="heading-alias" id="i10谁让下一轮开始断线后怎样继续" aria-hidden="true"></span><span class="heading-alias" id="i10设计编排与连续执行" aria-hidden="true"></span><span class="heading-alias" id="第-55-章设计编排与连续执行" aria-hidden="true"></span><span class="heading-alias" id="第-57-章设计编排与连续执行" aria-hidden="true"></span><span class="heading-alias" id="第-58-章设计编排与连续执行" aria-hidden="true"></span><h1 id="第-58-章设计编排orchestration与连续执行execution-continuity">第 58 章｜设计编排（Orchestration）与连续执行（Execution Continuity）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：批准、目标、定时触发和依赖就绪怎样启动工作，并在客户端断线后保持正确观察？</p>
-<p><strong>关键概念</strong>：执行意图：待准入的稳定工作身份；认领：取得本次触发的处理权；Admission（准入）：由 Host 接纳执行；Run（执行实例）：运行模型与工具；Snapshot（快照）：重建当前视图；序列：识别观察流中的位置。</p>
-<p><strong>关系主线</strong>：不同控制者按各自条件形成意图，再共享接纳与执行基础；重连先核对权威状态，恢复连接不重放命令，也不保证机器关闭后原进程继续运行。</p>
+<p><strong>核心问题</strong>：批准、目标、定时触发和依赖就绪怎样启动工作，客户端断线后又怎样继续查看同一份工作？</p>
+<p><strong>关键概念</strong>：执行意图（Execution Intent）固定待处理工作；准入（Admission）绑定执行身份；派发（Dispatch）让执行器实际开始；对账（Reconciliation）核对不确定效果；快照（Snapshot）与游标（Cursor）帮助重建观察基线。</p>
+<p><strong>关系主线</strong>：不同控制域（Control Domain）分别判断能否继续，再交给共同执行基础。恢复（Recovery）先定位原身份（Identity）、状态（State）和权限（Permission），连接重建不自动重放任务，持久记录也不保证原进程或外部资源仍然存活。</p>
 </blockquote>
-<p>前置：<a href="13-session-turn-run.html">第13章</a>、<a href="14-events-and-projections.html">第14章</a>、<a href="24-continuation-and-orchestration.html">第24章</a>、<a href="25-host-and-client.html">第25章</a>。依赖图部分另需 <a href="57-skills-and-subagents.html">第57章</a>。</p>
-<h2 id="1-原题与约束">1. 原题与约束</h2>
-<blockquote><p>Agent 要在用户批准后执行计划，也要能持续追目标、定时运行、多 Agent 协作。用户关闭界面后，还能从另一端查看。怎样设计？</p>
+<h2 id="前情回顾继续同一份工作需要保留哪些区别">前情回顾：继续同一份工作，需要保留哪些区别</h2>
+<p><a href="13-session-turn-run.html">第13章</a>把会话（Session）、工作轮次（Turn）与执行（Run）分开；<a href="14-events-and-projections.html">第14章</a>又区分持久事实（Persistent Fact）与用户界面（User Interface，UI）投影（Projection）。因此，界面重新出现一段文字，不证明新执行（Run）已经开始；界面暂时空白，也不证明原工作没有被接纳。</p>
+<p><a href="24-continuation-and-orchestration.html">第24章</a>解释不同继续理由：计划（Plan）等待批准（Approval），目标（Goal）依据证据与预算（Budget），定时任务（Scheduled Task）处理一次到期机会，任务图（Agent Graph）等待依赖。它们可以调用共同的执行基础，但不能用同一个“尚未完成就继续”条件。</p>
+<p><a href="25-host-and-client.html">第25章</a>说明连接连续性（Connection Continuity）与执行连续性（Execution Continuity）不同。客户端（Client）重连后需要重新取得可靠状态；宿主（Host）与工具执行器（Tool Executor）是否仍在工作，则取决于它们各自的寿命和恢复合同。</p>
+<p>刚读过的<a href="57-skills-and-subagents.html">第57章</a>还要求父任务（Parent Task）核对可交付产物（Artifact），不能把子任务（Subtask）的终态（Terminal State）直接当成依赖已经可用。本章将这些关系接成一套教学控制合同，并展开每个关键辅助函数的责任。</p>
+<span class="heading-alias" id="1-原题与约束" aria-hidden="true"></span><h2 id="1-原题与明确假设">1. 原题与明确假设</h2>
+<blockquote><p>智能代理（Agent）要在用户批准（Approval）后执行计划（Plan），也要持续追踪目标（Goal）、定时工作和协调多个子任务（Subtask）。用户关闭界面后，还能从另一端查看，应该怎样设计？</p>
 </blockquote>
-<p>控制状态决定能否创建下一份工作；连接状态决定用户怎样重新观察已存在的工作。查询任务不会因此重放执行命令。</p>
-<p>假设 Host 负责接纳执行，控制状态可持久保存；客户端可断线重连。本题不假定机器关机后进程仍运行，也不承诺任意跨机器迁移。</p>
-<span class="heading-alias" id="2-两分钟主答" aria-hidden="true"></span><h2 id="2-参考方案">2. 参考方案</h2>
-<blockquote><p>我会让普通 AgentRun 负责模型和工具执行，再由不同控制者决定何时创建下一轮。计划需要用户批准，目标需要根据结果和预算判断，定时任务需要认领一次触发机会，依赖图需要等前置节点的可用结果。它们可以复用接纳和执行基础，但各自的合法条件不同。触发先形成可恢复的意图，再进入准入，不能把 ready 当成已经开跑。客户端只提交意图和观察状态，重连时先取权威快照，再按序列补变化；重发命令要有身份与内容核对，避免重复工作。取消和完成并发时由对应状态 owner 收敛，已产生效果另行结算。最后分别验证重复触发、评估失败、取消竞争、连接断开和状态补齐。</p>
-</blockquote>
-<h2 id="3-主图不同触发进入共同执行">3. 主图：不同触发进入共同执行</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="主图：不同触发进入共同执行：可滚动示意图"><a href="../../../assets/diagrams/58-orchestration-and-continuity-1.svg"><img src="../../../assets/diagrams/58-orchestration-and-continuity-1.svg" alt="已批准计划、允许继续且预算足够的目标、已认领触发的定时任务、依赖与交接就绪的图分别形成持久意图；Host 接纳并绑定 Run，取得派发许可后才启动执行。结果与终态保存后由对应控制域决定后续，已有运行或终态不重新开跑。" width="1276" height="1231" loading="lazy" style="width:1276px;min-width:1085px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>四种触发共享 Run 执行基础，却不共享无条件 resume。Graph 的就绪、调度认领、Host 接纳是不同阶段；图中的接纳到 Run 箭头还要求取得派发许可。已有 Run 正在运行或已经终止时，入口只返回观察或已有结果，不沿箭头重新执行。</p>
-<h2 id="4-控制契约与具体状态">4. 控制契约与具体状态</h2>
-<p>教学接口，非 Maka 实际操作名：</p>
+<p>先分开控制状态（Control State）与连接状态（Connection State）。前者决定能否创建下一份工作，后者决定怎样查看已经存在的工作。查询（Query）任务状态，不因此重放执行命令（Command）。</p>
+<p>本题假设宿主（Host）负责接纳工作，控制状态（Control State）与执行身份（Execution Identity）可以持久保存；客户端（Client）允许断线重连。普通文件与命令执行器（Executor）由宿主（Host）侧持有。客户端能力（Client Capability）提供的工具（Tool）属于另一个条件，最后单独分析。</p>
+<p>本题不假定机器关闭后进程仍在运行，也不承诺任意跨机器迁移。以下数据结构、控制流程和结果都是教学设计与推演，没有实际启动模型（Model）、调度（Scheduling）、网络连接或故障注入。</p>
+<span class="heading-alias" id="2-两分钟主答" aria-hidden="true"></span><span class="heading-alias" id="2-参考方案" aria-hidden="true"></span><h2 id="2-参考方案控制者先给理由执行器executor再做工作">2. 参考方案：控制者先给理由，执行器（Executor）再做工作</h2>
+<p>让普通执行（Run）承担模型（Model）与工具（Tool）循环，各控制域（Control Domain）决定何时需要下一份工作。每次触发（Trigger）先形成可恢复的执行意图（Execution Intent），再进入准入（Admission）；准入（Admission）成功后，还须取得派发许可（Dispatch Permit），才能实际启动。</p>
+<p>取消（Cancellation）、修订（Revision）与完成可能并发发生。对应负责者（Owner）必须根据当前状态收束决定；已经产生的效果（Effect）另行结算。不能把一个过时的继续理由直接交给执行器（Executor），也不能因为恢复（Recovery）请求晚到，就让它覆盖当前授权（Authorization）。</p>
+<p>先看四个域分别需要什么事实：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 2. 参考方案：控制者先给理由，执行器（Executor）再做工作"><table><caption>表 1 / Table 1 · 2. 参考方案：控制者先给理由，执行器（Executor）再做工作</caption><thead><tr><th scope="col">控制域（Control Domain）</th><th scope="col">持有决定权者消费的输入（Input）</th><th scope="col">形成执行意图（Execution Intent）前的条件</th><th scope="col">不能当作任务完成</th></tr></thead><tbody><tr><td>计划（Plan）</td><td>当前计划内容、用户批准（Approval）、停止或修订记录</td><td>批准（Approval）仍覆盖这份计划与当前允许范围</td><td>进度文字、步骤标记或曾经批准</td></tr>
+<tr><td>目标（Goal）</td><td>当前证据、评估判断、停止策略与预算（Budget）</td><td>合法判断与策略允许继续，剩余资源足够</td><td>任意一次模型（Model）文本结束</td></tr>
+<tr><td>定时任务（Scheduled Task）</td><td>到期时间、本次火次（Fire）身份与已有认领（Claim）</td><td>取得本次触发机会的处理资格，并保持原身份</td><td>时钟到点、触发（Trigger）请求发出或已派发（Dispatch）</td></tr>
+<tr><td>任务图（Agent Graph）</td><td>当前依赖、上游结果可用性与调度状态（Scheduling State）</td><td>依赖满足、所需交付可读、当前节点允许调度（Scheduling）</td><td>节点就绪（Ready）或子任务（Subtask）文字“完成”</td></tr></tbody></table></div>
+<p>火次（Fire）指某个定时任务（Scheduled Task）的一次具体触发机会。同一个任务明天和后天的触发可以是不同火次（Fire）；两个入口重复报告明天这一机会，却不应自动变成两份工作。身份（Identity）必须表达这一业务区别，单看请求到达次数不够。</p>
+<p>共同基础负责绑定身份、准入（Admission）、派发（Dispatch）、结果保存与查询（Query）。各域继续负责自己的状态判断。共享代码减少重复实现，不能删除四行各自的合法条件。</p>
+<span class="heading-alias" id="3-主图不同触发进入共同执行" aria-hidden="true"></span><h2 id="3-主图触发trigger怎样进入共同执行run">3. 主图：触发（Trigger）怎样进入共同执行（Run）</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="继续工作的条件 · Continuation Conditions：可滚动示意图"><a href="../../../assets/diagrams/58-orchestration-and-continuity-1.svg"><img src="../../../assets/diagrams/58-orchestration-and-continuity-1.svg" alt="计划、目标、定时任务与依赖图分别提供合法继续理由，形成执行意图（Execution Intent）；准入（Admission）绑定后仍须取得派发许可（Dispatch Permit），结果回到对应控制域。" width="1241" height="1285" loading="lazy" style="width:1241px;min-width:1055px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>上方四条箭头传入的是合法继续工作的理由及其身份（Identity），不是四种已经发生的业务效果（Effect）。宿主（Host）接纳后保存绑定，再由派发（Dispatch）入口决定谁能启动；执行结果（Outcome）回到对应控制者，供它更新下一步状态。</p>
+<p>就绪（Ready）、认领（Claim）、准入（Admission）与启动（Start）是不同事实。已有执行（Run）正在工作或已经结束时，入口应返回可观察状态或原有结果，不沿首次派发（Dispatch）的箭头再开一遍。</p>
+<p>图中“持久”只描述执行意图（Execution Intent）的可恢复记录。它不独自证明文件、远端服务或进程调用栈可恢复；这些资源有各自的效果（Effect）与寿命合同。</p>
+<span class="heading-alias" id="4-控制契约与具体状态" aria-hidden="true"></span><h2 id="4-接纳合同固定内容再决定创建还是查询">4. 接纳合同：固定内容，再决定创建还是查询</h2>
+<h3 id="先给-intent-中每个输入input一个来源">先给 <code>intent</code> 中每个输入（Input）一个来源</h3>
+<p>固定一次教学定时检查：任务标识为 <code>daily-check</code>，用户授权明天只读核对 README 的测试步骤，不修改文件，也不把“检查”扩大为任意命令执行。协调者（Coordinator）保存当前第 1 版任务内容，并为明天这次火次（Fire）使用 <code>one-specific-fire</code> 标识。后续重复触发（Trigger）沿用它。</p>
+<p>下面 <code>current_revision</code> 来自这份可信控制记录，本例为第 1 版；<code>frozen_task_input</code> 是上述完整只读要求及其允许范围。它们在形成执行意图（Execution Intent）时固定，不能在重试时偷偷换成另一项任务。数据字典与函数均为教学接口，不是 Maka 应用编程接口（Application Programming Interface，API）。</p>
+<p>按“身份—内容—当前阶段”阅读这个结构；函数则处理既有绑定、明确拒绝、新准入（Admission）与异常判定四类结果。</p>
 <pre><code class="language-python">intent = {
+    # 控制域与本次触发共同定位原工作。
     &quot;domain&quot;: &quot;schedule&quot;,
     &quot;domain_id&quot;: &quot;daily-check&quot;,
     &quot;trigger_identity&quot;: &quot;one-specific-fire&quot;,
+    # 修订与内容来自可信控制记录，重试不替换。
     &quot;revision&quot;: current_revision,
     &quot;payload&quot;: frozen_task_input,
     &quot;status&quot;: &quot;pending_admission&quot;
 }
 
 def reconcile(intent):
-    # 同一状态 owner 内原子读取当前 revision、取消状态和既有 admission
+    # 在同一负责者边界核身份、当前授权和已有绑定。
     decision = claim_or_observe_atomically(intent)
     if decision.kind == &quot;existing&quot;:
         if decision.stop_required:
             request_stop_idempotently(decision.run_id)
             return observe(decision.run_id)
-        return dispatch_or_reconcile(decision.run_id)  # 恢复认领后尚未派发的工作
+        return dispatch_or_reconcile(decision.run_id)
     if decision.kind == &quot;rejected_before_admission&quot;:
         return record_rejection(decision.reason)
     if decision.kind == &quot;new_admission&quot;:
         return dispatch_or_reconcile(decision.accepted_run_id)
-    return report_admission_problem(decision)  # 冲突或未识别状态不派发</code></pre>
-<p><code>claim_or_observe_atomically</code> 是本题要求实现的原子合同：先核对调用者是否有权提交或观察该控制域，再按控制域、触发身份和作用域查找既有 admission，并核对冻结的 payload 与授权范围。已有绑定不能被新内容覆盖；只对尚未接纳的意图核对当前取消与 revision，再持久创建唯一 admission。该判断与取消/修订写入必须经过同一事务或串行 owner，不能只用 <code>if not exists</code>。原子判定之后的新取消按已接纳 Run 的停止路径处理；停止请求失败要能重试/对账。</p>
-<p>这里的 <code>dispatch_or_reconcile</code> 与<a href="49-agent-architecture.html#4-%E8%BA%AB%E4%BB%BDidentity%E6%B4%BE%E5%8F%91dispatch%E4%B8%8E%E4%B8%BB%E5%BE%AA%E7%8E%AF">第49章主循环</a>使用同一合同。第49章已给出首次、并发重复、运行中、终态后、派发前崩溃和效果未知六种情境的参考表。本章展开恢复者如何作决定：</p>
+    # 冲突或未识别状态不能进入派发。
+    return report_admission_problem(decision)</code></pre>
+<p><code>claim_or_observe_atomically</code> 不是用名称代替实现。它代表本题要求落实的一组原子合同（Atomic Contract）：同一控制状态的读取、判定与唯一绑定写入，要经过同一事务（Transaction）或串行负责者（Owner），并与取消（Cancellation）及修订（Revision）写入协调。</p>
+<h3 id="身份相同也要核对内容与当前权利">身份相同，也要核对内容与当前权利</h3>
+<p>设控制域（Control Domain）为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>D</mi></mrow><annotation encoding="application/x-tex">D</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">D</span></span></span></span></span>、该域中的任务标识（Task Identity）为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi></mrow><annotation encoding="application/x-tex">T</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">T</span></span></span></span></span>、作用域（Scope）为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi></mrow><annotation encoding="application/x-tex">S</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span></span></span></span></span>、本次触发身份（Trigger Identity）为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi></mrow><annotation encoding="application/x-tex">F</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">F</span></span></span></span></span>，本题用组合键 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>K</mi></mrow><annotation encoding="application/x-tex">K</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">K</span></span></span></span></span> 定位一次触发所形成的工作：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>K</mi><mo>=</mo><mo stretchy="false">(</mo><mi>D</mi><mo separator="true">,</mo><mi>T</mi><mo separator="true">,</mo><mi>S</mi><mo separator="true">,</mo><mi>F</mi><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">K=(D,T,S,F).</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">K</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">D</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">F</span><span class="mclose">)</span><span class="mord">.</span></span></span></span></span></div>
+<p>这里 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi></mrow><annotation encoding="application/x-tex">S</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span></span></span></span></span> 包含该应用选择的账户或工作区（Workspace）等隔离范围，由可信环境提供。相同键只帮助找到原绑定，不会使不同内容合法。已保存载荷（Payload）记为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>P</mi><mn>0</mn></msub></mrow><annotation encoding="application/x-tex">P_0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span>；后续请求必须按事先约定的内容比较规则与 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>P</mi><mn>0</mn></msub></mrow><annotation encoding="application/x-tex">P_0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span> 一致，且调用者仍有权提交或观察该对象。</p>
+<p>具体顺序如下：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 身份相同，也要核对内容与当前权利"><table><caption>表 2 / Table 2 · 身份相同，也要核对内容与当前权利</caption><thead><tr><th scope="col">检查位置</th><th scope="col">输入与负责者（Owner）的动作</th><th scope="col">输出及下一位消费者（Consumer）</th></tr></thead><tbody><tr><td>1. 授权（Authorization）</td><td>核对调用者能否提交或观察该控制域（Control Domain）与作用域（Scope）</td><td>无权者被拒绝；知道身份（Identity）不授予查询权</td></tr>
+<tr><td>2. 原绑定</td><td>按 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>K</mi></mrow><annotation encoding="application/x-tex">K</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">K</span></span></span></span></span> 找既有准入（Admission），核对冻结载荷（Payload）与授权范围</td><td>一致时定位原执行（Run）；同身份换内容则冲突</td></tr>
+<tr><td>3. 新准入（Admission）条件</td><td>仅对尚未被接纳的意图，核对当前取消（Cancellation）、修订（Revision）与各域合法条件</td><td>过时或被停止的意图明确拒绝，不先创建执行（Run）</td></tr>
+<tr><td>4. 唯一绑定</td><td>在相同负责者（Owner）的原子边界保存准入（Admission）</td><td>返回原身份或唯一的新执行身份（Execution Identity），供派发（Dispatch）路径消费</td></tr></tbody></table></div>
+<p>这里“仅对尚未接纳者”不表示已接纳执行（Run）可以忽略后来取消（Cancellation）。已经绑定的工作要定位原执行（Run），走它的停止路径；不能把原绑定改成另一项工作，也不能在原子判断之后假装再没有状态变化。</p>
+<p><code>request_stop_idempotently</code> 要能针对同一执行（Run）重复表达停止意图。请求失败需要重试或对账（Reconciliation）；请求返回也不独自证明所有工具（Tool）已停止。已开始效果（Effect）的结果仍须结算。</p>
+<h2 id="5-派发dispatch与恢复recovery先确定原执行run处于哪里">5. 派发（Dispatch）与恢复（Recovery）：先确定原执行（Run）处于哪里</h2>
+<p>这里的 <code>dispatch_or_reconcile</code> 与<a href="49-agent-architecture.html#4-%E8%BA%AB%E4%BB%BDidentity%E6%B4%BE%E5%8F%91dispatch%E4%B8%8E%E4%B8%BB%E5%BE%AA%E7%8E%AF">第49章主循环</a>使用同一教学合同。第49章已经给出首次、并发重复、运行中、终态（Terminal State）后、派发（Dispatch）前崩溃和未知效果（Unknown Effect）六种情境；本节解释收到原执行身份（Execution Identity）以后，恢复者怎样选择动作。</p>
+<p>先按消费者（Consumer）区分四种状态。已有记录供恢复者判断，真正启动仍由执行入口裁决。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 5. 派发（Dispatch）与恢复（Recovery）：先确定原执行（Run）处于哪里"><table><caption>表 3 / Table 3 · 5. 派发（Dispatch）与恢复（Recovery）：先确定原执行（Run）处于哪里</caption><thead><tr><th scope="col">读取到的状态（State）</th><th scope="col">可作的判断</th><th scope="col">本次允许的方向</th></tr></thead><tbody><tr><td>已有终态（Terminal State）</td><td>原执行（Run）已保存结束事实</td><td>读取原结果；成功、失败、取消（Cancellation）或预算（Budget）耗尽都不自动重新启动</td></tr>
+<tr><td>正在执行（Running）</td><td>原工作已经进入执行阶段</td><td>查询（Query）或订阅（Subscription）同一工作</td></tr>
+<tr><td>已准入、确定未派发（Admitted Not Dispatched）</td><td>唯一绑定已有，首次启动尚未发生</td><td>再核当前状态与取消（Cancellation），竞争唯一派发许可（Dispatch Permit）</td></tr>
+<tr><td>派发未知（Dispatch Unknown）、未知效果（Unknown Effect）或中断</td><td>可能已经越过启动或效果（Effect）边界，现有记录不足</td><td>围绕原执行（Run）与工具调用（Tool Call）核对事实，再按实际合同分类</td></tr></tbody></table></div>
+<p>下面的函数按这个顺序处理。<code>read_authoritative_state</code> 读取由合法负责者（Owner）维护的状态记录，提供判断起点；记录本身不拥有裁决权。</p>
 <pre><code class="language-python">def dispatch_or_reconcile(run_id):
     state = read_authoritative_state(run_id)
-    if state.is_terminal:  # 成功、失败、取消、预算耗尽均属于终态
+    if state.is_terminal:
         return read_recorded_result(run_id)
     if state.phase == &quot;running&quot;:
         return query_or_subscribe(run_id)
     if state.phase == &quot;admitted_not_dispatched&quot;:
-        # 执行 owner 再核对当前状态和取消，与其他恢复者竞争同一启动权
+        # 再核取消与当前状态，竞争同一首次启动资格。
         permit = claim_dispatch_atomically(run_id)
         if not permit.granted:
             return observe(run_id)
         return dispatch_same_run_once(run_id, permit.owner_token)
     if state.phase in {&quot;dispatch_unknown&quot;, &quot;effect_unknown&quot;, &quot;interrupted&quot;}:
-        return reconcile_known_facts(run_id)  # 核对后分类，不能直接从头跑
+        # 先按原身份核事实，不能直接从头执行。
+        return reconcile_known_facts(run_id)
     return report_recovery_state_problem(run_id, state)</code></pre>
-<p><code>read_authoritative_state</code> 的读取只能提供判断起点；真正派发前，<code>claim_dispatch_atomically</code> 必须再次核对取消与状态，避免“读到未开始，别人已派发，我又开跑”的竞争。<code>dispatch_same_run_once</code> 则要求执行入口按同一 Run 与有效 owner 凭证识别重复派发；若执行入口没有这一合同，单靠接纳记录仍不能承诺不重复开跑。该入口还要加载原先冻结的任务与允许范围，继续应用当前有效的授权限制，不能用恢复请求中的新内容替换原任务。恢复入口启动的是第49章取得派发许可后的执行骨架，不重新提交一次用户请求。</p>
-<p>“已认领、确定未启动”可以恢复首次派发；“派发请求已发出但响应丢失”必须先查询原 Run，不能误标为未启动。若工具效果可能已经发生、结果却未保存，<code>reconcile_known_facts</code> 还要核对对应工具身份和外部事实。查不到可靠结果时保留未知，采用该工具支持的查询、幂等重试或人工处置策略；请求 ID 本身不提供外部效果 exactly-once（恰好一次）。</p>
-<p>本题的单 owner 可以靠串行仲裁实现上述合同；如果改为可超时接管的租约（Lease），还须让执行入口与事实存储拒绝旧 owner 的代次凭证，这称为 fencing。多个恢复者不能只看到租约过期就各自开跑；租约过期也不能证明旧工具已经停下。派发、停止与终态竞争都要回到当前执行 owner 收敛，已结束的 Run 保留原结果，恢复不能刷新预算或扩大授权。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 4. 控制契约与具体状态"><table><caption>表 1 / Table 1 · 4. 控制契约与具体状态</caption><thead><tr><th scope="col">控制域（Control Domain）</th><th scope="col">继续的依据</th><th scope="col">不能误认作完成</th></tr></thead><tbody><tr><td>计划（Plan）</td><td>明确批准及当前计划状态</td><td>进度文字或步骤标记</td></tr>
-<tr><td>目标（Goal）</td><td>当前证据、策略、预算与合法评估</td><td>任意一次模型文本结束</td></tr>
-<tr><td>定时任务（Schedule）</td><td>本次 fire 身份与接纳</td><td>时钟到点、触发请求发出</td></tr>
-<tr><td>依赖图（Graph）</td><td>依赖满足、可用交付与调度状态</td><td>节点 ready 或 child 文字“完成”</td></tr></tbody></table></div>
-<p>本题把 evaluator 不可解析的结果保留为评估错误，再按有界策略处理。它与“有效判断为没有进展”不同；如果采用 Maka Goal 的策略，还要分别检查判断有效性、停滞计数、迭代额度和总预算。</p>
-<h2 id="5-断线重连时序图">5. 断线重连时序图</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="断线重连时序图：可滚动示意图"><a href="../../../assets/diagrams/58-orchestration-and-continuity-2.svg"><img src="../../../assets/diagrams/58-orchestration-and-continuity-2.svg" alt="首次任务意图由 Host 接纳并取得派发许可后启动 Runtime；Client 断线期间 Runtime 在既定存活条件下继续保存结果。重连后先读权威快照与序列游标，再补齐变化，不重放原任务命令。" width="1078" height="827" loading="lazy" style="width:1078px;min-width:917px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这是首次获准派发后发生断线的教学协议图；重复请求按第 4 节查询或恢复既有 Run。具体 API 与快照/订阅握手由实现决定。要防“取快照到订阅之间丢事件”的间隙，可以用可回放游标或订阅缓冲配合快照；不能仅画“先 GET 后 subscribe”就声称无缝。</p>
-<p>序列用于发现缺口，epoch 可用于区分不兼容的连接或状态代际。它们不自动恢复进程栈，也不证明文件、环境和远端资源已经迁移。</p>
-<h2 id="6-正常与失败走读">6. 正常与失败走读</h2>
-<p>正常：明天检查 README → 保存 Schedule → 到点认领该次 fire → 接纳 Run → 执行检查 → 保存终态 → 控制者记录该次结果。用户重连只读取既有 Run，不重新触发检查。</p>
-<p>重复触发：进程在接纳后、更新 Schedule 展示状态前崩溃。恢复时按原 fire 身份找到已有 admission，修复投影；不能因展示仍 pending 再开一轮。</p>
-<p>取消竞争：取消发生在接纳前，可以阻止该意图；接纳后必须定位已存在 Run 请求停止；如果结果已完成，保留既有终态与效果，不靠覆盖 status 抹去事实。</p>
-<p>UI 落后：界面显示 running，持久结果已 terminal。修复客户端投影；不要让 UI 回写 running 以“保持一致”。</p>
-<h2 id="7-递进追问">7. 递进追问</h2>
-<p><strong>为什么不能只用一个 background_tasks 表？</strong></p>
-<p>可以共用存储技术，但仍要表达批准、目标评估、触发身份和依赖的不同约束。一张表不是问题，无差别的 <code>status != done → run</code> 才掩盖合法触发条件。</p>
-<p><strong>Goal 没完成就一直调用模型可以吗？</strong></p>
-<p>要限制预算与重试，区分有进展、无进展、评估不可用和真正完成。自动继续不会扩大授权范围；目标要求无法在现有权限下达成时，需要明确处理。</p>
-<p><strong>关窗口后一定继续吗？</strong></p>
-<p>取决于执行 owner 的实际寿命和 Host 驻留合同。网络连接断开、UI 退出、Host 退出、机器关机是不同事件；本题不把逻辑责任等同于进程永远存活。</p>
-<p><strong>多机可以同时当 owner 吗？</strong></p>
-<p>这会引入协调、租约、fencing 和资源归属问题。先明确是否真的需要多机接管，再为过期 owner 的写入定义保护；不能把单机 run id 当成分布式互斥。</p>
-<span class="heading-alias" id="8-取舍验证与自测" aria-hidden="true"></span><h2 id="8-取舍与三个断线窗口">8. 取舍与三个断线窗口</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 8. 取舍与三个断线窗口"><table><caption>表 2 / Table 2 · 8. 取舍与三个断线窗口</caption><thead><tr><th scope="col">选择</th><th scope="col">收益</th><th scope="col">验证重点</th></tr></thead><tbody><tr><td>单宿主与可重连客户端（Host · Client）</td><td>执行 ownership 简单</td><td>快照/增量间隙、重复命令</td></tr>
-<tr><td>持久控制域与对账（Domain · Reconcile）</td><td>可核对触发状态</td><td>接纳前后崩溃、旧 revision</td></tr>
-<tr><td>依赖图调度（Graph Scheduling）</td><td>工作可拆分且依赖显式</td><td>部分失败、结果不可读、取消竞争</td></tr>
-<tr><td>多机接管（Failover）</td><td>主机故障时可转移责任</td><td>fencing、外部资源可达性、环境恢复</td></tr></tbody></table></div>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 8. 取舍与三个断线窗口"><table><caption>表 3 / Table 3 · 8. 取舍与三个断线窗口</caption><thead><tr><th scope="col">故障窗口（Failure Window）</th><th scope="col">可靠事实</th><th scope="col">完整处理</th></tr></thead><tbody><tr><td>请求已接纳，响应丢失</td><td>已存在 intent→Run 绑定</td><td>按原 intent 查询；允许同身份重发时核对同一 payload，并返回既有 admission，不另建 Run</td></tr>
-<tr><td>Client 断线，Host 与普通执行器仍工作</td><td>Run 可继续追加结果</td><td>新 Client 恢复快照与当前订阅，检测并补齐事件缺口；不重复任务命令</td></tr>
-<tr><td>Host 也退出</td><td>只保留已经持久提交的身份和结果</td><td>新 Host 先恢复已知状态，再按实际恢复合同分类未结束执行；没有进程/环境恢复能力时记录中断，而不是宣称原栈继续</td></tr></tbody></table></div>
-<p>若工具执行能力本来由断开的 Client 提供，第二行的存活前提不成立，应另行结算该能力丢失与未知效果。三种窗口都不能简化成重新调用模型并从头执行。</p>
-<p>相关机制：<a href="24-continuation-and-orchestration.html">第24章 触发与准入</a>、<a href="25-host-and-client.html">第25章 观察重连与执行连续性</a>。</p>
+<h3 id="为什么读取以后还要再认领claim">为什么读取以后还要再认领（Claim）</h3>
+<p>两个恢复者可能同时读到“尚未派发（Dispatch）”。如果它们各自根据旧读取结果启动，唯一准入（Admission）记录仍挡不住两次真实执行。<code>claim_dispatch_atomically</code> 必须在当前执行负责者（Execution Owner）的边界重新检查状态（State）和取消（Cancellation），只交出一个有效许可。</p>
+<p><code>dispatch_same_run_once</code> 还要求执行入口根据同一执行（Run）与有效负责者凭证（Owner Credential）识别重复派发（Dispatch）。如果入口没有这一合同，单靠数据库里一条准入（Admission）记录，不能承诺不重复开跑。函数名字中的 <code>once</code> 是待落实的合同要求，不是语言自带的保证。</p>
+<p>执行入口加载原先冻结的任务（Task）与允许范围，并继续应用当前有效的授权（Authorization）限制。恢复（Recovery）请求不得用新内容替换原任务，也不能延长原期限或重新领取完整预算（Budget）。它启动的是第49章获得派发许可（Dispatch Permit）后的执行骨架，不重新提交一次用户请求。</p>
+<h3 id="确定未开始与没有收到响应不能合并">“确定未开始”与“没有收到响应”不能合并</h3>
+<p>认领（Claim）成功后、派发（Dispatch）尚未发出就崩溃，可以恢复首次派发（Dispatch）。请求已经发出却丢失响应时，则可能已经执行，必须先查询原执行（Run），不能自行改成“尚未开始”。</p>
+<p>若工具（Tool）效果可能已经发生，<code>reconcile_known_facts</code> 还要核对原工具身份（Tool Identity）和外部资源。查到可靠结果时补记事实；查不到时保留未知效果（Unknown Effect），采用该工具（Tool）支持的查询（Query）、有条件的幂等重试（Idempotent Retry）或人工处置。请求身份（Request Identity）本身不提供外部效果的恰好一次（Exactly Once）保证。</p>
+<h3 id="负责者owner变更以后旧执行器executor可能仍在工作">负责者（Owner）变更以后，旧执行器（Executor）可能仍在工作</h3>
+<p>本题先假设由单一负责者（Owner）串行仲裁。若改成可超时接管的租约（Lease），执行入口与事实存储还须检查负责者代际（Owner Generation），拒绝无效旧凭证；这种保护称为隔离令牌检查（Fencing）。</p>
+<p>租约（Lease）过期意味着处理资格需要重新判断，不证明旧工具（Tool）或远端请求已经停止。多个恢复者不能各自看见过期就开跑；新负责者（Owner）获得资格以后，相关资源也必须能识别和拒绝旧代际（Generation）。同一有效代际（Generation）中的重复操作，仍由操作身份（Operation Identity）与幂等（Idempotency）合同处理。</p>
+<p>派发（Dispatch）、停止与终态（Terminal State）的竞争都要回到当前执行负责者（Execution Owner）。已结束的执行（Run）保留原结果；接管不会自动恢复进程栈，也不会扩大授权（Authorization）。</p>
+<h2 id="6-继续理由无效时应保留哪一种失败">6. 继续理由无效时，应保留哪一种失败</h2>
+<p>本题把评估器（Evaluator）不可解析的输出记为“没有得到有效评估”，再按有界错误策略决定重试、等待或停止。它与“有效判断为没有进展”不同：前者缺少可用判断，后者确实给出了判断。把前者直接累加成无进展，会把评估器（Evaluator）故障误写成任务（Task）停滞。</p>
+<p>如果采用 Maka 目标（Goal）的具体策略，需要按第24章已解释的分支处理：<code>evaluatorFailed</code> 时不提交 <code>madeProgress</code>，因而不据此增加停滞计数；预算（Budget）与迭代上限（Iteration Limit）仍需检查。缺失布尔字段而形成有效全假判断，又与无法解析的输出不同。不能仅从“评估失败不算停滞”推断下一次执行（Run）必定开始。</p>
+<p>无论采用哪一种策略，评估器（Evaluator）都需要实际证据。它只能消费得到的输入（Input）；模型（Model）声称“已完成”而缺少测试（Test）或业务结果，不会因为再问一次评估器（Evaluator）就自动变成独立验收（Acceptance）。</p>
+<p>其他三个域也保留自己的失败条件：计划（Plan）的内容已被修订（Revision），旧批准（Approval）不再覆盖新版计划（Plan）；定时任务（Scheduled Task）找不到可靠火次（Fire）身份，不能猜一次新启动；任务图（Agent Graph）的上游终态（Terminal State）存在但产物（Artifact）不可读，不能把依赖当成已经交付。</p>
+<span class="heading-alias" id="5-断线重连时序图" aria-hidden="true"></span><h2 id="7-断线重连建立读侧基线不重放工作">7. 断线重连：建立读侧基线，不重放工作</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="重连后的状态读取 · Reconnection：可滚动示意图"><a href="../../../assets/diagrams/58-orchestration-and-continuity-2.svg"><img src="../../../assets/diagrams/58-orchestration-and-continuity-2.svg" alt="首次派发后客户端断线，宿主与普通执行器仍存活并保存结果。新连接按所选快照（Snapshot）与游标（Cursor）合同重建读侧基线，不重放原任务命令。" width="1073" height="893" loading="lazy" style="width:1073px;min-width:913px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这张图固定为首次获准派发（Dispatch）后客户端（Client）断线，宿主（Host）与普通执行器（Executor）仍存活。重复任务请求按第4–5节查询或恢复（Recovery）原执行（Run）；图中重连请求只取得观察基线，不创建新的工作身份（Work Identity）。</p>
+<p>快照（Snapshot）给当前状态，游标（Cursor）给相应更新流的位置。两者要属于同一套可解释的合同：若取得快照（Snapshot）后才开始订阅（Subscription），中间恰好发生的新结果可能漏掉。本题可选带回放能力的游标（Replayable Cursor），或先缓冲订阅（Subscription）更新再与快照（Snapshot）衔接；仅写“先 <code>GET</code> 后 <code>subscribe</code>”不能证明没有间隙。</p>
+<p>这是一份通用设计合同。Maka 第25章的真实新连接会创建新订阅（Subscription）身份，并以 <code>nextSequence=1</code> 和当前快照（Snapshot）建立基线。旧订阅（Subscription）收到序号（Sequence）41，不意味着新订阅应从42继续。原逻辑流仍存活、只更换传输路径的情形，又与新建连接不同。</p>
+<p>序号（Sequence）帮助发现该流中的缺口；代际（Epoch）可区分不兼容的宿主（Host）或状态范围，具体含义由协议规定。发现缺口后应重建匹配基线，不能让缺少前缀的增量继续假装完整。它们不会自动恢复进程栈，也不证明工作文件、环境或远端资源已经迁移；当前投影（Projection）可恢复，也不等于所有历史通知（Notification）都能逐条重播。</p>
+<span class="heading-alias" id="6-正常与失败走读" aria-hidden="true"></span><h2 id="8-沿同一定时任务scheduled-task走读正常与失败">8. 沿同一定时任务（Scheduled Task）走读正常与失败</h2>
+<p>正常路径沿第4节的 <code>daily-check</code>：保存用户的只读要求，明天到点认领（Claim）<code>one-specific-fire</code>，将原触发身份（Trigger Identity）绑定到一次执行（Run），取得许可后开展检查，保存结果与终态（Terminal State），再由定时任务（Scheduled Task）控制者记录该次结果。用户重连读取这份已有记录，不再次触发检查。</p>
+<p>每一步新增的事实不同。到点不证明已接纳；接纳不证明已检查；终态（Terminal State）也要结合结果内容，才能说明 README 是否符合要求。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 8. 沿同一定时任务（Scheduled Task）走读正常与失败"><table><caption>表 4 / Table 4 · 8. 沿同一定时任务（Scheduled Task）走读正常与失败</caption><thead><tr><th scope="col">故障条件</th><th scope="col">当前已经知道的事实</th><th scope="col">完整参考处理</th></tr></thead><tbody><tr><td>重复触发（Trigger）：接纳后、展示状态更新前崩溃</td><td>原火次（Fire）已绑定执行（Run），展示仍待处理</td><td>按原身份查到已有准入（Admission），依据原执行（Run）的阶段选择查询、首次派发（Dispatch）或对账（Reconciliation），并修复投影（Projection）；不因展示落后再创建工作</td></tr>
+<tr><td>取消（Cancellation）发生在准入（Admission）前</td><td>当前意图尚未绑定执行（Run）</td><td>同一负责者（Owner）拒绝旧意图，并保存原因</td></tr>
+<tr><td>取消（Cancellation）发生在准入（Admission）后</td><td>原执行（Run）已存在，可能尚未启动或已开始</td><td>定位原身份请求停止，结算已开始效果（Effect）；不删除绑定来假装从未接纳</td></tr>
+<tr><td>取消（Cancellation）到达时原结果已经完成</td><td>原终态（Terminal State）与效果（Effect）已有可靠记录</td><td>保留事实，禁止后续不再获准的工作；取消不回滚已完成结果</td></tr>
+<tr><td>用户界面（UI）落后</td><td>界面仍显示 <code>running</code>，持久结果已经终结</td><td>修复客户端（Client）投影（Projection），不让界面回写 <code>running</code> 覆盖事实</td></tr></tbody></table></div>
+<p>这张表中的恢复（Recovery）可能只更新记录和展示，也可能处理未派发（Dispatch）工作或未知效果（Unknown Effect）。是否需要模型（Model）参与，取决于真实未完成的工作；不能把所有故障都写成“重新调用模型”。</p>
+<span class="heading-alias" id="7-递进追问" aria-hidden="true"></span><h2 id="9-递进追问与参考答案">9. 递进追问与参考答案</h2>
+<p><strong>为什么不能只使用一张 <code>background_tasks</code> 表？</strong></p>
+<p>可以共用存储技术，但仍须表达批准（Approval）、目标评估（Goal Evaluation）、触发身份（Trigger Identity）与依赖（Dependency）的不同约束。一张表不是问题；无差别的 <code>status != done → run</code> 会遗漏合法继续条件。同样，保存了状态字段，不证明派发（Dispatch）入口已经消费它。</p>
+<p><strong>目标（Goal）没有完成，就一直调用模型（Model）可以吗？</strong></p>
+<p>必须限制预算（Budget）与重试，区分有进展、无进展、评估不可用和真正完成。自动继续（Continuation）不扩大授权（Authorization）。如果目标（Goal）无法在现有范围内达成，就要说明缺少的条件并按策略处理；不能靠增加轮次越过用户明确拒绝的路径。</p>
+<p><strong>用户关闭窗口以后一定继续吗？</strong></p>
+<p>取决于执行负责者（Execution Owner）的实际寿命和宿主（Host）驻留合同。网络连接断开、用户界面（UI）退出、宿主（Host）退出和机器关机，是不同事件（Event）。逻辑责任仍然存在，不等于持有该责任的进程永远存活。</p>
+<p><strong>多台机器可以同时当负责者（Owner）吗？</strong></p>
+<p>这会增加协调、租约（Lease）、隔离令牌检查（Fencing）与资源归属问题。先明确哪些资源允许并行负责，哪些状态要求唯一写入者（Writer），再定义旧负责者（Owner）的请求如何被拒绝。单机执行（Run）标识不会自动成为分布式互斥（Distributed Mutual Exclusion）。</p>
+<span class="heading-alias" id="8-取舍验证与自测" aria-hidden="true"></span><span class="heading-alias" id="8-取舍与三个断线窗口" aria-hidden="true"></span><h2 id="10-取舍与三个断线窗口failure-window">10. 取舍与三个断线窗口（Failure Window）</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 10. 取舍与三个断线窗口（Failure Window）"><table><caption>表 5 / Table 5 · 10. 取舍与三个断线窗口（Failure Window）</caption><thead><tr><th scope="col">选择</th><th scope="col">主要收益</th><th scope="col">必须检查的边界</th></tr></thead><tbody><tr><td>单宿主（Host）与可重连客户端（Client）</td><td>执行归属关系较简单</td><td>快照（Snapshot）与增量的间隙、重复命令（Command）</td></tr>
+<tr><td>持久控制域（Control Domain）与对账（Reconciliation）</td><td>可以核对触发状态与原绑定</td><td>准入（Admission）前后崩溃、旧修订（Revision）与冻结内容</td></tr>
+<tr><td>任务图（Agent Graph）调度（Scheduling）</td><td>工作可拆分，依赖（Dependency）显式</td><td>部分失败、产物（Artifact）不可读与取消（Cancellation）竞争</td></tr>
+<tr><td>多机接管（Failover）</td><td>主机故障时可移交控制责任</td><td>隔离令牌检查（Fencing）、外部资源可达性与环境恢复（Recovery）</td></tr></tbody></table></div>
+<p>最后把本题的三个断线窗口逐一闭合：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 10. 取舍与三个断线窗口（Failure Window）"><table><caption>表 6 / Table 6 · 10. 取舍与三个断线窗口（Failure Window）</caption><thead><tr><th scope="col">故障窗口（Failure Window）</th><th scope="col">可靠事实</th><th scope="col">完整处理与限制</th></tr></thead><tbody><tr><td>请求已接纳，响应丢失</td><td>已存在执行意图（Execution Intent）到执行（Run）的绑定</td><td>按原身份查询；若允许同身份重发，仍核对同一载荷（Payload）与当前查询权，返回既有绑定，不另建执行（Run）</td></tr>
+<tr><td>客户端（Client）断线，宿主（Host）与普通执行器（Executor）仍工作</td><td>原执行（Run）可以继续保存结果</td><td>新客户端（Client）重建快照（Snapshot）与订阅（Subscription）基线，发现并处理更新缺口，不重复任务命令（Command）</td></tr>
+<tr><td>宿主（Host）也退出</td><td>只保留已持久提交的身份（Identity）与结果</td><td>新宿主（Host）先确认有效控制责任，再按真实恢复（Recovery）合同分类未结束执行（Run）；没有进程或环境恢复能力时记录中断，不宣称原栈继续</td></tr></tbody></table></div>
+<p>如果工具执行能力原本由断开的客户端（Client）提供，第二行的存活前提就不成立。例如客户端能力（Client Capability）失联后，宿主（Host）即使仍在，也不能假装浏览器动作已经成功；需分别处理能力丢失与未知效果（Unknown Effect）。</p>
+<p>三个窗口共同要求定位原工作、保留实际效果（Effect）并重新核对当前许可。只有查清缺少的是启动、结果还是观察基线，才能决定补哪一步。</p>
+<p>相关机制：<a href="24-continuation-and-orchestration.html">第24章触发（Trigger）与准入（Admission）</a>、<a href="25-host-and-client.html">第25章宿主（Host）与连接连续性（Connection Continuity）</a>、<a href="49-agent-architecture.html">第49章代码代理（Code Agent）修复流程</a>。</p>
 <hr>
-<p><a href="57-skills-and-subagents.html">上一章：第 57 章｜选择 Skills 与子 Agent</a> · <a href="59-evaluation-and-progress.html">下一章：第 59 章｜评价设计与任务进展</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="57-skills-and-subagents.html"><span>← 上一章</span><strong>第 57 章｜选择 Skills 与子 Agent</strong></a><a href="59-evaluation-and-progress.html"><span>下一章 →</span><strong>第 59 章｜评价设计与任务进展</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E4%B8%8E%E7%BA%A6%E6%9D%9F">1. 原题与约束</a></li><li class="toc-level-2"><a href="#2-%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 参考方案</a></li><li class="toc-level-2"><a href="#3-%E4%B8%BB%E5%9B%BE%E4%B8%8D%E5%90%8C%E8%A7%A6%E5%8F%91%E8%BF%9B%E5%85%A5%E5%85%B1%E5%90%8C%E6%89%A7%E8%A1%8C">3. 主图：不同触发进入共同执行</a></li><li class="toc-level-2"><a href="#4-%E6%8E%A7%E5%88%B6%E5%A5%91%E7%BA%A6%E4%B8%8E%E5%85%B7%E4%BD%93%E7%8A%B6%E6%80%81">4. 控制契约与具体状态</a></li><li class="toc-level-2"><a href="#5-%E6%96%AD%E7%BA%BF%E9%87%8D%E8%BF%9E%E6%97%B6%E5%BA%8F%E5%9B%BE">5. 断线重连时序图</a></li><li class="toc-level-2"><a href="#6-%E6%AD%A3%E5%B8%B8%E4%B8%8E%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB">6. 正常与失败走读</a></li><li class="toc-level-2"><a href="#7-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE">7. 递进追问</a></li><li class="toc-level-2"><a href="#8-%E5%8F%96%E8%88%8D%E4%B8%8E%E4%B8%89%E4%B8%AA%E6%96%AD%E7%BA%BF%E7%AA%97%E5%8F%A3">8. 取舍与三个断线窗口</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="57-skills-and-subagents.html">上一章：第 57 章｜选择技能说明包（Skill）与子代理（Subagent）</a> · <a href="59-evaluation-and-progress.html">下一章：第 59 章｜评价设计与任务进展</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="57-skills-and-subagents.html"><span>← 上一章</span><strong>第 57 章｜选择技能说明包（Skill）与子代理（Subagent）</strong></a><a href="59-evaluation-and-progress.html"><span>下一章 →</span><strong>第 59 章｜评价设计与任务进展</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E7%BB%A7%E7%BB%AD%E5%90%8C%E4%B8%80%E4%BB%BD%E5%B7%A5%E4%BD%9C%E9%9C%80%E8%A6%81%E4%BF%9D%E7%95%99%E5%93%AA%E4%BA%9B%E5%8C%BA%E5%88%AB">前情回顾：继续同一份工作，需要保留哪些区别</a></li><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E4%B8%8E%E6%98%8E%E7%A1%AE%E5%81%87%E8%AE%BE">1. 原题与明确假设</a></li><li class="toc-level-2"><a href="#2-%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88%E6%8E%A7%E5%88%B6%E8%80%85%E5%85%88%E7%BB%99%E7%90%86%E7%94%B1%E6%89%A7%E8%A1%8C%E5%99%A8executor%E5%86%8D%E5%81%9A%E5%B7%A5%E4%BD%9C">2. 参考方案：控制者先给理由，执行器（Executor）再做工作</a></li><li class="toc-level-2"><a href="#3-%E4%B8%BB%E5%9B%BE%E8%A7%A6%E5%8F%91trigger%E6%80%8E%E6%A0%B7%E8%BF%9B%E5%85%A5%E5%85%B1%E5%90%8C%E6%89%A7%E8%A1%8Crun">3. 主图：触发（Trigger）怎样进入共同执行（Run）</a></li><li class="toc-level-2"><a href="#4-%E6%8E%A5%E7%BA%B3%E5%90%88%E5%90%8C%E5%9B%BA%E5%AE%9A%E5%86%85%E5%AE%B9%E5%86%8D%E5%86%B3%E5%AE%9A%E5%88%9B%E5%BB%BA%E8%BF%98%E6%98%AF%E6%9F%A5%E8%AF%A2">4. 接纳合同：固定内容，再决定创建还是查询</a></li><li class="toc-level-3"><a href="#%E5%85%88%E7%BB%99-intent-%E4%B8%AD%E6%AF%8F%E4%B8%AA%E8%BE%93%E5%85%A5input%E4%B8%80%E4%B8%AA%E6%9D%A5%E6%BA%90">先给 intent 中每个输入（Input）一个来源</a></li><li class="toc-level-3"><a href="#%E8%BA%AB%E4%BB%BD%E7%9B%B8%E5%90%8C%E4%B9%9F%E8%A6%81%E6%A0%B8%E5%AF%B9%E5%86%85%E5%AE%B9%E4%B8%8E%E5%BD%93%E5%89%8D%E6%9D%83%E5%88%A9">身份相同，也要核对内容与当前权利</a></li><li class="toc-level-2"><a href="#5-%E6%B4%BE%E5%8F%91dispatch%E4%B8%8E%E6%81%A2%E5%A4%8Drecovery%E5%85%88%E7%A1%AE%E5%AE%9A%E5%8E%9F%E6%89%A7%E8%A1%8Crun%E5%A4%84%E4%BA%8E%E5%93%AA%E9%87%8C">5. 派发（Dispatch）与恢复（Recovery）：先确定原执行（Run）处于哪里</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%AF%BB%E5%8F%96%E4%BB%A5%E5%90%8E%E8%BF%98%E8%A6%81%E5%86%8D%E8%AE%A4%E9%A2%86claim">为什么读取以后还要再认领（Claim）</a></li><li class="toc-level-3"><a href="#%E7%A1%AE%E5%AE%9A%E6%9C%AA%E5%BC%80%E5%A7%8B%E4%B8%8E%E6%B2%A1%E6%9C%89%E6%94%B6%E5%88%B0%E5%93%8D%E5%BA%94%E4%B8%8D%E8%83%BD%E5%90%88%E5%B9%B6">“确定未开始”与“没有收到响应”不能合并</a></li><li class="toc-level-3"><a href="#%E8%B4%9F%E8%B4%A3%E8%80%85owner%E5%8F%98%E6%9B%B4%E4%BB%A5%E5%90%8E%E6%97%A7%E6%89%A7%E8%A1%8C%E5%99%A8executor%E5%8F%AF%E8%83%BD%E4%BB%8D%E5%9C%A8%E5%B7%A5%E4%BD%9C">负责者（Owner）变更以后，旧执行器（Executor）可能仍在工作</a></li><li class="toc-level-2"><a href="#6-%E7%BB%A7%E7%BB%AD%E7%90%86%E7%94%B1%E6%97%A0%E6%95%88%E6%97%B6%E5%BA%94%E4%BF%9D%E7%95%99%E5%93%AA%E4%B8%80%E7%A7%8D%E5%A4%B1%E8%B4%A5">6. 继续理由无效时，应保留哪一种失败</a></li><li class="toc-level-2"><a href="#7-%E6%96%AD%E7%BA%BF%E9%87%8D%E8%BF%9E%E5%BB%BA%E7%AB%8B%E8%AF%BB%E4%BE%A7%E5%9F%BA%E7%BA%BF%E4%B8%8D%E9%87%8D%E6%94%BE%E5%B7%A5%E4%BD%9C">7. 断线重连：建立读侧基线，不重放工作</a></li><li class="toc-level-2"><a href="#8-%E6%B2%BF%E5%90%8C%E4%B8%80%E5%AE%9A%E6%97%B6%E4%BB%BB%E5%8A%A1scheduled-task%E8%B5%B0%E8%AF%BB%E6%AD%A3%E5%B8%B8%E4%B8%8E%E5%A4%B1%E8%B4%A5">8. 沿同一定时任务（Scheduled Task）走读正常与失败</a></li><li class="toc-level-2"><a href="#9-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE%E4%B8%8E%E5%8F%82%E8%80%83%E7%AD%94%E6%A1%88">9. 递进追问与参考答案</a></li><li class="toc-level-2"><a href="#10-%E5%8F%96%E8%88%8D%E4%B8%8E%E4%B8%89%E4%B8%AA%E6%96%AD%E7%BA%BF%E7%AA%97%E5%8F%A3failure-window">10. 取舍与三个断线窗口（Failure Window）</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

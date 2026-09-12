@@ -6,7 +6,7 @@
 <p><strong>关系主线</strong>：先选安全范围，再生成、验证和保存候选，最后由后续消费者（Consumer）重新核对并采用。来源一致、提交成功、语义准确和请求可容纳，是四项不同判断。</p>
 </blockquote>
 <h2 id="前情回顾已有结果怎样成为下一次依据">前情回顾：已有结果怎样成为下一次依据</h2>
-<p><a href="15-model-context.html">第15章</a>区分了历史（History）与上下文（Context）：前者保存发生过的记录，后者是本次真正送给模型（Model）的材料。<a href="18-effects-and-recovery.html">第18章</a>进一步说明，工具效果（Effect）与持久结果不是同一时刻发生；结果结算边界T2可以记录成功、失败或效果未知。这里的T2是协议阶段标签，不是工作轮次（Turn）的编号。</p>
+<p><a href="15-model-context.html">第15章</a>区分了历史（History）与上下文（Context）：前者保存发生过的记录，后者是本次真正送给模型（Model）的材料。<a href="18-effects-and-recovery.html">第18章</a>进一步说明，工具效果（Effect）与持久结果不是同一时刻发生；结果结算边界T2可以记录成功、失败或未知效果（Unknown Effect）。这里的T2是协议阶段标签，不是工作轮次（Turn）的编号。</p>
 <p>本章处理这些记录<strong>以后怎样被表示</strong>。已经失败的测试（Test）不能因整理而变成成功，尚未确定的效果（Effect）也不能由摘要（Summary）补成已完成。上下文压缩（Context Compaction）不执行缺失的工具（Tool），不保存旧进程的调用栈，也不代替工具结果（Tool Result）结算。</p>
 <p>继续采用<a href="12-request-lifecycle.html">第12章</a>的教学分支：会话（Session）S1中的工作轮次（Turn）T7，由执行（Run）R7完成README入口更正。函数原本正确，四个既有测试（Test）原本通过；本次只允许修改README，将 <code>npm run check</code> 改为 <code>npm test</code>，最后用中文解释。下面为S1增加较长旧记录；这些身份、日志大小和历史分段都是教学条件，不是新增执行轨迹（Trajectory）。</p>
 <span class="heading-alias" id="核心路径给有限工作台整理材料" aria-hidden="true"></span><h2 id="从历史history到本次上下文context">从历史（History）到本次上下文（Context）</h2>

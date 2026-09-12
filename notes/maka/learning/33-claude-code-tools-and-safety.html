@@ -6,7 +6,7 @@
 <p><strong>关系主线</strong>：先理解控制发生的时点，再检查最终输入和实际执行路径；工具（Tool）被找到不代表获准，事后反馈也不能撤销既有变化。</p>
 </blockquote>
 <h2 id="前情回顾权限permission隔离isolation与结果各回答什么">前情回顾：权限（Permission）、隔离（Isolation）与结果各回答什么？</h2>
-<p><a href="17-permissions-and-sandbox.html">第17章</a>区分了权限（Permission）与隔离（Isolation）：前者回答某项行动请求（Action）是否允许，后者限制实际执行能够访问什么。允许运行一个测试入口，并不等于它递归调用的所有脚本都只会测试。<a href="31-tool-contracts.html">第31章</a>进一步说明，工具调用（Tool Call）需要合法参数、有效授权和可解释的结果；缺少回执时，效果未知（Outcome Unknown）不能被改写成“没有执行”。</p>
+<p><a href="17-permissions-and-sandbox.html">第17章</a>区分了权限（Permission）与隔离（Isolation）：前者回答某项行动请求（Action）是否允许，后者限制实际执行能够访问什么。允许运行一个测试入口，并不等于它递归调用的所有脚本都只会测试。<a href="31-tool-contracts.html">第31章</a>进一步说明，工具调用（Tool Call）需要合法参数、有效授权和可解释的结果；缺少回执时，未知效果（Unknown Effect）不能被改写成“没有执行”。</p>
 <p>本章沿用<a href="30-claude-code-loop-and-context.html">第30章</a>的 Python 扫描器：<code>scan.py</code> 在路径含空格时失败，README 的命令也有问题。用户允许修改相关实现、必要回归测试和 README，要求保留已有配置差异，并禁止上传仓库或发布内容。我们研究这些约束怎样进入运行支撑（Agent Harness）的工具控制；以下是公开产品合同与教学推演，不是一次真实 Claude Code 运行，也不假定其内部类型与 Maka 相同。</p>
 <span class="heading-alias" id="2-第一张图事前与事后有不可交换的位置" aria-hidden="true"></span><h2 id="1-同一次写入检查放在哪里会改变结论">1. 同一次写入，检查放在哪里会改变结论</h2>
 <p>先暂时增加一个明确的教学变体：用户允许在指定输出目录生成 <code>report.md</code>。这个文件只用于解释报告写入，不扩大上述扫描器修复题的文件范围。</p>
@@ -24,7 +24,7 @@
 <tr><td>请求（Request）</td><td>输入是否指向正确对象？</td><td>一个空格路径被拆成两个参数</td><td>工具名、字段与参数边界</td></tr>
 <tr><td>决策（Decision）</td><td>当前调用是否允许？</td><td>匹配拒绝（Deny）或需要询问（Ask）</td><td>权限规则（Permission Rule）与相关钩子（Hook）</td></tr>
 <tr><td>执行（Execution）</td><td>进程实际上能访问什么？</td><td>命令已启动，但文件或网络访问被限制</td><td>对应执行环境与沙箱（Sandbox）</td></tr>
-<tr><td>反馈（Feedback）</td><td>返回内容说明了什么？</td><td>断言失败，或远端超时后效果未知（Outcome Unknown）</td><td>真实输出、目标现态与后续检查</td></tr></tbody></table></div>
+<tr><td>反馈（Feedback）</td><td>返回内容说明了什么？</td><td>断言失败，或远端超时后未知效果（Unknown Effect）</td><td>真实输出、目标现态与后续检查</td></tr></tbody></table></div>
 <p>这五层解释了为什么同一句“工具（Tool）报错”不足以决定重试（Retry）。找不到定义不等于业务对象不存在；认证（Authentication）失败也不等于查询结果为空；超时不一定意味着远端没有处理请求。</p>
 <p>工具（Tool）接口越通用，参数中承载的语义越多。<code>Bash(command)</code> 可以读取文件、运行测试、修改仓库或连接网络。<strong>允许 Bash 与允许本次测试的授权粒度不同。</strong> 前者开放一种执行入口，后者仍依赖具体命令、被加载的脚本和运行环境。</p>
 <span class="heading-alias" id="4-权限规则冲突时谁获胜" aria-hidden="true"></span><h2 id="3-权限规则permission-rule具体允许allow为何不能覆盖拒绝deny">3. 权限规则（Permission Rule）：具体允许（Allow）为何不能覆盖拒绝（Deny）？</h2>
@@ -103,7 +103,7 @@ otherwise:
 <p>三种条件变化会改变后续动作。第三项另设用户明确允许创建一次远端报告的变体，不扩大原题的发布范围：</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 7. 把正常修复与三种失败连起来"><table><caption>表 5 / Table 5 · 7. 把正常修复与三种失败连起来</caption><thead><tr><th scope="col">变化</th><th scope="col">应保留的事实</th><th scope="col">后续处理</th></tr></thead><tbody><tr><td>文件写出后，格式化钩子（Hook）失败</td><td>写入效果（Effect）已经发生，事后处理失败</td><td>读取现态与相关日志，再补修；不能说此前未执行</td></tr>
 <tr><td>前置钩子（PreToolUse Hook）改写输入，遗漏必要字段</td><td>最终参数与原提案不同，可能不满足工具格式</td><td>补全必要字段并重新检查；不能假设自动局部合并</td></tr>
-<tr><td>远端创建报告后超时</td><td>回执缺席，效果未知（Outcome Unknown）</td><td>按稳定业务标识查询，再决定补发、补偿（Compensation）或报告限制</td></tr></tbody></table></div>
+<tr><td>远端创建报告后超时</td><td>回执缺席，未知效果（Unknown Effect）</td><td>按稳定业务标识查询，再决定补发、补偿（Compensation）或报告限制</td></tr></tbody></table></div>
 <p>最后一行是本课程希望系统闭合的恢复（Recovery）责任，不宣称 Claude Code 已有某个内部幂等协议。用户取消时同样先区分：尚未发送的调用可阻止，已发生的效果（Effect）要检查，无法查询的远端结果保持未知。取消（Cancellation）不会使时间倒流。</p>
 <p>少询问、强边界与可恢复性各有代价。精确允许（Allow）减少重复交互，但参数变化要重新匹配；动态钩子（Hook）更灵活，却增加自身出错和漏匹配的可能；沙箱（Sandbox）需要平台支持和资源配置；事后验证（Post-execution Verification）能检查质量，但失败发生时可能已经需要补救。理解各自位置，才能解释它们为何同时存在。</p>
 <span class="heading-alias" id="10-自测与完整参考答案" aria-hidden="true"></span><span class="heading-alias" id="10-常见场景与完整参考结论" aria-hidden="true"></span><h2 id="8-场景问答从观察得出有限结论">8. 场景问答：从观察得出有限结论</h2>

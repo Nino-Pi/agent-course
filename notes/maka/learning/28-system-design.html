@@ -6,7 +6,7 @@
 <p><strong>关系主线</strong>：从任务合同（Task Contract）确定身份（Identity）和负责者（Owner），连接模型（Model）输入（Input）、工具（Tool）与结果，再沿故障时间线检验哪些保证成立、哪些复杂度值得增加。</p>
 </blockquote>
 <h2 id="前情回顾把六组职责放回同一项任务task">前情回顾：把六组职责放回同一项任务（Task）</h2>
-<p>第27章区分交接（Handoff）资料、当前要求与当前产物：接手者必须重新判断哪些观察（Observation）仍适用。第13–18章建立了身份（Identity）、事实（Fact）、投影（Projection）、工具（Tool）结算（Settlement）与效果未知（Unknown Effect）；第19–20章说明压缩和记忆（Memory）改变模型（Model）本次能读到什么；第23–26章再讨论分工、接续（Continuation）与验收（Acceptance）。</p>
+<p>第27章区分交接（Handoff）资料、当前要求与当前产物：接手者必须重新判断哪些观察（Observation）仍适用。第13–18章建立了身份（Identity）、事实（Fact）、投影（Projection）、工具（Tool）结算（Settlement）与未知效果（Unknown Effect）；第19–20章说明压缩和记忆（Memory）改变模型（Model）本次能读到什么；第23–26章再讨论分工、接续（Continuation）与验收（Acceptance）。</p>
 <p>本章用这些知识做设计判断：先写清修复合同，再找每个决定的负责者（Owner），然后检查读取、执行和记录之间的间隔。先读完前六节，可以形成一套完整的设计；后面的真实循环与输入（Input）队列（Queue）用于检验这些职责怎样接到具体消费者（Consumer）。</p>
 <span class="heading-alias" id="1-先把做一个代码-agent变成任务合同" aria-hidden="true"></span><span class="heading-alias" id="1-从修复目标到任务合同" aria-hidden="true"></span><h2 id="1-从修复目标到任务合同task-contract">1. 从修复目标到任务合同（Task Contract）</h2>
 <p>这里重新使用函数尚未修好的初态：<code>formatDuration</code> 以 <code>% 100</code> 求余，125秒显示 <code>2:25</code>，目标是 <code>2:05</code>；README 仍写错误命令 <code>npm run check</code>，项目实际入口为 <code>npm test</code>，执行 <code>node --test</code>。允许修改 <code>src/duration.js</code> 与 <code>README.md</code>，保留用户已有说明和测试、配置等其他文件，并用中文汇报。这是设计推演，初态不同于第27章已经修好函数的 W1 状态（State），也不是新增运行记录。</p>
