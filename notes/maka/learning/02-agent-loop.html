@@ -1,283 +1,195 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 02 章｜Agent Loop 的执行过程 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 02 / 62</div><article id="main-content"><span class="heading-alias" id="a01run--step--query--execute跟着源码走完一轮-agent-loop" aria-hidden="true"></span><span class="heading-alias" id="a01agent-loop-的执行过程" aria-hidden="true"></span><h1 id="第-02-章agent-loop-的执行过程">第 02 章｜Agent Loop 的执行过程</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 02 章｜代理循环（Agent Loop）的执行过程 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 02 / 62</div><article id="main-content"><span class="heading-alias" id="a01run--step--query--execute跟着源码走完一轮-agent-loop" aria-hidden="true"></span><span class="heading-alias" id="a01agent-loop-的执行过程" aria-hidden="true"></span><span class="heading-alias" id="第-02-章agent-loop-的执行过程" aria-hidden="true"></span><h1 id="第-02-章代理循环agent-loop的执行过程">第 02 章｜代理循环（Agent Loop）的执行过程</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：一次请求怎样经过多轮模型与命令调用，并在预算、完成信号或异常出现时停下？</p>
-<p><strong>关键概念</strong>：run（外层循环）控制整体执行；step（单步推进）连接查询与动作批次；messages（消息列表）保存当前输入材料；observation（观察消息）表达执行结果。</p>
-<p><strong>关系主线</strong>：正常步骤把模型动作交给环境，再将普通结果追加到消息中；外层循环处理终止与保存。批次中断、未处理异常和硬终止会留下不同的消息与轨迹状态。</p>
+<p><strong>核心问题</strong>：上一轮的执行结果怎样进入下一轮判断？循环为何会继续，又凭什么停下？</p>
+<p><strong>关键概念</strong>：代理循环（Agent Loop）连接决策与执行；单步推进（Step）完成一次查询与动作批次（Action Batch）；消息列表（Message List）保存当前输入；观察消息（Observation Message）是承载观察结果（Observation）、供后续调用读取的消息（Message）。</p>
+<p><strong>关系主线</strong>：先跟随同一项文档修复，观察材料怎样增长，再映射到 <code>run</code>、<code>step</code>、<code>query</code> 与 <code>execute_actions</code>，最后解释预算（Budget）、批次中断与保存边界。</p>
 </blockquote>
 <h2 id="前情回顾">前情回顾</h2>
-<p><a href="01-agent-components.html">第 01 章</a>区分了三个角色：模型根据当前材料提出下一步，工具在工作环境里执行动作，Harness 负责组织输入并控制运行。模型说“读取文件”时，文件还没有因此被读到；只有执行结果回到下一次输入，模型才有机会据此改变判断。这正是本章要展开的循环。</p>
-<p>本章沿用“只修 README 测试命令”的任务：读取配置与说明、把错误入口改成 <code>npm test</code>、检查并交付。项目代码假设正常；下面四步和消息片段是教学示意，涉及真实函数修复的片段会另行交代。阅读时先追踪一件事：<strong>本轮产生的结果，在哪一步变成下一轮能看到的材料？</strong></p>
-<span class="heading-alias" id="核心阅读" aria-hidden="true"></span><span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><h2 id="defaultagent-的执行循环">DefaultAgent 的执行循环</h2>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="DefaultAgent 的执行循环：可滚动示意图"><a href="../../../assets/diagrams/02-agent-loop-1.svg"><img src="../../../assets/diagrams/02-agent-loop-1.svg" alt="DefaultAgent 先初始化消息，再检查预算并请求模型；执行整批动作、统一格式化并追加观察后进入下一 step，回边不重新初始化 messages。" width="720" height="893" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p><code>query</code> 取得并追加模型消息，<code>execute_actions</code> 执行整批动作，整批返回后才把 observations 放进下一次模型输入。最外侧的回边表示下一 step，不表示重新初始化消息。这张图展示直接使用 <code>DefaultAgent</code> 的正常循环；普通回答文案不是退出信号，程序会根据完成信号、限制或异常转入相应结束分支。</p>
-<h3 id="python-最小阅读卡">Python 最小阅读卡</h3>
-<p>读本章代码时，先认清“数据放在哪里”与“哪一行使程序继续或停下”。对象（Object）可以同时保存数据和提供操作；按 <code>DefaultAgent</code> 这个类创建的一个具体对象叫实例（Instance），本章的 <code>self</code> 指当前这个实例。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · Python 最小阅读卡"><table><caption>表 1 / Table 1 · Python 最小阅读卡</caption><thead><tr><th scope="col">本章写法</th><th scope="col">怎样读</th><th scope="col">空值或缺失时怎样</th></tr></thead><tbody><tr><td><code>self.messages</code></td><td>当前实例的消息列表；点号取得对象的属性</td><td>列表可以存在但没有消息，即 <code>[]</code></td></tr>
-<tr><td><code>messages[0]</code>、<code>messages[-1]</code></td><td>列表（List）从 0 编号；<code>-1</code> 读取最后一项</td><td>空列表没有最后一项，读取 <code>[-1]</code> 会抛出 <code>IndexError</code>，不是返回空消息</td></tr>
-<tr><td><code>message[&quot;role&quot;]</code>、<code>message.get(&quot;role&quot;)</code></td><td>字典（Dictionary）用键取值；这里键是字符串 <code>&quot;role&quot;</code></td><td>键不存在时，前者抛出 <code>KeyError</code>，后者返回 <code>None</code>，表示没有取到值</td></tr>
-<tr><td><code>message.get(&quot;extra&quot;, {})</code></td><td>读取 <code>extra</code>；键缺失时使用默认值（Default）空字典 <code>{}</code></td><td>默认值只在键缺失时使用；键存在但值为 <code>None</code> 时仍返回 <code>None</code>，不会补写原字典</td></tr>
-<tr><td><code>self.query()</code>、<code>messages.append(message)</code></td><td>调用对象的方法（Method）；括号中是交给它的输入，空括号表示这里没有额外参数</td><td>调用可能读取或改变状态，须看方法实现；<code>append</code> 把一项加到原列表末尾</td></tr></tbody></table></div>
-<p>下面三行摘自真实 <code>run()</code> 的末尾。到这里，前面已经建立非空消息列表并尝试推进一步；<code>if</code> 和 <code>break</code> 仍位于循环中，最后的 <code>return</code> 位于循环之后。缩进表示这些层级，<code>==</code> 比较是否相等：</p>
-<pre><code class="language-python">    if self.messages[-1].get(&quot;role&quot;) == &quot;exit&quot;:
-        break
-return self.messages[-1].get(&quot;extra&quot;, {})</code></pre>
-<ul>
-<li><strong>读取什么？</strong> 第一行先取当前列表的最后一条消息，再取它的 <code>role</code>。若最后一条是 <code>{&quot;role&quot;: &quot;exit&quot;, &quot;extra&quot;: {&quot;exit_status&quot;: &quot;Submitted&quot;}}</code>，比较结果为真。</li>
-<li><strong>改变什么？</strong> 这几行没有追加消息，也没有修改字典；<code>break</code> 只结束所在循环。若 <code>role</code> 缺失，<code>.get(&quot;role&quot;)</code> 返回 <code>None</code>，与 <code>&quot;exit&quot;</code> 不相等，本轮不会由这句 <code>break</code> 退出；若整个列表为空，取末项时就已报错，还到不了 <code>.get</code>。</li>
-<li><strong>返回什么？</strong> 离开循环后，<code>return</code> 把最后一条消息的 <code>extra</code> 交回调用者；上例得到 <code>{&quot;exit_status&quot;: &quot;Submitted&quot;}</code>。若 <code>extra</code> 键缺失，得到 <code>{}</code>。停止原因要读返回字段，不能只凭“循环结束”认定任务成功。</li>
-</ul>
-<p>下面回到正常路径。<code>def</code> 定义一个函数，调用函数时才执行它的内容；<code>=</code> 把右侧得到的值交给左侧名字或属性，区别于上面的相等比较 <code>==</code>。例如 <code>self.messages = []</code> 会让这个实例改用新建的空列表。</p>
-<span class="heading-alias" id="先看最小伪代码" aria-hidden="true"></span><h3 id="正常路径的伪代码">正常路径的伪代码</h3>
-<p>如果去掉模板、成本统计、异常类型和保存逻辑，<code>DefaultAgent</code> 的主干可以被压缩成：</p>
-<p>下面用 Python 表达顺序。<code>run(task)</code> 表示将任务作为输入交给 run；<code>messages</code> 保存一组消息，<code>while</code> 表示按条件重复。<code>[处理动作 for action in 动作列表]</code> 叫列表推导：依次处理每项并收集成新列表。<code>append</code> 加入一项，<code>extend</code> 则依次加入另一列表里的每项；这里先收齐 outputs，随后才用 <code>extend</code> 将观察加入消息列表。</p>
+<p><a href="01-agent-components.html">第01章</a>区分了模型（Model）、运行支撑（Agent Harness）和执行环境（Environment）：前者依据当前材料提出下一步，中间一层组织输入并控制执行，后者承接对文件与进程的实际操作。行动请求（Action）表达意图；观察结果（Observation）是执行后取得的材料。只有这些材料进入后续输入，下一次判断才有机会使用它们。</p>
+<p>本章沿用同一项任务（Task）：只把 README 中错误的测试入口修正为 <code>npm test</code>，检查并交付；项目代码假设正常。前章已经讲清 <code>npm test → scripts.test → node --test</code> 的配置消费关系，这里把注意力移到<strong>本轮结果在哪一步成为下一轮依据</strong>。四步过程及简化消息（Message）均为教学示意；涉及真实函数修复的历史片段会另行交代。</p>
+<span class="heading-alias" id="核心阅读" aria-hidden="true"></span><span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><span class="heading-alias" id="defaultagent-的执行循环" aria-hidden="true"></span><h2 id="一次结果怎样进入下一轮代理循环agent-loop">一次结果怎样进入下一轮代理循环（Agent Loop）</h2>
+<p>设想刚收到要求时，模型（Model）还没读到两份文件。它可以提出读取请求，却不能只凭请求内容知道磁盘上的真实配置。执行环境（Environment）返回文件内容以后，运行支撑（Agent Harness）还要把它组织为观察消息（Observation Message），加入消息列表（Message List）。第二次调用才会带上这个新增依据。</p>
+<p>这说明代理循环（Agent Loop）连接的并非几个函数名，而是三次变化：<strong>提出请求、取得执行结果、改变下一次输入。</strong> 默认实现的正常路径如下：</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="结果进入下一轮 · Results in the Next Step：可滚动示意图"><a href="../../../assets/diagrams/02-agent-loop-1.svg"><img src="../../../assets/diagrams/02-agent-loop-1.svg" alt="代理循环（Agent Loop）先初始化消息列表（Message List），模型调用（Model Query）检查预算（Budget），执行动作批次（Action Batch），整批返回后追加观察消息（Observation Message），再进入下一步（Step）。此图仅解释正常路径，未表示异常分支。" width="720" height="977" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中，<code>query</code> 取得并追加模型消息（Model Message），<code>execute_actions</code> 执行整批行动请求（Action），整批返回后才追加观察消息（Observation Message）。回边指向下一次单步推进（Step），不会重新初始化消息列表（Message List）。这里展示直接使用 <code>DefaultAgent</code> 的正常路径；普通回答文案不是它的退出信号，完成标记、限制或异常会转入相应结束分支。</p>
+<span class="heading-alias" id="用固定案例追踪四个-step" aria-hidden="true"></span><span class="heading-alias" id="step-1读取" aria-hidden="true"></span><span class="heading-alias" id="step-2修改" aria-hidden="true"></span><span class="heading-alias" id="step-3测试" aria-hidden="true"></span><span class="heading-alias" id="step-4提交" aria-hidden="true"></span><h3 id="用同一项任务task追踪四次单步推进step">用同一项任务（Task）追踪四次单步推进（Step）</h3>
+<p>开始时只有规则与用户要求。下面假定每个正常步骤都有一个行动请求（Action），执行后形成一条观察消息（Observation Message）；这使我们可以先看懂材料增长，再讨论多次调用和中断。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 用同一项任务（Task）追踪四次单步推进（Step）"><table><caption>表 1 / Table 1 · 用同一项任务（Task）追踪四次单步推进（Step）</caption><thead><tr><th scope="col">阶段</th><th scope="col">本次模型调用（Model Query）得到什么依据</th><th scope="col">行动请求（Action）</th><th scope="col">观察结果（Observation）怎样影响后续</th></tr></thead><tbody><tr><td>读取（Read）</td><td>规则与任务（Task），尚无当前文件内容</td><td>读取 <code>package.json</code> 和 <code>README.md</code></td><td>发现配置提供 <code>test</code>，文档却写 <code>npm run check</code></td></tr>
+<tr><td>修改（Edit）</td><td>上一步取得的两个入口不一致</td><td>把文档入口改成 <code>npm test</code></td><td>收到修改执行的返回；随后仍可回读或检查差异</td></tr>
+<tr><td>测试（Test）</td><td>修改已经尝试，但还没有测试结论</td><td>执行 <code>npm test</code></td><td>本例给定结果为测试通过，退出码（Exit Code）为0</td></tr>
+<tr><td>提交（Submit）</td><td>已有改动与检查结果</td><td>发出规定的完成标记</td><td>执行层产生提交信号（Submission Signal），外层处理退出</td></tr></tbody></table></div>
+<p>在前三个正常步骤中，每次都是“已有材料 → 新请求 → 执行结果 → 更多材料”。修改执行返回正常，并不单独证明文档改对；后续读取与差异检查仍有意义。这里没有训练模型参数（Model Parameters），变化的是本次输入。新材料也可能重复、失败或不完整，因此增加消息（Message）不保证判断进步。</p>
+<p>默认课程配置用一条特殊 Bash 命令表达完成：</p>
+<pre><code class="language-text">echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code></pre>
+<p><code>LocalEnvironment</code> 识别成功输出的第一行后抛出 <code>Submitted</code>，外层将这个提交信号（Submission Signal）转为退出消息（Exit Message）。因此，第四步不同于前三步的普通返回，不能机械地把它也计成一条普通观察消息（Observation Message）。默认命令行入口还会用 <code>InteractiveAgent</code> 增加交互层，询问是否追加工作；<a href="05-exit-and-trajectory.html">第05章</a>解释具体交互。</p>
+<p>本例的四步是教学顺序，不是实际执行轨迹（Trajectory）。第04章会增加函数修复并先运行出失败测试；后面本章另给一段历史真实记录，用来说明相同的输入更新关系。</p>
+<span class="heading-alias" id="先看最小伪代码" aria-hidden="true"></span><span class="heading-alias" id="正常路径的伪代码" aria-hidden="true"></span><h3 id="先看正常路径的伪代码pseudocode">先看正常路径的伪代码（Pseudocode）</h3>
+<p>下面要解决的问题很具体：怎样让本轮执行结果进入后续调用？先忽略模板、成本、异常与保存，只保留这个顺序。伪代码（Pseudocode）的输入是任务（Task），核心状态（State）是消息列表（Message List）；它没有完整实现退出消息（Exit Message）的产生，也不是可独立运行的程序。</p>
+<p>阅读时，<code>def</code> 定义函数（Function），调用后才执行其中内容；<code>=</code> 把右侧结果交给左侧名字，<code>while</code> 按条件重复。<code>append</code> 加入一项，<code>extend</code> 依次加入另一个列表（List）中的各项。代码里的列表推导（List Comprehension）会依次处理行动请求（Action），先收齐整批输出（Output），然后才统一追加。</p>
 <pre><code class="language-python">def run(task):
-    # 输入：先放入运行规则与用户任务，后续步骤复用这份消息列表。
+    # 输入组织（Input Composition）：先放规则与任务（Task），后续复用。
     messages = [system_message, user_message(task)]
 
     while last_message_is_not_exit(messages):
-        # 决策：记录模型本轮提出的动作；记录动作并不等于已经执行。
+        # 模型调用（Model Query）：先记录意图，此时还未执行行动请求（Action）。
         assistant_message = model.query(messages)
         messages.append(assistant_message)
 
-        # 执行与反馈：整批执行返回后，才统一追加下一轮可见的观察。
+        # 动作批次（Action Batch）：先收齐整批输出（Output），再整理观察消息（Observation Message）。
         outputs = [environment.execute(action)
                    for action in assistant_message.actions]
         messages.extend(observations(outputs))</code></pre>
-<p>这段伪代码只表示正常路径，不是逐字源码；它省略模板、异常和退出消息的产生过程，保留先收集整批 outputs、再统一追加 observations 的顺序：</p>
-<pre><code class="language-text">模型消息产生 action
-action 产生 output
-output 变成 observation message
-observation 进入下一次模型调用</code></pre>
-<h3 id="runtask初始化消息并拥有外层循环"><code>run(task)</code>：初始化消息并拥有外层循环</h3>
-<h4 id="task-先被放进模板变量">Task 先被放进模板变量</h4>
-<p><code>run(task)</code> 先把任务填进模板，形成给模型的初始消息。模板可以理解为预留了任务位置的一段提示文本。实现中，Task 与其他参数通过 <code>extra_template_vars</code> 供两个模板使用。</p>
-<p>这意味着模型并不是直接收到 Python 的 <code>task</code> 变量。中间还有一次“把任务组织成消息”的过程：</p>
-<pre><code class="language-text">task 字符串
-  ↓
-instance_template
-  ↓
-第一条 user message</code></pre>
-<p>这里的执行器把命令文本交给 <strong>shell</strong> 解释；shell 是解释并运行这类命令的程序，<strong>Bash</strong> 是常见的一种。本课程片段中的 <code>bash</code> 也用作模型看到的工具协议名称，实际启动哪种 shell 由执行器决定，不能仅凭这个名字认定一定使用 <code>/bin/bash</code>。<a href="03-actions-and-messages.html#%E9%BB%98%E8%AE%A4%E8%B7%AF%E5%BE%84%E4%B8%80%E4%B8%AA-bash-%E5%B7%A5%E5%85%B7%E7%B1%BB%E5%9E%8B">第03章</a>会把工具名称、命令参数和实际执行器进一步分开。</p>
-<p>固定案例最开始可以简化成：</p>
+<p>最后两行故意分开：<code>outputs</code> 是执行层返回的数据；<code>observations(outputs)</code> 把它们整理为观察消息（Observation Message），<code>extend</code> 才使其进入下一次输入。<strong>执行返回、格式转换、输入更新是三个相连但不同的动作。</strong> 如果收集整批结果时被中断，就可能还没有走到最后一行；后面的批次分析将解释这个后果。</p>
+<h2 id="从阅读-python-到理解控制接口control-interface">从阅读 Python 到理解控制接口（Control Interface）</h2>
+<p>现在已经知道循环要连接什么，再看 <code>DefaultAgent</code> 的四个入口：<code>run(task)</code> 建立与结束整次工作；<code>step()</code> 推进一步；<code>query()</code> 请求模型（Model）；<code>execute_actions()</code> 执行并整理结果。先补齐读懂这些片段所需的最少语法，然后逐个解释它们的输入、变化与返回。</p>
+<h3 id="python-最小阅读卡">Python 最小阅读卡</h3>
+<p>对象（Object）可以保存数据并提供操作；按一个类（Class）创建出的具体对象叫实例（Instance）。这里 <code>self</code> 指当前 <code>DefaultAgent</code> 实例（Instance）。点号读取其属性（Attribute），方法（Method）则是通过这个对象调用的操作。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · Python 最小阅读卡"><table><caption>表 2 / Table 2 · Python 最小阅读卡</caption><thead><tr><th scope="col">本章写法</th><th scope="col">怎样读</th><th scope="col">空值或缺失时怎样</th></tr></thead><tbody><tr><td><code>self.messages</code></td><td>当前实例（Instance）的消息列表（Message List）</td><td>可以存在但没有任何一项，即 <code>[]</code></td></tr>
+<tr><td><code>messages[0]</code>、<code>messages[-1]</code></td><td>列表（List）从0编号；负索引（Negative Index）<code>-1</code> 取最后一项</td><td>空列表（List）读取末项会抛出 <code>IndexError</code>，不是返回空消息（Message）</td></tr>
+<tr><td><code>message[&quot;role&quot;]</code>、<code>message.get(&quot;role&quot;)</code></td><td>字典（Dictionary）用键（Key）取值；这里键（Key）是 <code>&quot;role&quot;</code></td><td>不存在时，前者抛出 <code>KeyError</code>，后者返回空值（None）</td></tr>
+<tr><td><code>message.get(&quot;extra&quot;, {})</code></td><td>键（Key）缺失时采用默认值（Default Value）<code>{}</code></td><td>现有值若为 <code>None</code>，仍返回 <code>None</code>；不会改写原字典（Dictionary）</td></tr>
+<tr><td><code>self.query()</code>、<code>messages.append(message)</code></td><td>调用方法（Method）；括号内是交给它的参数（Argument）</td><td>可能读取或改变状态（State）；<code>append</code> 将一项加入原列表（List）末尾</td></tr></tbody></table></div>
+<p>下面三行摘自真实 <code>run()</code> 的末尾。此前已经建立非空消息列表（Message List），并尝试推进一步；<code>if</code> 与 <code>break</code> 仍在循环中，最后的 <code>return</code> 位于循环之后。缩进表达这些层级，<code>==</code> 比较是否相等：</p>
+<pre><code class="language-python">    if self.messages[-1].get(&quot;role&quot;) == &quot;exit&quot;:
+        break
+return self.messages[-1].get(&quot;extra&quot;, {})</code></pre>
+<p>可以按“读什么—改变什么—返回什么”理解这段源码摘录（Source Excerpt）：</p>
+<ol>
+<li>先读取最后一条消息（Message）的角色（Role）。若末项是 <code>{&quot;role&quot;: &quot;exit&quot;, &quot;extra&quot;: {&quot;exit_status&quot;: &quot;Submitted&quot;}}</code>，比较结果为真。</li>
+<li><code>break</code> 只结束所在循环，不追加消息（Message）或改写字典（Dictionary）。若缺少 <code>role</code>，<code>.get</code> 返回 <code>None</code>，比较不成立；若整个列表（List）为空，则更早就会在 <code>[-1]</code> 处报错。</li>
+<li>离开循环后，<code>return</code> 将 <code>extra</code> 交回调用者，上例得到 <code>{&quot;exit_status&quot;: &quot;Submitted&quot;}</code>；缺少该键（Key）时得到 <code>{}</code>。返回内容说明停止原因，不能只凭“循环结束”认定成功。</li>
+</ol>
+<p>赋值（Assignment）与比较（Comparison）也要分开：<code>self.messages = []</code> 让当前实例（Instance）改用新建的空列表（List），<code>==</code> 则只进行相等判断，不重新赋值。</p>
+<span class="heading-alias" id="runtask初始化消息并拥有外层循环" aria-hidden="true"></span><h3 id="runtask怎样建立一次运行run"><code>run(task)</code>：怎样建立一次运行（Run）？</h3>
+<span class="heading-alias" id="task-先被放进模板变量" aria-hidden="true"></span><h4 id="任务task先进入消息模板message-template">任务（Task）先进入消息模板（Message Template）</h4>
+<p><code>run(task)</code> 不把 Python 变量 <code>task</code> 原封不动交给服务，而是先组织输入。消息模板（Message Template）可以理解为预留内容位置的文本；实现通过 <code>extra_template_vars</code> 将任务（Task）与其他参数（Argument）提供给两个模板。</p>
+<p>其中，<code>instance_template</code> 把要求组织成用户消息（User Message）。本例可以简化为以下内容；这是教学表示，不是完整协议或真实调用日志：</p>
 <pre><code class="language-text">system: 你是一个能通过 Bash 与电脑交互的助手……
 user:   请解决这个任务：检查 package.json 和 README.md……</code></pre>
-<h4 id="messages-在每次-run-开始时清空"><code>messages</code> 在每次 <code>run()</code> 开始时清空</h4>
-<p><code>run()</code> 会执行：</p>
+<p>这里的执行器（Executor）把命令（Command）交给命令解释器（Shell）；Bash 是其中一种。模型（Model）看到的工具协议（Tool Protocol）名称也叫 <code>bash</code>，但实际启动哪种命令解释器（Shell）由实现决定，不能凭这个名字断言使用 <code>/bin/bash</code>。<a href="03-actions-and-messages.html#%E9%BB%98%E8%AE%A4%E8%B7%AF%E5%BE%84%E4%B8%80%E4%B8%AA-bash-%E5%B7%A5%E5%85%B7%E7%B1%BB%E5%9E%8B">第03章</a>进一步区分协议名、命令参数（Command Argument）与实际执行程序。</p>
+<span class="heading-alias" id="messages-在每次-run-开始时清空" aria-hidden="true"></span><h4 id="消息列表message-list在每次-run-开始时重建">消息列表（Message List）在每次 <code>run()</code> 开始时重建</h4>
+<p>初始化包含一行：</p>
 <pre><code class="language-python">self.messages = []</code></pre>
-<p>然后加入 system message 与 user message。</p>
-<p>因此，在这条最小路径中，第一次 <code>query()</code> 前的状态是：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · `messages` 在每次 `run()` 开始时清空"><table><caption>表 2 / Table 2 · `messages` 在每次 `run()` 开始时清空</caption><thead><tr><th scope="col">位置</th><th scope="col">角色（role）</th><th scope="col">主要内容</th></tr></thead><tbody><tr><td><code>messages[0]</code></td><td>system</td><td>行动规则、命令格式、环境说明</td></tr>
-<tr><td><code>messages[1]</code></td><td>user</td><td>当前 Task</td></tr></tbody></table></div>
-<p>这两条消息不是命令执行记录。它们只是第一次模型判断的输入。</p>
-<h4 id="while-true-表示由退出消息结束而不是预先知道步数"><code>while True</code> 表示由退出消息结束，而不是预先知道步数</h4>
-<p>初始化完成后，<code>run()</code> 进入 <code>while True</code>。每一轮尝试调用一次 <code>step()</code>，最后检查：</p>
+<p>随后加入系统消息（System Message）与用户消息（User Message）。因此，最小路径中第一次模型调用（Model Query）前的材料是：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 消息列表（Message List）在每次 `run()` 开始时重建"><table><caption>表 3 / Table 3 · 消息列表（Message List）在每次 `run()` 开始时重建</caption><thead><tr><th scope="col">位置</th><th scope="col">角色（Role）</th><th scope="col">主要内容</th></tr></thead><tbody><tr><td><code>messages[0]</code></td><td>系统（system）</td><td>行动规则、命令格式、执行环境（Environment）说明</td></tr>
+<tr><td><code>messages[1]</code></td><td>用户（user）</td><td>当前任务（Task）</td></tr></tbody></table></div>
+<p>这两项是决策输入，不是执行记录。重建输入也不自动重置整个实例（Instance）的所有状态（State）；预算（Budget）小节会解释为什么第二次调用 <code>run()</code> 仍可能沿用旧计数。</p>
+<span class="heading-alias" id="while-true-表示由退出消息结束而不是预先知道步数" aria-hidden="true"></span><span class="heading-alias" id="run-返回什么" aria-hidden="true"></span><h4 id="外层循环outer-loop怎样决定继续与退出">外层循环（Outer Loop）怎样决定继续与退出？</h4>
+<p>初始化之后，<code>run()</code> 进入 <code>while True</code>，每轮尝试调用一次 <code>step()</code>，然后检查：</p>
 <pre><code class="language-python">if self.messages[-1].get(&quot;role&quot;) == &quot;exit&quot;:
     break</code></pre>
-<p>也就是说，正常循环不是“固定执行四次”，而是：</p>
-<pre><code class="language-text">继续 step
-  ↓
-最后一条消息是否为 exit？
-  ├─ 否：继续
-  └─ 是：退出</code></pre>
-<p>固定案例也许四个 model calls 就完成，也可能因为命令失败需要更多轮。Task 的内容并不预先决定精确步数。</p>
-<h4 id="run-返回什么"><code>run()</code> 返回什么</h4>
-<p>循环结束后，<code>run()</code> 返回最后一条 exit message 的 <code>extra</code> 字段，通常可以包含：</p>
-<ul>
-<li><code>exit_status</code>；</li>
-<li><code>submission</code>；</li>
-<li>某些错误或异常信息。</li>
-</ul>
-<p>它返回这次运行的退出摘要，不是完整的任务状态库。</p>
-<h3 id="step一轮问模型然后执行动作"><code>step()</code>：一轮“问模型，然后执行动作”</h3>
-<p>真实源码中的 <code>step()</code> 很短。<code>self</code> 是调用这个方法的当前实例；<code>-&gt; list[dict]</code> 标注预期返回一个由字典组成的列表，不会单独检查运行时数据：</p>
+<p>最后一条是退出消息（Exit Message），就结束；否则继续下一次单步推进（Step）。开头的文档案例可能四次模型调用（Model Query）就完成，也可能因失败而需要更多次，任务（Task）描述不预先决定精确步数。</p>
+<p>循环结束后，<code>run()</code> 返回末条退出消息（Exit Message）的 <code>extra</code>。其中通常包含 <code>exit_status</code>、<code>submission</code>，也可能含错误信息。它是本次运行（Run）的退出摘要（Exit Summary），不是完整执行记录（Execution Record）库；未处理异常还可能继续向调用者抛出。</p>
+<span class="heading-alias" id="误区一step-就是一条用户消息" aria-hidden="true"></span><span class="heading-alias" id="step一轮问模型然后执行动作" aria-hidden="true"></span><span class="heading-alias" id="一个-step-通常包含一次模型调用" aria-hidden="true"></span><h3 id="step怎样连接一次查询与动作批次action-batch"><code>step()</code>：怎样连接一次查询与动作批次（Action Batch）？</h3>
+<p>真实的单步推进（Step）实现很短。返回类型注解（Return Type Annotation）<code>-&gt; list[dict]</code> 表示预期返回字典（Dictionary）组成的列表（List），但不单独检查运行时数据：</p>
 <pre><code class="language-python">def step(self) -&gt; list[dict]:
     return self.execute_actions(self.query())</code></pre>
-<p>这行代码可以从内向外读：</p>
-<ol>
-<li>先调用 <code>query()</code>；</li>
-<li>得到一条模型消息；</li>
-<li>把模型消息交给 <code>execute_actions()</code>；</li>
-<li>返回新增加的 observation messages。</li>
-</ol>
-<span class="heading-alias" id="误区一step-就是一条用户消息" aria-hidden="true"></span><h4 id="一个-step-通常包含一次模型调用">一个 step 通常包含一次模型调用</h4>
-<p>在 <code>DefaultAgent</code> 的正常路径中，一个 <code>step()</code> 会调用一次 <code>query()</code>，所以也就对应一次 Model query。</p>
-<p>但一个 step 不等于一个完整 Task：</p>
-<pre><code class="language-text">Task：修正文档并测试
-  ├─ step 1：读取文件
-  ├─ step 2：修改 README
-  ├─ step 3：运行测试
-  └─ step 4：提交结果</code></pre>
-<span class="heading-alias" id="误区三execute_actions-只执行一个命令" aria-hidden="true"></span><h4 id="一个模型消息可以包含多个-action">一个模型消息可以包含多个 action</h4>
-<p><code>execute_actions()</code> 遍历消息中 <code>extra.actions</code> 的列表。因此源码允许同一次模型消息产生多个 action，然后逐个交给 Environment。</p>
-<p>这里要区分两个“单一”：</p>
-<ul>
-<li>默认 <code>LitellmModel</code> 只暴露一个可用工具类型：名为 <code>bash</code> 的 function/tool；</li>
-<li>一条模型消息在数据结构上仍可能包含多个 Bash tool calls。</li>
-</ul>
-<p>所以“只有一个工具类型”不等于“每一步只能有一个调用”。文本变体对 action 数量有自己的格式约束，第03章会单独说明。</p>
-<h3 id="query检查限制调用-model追加模型消息"><code>query()</code>：检查限制、调用 Model、追加模型消息</h3>
-<p>在模型调用前先检查限制，通过后记录调用计数；取得可用模型消息后再更新成本并追加它。计数对象是模型请求；它与动作执行次数不同。</p>
-<h4 id="调用-modelqueryselfmessages">调用 <code>model.query(self.messages)</code></h4>
-<p>此时当前完整 <code>messages</code> 被交给模型适配器（Model adapter），由它转换模型服务提供方（provider）的协议。Model adapter 负责：</p>
-<ol>
-<li>把内部消息整理成 provider 接受的格式；</li>
-<li>调用具体模型服务；</li>
-<li>从返回中解析 action；</li>
-<li>把原始响应、action、成本与时间等整理成一条模型消息。</li>
-</ol>
-<p><code>DefaultAgent</code> 不自己理解不同 provider 的所有响应格式。它只依赖 Model 接口返回统一可消费的消息。</p>
-<span class="heading-alias" id="误区二query-返回成功所以任务成功" aria-hidden="true"></span><h4 id="统计成本并追加消息">统计成本并追加消息</h4>
-<p>Model 返回后，<code>query()</code> 更新本次 Agent 的成本，然后调用：</p>
+<p>从内向外读：先调用 <code>query()</code>，得到模型消息（Model Message），再将其交给 <code>execute_actions()</code>，最后返回新增加的观察消息（Observation Message）。这行代码连接两个阶段，真正的执行细节在被调用的方法（Method）中。</p>
+<p>正常路径中的一次单步推进（Step）对应一次模型调用（Model Query），但不等于一项完整任务（Task）。读取、修改、测试与提交可能分别占用一次，也可能采用别的组合。</p>
+<span class="heading-alias" id="误区三execute_actions-只执行一个命令" aria-hidden="true"></span><span class="heading-alias" id="一个模型消息可以包含多个-action" aria-hidden="true"></span><h4 id="一个工具类型tool-type为什么还能有多次工具调用tool-call">一个工具类型（Tool Type），为什么还能有多次工具调用（Tool Call）？</h4>
+<p><code>execute_actions()</code> 遍历模型消息（Model Message）的 <code>extra.actions</code> 列表（List），所以同一响应可以包含多个行动请求（Action），按顺序交给执行环境（Environment）。默认 <code>LitellmModel</code> 只暴露名为 <code>bash</code> 的一个工具类型（Tool Type），不代表只允许一个工具调用（Tool Call）。</p>
+<p>这两个计数回答不同的问题：类型数说明“可选择哪些能力”，调用数说明“这次提出了几次执行请求”。文本变体对行动请求（Action）数量另有格式约束，第03章会单独说明。</p>
+<span class="heading-alias" id="query检查限制调用-model追加模型消息" aria-hidden="true"></span><h3 id="query模型调用model-query前后改变了什么"><code>query()</code>：模型调用（Model Query）前后改变了什么？</h3>
+<p>在请求之前先检查限制，通过后增加调用计数；取得可用模型消息（Model Message）后，更新成本并追加内容。这里统计的是模型调用（Model Query），与执行命令（Command）的次数不同。</p>
+<span class="heading-alias" id="调用-modelqueryselfmessages" aria-hidden="true"></span><h4 id="模型协议适配器model-adapter如何处理协议protocol">模型协议适配器（Model Adapter）如何处理协议（Protocol）？</h4>
+<p><code>model.query(self.messages)</code> 接收当前消息列表（Message List）。模型协议适配器（Model Adapter）负责将它转换成模型服务提供方（Provider）接受的格式，调用服务，再把返回响应、行动请求（Action）、成本与时间整理为统一结果。</p>
+<p><code>DefaultAgent</code> 因而不需要在主循环里处理每家服务的所有响应格式，而是依赖模型（Model）接口（Interface）提供统一可消费的消息（Message）。这种分工只说明接线方式，不能免除适配器自己的解析与检查。</p>
+<span class="heading-alias" id="误区二query-返回成功所以任务成功" aria-hidden="true"></span><span class="heading-alias" id="统计成本并追加消息" aria-hidden="true"></span><h4 id="追加模型消息model-message为何还不等于执行">追加模型消息（Model Message）为何还不等于执行？</h4>
+<p>取得结果并更新成本后，<code>query()</code> 调用：</p>
 <pre><code class="language-python">self.add_messages(message)</code></pre>
-<p>此时 <code>messages</code> 才增加 assistant message。</p>
-<p>固定案例第一次 query 后，可以简化成：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 统计成本并追加消息"><table><caption>表 3 / Table 3 · 统计成本并追加消息</caption><thead><tr><th scope="col">位置</th><th scope="col">角色（role）</th><th scope="col">主要内容</th></tr></thead><tbody><tr><td>0</td><td>system</td><td>行动规则</td></tr>
-<tr><td>1</td><td>user</td><td>Task</td></tr>
-<tr><td>2</td><td>assistant</td><td>请求读取两个文件的 Bash tool call</td></tr></tbody></table></div>
-<p>注意：这时 Environment 还没有执行。文件内容仍未进入消息列表。</p>
-<h3 id="execute_actionsmessage让请求接触现实再形成新消息"><code>execute_actions(message)</code>：让请求接触现实，再形成新消息</h3>
-<p><code>execute_actions()</code> 做两件事：</p>
-<ol>
-<li>对每个 action 调用 <code>self.env.execute(action)</code>；</li>
-<li>让 Model adapter 把 outputs 格式化成 observation messages，并追加到 <code>messages</code>。</li>
-</ol>
-<h4 id="先得到原始-output">先得到原始 output</h4>
-<p>固定案例的第一个 action 假设是：</p>
-<p>这里用 <code>sed</code> 按文本规则读取文件：<code>-n</code> 关闭默认输出，<code>1,220p</code> 只打印第1–220行。本命令把 <code>package.json</code>、<code>README.md</code> 按顺序连成一个连续行号序列，并非各取220行；下面假定两份小文件的总行数不足220，因此都能读到。</p>
+<p>本例第一次查询后的简化状态（State）是：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 追加模型消息（Model Message）为何还不等于执行？"><table><caption>表 4 / Table 4 · 追加模型消息（Model Message）为何还不等于执行？</caption><thead><tr><th scope="col">位置</th><th scope="col">角色（Role）</th><th scope="col">主要内容</th></tr></thead><tbody><tr><td>0</td><td>系统（system）</td><td>行动规则</td></tr>
+<tr><td>1</td><td>用户（user）</td><td>任务（Task）</td></tr>
+<tr><td>2</td><td>助手（assistant）</td><td>读取两个文件的行动请求（Action）</td></tr></tbody></table></div>
+<p>第三项记录的是意图，此时执行环境（Environment）还没被调用，文件内容没有进入消息列表（Message List）。这正是前章“建议已经出现，执行仍需证据”的代码落点。</p>
+<span class="heading-alias" id="execute_actionsmessage让请求接触现实再形成新消息" aria-hidden="true"></span><h3 id="execute_actionsmessage原始输出output怎样变成观察消息observation-message"><code>execute_actions(message)</code>：原始输出（Output）怎样变成观察消息（Observation Message）？</h3>
+<p>该方法（Method）先对每个行动请求（Action）调用 <code>self.env.execute(action)</code>，收集输出（Output），再让模型协议适配器（Model Adapter）格式化，并追加到消息列表（Message List）。下面跟随一条实际格式的教学请求，逐层看数据变化。</p>
+<span class="heading-alias" id="先得到原始-output" aria-hidden="true"></span><h4 id="从命令参数command-argument取得原始输出output">从命令参数（Command Argument）取得原始输出（Output）</h4>
+<p>假设第一个行动请求（Action）如下。<code>sed</code> 按文本规则读取文件，<code>-n</code> 关闭默认输出，<code>1,220p</code> 只打印第1–220行。<strong>这个命令（Command）将两份文件按顺序连接成连续行号，并非各取220行。</strong> 本例假设合计不足220行，因此都能读到。</p>
 <pre><code class="language-json">{
   &quot;command&quot;: &quot;sed -n &#39;1,220p&#39; package.json README.md&quot;,
   &quot;tool_call_id&quot;: &quot;call-1&quot;
 }</code></pre>
-<p>Environment 执行后得到：</p>
+<p>执行环境（Environment）返回下列形状的结果；其中正文省略号是教学占位，不是本章新增的实际读取日志：</p>
 <pre><code class="language-json">{
   &quot;output&quot;: &quot;...真实文件内容...&quot;,
   &quot;returncode&quot;: 0,
   &quot;exception_info&quot;: &quot;&quot;
 }</code></pre>
-<p>这个 output 是执行层数据，还没有自动成为 provider 接受的 tool result message。</p>
-<span class="heading-alias" id="误区四工具-output-可以原样塞回任意模型" aria-hidden="true"></span><h4 id="再由-model-adapter-格式化-observation">再由 Model adapter 格式化 observation</h4>
-<p>为什么由 Model adapter 格式化？因为不同模型 API 对 tool result 的消息结构可能不同。</p>
-<p>Agent 知道的是：</p>
-<pre><code class="language-text">这些 outputs 对应刚才那条模型消息中的 actions</code></pre>
-<p>Model adapter 知道的是：</p>
-<pre><code class="language-text">怎样把它们表示成当前 provider 能在下一次请求中理解的消息</code></pre>
-<p>格式化以后，<code>add_messages()</code> 把 observation 追加到线性列表。</p>
-<p>此时消息变成：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 再由 Model adapter 格式化 observation"><table><caption>表 4 / Table 4 · 再由 Model adapter 格式化 observation</caption><thead><tr><th scope="col">位置</th><th scope="col">角色（role）</th><th scope="col">主要内容</th></tr></thead><tbody><tr><td>0</td><td>system</td><td>行动规则</td></tr>
-<tr><td>1</td><td>user</td><td>Task</td></tr>
-<tr><td>2</td><td>assistant</td><td>Bash action：读取文件</td></tr>
-<tr><td>3</td><td>tool</td><td>observation：文件内容与 return code</td></tr></tbody></table></div>
-<p>到这里，一个正常 step 才算闭环。</p>
-<h3 id="第二个-step-为什么能获得更多依据">第二个 step 为什么能获得更多依据</h3>
-<p>第二个 step 再次进入 <code>query()</code> 时，Model 收到的不再只有任务描述，还收到第一次命令的 observation。</p>
-<p>它现在可以看到：</p>
-<pre><code class="language-text">package.json: &quot;scripts&quot;: {&quot;test&quot;: &quot;node --test&quot;}
-调用入口:    npm test
-README.md:    仍然写着 npm run check</code></pre>
-<p>所以它可以生成更有依据的 action，例如请求把 README 中的过时命令替换成 <code>npm test</code>。</p>
-<p>正常追加的回执会成为下一次输入的一部分，即使它只是重复旧结果或报告失败。模型参数在这里没有经过训练更新；变化的是系统交给模型的消息。</p>
-<h3 id="用固定案例追踪四个-step">用固定案例追踪四个 step</h3>
-<p>下面延续 README 简化任务，假设项目代码原本正确、修正文档后测试通过。消息是教学示意，不是实际模型 trace；第04章 会增加函数修复并先运行出失败测试。</p>
-<h4 id="step-1读取">Step 1：读取</h4>
-<pre><code class="language-text">query(messages[0..1])
-  → assistant action: 读取 package.json 与 README.md
-execute_actions(...)
-  → tool observation: 返回两份文件内容</code></pre>
-<p>消息数量从 2 增长到 4。</p>
-<h4 id="step-2修改">Step 2：修改</h4>
-<pre><code class="language-text">query(messages[0..3])
-  → assistant action: 把 npm run check 改成 npm test
-execute_actions(...)
-  → tool observation: 命令返回 0</code></pre>
-<p>消息继续增长。Model 能看到修改命令报告的结果，但是否真的改对，还可以在后续命令中再次读取验证。</p>
-<h4 id="step-3测试">Step 3：测试</h4>
-<pre><code class="language-text">query(...)
-  → assistant action: npm test
-execute_actions(...)
-  → tool observation: 测试通过，returncode 0</code></pre>
-<h4 id="step-4提交">Step 4：提交</h4>
-<p>在默认课程配置里，完成任务仍通过一条特殊 Bash 命令表达：</p>
-<pre><code class="language-text">echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code></pre>
-<p><code>LocalEnvironment</code> 识别成功输出的第一行后抛出 <code>Submitted</code>，外层控制流把这个提交信号转成 exit message。默认命令行入口在 <code>DefaultAgent</code> 上增加 <code>InteractiveAgent</code> 交互层，还会询问是否追加任务；具体交互见 <a href="05-exit-and-trajectory.html">第05章</a>。</p>
-<p>完成信号是离开正常循环的一种情况，其他代表分支如下：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · Step 4：提交"><table><caption>表 5 / Table 5 · Step 4：提交</caption><thead><tr><th scope="col">打断正常环的情况</th><th scope="col">怎样处理</th><th scope="col">后续控制</th></tr></thead><tbody><tr><td>格式错误，例如缺少规定的工具调用</td><td>追加格式反馈，检查连续错误上限</td><td>未达上限可再 query；达到上限则追加 exit 并返回退出摘要</td></tr>
-<tr><td>预算或时限到达；动作抛出 <code>Submitted</code></td><td>追加相应 exit 消息</td><td>离开循环，返回退出摘要</td></tr>
-<tr><td>未处理的 <code>Exception</code></td><td>记录异常 exit</td><td>仍向调用者抛出异常，不当作正常返回</td></tr></tbody></table></div>
-<p>这些分支不是全部异常清单。后面的批次小节将说明中断时哪些结果已经加入消息，<a href="05-exit-and-trajectory.html#%E5%BC%82%E5%B8%B8%E9%A2%84%E7%AE%97%E4%B8%8E%E4%BF%9D%E5%AD%98%E5%8D%8F%E8%AE%AE">第05章</a>再展开精确条件与保存过程。</p>
-<span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="本章小结" aria-hidden="true"></span><h3 id="正常调用链的输入输出和状态变化">正常调用链的输入、输出和状态变化</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 正常调用链的输入、输出和状态变化"><table><caption>表 6 / Table 6 · 正常调用链的输入、输出和状态变化</caption><thead><tr><th scope="col">函数</th><th scope="col">主要输入（Input）</th><th scope="col">主要输出（Output）</th><th scope="col">关键状态变化（State）</th></tr></thead><tbody><tr><td><code>run(task)</code></td><td>Task 字符串</td><td>最终 exit <code>extra</code></td><td>重置并初始化 <code>messages</code>，反复调用 <code>step()</code></td></tr>
-<tr><td><code>step()</code></td><td>Agent 当前状态</td><td>observation message 列表</td><td>串起一次 query 与 action execution</td></tr>
-<tr><td><code>query()</code></td><td>当前 <code>messages</code></td><td>assistant/model message</td><td>增加 <code>n_calls</code>、<code>cost</code>，追加模型消息</td></tr>
-<tr><td><code>execute_actions(message)</code></td><td>带 actions 的模型消息</td><td>observation messages</td><td>执行 actions，追加 observations</td></tr>
-<tr><td><code>env.execute(action)</code></td><td>一个 action</td><td>原始 output</td><td>现实环境可能发生变化</td></tr></tbody></table></div>
-<p>这里重点区分消息状态与任务工作区：<code>env.execute()</code> 才承接本例的读文件、编辑和测试。不要把它扩大成“其他函数都没有外部效果”：模型请求也可能访问服务并产生费用，<code>save()</code> 也会写轨迹文件，只是它们不等于完成了工作区里的修复。</p>
+<p><code>output</code> 承载文本，<code>returncode</code> 是退出码（Exit Code），<code>exception_info</code> 提供异常信息。它们仍是执行层的数据，尚未自动成为服务能够接收的工具结果消息（Tool Result Message）。</p>
+<span class="heading-alias" id="误区四工具-output-可以原样塞回任意模型" aria-hidden="true"></span><span class="heading-alias" id="再由-model-adapter-格式化-observation" aria-hidden="true"></span><span class="heading-alias" id="第二个-step-为什么能获得更多依据" aria-hidden="true"></span><h4 id="格式转换为什么交给模型协议适配器model-adapter">格式转换为什么交给模型协议适配器（Model Adapter）？</h4>
+<p>主循环知道“这些输出（Output）来自刚才那批行动请求（Action）”，但不同模型服务提供方（Provider）要求的工具结果消息（Tool Result Message）格式可能不同。模型协议适配器（Model Adapter）因此负责表达方式，完成后 <code>add_messages()</code> 再把观察消息（Observation Message）追加进去。</p>
+<p>在这个只有一次工具调用（Tool Call）的正常步骤之后，材料从2项增长到4项：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 格式转换为什么交给模型协议适配器（Model Adapter）？"><table><caption>表 5 / Table 5 · 格式转换为什么交给模型协议适配器（Model Adapter）？</caption><thead><tr><th scope="col">位置</th><th scope="col">角色（Role）</th><th scope="col">主要内容</th></tr></thead><tbody><tr><td>0</td><td>系统（system）</td><td>行动规则</td></tr>
+<tr><td>1</td><td>用户（user）</td><td>任务（Task）</td></tr>
+<tr><td>2</td><td>助手（assistant）</td><td>读取文件的行动请求（Action）</td></tr>
+<tr><td>3</td><td>工具（tool）</td><td>包含文件内容与退出码（Exit Code）的观察消息（Observation Message）</td></tr></tbody></table></div>
+<p>到这里，正常单步推进（Step）才闭合。下一次模型调用（Model Query）除了最初要求，还会看到配置中的 <code>&quot;scripts&quot;: {&quot;test&quot;: &quot;node --test&quot;}</code> 与 README 中的 <code>npm run check</code>，因此有依据请求把入口改为 <code>npm test</code>。</p>
+<span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="本章小结" aria-hidden="true"></span><span class="heading-alias" id="正常调用链的输入输出和状态变化" aria-hidden="true"></span><h3 id="用输入input输出output与状态state对照调用链">用输入（Input）、输出（Output）与状态（State）对照调用链</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 用输入（Input）、输出（Output）与状态（State）对照调用链"><table><caption>表 6 / Table 6 · 用输入（Input）、输出（Output）与状态（State）对照调用链</caption><thead><tr><th scope="col">函数（Function）</th><th scope="col">主要输入（Input）</th><th scope="col">主要输出（Output）</th><th scope="col">关键状态（State）变化</th></tr></thead><tbody><tr><td><code>run(task)</code></td><td>任务（Task）字符串</td><td>最终退出消息（Exit Message）的 <code>extra</code></td><td>重建 <code>messages</code>，反复调用 <code>step()</code></td></tr>
+<tr><td><code>step()</code></td><td>当前实例（Instance）保存的数据</td><td>观察消息（Observation Message）的列表（List）</td><td>连接查询与动作批次（Action Batch）</td></tr>
+<tr><td><code>query()</code></td><td>当前 <code>messages</code></td><td>模型消息（Model Message）</td><td>增加 <code>n_calls</code>、<code>cost</code>，追加结果</td></tr>
+<tr><td><code>execute_actions(message)</code></td><td>带 <code>actions</code> 的模型消息（Model Message）</td><td>观察消息（Observation Message）的列表（List）</td><td>执行整批请求并追加格式化结果</td></tr>
+<tr><td><code>env.execute(action)</code></td><td>一个行动请求（Action）</td><td>原始输出（Output）</td><td>现实工作区可能发生变化</td></tr></tbody></table></div>
+<p>这张表把消息状态（Message State）与任务工作区（Task Workspace）分开：<code>env.execute()</code> 承接本例的读取、编辑与测试。不要把它扩大成“其他函数（Function）都没有外部效果”：请求服务也可能产生费用，<code>save()</code> 也会写文件，只是这些行为不等于完成了工作区里的修复。</p>
 <h3 id="一段真实的再问一次">一段真实的“再问一次”</h3>
-<p>这里提前摘取后面第22章的一段真实记录，用来对照教学四步。该任务同时修 README 和时间格式化函数 <code>formatDuration(seconds)</code>：它应把125秒表示为 <code>2:05</code>，现有实现却用 <code>% 100</code> 计算余秒。需要读取的四份文件是说明、脚本配置、函数源码和测试。</p>
-<p>在摘取的这段过程中，模型提出读取四份文件的请求，环境执行读取，结果进入下一次模型请求。文件内容给出两个可核对线索：<code>package.json</code> 声明 <code>test</code> 脚本，其调用入口为 <code>npm test</code>，README 却写 <code>npm run check</code>；函数用 <code>% 100</code> 计算余秒，测试则要求分钟/秒格式。</p>
-<p>模型得到这些观察后，指出两个问题并请求运行测试。文件内容支持诊断方向，测试结果进一步区分“代码看起来有误”与“当前输入实际失败”。这里的因果关系是“请求读取 → 执行读取 → 下一次判断使用结果”；整个任务的 8 次模型请求顺序在<a href="22-agent-cases.html#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">第22章</a>完整展示，动作由真实模型生成，不是预写脚本。</p>
-<span class="heading-alias" id="基础完成条件与下一步" aria-hidden="true"></span><span class="heading-alias" id="基础自测让消息和现实按顺序发生" aria-hidden="true"></span><span class="heading-alias" id="练习消息与执行顺序" aria-hidden="true"></span><h3 id="消息与执行顺序问答">消息与执行顺序问答</h3>
-<p><strong>问题 1。</strong> 第一次 query 前，messages 通常是哪两条？正常一步后又增加什么？</p>
-<p><strong>解释。</strong> system 与由 Task 渲染的 user；正常一步增加 assistant 和对应 observation。多个 actions 或中断会改变条数。</p>
-<p><strong>问题 2。</strong> 为什么 assistant action 已在 messages 中时，文件仍可能没有被读取？</p>
-<p><strong>解释。</strong> query 先把请求加入内存 messages，随后 execute_actions 才调用 Environment。这里的追加还不等于写入磁盘；请求存在也不证明执行已发生。</p>
-<p><strong>问题 3。</strong> 下一次请求怎样得知上一次测试失败？模型参数是否因此被训练更新？</p>
-<p><strong>解释。</strong> Agent 把失败 output 形成的 observation 放入 messages，再交给下一次 Model.query。这是输入变化，没有在这条循环中训练模型参数。</p>
-<span class="heading-alias" id="实现深化" aria-hidden="true"></span><h2 id="预算批次与记录">预算、批次与记录</h2>
-<span class="heading-alias" id="先检查是否已经到达限制" aria-hidden="true"></span><h3 id="模型请求前的限制检查">模型请求前的限制检查</h3>
-<p>在真正请求模型前，它会检查：</p>
-<ul>
-<li>step limit；</li>
-<li>cost limit；</li>
-<li>wall-time limit。</li>
-</ul>
-<p>如果已经达到配置条件，就通过控制流异常生成退出消息，而不是继续花费下一次模型调用。</p>
-<p>限制检查发生在模型请求之前：</p>
-<pre><code class="language-text">先检查限制
-  ↓
-再请求模型</code></pre>
-<h3 id="增加模型调用计数">增加模型调用计数</h3>
-<p>通过限制检查后：</p>
+<p>这里提前摘取第22章的一段历史真实记录，用来对照教学四步。该任务（Task）同时修 README 和时间格式化函数 <code>formatDuration(seconds)</code>：125秒应表示为 <code>2:05</code>，现有实现却用 <code>% 100</code> 计算余秒。要读取的四份文件分别是说明、配置、函数源码与测试，修改范围比本章主例更大。</p>
+<p>在这段过程中，模型（Model）请求读取四份文件，执行环境（Environment）完成读取，观察结果（Observation）进入下一次调用。当前内容给出两个线索：配置声明 <code>test</code> 脚本而 README 写 <code>npm run check</code>；函数用 <code>% 100</code>，测试却要求分钟/秒格式。随后它指出两个问题，并请求运行测试。</p>
+<p>文件内容支持诊断方向，测试结果进一步区分“代码看起来有误”和“当前输入实际失败”。其因果关系仍是<strong>读取请求 → 实际读取 → 后续判断使用结果</strong>。整个工作的8次模型调用（Model Query）顺序见<a href="22-agent-cases.html#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">第22章</a>，行动请求（Action）由真实模型（Model）生成，不是预写脚本。本章引用已有记录，没有重新运行。</p>
+<span class="heading-alias" id="基础完成条件与下一步" aria-hidden="true"></span><span class="heading-alias" id="基础自测让消息和现实按顺序发生" aria-hidden="true"></span><span class="heading-alias" id="练习消息与执行顺序" aria-hidden="true"></span><span class="heading-alias" id="消息与执行顺序问答" aria-hidden="true"></span><h3 id="消息message与执行顺序问答">消息（Message）与执行顺序问答</h3>
+<p><strong>问题 1。</strong> 第一次模型调用（Model Query）前有哪些材料？正常一步后增加什么？</p>
+<p><strong>解释。</strong> 最初是系统消息（System Message）与由任务（Task）渲染的用户消息（User Message）；正常一步增加模型消息（Model Message）及对应观察消息（Observation Message）。多个行动请求（Action）或批次中断会改变条数。</p>
+<p><strong>问题 2。</strong> 行动请求（Action）已经在消息列表（Message List）里，为什么文件还可能没被读取？</p>
+<p><strong>解释。</strong> <code>query()</code> 先把意图加入进程内存（Process Memory），<code>execute_actions()</code> 随后才调用执行环境（Environment）。追加还不等于写入磁盘，请求存在也不证明现实操作已经发生。</p>
+<p><strong>问题 3。</strong> 下次调用怎样得知测试失败？模型参数（Model Parameters）是否因此被训练更新？</p>
+<p><strong>解释。</strong> 主循环将失败输出（Output）整理为观察消息（Observation Message），再交给后续模型调用（Model Query）。这条路径改变的是输入，没有进行参数训练。</p>
+<span class="heading-alias" id="实现深化" aria-hidden="true"></span><span class="heading-alias" id="预算批次与记录" aria-hidden="true"></span><h2 id="预算budget动作批次action-batch与执行记录execution-record">预算（Budget）、动作批次（Action Batch）与执行记录（Execution Record）</h2>
+<p>正常路径说明“怎样继续”，还需弄清“何时停止”和“中断后留下了什么”。以下沿用同一实现，不把交互变体、普通异常与硬终止混在一起。</p>
+<span class="heading-alias" id="先检查是否已经到达限制" aria-hidden="true"></span><span class="heading-alias" id="模型请求前的限制检查" aria-hidden="true"></span><span class="heading-alias" id="增加模型调用计数" aria-hidden="true"></span><h3 id="模型调用model-query前的限制检查">模型调用（Model Query）前的限制检查</h3>
+<p>真正请求服务之前，程序检查步数上限（Step Limit）、成本上限（Cost Limit）和总耗时上限（Wall-Time Limit）。达到配置条件时，通过控制流异常（Control-Flow Exception）产生退出消息（Exit Message），不继续发起下一次请求。</p>
+<p>通过检查以后，调用计数才增加：</p>
 <pre><code class="language-python">self.n_calls += 1</code></pre>
-<p>这个计数表示 Model query 次数，不表示 Environment 执行次数，也不表示 Task 数量。</p>
-<p>如果一条模型消息包含两个 Bash actions：</p>
-<pre><code class="language-text">n_calls 增加 1
-Environment.execute 可能发生 2 次</code></pre>
-<p>计数口径必须先说清楚，数字才有意义。</p>
-<h3 id="新消息列表为什么不等于新预算">新消息列表为什么不等于新预算</h3>
-<p>注意“清空 messages”的准确范围：<code>n_calls</code>、<code>cost</code> 与 <code>_start_time</code> 在对象构造时初始化，<code>run()</code> 不重置它们，也不会替模型重置游标。复用同一 Agent 对象调用第二次 <code>run()</code>，不会获得全新的预算。实验为每次运行创建新对象，分别初始化消息、计数和时钟。</p>
-<h3 id="同一批-action-中断时前面的结果是否已经加入-messages">同一批 action 中断时，前面的结果是否已经加入 messages？</h3>
-<p><code>DefaultAgent.execute_actions()</code> 用列表推导先收集整批 outputs，全部完成后才统一格式化并追加 observation。假设一批依次为 <code>echo FIRST</code>、完成标记、<code>echo THIRD</code>：第一条实际执行；第二条触发 Submitted；第三条未执行。但因为整批收集被打断，DefaultAgent 还没有追加第一条 output，最后直接记录 exit。不能把“按序执行”解释为“每条结果立即落入 messages”。</p>
-<p><code>InteractiveAgent.execute_actions()</code> 使用不同接线：逐条积累 outputs，并在 finally 中格式化已有结果；tool-call formatter 为缺少的结果补 <code>returncode=-1</code> / <code>action was not executed</code>。因此第一条的真实 output 可保留，完成命令和未执行第三条都可能显示占位结果。完成命令实际上执行过，这个占位文本表达的是“没有普通 output 返回给 formatter”，不能据它断言现实中没有执行。提交信号的异常路径见 第05章。</p>
-<span class="heading-alias" id="记录与恢复的常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区一messages-里有所有步骤所以它就是数据库" aria-hidden="true"></span><span class="heading-alias" id="误区二save-在-finally-中运行所以外部副作用一定可恢复" aria-hidden="true"></span><h3 id="消息增长不是模型拥有持久记忆">消息增长不是“模型拥有持久记忆”</h3>
-<p>在一次 <code>DefaultAgent.run()</code> 内，<code>self.messages</code> 是一个线性内存列表。正常完成的一轮把 action 与 observation 加入列表，供下一次 Model query 使用；前述批次中断可能跳过普通 observation 追加。</p>
-<p>这是当前运行的工作记忆。下次启动是否重新装入历史，需要另有读取入口；跨进程恢复和并发写入也不能只由一个内存列表承担。下面沿保存时点说明这条边界。</p>
-<h3 id="为什么这种拆法容易扩展">为什么这种拆法容易扩展</h3>
-<p><code>DefaultAgent</code> 并不把某个特定模型 API 或某个特定执行后端写死在主循环里。它只依赖 Model 和 Environment 接口。</p>
-<p>因此可以替换：</p>
-<ul>
-<li>不同 Model adapter；</li>
-<li>本地、Docker、Singularity 等不同 Environment；</li>
-<li><code>DefaultAgent</code> 与 <code>InteractiveAgent</code>。</li>
-</ul>
-<p>主循环仍保留相似结构：</p>
-<pre><code class="language-text">query → action → execute → observation</code></pre>
-<p>不过“容易替换”不等于“所有实现具有相同安全、持久化和恢复保证”。那需要逐个实现核对，不能从接口形状自动继承。</p>
-<span class="heading-alias" id="深化自测区分一次调用一个批次与一个对象" aria-hidden="true"></span><span class="heading-alias" id="练习调用批次与对象状态" aria-hidden="true"></span><h3 id="调用批次与对象状态问答">调用、批次与对象状态问答</h3>
-<p><strong>问题 1。</strong> model call 数与 command 执行数为什么不相等？</p>
-<p><strong>解释。</strong> 一条响应可带多个 actions；格式错误可能没有可执行 action。完成信号或错误也会使批次提前停止。</p>
-<p><strong>问题 2。</strong> 同一批第一条正常返回，第二条 Submitted，DefaultAgent 会保存第一条 observation 吗？</p>
-<p><strong>解释。</strong> 不会由 execute_actions 追加；列表推导被打断，尚未到统一格式化与 add_messages。InteractiveAgent 的 finally 路径不同。</p>
-<p><strong>问题 3。</strong> 同一对象第二次 run，messages 重新开始是否表示 step/cost/time 预算归零？</p>
-<p><strong>解释。</strong> 不表示。n_calls、cost 和构造时钟没有在 run 中重置，模型对象也有自己的状态。本课程实验每次创建新对象。</p>
-<span class="heading-alias" id="继续读源码" aria-hidden="true"></span><span class="heading-alias" id="练习标注消息与保存时点" aria-hidden="true"></span><h3 id="消息追加与保存的先后关系">消息追加与保存的先后关系</h3>
-<p><a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/agents/default.py"><code>DefaultAgent</code></a> 的调用顺序是 <code>run → step → query → execute_actions</code>。<code>query</code> 先追加 assistant 消息；<code>execute_actions</code> 收齐整批 outputs 后才追加 tool observations；外层这一轮的 <code>finally</code> 再调用 <code>save</code>。</p>
-<p>前述批次若被 <code>Submitted</code> 打断，外层会处理退出信号，再在 <code>finally</code> 保存当时状态；已执行动作的普通结果可能还没加入消息。若进程直接收到 SIGKILL，这个 <code>finally</code> 也不会执行，磁盘上可能只剩前一轮快照，文件却已经改变。</p>
-<p>因此，保存 trajectory 快照不等于拥有 durable ledger——可用于恢复核对的持久执行记录。后者还要解决工作身份、写入权与不确定效果的处理；<a href="05-exit-and-trajectory.html">第05章</a>继续解释保存结构，<a href="06-crash-window.html">第06章</a>展示指定硬终止窗口。</p>
+<p>这个计数对应模型调用（Model Query），不等于命令（Command）执行次数，也不等于任务（Task）数量。一条响应若有两个行动请求（Action），<code>n_calls</code> 增加1，<code>env.execute()</code> 却可能被调用2次；若格式无效或批次中断，实际执行次数还会不同。计数口径决定了预算（Budget）限制的对象。</p>
+<span class="heading-alias" id="新消息列表为什么不等于新预算" aria-hidden="true"></span><h3 id="重建消息列表message-list为什么没有得到新预算budget">重建消息列表（Message List），为什么没有得到新预算（Budget）？</h3>
+<p><code>n_calls</code>、<code>cost</code> 与 <code>_start_time</code> 在实例（Instance）构造时初始化，<code>run()</code> 不重置它们，也不会替模型（Model）重置自己的游标。因此，复用同一实例（Instance）第二次调用 <code>run()</code>，虽然输入重新开始，却不获得全新的预算（Budget）。本课程已有实验为每次运行（Run）创建新对象（Object），分别初始化消息列表（Message List）、计数和时钟。</p>
+<p>这一区分来自状态（State）的归属：一部分在“本次开始”时重建，另一部分在“对象创建”时才建立。不能只看到 <code>messages = []</code> 就推断所有计数都归零。</p>
+<h3 id="哪些情况会打断正常代理循环agent-loop">哪些情况会打断正常代理循环（Agent Loop）？</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 哪些情况会打断正常代理循环（Agent Loop）？"><table><caption>表 7 / Table 7 · 哪些情况会打断正常代理循环（Agent Loop）？</caption><thead><tr><th scope="col">打断情形</th><th scope="col">怎样记录</th><th scope="col">后续控制</th></tr></thead><tbody><tr><td>格式错误（Format Error），如缺少规定的工具调用（Tool Call）</td><td>追加格式反馈（Format Feedback），检查连续错误上限</td><td>未达上限可再次查询；达到上限则追加退出消息（Exit Message）并返回摘要</td></tr>
+<tr><td>预算（Budget）或时限达到条件；执行中抛出 <code>Submitted</code></td><td>追加相应退出消息（Exit Message）</td><td>离开循环，返回退出摘要（Exit Summary）</td></tr>
+<tr><td>未处理异常（Unhandled Exception）</td><td>记录带异常的退出消息（Exit Message）</td><td>仍向调用者抛出异常，不当作正常返回</td></tr></tbody></table></div>
+<p>表中只列代表分支，不是全部异常清单。下一节具体解释批次中断时已经取得的结果去了哪里，<a href="05-exit-and-trajectory.html#4-%E9%A2%84%E7%AE%97budget%E6%A3%80%E6%9F%A5%E5%8F%91%E7%94%9F%E5%9C%A8%E5%93%AA%E4%B8%80%E4%B8%AA%E6%97%B6%E7%82%B9">第05章</a>再展开精确条件。</p>
+<span class="heading-alias" id="同一批-action-中断时前面的结果是否已经加入-messages" aria-hidden="true"></span><h3 id="动作批次action-batch中断前面的结果去了哪里">动作批次（Action Batch）中断，前面的结果去了哪里？</h3>
+<p>考虑同一响应中的三个行动请求（Action），顺序为 <code>echo FIRST</code>、完成标记、<code>echo THIRD</code>。使用 <code>DefaultAgent</code> 时，第一条实际执行；第二条触发 <code>Submitted</code>；第三条没有执行。但 <code>execute_actions()</code> 使用列表推导（List Comprehension）收齐整批输出（Output）后才格式化，第二条的提交信号（Submission Signal）打断了收集，所以第一条也尚未作为观察消息（Observation Message）追加。</p>
+<p>按“现实执行”和“已追加材料”两条线读，就不会混淆：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 动作批次（Action Batch）中断，前面的结果去了哪里？"><table><caption>表 8 / Table 8 · 动作批次（Action Batch）中断，前面的结果去了哪里？</caption><thead><tr><th scope="col">时点</th><th scope="col">现实中的执行</th><th scope="col">消息列表（Message List）中的普通结果</th></tr></thead><tbody><tr><td>第一条返回</td><td>已执行 <code>echo FIRST</code></td><td>整批尚未结束，还没有统一追加</td></tr>
+<tr><td>第二条提交</td><td>完成命令（Command）实际运行并触发 <code>Submitted</code></td><td>收集被打断，未进入统一格式化</td></tr>
+<tr><td>外层处理信号</td><td>第三条没有运行</td><td>转而记录退出消息（Exit Message）</td></tr></tbody></table></div>
+<p><strong>按序执行，不等于每条结果立即进入输入。</strong> 这是前面伪代码（Pseudocode）将收集与追加分开写的实际含义。</p>
+<p><code>InteractiveAgent.execute_actions()</code> 采用另一条路径：逐条积累输出（Output），并在 <code>finally</code> 中格式化已有结果。工具调用格式化器（Tool-Call Formatter）为缺少结果的位置补 <code>returncode=-1</code> / <code>action was not executed</code>。因此第一条真实返回可以保留，完成命令（Command）与未执行的第三条却都可能显示占位结果（Placeholder Result）。</p>
+<p>第二条实际上执行过；这里的占位结果（Placeholder Result）表达的是“没有普通返回可交给格式化器”，不能据文字断言现实中没有运行。不同实现的保存范围需要分别核对，提交信号（Submission Signal）的具体异常路径见第05章。</p>
+<span class="heading-alias" id="记录与恢复的常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区一messages-里有所有步骤所以它就是数据库" aria-hidden="true"></span><span class="heading-alias" id="误区二save-在-finally-中运行所以外部副作用一定可恢复" aria-hidden="true"></span><span class="heading-alias" id="消息增长不是模型拥有持久记忆" aria-hidden="true"></span><h3 id="消息message增长为什么不等于持久记忆persistent-memory">消息（Message）增长为什么不等于持久记忆（Persistent Memory）？</h3>
+<p>一次 <code>DefaultAgent.run()</code> 内，<code>self.messages</code> 是线性内存列表（In-Memory List）。正常步骤将行动请求（Action）及观察消息（Observation Message）加入其中，供后续模型调用（Model Query）使用；前述中断可能跳过普通结果追加。</p>
+<p>这承担的是当前运行（Run）的工作记忆（Working Memory）：本次可用，不意味着下次自动可用。重新启动后是否载入历史需要另有读取入口，跨进程恢复（Cross-Process Recovery）与并发写入也不能由一个内存列表（In-Memory List）自动承担。</p>
+<span class="heading-alias" id="继续读源码" aria-hidden="true"></span><span class="heading-alias" id="练习标注消息与保存时点" aria-hidden="true"></span><span class="heading-alias" id="消息追加与保存的先后关系" aria-hidden="true"></span><h3 id="消息message追加与执行轨迹trajectory保存的先后关系">消息（Message）追加与执行轨迹（Trajectory）保存的先后关系</h3>
+<p>在 <a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/agents/default.py"><code>DefaultAgent</code></a> 中，<code>query</code> 先追加模型消息（Model Message），<code>execute_actions</code> 收齐整批输出（Output）后才追加观察消息（Observation Message），外层本轮的 <code>finally</code> 再调用 <code>save()</code>。</p>
+<p>若批次被 <code>Submitted</code> 打断，外层先处理退出信号，再保存当时状态（State）；已执行动作的普通结果可能还没加入。若进程（Process）直接收到 <code>SIGKILL</code>，这个 <code>finally</code> 也不会执行，磁盘可能只剩前一轮快照（Snapshot），文件却已经改变。</p>
+<p>因此，执行轨迹（Trajectory）快照（Snapshot）不自动等于持久执行账本（Durable Execution Ledger）。后者必须支持恢复时核对已经发生的事，还要处理工作身份、写入权与不确定效果。<a href="05-exit-and-trajectory.html">第05章</a>继续解释保存结构，<a href="06-crash-window.html">第06章</a>展示指定硬终止（Hard Termination）窗口；本章没有重新注入故障。</p>
+<span class="heading-alias" id="为什么这种拆法容易扩展" aria-hidden="true"></span><h3 id="接口interface可替换哪些结论不能一起继承">接口（Interface）可替换，哪些结论不能一起继承？</h3>
+<p><code>DefaultAgent</code> 的主循环依赖模型（Model）与执行环境（Environment）接口（Interface），没有把特定服务或执行后端（Execution Backend）完全写死。因此可以更换模型协议适配器（Model Adapter），选择本地、Docker、Singularity 等执行环境（Environment），或采用 <code>InteractiveAgent</code> 增加交互。</p>
+<p>相似的调用形状仍能连接查询、执行与观察消息（Observation Message），但它不证明这些实现拥有相同安全隔离（Isolation）、持久化（Persistence）与恢复（Recovery）保证。刚才两个批次路径就是具体反例：外表都“执行一批请求”，结果追加时点却不同。</p>
+<span class="heading-alias" id="深化自测区分一次调用一个批次与一个对象" aria-hidden="true"></span><span class="heading-alias" id="练习调用批次与对象状态" aria-hidden="true"></span><span class="heading-alias" id="调用批次与对象状态问答" aria-hidden="true"></span><h3 id="调用批次与对象状态object-state问答">调用、批次与对象状态（Object State）问答</h3>
+<p><strong>问题 1。</strong> 模型调用（Model Query）次数与命令（Command）执行次数为什么不相等？</p>
+<p><strong>解释。</strong> 一条响应可带多个行动请求（Action），格式错误（Format Error）也可能没有可执行请求；提交信号（Submission Signal）或其他错误还会使动作批次（Action Batch）提前停止。</p>
+<p><strong>问题 2。</strong> 第一条正常返回、第二条抛出 <code>Submitted</code>，<code>DefaultAgent</code> 会追加第一条观察消息（Observation Message）吗？</p>
+<p><strong>解释。</strong> 不会由 <code>execute_actions()</code> 追加。列表推导（List Comprehension）在统一格式化和 <code>add_messages()</code> 之前被打断；外层保存的是当时状态（State）。<code>InteractiveAgent</code> 在 <code>finally</code> 中整理已有结果，路径不同。</p>
+<p><strong>问题 3。</strong> 同一实例（Instance）再次调用 <code>run()</code>，输入重新开始是否表示预算（Budget）归零？</p>
+<p><strong>解释。</strong> 不表示。<code>n_calls</code>、<code>cost</code> 和构造时钟未在该入口重置，模型（Model）也有自己的状态（State）。已有课程实验每次创建新对象（Object），不能把其独立计数无条件推广到复用情境。</p>
 <span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
 <ul>
-<li>相关章节：<a href="01-agent-components.html">第01章｜什么是 Agent 与 Agent Harness</a></li>
-<li>相关章节：<a href="03-actions-and-messages.html#%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%9B%9E%E6%89%A7">第03章｜Actions、Observations 与 Messages</a></li>
+<li><a href="01-agent-components.html">第01章｜智能代理（Agent）与运行支撑（Agent Harness）</a>：职责与完整文档修复。</li>
+<li><a href="03-actions-and-messages.html#%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%9B%9E%E6%89%A7">第03章｜行动请求（Action）、观察结果（Observation）与消息（Message）协议</a>：表示、解析与执行。</li>
+<li><a href="05-exit-and-trajectory.html">第05章｜交互、退出与执行轨迹（Trajectory）</a>：精确结束分支与保存结构。</li>
 </ul>
 <hr>
-<p><a href="01-agent-components.html">上一章：第 01 章｜什么是 Agent 与 Agent Harness</a> · <a href="03-actions-and-messages.html">下一章：第 03 章｜动作、观察与消息协议</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="01-agent-components.html"><span>← 上一章</span><strong>第 01 章｜什么是 Agent 与 Agent Harness</strong></a><a href="03-actions-and-messages.html"><span>下一章 →</span><strong>第 03 章｜动作、观察与消息协议</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE">前情回顾</a></li><li class="toc-level-2"><a href="#defaultagent-%E7%9A%84%E6%89%A7%E8%A1%8C%E5%BE%AA%E7%8E%AF">DefaultAgent 的执行循环</a></li><li class="toc-level-3"><a href="#python-%E6%9C%80%E5%B0%8F%E9%98%85%E8%AF%BB%E5%8D%A1">Python 最小阅读卡</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E8%B7%AF%E5%BE%84%E7%9A%84%E4%BC%AA%E4%BB%A3%E7%A0%81">正常路径的伪代码</a></li><li class="toc-level-3"><a href="#runtask%E5%88%9D%E5%A7%8B%E5%8C%96%E6%B6%88%E6%81%AF%E5%B9%B6%E6%8B%A5%E6%9C%89%E5%A4%96%E5%B1%82%E5%BE%AA%E7%8E%AF">run(task)：初始化消息并拥有外层循环</a></li><li class="toc-level-3"><a href="#step%E4%B8%80%E8%BD%AE%E9%97%AE%E6%A8%A1%E5%9E%8B%E7%84%B6%E5%90%8E%E6%89%A7%E8%A1%8C%E5%8A%A8%E4%BD%9C">step()：一轮“问模型，然后执行动作”</a></li><li class="toc-level-3"><a href="#query%E6%A3%80%E6%9F%A5%E9%99%90%E5%88%B6%E8%B0%83%E7%94%A8-model%E8%BF%BD%E5%8A%A0%E6%A8%A1%E5%9E%8B%E6%B6%88%E6%81%AF">query()：检查限制、调用 Model、追加模型消息</a></li><li class="toc-level-3"><a href="#execute_actionsmessage%E8%AE%A9%E8%AF%B7%E6%B1%82%E6%8E%A5%E8%A7%A6%E7%8E%B0%E5%AE%9E%E5%86%8D%E5%BD%A2%E6%88%90%E6%96%B0%E6%B6%88%E6%81%AF">execute_actions(message)：让请求接触现实，再形成新消息</a></li><li class="toc-level-3"><a href="#%E7%AC%AC%E4%BA%8C%E4%B8%AA-step-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%83%BD%E8%8E%B7%E5%BE%97%E6%9B%B4%E5%A4%9A%E4%BE%9D%E6%8D%AE">第二个 step 为什么能获得更多依据</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E5%9B%BA%E5%AE%9A%E6%A1%88%E4%BE%8B%E8%BF%BD%E8%B8%AA%E5%9B%9B%E4%B8%AA-step">用固定案例追踪四个 step</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E8%B0%83%E7%94%A8%E9%93%BE%E7%9A%84%E8%BE%93%E5%85%A5%E8%BE%93%E5%87%BA%E5%92%8C%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96">正常调用链的输入、输出和状态变化</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AE%B5%E7%9C%9F%E5%AE%9E%E7%9A%84%E5%86%8D%E9%97%AE%E4%B8%80%E6%AC%A1">一段真实的“再问一次”</a></li><li class="toc-level-3"><a href="#%E6%B6%88%E6%81%AF%E4%B8%8E%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E9%97%AE%E7%AD%94">消息与执行顺序问答</a></li><li class="toc-level-2"><a href="#%E9%A2%84%E7%AE%97%E6%89%B9%E6%AC%A1%E4%B8%8E%E8%AE%B0%E5%BD%95">预算、批次与记录</a></li><li class="toc-level-3"><a href="#%E6%A8%A1%E5%9E%8B%E8%AF%B7%E6%B1%82%E5%89%8D%E7%9A%84%E9%99%90%E5%88%B6%E6%A3%80%E6%9F%A5">模型请求前的限制检查</a></li><li class="toc-level-3"><a href="#%E5%A2%9E%E5%8A%A0%E6%A8%A1%E5%9E%8B%E8%B0%83%E7%94%A8%E8%AE%A1%E6%95%B0">增加模型调用计数</a></li><li class="toc-level-3"><a href="#%E6%96%B0%E6%B6%88%E6%81%AF%E5%88%97%E8%A1%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%AD%89%E4%BA%8E%E6%96%B0%E9%A2%84%E7%AE%97">新消息列表为什么不等于新预算</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E6%89%B9-action-%E4%B8%AD%E6%96%AD%E6%97%B6%E5%89%8D%E9%9D%A2%E7%9A%84%E7%BB%93%E6%9E%9C%E6%98%AF%E5%90%A6%E5%B7%B2%E7%BB%8F%E5%8A%A0%E5%85%A5-messages">同一批 action 中断时，前面的结果是否已经加入 messages？</a></li><li class="toc-level-3"><a href="#%E6%B6%88%E6%81%AF%E5%A2%9E%E9%95%BF%E4%B8%8D%E6%98%AF%E6%A8%A1%E5%9E%8B%E6%8B%A5%E6%9C%89%E6%8C%81%E4%B9%85%E8%AE%B0%E5%BF%86">消息增长不是“模型拥有持久记忆”</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%99%E7%A7%8D%E6%8B%86%E6%B3%95%E5%AE%B9%E6%98%93%E6%89%A9%E5%B1%95">为什么这种拆法容易扩展</a></li><li class="toc-level-3"><a href="#%E8%B0%83%E7%94%A8%E6%89%B9%E6%AC%A1%E4%B8%8E%E5%AF%B9%E8%B1%A1%E7%8A%B6%E6%80%81%E9%97%AE%E7%AD%94">调用、批次与对象状态问答</a></li><li class="toc-level-3"><a href="#%E6%B6%88%E6%81%AF%E8%BF%BD%E5%8A%A0%E4%B8%8E%E4%BF%9D%E5%AD%98%E7%9A%84%E5%85%88%E5%90%8E%E5%85%B3%E7%B3%BB">消息追加与保存的先后关系</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="01-agent-components.html">上一章：第 01 章｜智能代理（Agent）与运行支撑（Agent Harness）</a> · <a href="03-actions-and-messages.html">下一章：第 03 章｜行动请求（Action）、观察结果（Observation）与消息（Message）协议</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="01-agent-components.html"><span>← 上一章</span><strong>第 01 章｜智能代理（Agent）与运行支撑（Agent Harness）</strong></a><a href="03-actions-and-messages.html"><span>下一章 →</span><strong>第 03 章｜行动请求（Action）、观察结果（Observation）与消息协议（Message Protocol）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE">前情回顾</a></li><li class="toc-level-2"><a href="#%E4%B8%80%E6%AC%A1%E7%BB%93%E6%9E%9C%E6%80%8E%E6%A0%B7%E8%BF%9B%E5%85%A5%E4%B8%8B%E4%B8%80%E8%BD%AE%E4%BB%A3%E7%90%86%E5%BE%AA%E7%8E%AFagent-loop">一次结果怎样进入下一轮代理循环（Agent Loop）</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E5%90%8C%E4%B8%80%E9%A1%B9%E4%BB%BB%E5%8A%A1task%E8%BF%BD%E8%B8%AA%E5%9B%9B%E6%AC%A1%E5%8D%95%E6%AD%A5%E6%8E%A8%E8%BF%9Bstep">用同一项任务（Task）追踪四次单步推进（Step）</a></li><li class="toc-level-3"><a href="#%E5%85%88%E7%9C%8B%E6%AD%A3%E5%B8%B8%E8%B7%AF%E5%BE%84%E7%9A%84%E4%BC%AA%E4%BB%A3%E7%A0%81pseudocode">先看正常路径的伪代码（Pseudocode）</a></li><li class="toc-level-2"><a href="#%E4%BB%8E%E9%98%85%E8%AF%BB-python-%E5%88%B0%E7%90%86%E8%A7%A3%E6%8E%A7%E5%88%B6%E6%8E%A5%E5%8F%A3control-interface">从阅读 Python 到理解控制接口（Control Interface）</a></li><li class="toc-level-3"><a href="#python-%E6%9C%80%E5%B0%8F%E9%98%85%E8%AF%BB%E5%8D%A1">Python 最小阅读卡</a></li><li class="toc-level-3"><a href="#runtask%E6%80%8E%E6%A0%B7%E5%BB%BA%E7%AB%8B%E4%B8%80%E6%AC%A1%E8%BF%90%E8%A1%8Crun">run(task)：怎样建立一次运行（Run）？</a></li><li class="toc-level-3"><a href="#step%E6%80%8E%E6%A0%B7%E8%BF%9E%E6%8E%A5%E4%B8%80%E6%AC%A1%E6%9F%A5%E8%AF%A2%E4%B8%8E%E5%8A%A8%E4%BD%9C%E6%89%B9%E6%AC%A1action-batch">step()：怎样连接一次查询与动作批次（Action Batch）？</a></li><li class="toc-level-3"><a href="#query%E6%A8%A1%E5%9E%8B%E8%B0%83%E7%94%A8model-query%E5%89%8D%E5%90%8E%E6%94%B9%E5%8F%98%E4%BA%86%E4%BB%80%E4%B9%88">query()：模型调用（Model Query）前后改变了什么？</a></li><li class="toc-level-3"><a href="#execute_actionsmessage%E5%8E%9F%E5%A7%8B%E8%BE%93%E5%87%BAoutput%E6%80%8E%E6%A0%B7%E5%8F%98%E6%88%90%E8%A7%82%E5%AF%9F%E6%B6%88%E6%81%AFobservation-message">execute_actions(message)：原始输出（Output）怎样变成观察消息（Observation Message）？</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E8%BE%93%E5%85%A5input%E8%BE%93%E5%87%BAoutput%E4%B8%8E%E7%8A%B6%E6%80%81state%E5%AF%B9%E7%85%A7%E8%B0%83%E7%94%A8%E9%93%BE">用输入（Input）、输出（Output）与状态（State）对照调用链</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AE%B5%E7%9C%9F%E5%AE%9E%E7%9A%84%E5%86%8D%E9%97%AE%E4%B8%80%E6%AC%A1">一段真实的“再问一次”</a></li><li class="toc-level-3"><a href="#%E6%B6%88%E6%81%AFmessage%E4%B8%8E%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E9%97%AE%E7%AD%94">消息（Message）与执行顺序问答</a></li><li class="toc-level-2"><a href="#%E9%A2%84%E7%AE%97budget%E5%8A%A8%E4%BD%9C%E6%89%B9%E6%AC%A1action-batch%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%AE%B0%E5%BD%95execution-record">预算（Budget）、动作批次（Action Batch）与执行记录（Execution Record）</a></li><li class="toc-level-3"><a href="#%E6%A8%A1%E5%9E%8B%E8%B0%83%E7%94%A8model-query%E5%89%8D%E7%9A%84%E9%99%90%E5%88%B6%E6%A3%80%E6%9F%A5">模型调用（Model Query）前的限制检查</a></li><li class="toc-level-3"><a href="#%E9%87%8D%E5%BB%BA%E6%B6%88%E6%81%AF%E5%88%97%E8%A1%A8message-list%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B2%A1%E6%9C%89%E5%BE%97%E5%88%B0%E6%96%B0%E9%A2%84%E7%AE%97budget">重建消息列表（Message List），为什么没有得到新预算（Budget）？</a></li><li class="toc-level-3"><a href="#%E5%93%AA%E4%BA%9B%E6%83%85%E5%86%B5%E4%BC%9A%E6%89%93%E6%96%AD%E6%AD%A3%E5%B8%B8%E4%BB%A3%E7%90%86%E5%BE%AA%E7%8E%AFagent-loop">哪些情况会打断正常代理循环（Agent Loop）？</a></li><li class="toc-level-3"><a href="#%E5%8A%A8%E4%BD%9C%E6%89%B9%E6%AC%A1action-batch%E4%B8%AD%E6%96%AD%E5%89%8D%E9%9D%A2%E7%9A%84%E7%BB%93%E6%9E%9C%E5%8E%BB%E4%BA%86%E5%93%AA%E9%87%8C">动作批次（Action Batch）中断，前面的结果去了哪里？</a></li><li class="toc-level-3"><a href="#%E6%B6%88%E6%81%AFmessage%E5%A2%9E%E9%95%BF%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%AD%89%E4%BA%8E%E6%8C%81%E4%B9%85%E8%AE%B0%E5%BF%86persistent-memory">消息（Message）增长为什么不等于持久记忆（Persistent Memory）？</a></li><li class="toc-level-3"><a href="#%E6%B6%88%E6%81%AFmessage%E8%BF%BD%E5%8A%A0%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%BD%A8%E8%BF%B9trajectory%E4%BF%9D%E5%AD%98%E7%9A%84%E5%85%88%E5%90%8E%E5%85%B3%E7%B3%BB">消息（Message）追加与执行轨迹（Trajectory）保存的先后关系</a></li><li class="toc-level-3"><a href="#%E6%8E%A5%E5%8F%A3interface%E5%8F%AF%E6%9B%BF%E6%8D%A2%E5%93%AA%E4%BA%9B%E7%BB%93%E8%AE%BA%E4%B8%8D%E8%83%BD%E4%B8%80%E8%B5%B7%E7%BB%A7%E6%89%BF">接口（Interface）可替换，哪些结论不能一起继承？</a></li><li class="toc-level-3"><a href="#%E8%B0%83%E7%94%A8%E6%89%B9%E6%AC%A1%E4%B8%8E%E5%AF%B9%E8%B1%A1%E7%8A%B6%E6%80%81object-state%E9%97%AE%E7%AD%94">调用、批次与对象状态（Object State）问答</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

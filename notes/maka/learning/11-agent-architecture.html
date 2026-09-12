@@ -20,7 +20,7 @@
 <p>这六组是学习地图；具体机制不必各有一个同名类。Context 是本次输入，Memory 是供后续复用的信息：后者必须被读出并选入输入，才能影响当前模型调用。模型看到 Edit 的说明，只能提出调用意图，实际执行仍受工具绑定、参数和当前许可约束。</p>
 <h2 id="一项-readme-修复怎样推进">一项 README 修复怎样推进</h2>
 <h3 id="贯穿全套教程的案例">贯穿全套教程的案例</h3>
-<p>代码修复任务来自 <a href="04-code-repair.html#%E7%AC%AC-04-%E7%AB%A0%E4%BB%A3%E7%A0%81%E4%BF%AE%E5%A4%8D%E4%B8%8E%E6%B5%8B%E8%AF%95">第04章 的四文件案例</a>：</p>
+<p>代码修复任务来自 <a href="04-code-repair.html#%E7%AC%AC-04-%E7%AB%A0%E4%BB%A3%E7%A0%81%E4%BF%AE%E5%A4%8Dcode-repair%E4%B8%8E%E6%B5%8B%E8%AF%95test">第04章 的四文件案例</a>：</p>
 <blockquote><p>修正 README 的测试步骤，找出并修复 <code>formatDuration</code> 的时间格式化错误，运行测试并检查 diff；用中文解释结果。</p>
 </blockquote>
 <p><code>formatDuration(seconds)</code> 要把非负整数秒表示为 <code>minutes:ss</code>，例如 <code>125 → 2:05</code>。README 告诉人怎样启动测试，函数实现和测试则用来判断行为是否正确。</p>

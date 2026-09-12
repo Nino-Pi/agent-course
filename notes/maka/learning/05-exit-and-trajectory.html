@@ -1,351 +1,219 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 05 章｜交互、退出、预算与执行轨迹 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 05 / 62</div><article id="main-content"><span class="heading-alias" id="a03interactionexitlimits-与-trajectoryagent-怎样停下以及记录能证明什么" aria-hidden="true"></span><span class="heading-alias" id="a03交互退出预算与执行轨迹" aria-hidden="true"></span><h1 id="第-05-章交互退出预算与执行轨迹">第 05 章｜交互、退出、预算与执行轨迹</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 05 章｜交互（Interaction）、退出（Exit）、预算（Budget）与执行轨迹（Trajectory） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script><link rel="stylesheet" href="../../../assets/katex/katex.min.css"><link rel="stylesheet" href="../../../assets/course-math.css"></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 05 / 62</div><article id="main-content"><span class="heading-alias" id="a03interactionexitlimits-与-trajectoryagent-怎样停下以及记录能证明什么" aria-hidden="true"></span><span class="heading-alias" id="a03交互退出预算与执行轨迹" aria-hidden="true"></span><span class="heading-alias" id="第-05-章交互退出预算与执行轨迹" aria-hidden="true"></span><h1 id="第-05-章交互interaction退出exit预算budget与执行轨迹trajectory">第 05 章｜交互（Interaction）、退出（Exit）、预算（Budget）与执行轨迹（Trajectory）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：人工确认、完成标记、预算超限和异常，各自怎样改变循环与保存结果？</p>
-<p><strong>关键概念</strong>：Interaction（交互）影响动作是否执行；Submitted（提交信号）触发完成退出；预算限制资源消耗；trajectory（执行轨迹）保存 Agent 对象中的过程。</p>
-<p><strong>关系主线</strong>：执行前的交互、循环中的退出判断与外层保存各有时点。轨迹反映已进入对象并被保存的内容，不是与外部文件同步提交的账本；循环结束也不等于任务正确。</p>
+<p>智能代理（Agent）能执行命令以后，还需要决定谁同意执行、何时停止，以及留下什么记录。本章把交互（Interaction）、退出（Exit）、预算（Budget）和执行轨迹（Trajectory）放回运行支撑（Agent Harness）：确认（Confirmation）决定是否开始，提交信号（Submission Signal）结束代理循环（Agent Loop），预算（Budget）限制后续调用，保存（Save）把已知过程写到磁盘。它们分别回答不同问题；任务成功（Task Success）仍须靠验收，已存记录也可能落后于效果（Effect）。</p>
 </blockquote>
-<p>动作与消息的转换见 <a href="03-actions-and-messages.html">第03章</a>；<a href="04-code-repair.html">第04章</a>提供实际命令和测试结果。</p>
-<span class="heading-alias" id="核心阅读" aria-hidden="true"></span><span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><h2 id="交互退出与轨迹">交互、退出与轨迹</h2>
-<span class="heading-alias" id="先分清控制与记录" aria-hidden="true"></span><h3 id="控制与记录的分工">控制与记录的分工</h3>
-<p>第04章 使用 <code>DefaultAgent</code> 让固定响应经过真实循环。日常命令行 <code>mini</code> 默认再加一层 <code>InteractiveAgent</code>，让人在命令执行前参与选择。预算检查由 <code>DefaultAgent</code> 提供，交互层可在部分限制到达时增加询问。运行中的消息可以保存成 trajectory JSON，供之后检查。</p>
-<h3 id="为什么默认-cli-使用-interactiveagent">为什么默认 CLI 使用 <code>InteractiveAgent</code></h3>
-<p><code>run/mini.py</code> 组装 Agent 时使用：</p>
-<pre><code class="language-text">get_agent(..., default_type=&quot;interactive&quot;)</code></pre>
-<p><code>InteractiveAgent</code> 继承 <code>DefaultAgent</code>。这里的<strong>继承</strong>表示在已有类的基础上复用和扩展行为，因此不需要重新写一套 Agent loop。它主要在最小循环上增加：</p>
-<ul>
-<li>把消息打印到终端；</li>
-<li>支持人直接输入命令；</li>
-<li>在执行模型命令前询问确认；</li>
-<li>处理键盘中断；</li>
-<li>在 Agent 想结束时询问用户是否还有补充任务；</li>
-<li>在某些限制到达时允许用户调整限制。</li>
-</ul>
-<p>可以把关系画成：</p>
-<pre><code class="language-text">DefaultAgent
-  └─ query → execute → observation 的最小循环
-
-InteractiveAgent(DefaultAgent)
-  └─ 在若干边界插入人类交互</code></pre>
-<h3 id="三种交互模式">三种交互模式</h3>
-<h4 id="confirm模型提命令人在执行前确认"><code>confirm</code>：模型提命令，人在执行前确认</h4>
-<p>这是默认 <code>mini.yaml</code> 的模式。</p>
-<p>沿用第01章的 README 文档任务，假设模型提出下面的读取命令；这里说明 confirm 模式的处理方式，不复用第04章的固定响应运行：</p>
-<pre><code class="language-text">sed -n &#39;1,220p&#39; package.json README.md</code></pre>
-<p>在执行前，InteractiveAgent 可以显示命令并询问是否执行。用户可以：</p>
-<ul>
-<li>直接确认；</li>
-<li>输入说明拒绝本次命令；</li>
-<li>切换模式；</li>
-<li>中断并补充新的上下文。</li>
-</ul>
-<p>确认模式的价值是把人放进关键动作之前：模型不会在一组 actions 生成后都无条件立即执行。</p>
-<p>当前实现对同一条模型消息中的整组 actions 作一次确认，再按顺序执行，不是每条 command 分别弹窗。</p>
-<span class="heading-alias" id="误区一yolo-只是少点一次按钮不改变风险" aria-hidden="true"></span><h4 id="yolo模型命令无需执行前批量确认"><code>yolo</code>：模型命令无需执行前批量确认</h4>
-<p>在 yolo 模式中，模型生成的 action 直接进入 Environment。</p>
-<p>它只取消命令执行前确认，结束前是否再询问是独立设置。因此切到 yolo，不意味着所有人工交互都会消失。<code>confirm_exit</code> 独立控制结束前询问。</p>
-<p>实际命令仍交给同一个 Environment 执行。</p>
-<h4 id="human由人直接提供命令"><code>human</code>：由人直接提供命令</h4>
-<p>human 模式不请求模型来决定当前 action，而是提示用户输入命令。InteractiveAgent 把用户命令包装成带 action 的 user message，随后仍复用 Environment execution 和 observation formatting。</p>
-<p>因此 human 模式不是“退出 Agent 系统去开另一个终端”。它仍然走当前 Agent 的消息与执行通道，只是 action 的提出者从 Model 换成了人。</p>
-<h4 id="模式改变了什么没有改变什么">模式改变了什么，没有改变什么</h4>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 模式改变了什么，没有改变什么"><table><caption>表 1 / Table 1 · 模式改变了什么，没有改变什么</caption><thead><tr><th scope="col">模式</th><th scope="col">谁提出命令</th><th scope="col">模型动作批次（Action Batch）执行前是否询问</th><th scope="col">执行环境（Environment）是否仍负责执行</th></tr></thead><tbody><tr><td>人工模式（human）</td><td>用户</td><td>用户本身输入</td><td>是</td></tr>
-<tr><td>确认模式（confirm）</td><td>模型（Model）</td><td>通常是</td><td>是</td></tr>
-<tr><td>免执行前确认（yolo）</td><td>模型（Model）</td><td>否</td><td>是</td></tr></tbody></table></div>
-<p>三种模式都没有改变一个事实：现实副作用仍由具体 Environment 产生。</p>
-<span class="heading-alias" id="误区一confirm-模式等于安全沙箱" aria-hidden="true"></span><h3 id="确认为什么不等于-sandbox">确认为什么不等于 Sandbox</h3>
-<h4 id="确认解决人是否同意这段可见命令">确认解决“人是否同意这段可见命令”</h4>
-<p>确认对话让用户看到模型准备执行的 command，并决定是否继续。它属于人机控制层。</p>
-<h4 id="sandbox-解决命令实际越界时能否被强制挡住">Sandbox 解决“命令实际越界时能否被强制挡住”</h4>
-<p>如果一条看似普通的命令：</p>
-<ul>
-<li>通过脚本间接访问工作区外文件；</li>
-<li>启动另一个程序；</li>
-<li>在宿主允许时访问网络；</li>
-<li>展开到用户没有预见的路径；</li>
-</ul>
-<p>仅仅点击“确认”不会额外建立 OS 级隔离。</p>
-<p>确认也不能证明用户已经理解命令内部所有动态行为。</p>
-<p>所以必须保留下面的边界：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · Sandbox 解决“命令实际越界时能否被强制挡住”"><table><caption>表 2 / Table 2 · Sandbox 解决“命令实际越界时能否被强制挡住”</caption><thead><tr><th scope="col">控制概念</th><th scope="col">生效时点与责任</th><th scope="col">仍需核对什么</th></tr></thead><tbody><tr><td>确认（Confirmation）</td><td>执行前由人判断是否接受可见命令</td><td>不自动限制脚本间接产生的文件、网络和子进程行为</td></tr>
-<tr><td>沙箱隔离（Sandbox Isolation）</td><td>执行时由具体后端落实资源限制</td><td>要检查所选 Environment 的实际能力；普通 LocalEnvironment 不因确认而获得隔离</td></tr></tbody></table></div>
-<p>mini-SWE-agent 支持选择不同 Environment，但每个 Environment 的实际隔离保证必须独立核对。</p>
-<h3 id="一次拒绝怎样回到循环">一次拒绝怎样回到循环</h3>
-<p>在 confirm 模式中，用户可以拒绝当前命令并写明原因。InteractiveAgent 把反馈变成用户消息，交回外层循环。例如：</p>
-<pre><code class="language-text">用户：先不要修改，请先读取测试文件。
-    ↓
-反馈进入 messages
-    ↓
-下一轮模型看见反馈，再决定动作</code></pre>
-<p>因此，拒绝命令不一定等于结束任务。反馈可以成为下一轮的判断依据。该反馈经控制流异常回到外层循环，而不是执行已被拒绝的命令。</p>
-<span class="heading-alias" id="误区二模型输出最终中文说明就会停止" aria-hidden="true"></span><h3 id="agent-怎样正常提交">Agent 怎样正常提交</h3>
-<h4 id="完成也通过-bash-协议表达">完成也通过 Bash 协议表达</h4>
-<p>默认任务模板要求 Agent 完成后执行：</p>
-<pre><code class="language-text">echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code></pre>
-<p>并要求不要与其他命令组合。</p>
-<p>这条命令不是为了修改项目。它是 Environment 能识别的完成信号。</p>
-<h4 id="localenvironment_check_finished-检查什么"><code>LocalEnvironment._check_finished()</code> 检查什么</h4>
-<p>执行命令以后，LocalEnvironment：</p>
+<h2 id="前情回顾从行动请求action到任务成功task-success">前情回顾：从行动请求（Action）到任务成功（Task Success）</h2>
+<p>第03章区分了三个相邻步骤：模型（Model）提出行动请求（Action），执行环境（Environment）真正运行命令并返回执行输出（Output），运行支撑（Agent Harness）再把结果整理成观察消息（Observation Message）。观察消息（Observation Message）承载观察结果（Observation），本体是供后续读取的消息（Message）。因此，看到一条命令只能证明它被提出；看到命令返回码（Return Code）为 0，也只证明那次命令按自身约定结束。</p>
+<p>第04章把这个区别放进修复案例：README 原先写错测试命令，<code>formatDuration(125)</code> 原先返回 <code>2:25</code>，要求是 <code>2:05</code>。在使用正确的 <code>npm test</code> 后，已有案例的测试从 2 项通过、2 项失败变为 4 项通过、0 项失败；修改范围还必须符合 README 与实现文件的约束。这些结果共同支撑那个限定案例的任务成功（Task Success）。案例采用预先写好的响应和真实本地执行，不能据此评价真实模型（Model）的修复能力。</p>
+<p>现在还有三个问题没有回答：执行前有人不同意怎么办；模型（Model）说“完成”怎样让程序停下；文件改好了，记录是否也已经保存（Save）？本章分别追踪这些控制点。读者只需记住上述背景，不需要先读后面的恢复（Recovery）或分布式执行章节。</p>
+<span class="heading-alias" id="核心阅读" aria-hidden="true"></span><span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><span class="heading-alias" id="先分清控制与记录" aria-hidden="true"></span><span class="heading-alias" id="交互退出与轨迹" aria-hidden="true"></span><span class="heading-alias" id="控制与记录的分工" aria-hidden="true"></span><h2 id="1-先分清确认confirmation退出exit与保存save">1. 先分清确认（Confirmation）、退出（Exit）与保存（Save）</h2>
+<p>智能代理（Agent）推进任务，运行支撑（Agent Harness）承担调用、执行、消息（Message）组织和停止控制。代理循环（Agent Loop）指这些决策、执行与反馈反复衔接的过程。这里讨论 mini-SWE-agent 的具体实现，类名 <code>DefaultAgent</code> 与 <code>InteractiveAgent</code> 是实现入口，不是所有智能代理（Agent）的统一定义。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 先分清确认（Confirmation）、退出（Exit）与保存（Save）"><table><caption>表 1 / Table 1 · 1. 先分清确认（Confirmation）、退出（Exit）与保存（Save）</caption><thead><tr><th scope="col">要回答的问题</th><th scope="col">对应机制</th><th scope="col">这项证据的边界</th></tr></thead><tbody><tr><td>人是否允许开始执行？</td><td>确认（Confirmation）</td><td>同意可见命令，不自动证明命令安全或正确</td></tr>
+<tr><td>命令执行得到什么？</td><td>执行输出（Output）与观察消息（Observation Message）</td><td>返回码（Return Code）为 0 不等于整个任务成功（Task Success）</td></tr>
+<tr><td>程序是否结束当前代理循环（Agent Loop）？</td><td>退出（Exit）</td><td>可以因完成、超限或错误结束，不都代表任务成功（Task Success）</td></tr>
+<tr><td>已知过程是否写入磁盘？</td><td>执行轨迹（Trajectory）的保存（Save）</td><td>记录包含什么，取决于当时内存里已有的内容</td></tr>
+<tr><td>目标与约束是否满足？</td><td>任务成功（Task Success）的验收</td><td>需要测试结果、修改范围和任务要求共同支持</td></tr></tbody></table></div>
+<p>下面先画普通完成路径。图中“每轮结束”指执行到该轮的 <code>finally</code>；硬终止（Hard Termination），例如本课案例里的 <code>SIGKILL</code>，可能让程序根本到不了那里。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="确认、退出与保存 · Confirmation, Exit, Save：可滚动示意图"><a href="../../../assets/diagrams/05-exit-and-trajectory-1.svg"><img src="../../../assets/diagrams/05-exit-and-trajectory-1.svg" alt="图中确认（Confirmation）节点适用于需要询问的交互（Interaction）路径；无需询问时可直接进入执行环境（Environment）。普通返回成为观察消息（Observation Message），提交信号（Submission Signal）成为退出消息（Exit Message）。到达每轮 finally 时尝试保存（Save）执行轨迹（Trajectory），再依据末条消息继续或退出（Exit）；硬终止（Hard Termination）可能到不了保存处。" width="766" height="1949" loading="lazy" style="width:766px;min-width:652px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中的确认（Confirmation）节点只适用于需要询问的交互（Interaction）路径；普通 <code>DefaultAgent</code> 等不需要这道询问的路径可以直接执行，并非每轮都经过人工同意。提交信号（Submission Signal）在交互（Interaction）分支还可能先触发结束前询问，稍后会展开。任务成功（Task Success）不在这张控制图里自动产生：即使程序正常退出（Exit），仍要回看验收材料。</p>
+<h2 id="2-交互interaction谁提出命令谁允许执行">2. 交互（Interaction）：谁提出命令，谁允许执行</h2>
+<span class="heading-alias" id="误区一yolo-只是少点一次按钮不改变风险" aria-hidden="true"></span><span class="heading-alias" id="为什么默认-cli-使用-interactiveagent" aria-hidden="true"></span><span class="heading-alias" id="三种交互模式" aria-hidden="true"></span><span class="heading-alias" id="confirm模型提命令人在执行前确认" aria-hidden="true"></span><span class="heading-alias" id="yolo模型命令无需执行前批量确认" aria-hidden="true"></span><span class="heading-alias" id="human由人直接提供命令" aria-hidden="true"></span><span class="heading-alias" id="模式改变了什么没有改变什么" aria-hidden="true"></span><span class="heading-alias" id="整批确认的实现条件" aria-hidden="true"></span><h3 id="三种交互模式interaction-mode">三种交互模式（Interaction Mode）</h3>
+<p>默认命令行界面（Command-Line Interface，CLI）通过 <code>get_agent(..., default_type=&quot;interactive&quot;)</code> 选择 <code>InteractiveAgent</code>。它继承（Inheritance） <code>DefaultAgent</code>：继承（Inheritance）是复用已有类并扩展部分行为，因此基本代理循环（Agent Loop）不需要重写。扩展内容包括打印消息（Message）、接收人工命令、执行前询问、键盘中断反馈，以及结束前追加任务。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 三种交互模式（Interaction Mode）"><table><caption>表 2 / Table 2 · 三种交互模式（Interaction Mode）</caption><thead><tr><th scope="col">交互模式（Interaction Mode）</th><th scope="col">命令由谁提出</th><th scope="col">执行前的确认（Confirmation）</th><th scope="col">实际执行者</th></tr></thead><tbody><tr><td>确认模式（confirm）</td><td>模型（Model）</td><td>对需要询问的一整批命令询问一次</td><td>执行环境（Environment）</td></tr>
+<tr><td>免执行前确认模式（yolo）</td><td>模型（Model）</td><td>跳过这道批量询问</td><td>执行环境（Environment）</td></tr>
+<tr><td>人工模式（human）</td><td>人</td><td>人直接提供本次命令</td><td>执行环境（Environment）</td></tr></tbody></table></div>
+<p>例如，模型（Model）在独立的命令行界面（CLI）场景中提出 <code>sed -n &#39;1,220p&#39; package.json README.md</code>。确认模式（confirm）会让人先看命令，允许继续、写下拒绝原因，或切换模式。这只是交互（Interaction）说明，不是第04章固定运行记录的新增步骤。</p>
+<p>一次模型（Model）响应可能含多个行动请求（Action）。实现先收集这一批的全部命令；只要至少一条不匹配白名单（Whitelist），就询问一次 <code>Execute N action(s)?</code>，获准后依次执行整批。默认白名单（Whitelist）为空。因此，“每次都询问”不能被理解为“每条命令之间都再停下来问一次”。</p>
+<p>免执行前确认模式（yolo）只改变这道执行前询问。它不绕过执行环境（Environment），也不自动关闭独立的 <code>confirm_exit</code>；结束时是否继续询问，由该配置与 <code>--exit-immediately</code> 等入口设置控制。</p>
+<p>人工模式（human）将人的命令包装成带有 <code>extra.actions</code> 的用户消息（Message），再走相同的执行环境（Environment）和观察消息（Observation Message）整理过程。它是在代理循环（Agent Loop）内替换本次命令的来源，没有跳出整套运行支撑（Agent Harness）。</p>
+<span class="heading-alias" id="误区一confirm-模式等于安全沙箱" aria-hidden="true"></span><span class="heading-alias" id="确认为什么不等于-sandbox" aria-hidden="true"></span><span class="heading-alias" id="确认解决人是否同意这段可见命令" aria-hidden="true"></span><span class="heading-alias" id="sandbox-解决命令实际越界时能否被强制挡住" aria-hidden="true"></span><h3 id="确认confirmation与沙箱隔离sandbox-isolation各管什么">确认（Confirmation）与沙箱隔离（Sandbox Isolation）各管什么</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 确认（Confirmation）与沙箱隔离（Sandbox Isolation）各管什么"><table><caption>表 3 / Table 3 · 确认（Confirmation）与沙箱隔离（Sandbox Isolation）各管什么</caption><thead><tr><th scope="col">机制</th><th scope="col">生效位置</th><th scope="col">不能由它单独推出什么</th></tr></thead><tbody><tr><td>确认（Confirmation）</td><td>实际执行前，由人决定是否同意可见命令</td><td>不能保证人已展开所有脚本、子进程、网络访问或动态路径</td></tr>
+<tr><td>沙箱隔离（Sandbox Isolation）</td><td>执行过程中，由系统强制限制资源访问</td><td>不替代任务目标判断，也不自动证明结果正确</td></tr></tbody></table></div>
+<p>例如，人同意运行一个脚本，不等于已经理解脚本随后加载的所有代码。普通 <code>LocalEnvironment</code> 也不会因为经过确认（Confirmation），就自动拥有操作系统级沙箱隔离（Sandbox Isolation）。实际能访问什么，还要看对应执行环境（Environment）的实现和部署条件。</p>
+<span class="heading-alias" id="一次拒绝怎样回到循环" aria-hidden="true"></span><span class="heading-alias" id="拒绝反馈怎样回到外层循环" aria-hidden="true"></span><h3 id="拒绝如何成为下一轮可读的反馈">拒绝如何成为下一轮可读的反馈</h3>
+<p>拒绝时，<code>InteractiveAgent</code> 抛出 <code>UserInterruption</code>，其中携带用户角色的反馈消息（Message）。它属于用于改变代理循环（Agent Loop）走向的控制流异常（Control-flow Exception）；外层 <code>DefaultAgent.run()</code> 捕获其基类 <code>InterruptAgentFlow</code>，把消息（Message）追加进 <code>messages</code>，随后可以继续。</p>
+<p>于是，模型（Model）下一轮能看到拒绝原因，并提出新的行动请求（Action）。被拒绝的命令不会在该分支继续执行。这是进程内的交互（Interaction）协议，不能据此推出已有跨进程的持久审批记录或重启后自动续接机制。</p>
+<span class="heading-alias" id="误区二模型输出最终中文说明就会停止" aria-hidden="true"></span><span class="heading-alias" id="agent-怎样正常提交" aria-hidden="true"></span><h2 id="3-退出exit提交信号submission-signal怎样结束代理循环agent-loop">3. 退出（Exit）：提交信号（Submission Signal）怎样结束代理循环（Agent Loop）</h2>
+<span class="heading-alias" id="完成也通过-bash-协议表达" aria-hidden="true"></span><span class="heading-alias" id="localenvironment_check_finished-检查什么" aria-hidden="true"></span><span class="heading-alias" id="submitted-为什么是控制流异常" aria-hidden="true"></span><h3 id="先看完成命令再看实际消费者consumer">先看完成命令，再看实际消费者（Consumer）</h3>
+<p>本例的完成协议要求单独运行下面这条命令，不要把它接在其他命令后面凑成一条：</p>
+<pre><code class="language-bash">echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code></pre>
+<p>命令先由 <code>LocalEnvironment</code> 真正执行。执行输出（Output）的消费者（Consumer）是 <code>_check_finished()</code>，它检查返回码（Return Code）和标准输出（Standard Output），再决定是否通过 <code>Submitted</code> 异常（Exception）发出提交信号（Submission Signal）。仅在普通说明文字中写“任务完成”，不等于触发了这个协议。</p>
+<p>下面是 <code>_check_finished()</code> 的关键判断，添加了教学注释；这是类方法中的片段，不是独立脚本。<code>output</code> 是本次命令的执行输出（Output），<code>Submitted</code> 是携带结束信息的异常（Exception）类型。</p>
+<pre><code class="language-python">lines = output.get(&quot;output&quot;, &quot;&quot;).lstrip().splitlines(keepends=True)
+# 去掉首部空白后，检查首行标记；同时要求命令返回码为 0。
+if (
+    lines
+    and lines[0].strip() == &quot;COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT&quot;
+    and output[&quot;returncode&quot;] == 0
+):
+    # 首行之后的标准输出（Standard Output）才进入 submission 字段。
+    submission = &quot;&quot;.join(lines[1:])
+    raise Submitted(
+        {
+            &quot;role&quot;: &quot;exit&quot;,
+            &quot;content&quot;: submission,
+            &quot;extra&quot;: {&quot;exit_status&quot;: &quot;Submitted&quot;, &quot;submission&quot;: submission},
+        }
+    )</code></pre>
+<p>匹配过程容许前导空白，首行还会去除首尾空白；不是在任意一行找到标记就结束。返回码（Return Code）非 0 时，也不会走这个成功匹配分支。</p>
+<p>承载提交信号（Submission Signal）的异常（Exception）类型 <code>Submitted</code> 继承（Inheritance） <code>InterruptAgentFlow</code>。这里用异常（Exception）机制把“结束当前代理循环（Agent Loop）”从执行环境（Environment）传到外层，并不意味着发生了意外故障。外层追加退出消息（Exit Message），执行到本轮 <code>finally</code> 时尝试保存（Save），再检查最后一条消息（Message）的角色；角色是 <code>exit</code> 才结束代理循环（Agent Loop）。</p>
+<span class="heading-alias" id="interactiveagent-还能在退出前询问" aria-hidden="true"></span><h3 id="人可以在退出exit前补充任务">人可以在退出（Exit）前补充任务</h3>
+<p>默认 <code>confirm_exit=true</code> 时，<code>InteractiveAgent</code> 会先截获提交信号（Submission Signal），询问是否结束。人可以按回车结束，也可以补充任务，或切换到人工模式（human）。补充任务会转成用户反馈并回到代理循环（Agent Loop）。</p>
+<p>因此，模型（Model）判断“可以完成”和人决定“现在结束”是两个时点。这个询问检查的是是否继续工作，不能把它当成自动测试，也不能单凭按回车就补出任务成功（Task Success）的证据。</p>
+<span class="heading-alias" id="完成命令为何会留下-not-executed-占位" aria-hidden="true"></span><h3 id="为什么完成命令会留下-action-was-not-executed">为什么完成命令会留下 <code>action was not executed</code></h3>
+<p>普通 <code>DefaultAgent</code> 收到提交信号（Submission Signal）后，不会得到该命令通常应返回的执行输出（Output）字典。交互（Interaction）分支还多一层 <code>finally</code>：无论是否收到提交信号（Submission Signal），它都会调用格式化器，为这一批行动请求（Action）补齐观察消息（Observation Message）。</p>
+<p>需要按顺序读这四步，才能解释已核对的交互（Interaction）分支行为：</p>
 <ol>
-<li>去掉输出开头的空白；</li>
-<li>按行拆分；</li>
-<li>检查第一行是否正好是 <code>COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code>；</li>
-<li>检查 return code 是否为 0。</li>
+<li><code>LocalEnvironment.execute()</code> 已执行完成命令，随后抛出提交信号（Submission Signal）。</li>
+<li>因为函数没有普通返回，该命令的执行输出（Output）没有追加进 <code>outputs</code>。</li>
+<li><code>InteractiveAgent.execute_actions()</code> 的 <code>finally</code> 仍调用格式化器；缺少匹配结果时，格式化器生成占位观察消息（Observation Message），含 <code>returncode: -1</code> 和 <code>exception_info: &quot;action was not executed&quot;</code>。</li>
+<li>如果人允许结束，提交信号（Submission Signal）继续传到外层，外层再追加真正的退出消息（Exit Message）。</li>
 </ol>
-<p>满足条件时，它抛出 <code>Submitted</code>，并把第一行之后的内容作为 submission。</p>
-<h4 id="submitted-为什么是控制流异常"><code>Submitted</code> 为什么是控制流异常</h4>
-<p><code>Submitted</code> 继承 <code>InterruptAgentFlow</code>。它不是“程序出现意外 bug”的普通错误，而是一种从深层 Environment execution 跳回外层 Agent loop 的控制信号。</p>
-<p><code>DefaultAgent.run()</code> 捕获后把携带的 exit message 加入 <code>messages</code>。最后一条消息 role 为 <code>exit</code>，循环随即结束。</p>
-<p>如果直接使用 <code>DefaultAgent</code>，主路径可以画成：</p>
-<pre><code class="language-text">Model 请求完成命令
-  ↓
-LocalEnvironment 真正执行
-  ↓
-输出首行匹配 + returncode 0
-  ↓
-raise Submitted(exit message)
-  ↓
-DefaultAgent.run 捕获并追加消息
-  ↓
-last role == exit
-  ↓
-break</code></pre>
-<h4 id="interactiveagent-还能在退出前询问">InteractiveAgent 还能在退出前询问</h4>
-<p>默认 <code>confirm_exit</code> 为 true。InteractiveAgent 捕获 Submitted 后，可以询问用户：</p>
-<ul>
-<li>直接确认结束；</li>
-<li>补充新任务；</li>
-<li>切换到 human 等模式继续。</li>
-</ul>
-<p>因此“模型认为完成”与“交互用户同意结束”在该 CLI 中可以是两个时点。</p>
-<h3 id="下一次调用为什么也可能被阻止">下一次调用为什么也可能被阻止</h3>
-<p>即使尚未正常提交，系统也不能无限请求模型。DefaultAgent 在下一次模型 query 前检查已有步数、成本与经过时间；格式错误（例如模型响应不符合工具调用协议）可以先反馈给模型，连续达到上限才退出。这些检查发生在指定控制点，不是能随时打断所有进行中操作的万能计时器。human 命令绕过模型 query，不能把模型调用预算当作所有人工命令的限制。</p>
-<h3 id="trajectory保存当前已经知道的过程">Trajectory：保存当前已经知道的过程</h3>
-<p>Trajectory 是本次运行的结构化轨迹快照。它保存当前 <code>messages</code>，以及配置、模型统计和退出摘要，用来调试和复盘。它记录已经进入 Agent 对象的信息；不会自动知道消息之外的文件变化。</p>
-<h4 id="什么时候保存">什么时候保存</h4>
-<p><code>run()</code> 的循环在 <code>finally</code> 中调用 <code>save(output_path)</code>。配置了 path 且控制流走到 <code>finally</code> 时，程序会尝试把当前序列化数据写到该路径。硬终止会跳过这一步，写入自身也可能失败。</p>
-<p>命令行 <code>mini</code> 默认也提供 trajectory 输出文件位置，并在结束时提示保存位置。</p>
-<p>这比只在最后保存更有利于调试：中途出现预期错误或退出时，通常仍能看到已经进入 Agent 对象的消息。</p>
-<p>保存时会覆盖同一个 JSON 快照，而不是为每个现实副作用建立独立的恢复协议。因此，实际效果与下一份快照之间可能存在记录缺口。</p>
-<span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区四trajectory-每轮保存所以命令绝不会重复" aria-hidden="true"></span><span class="heading-alias" id="本章小结" aria-hidden="true"></span><h3 id="一个关键崩溃窗口">一个关键崩溃窗口</h3>
-<p>固定案例中，假设 Environment 正在执行修改 README 的命令：</p>
-<pre><code class="language-text">t0  上一轮 observation 已经成功保存
-t1  query() 把本轮 assistant action 加入内存 messages
-t2  LocalEnvironment 启动 shell，shell 把 README 写到磁盘
-t3  Python 进程被硬终止，output 尚未追加为 observation
-t4  硬终止绕过本轮 finally/save，磁盘 snapshot 仍停在 t0</code></pre>
-<p>重新启动后，可能出现：</p>
-<ul>
-<li>文件系统中的 README 已经改变；</li>
-<li>因为 assistant action 与 Environment execution 位于同一个 <code>step()</code>，而该轮保存发生在外层 <code>finally</code>，上一次成功落盘的 trajectory 通常只到前一轮 observation，甚至还看不到本轮“准备执行修改”的 assistant action；</li>
-<li>没有本轮 action/observation 的落盘配对能直接证明命令成功、失败还是部分完成。</li>
-</ul>
-<p><a href="06-crash-window.html">第06章</a> 已实际注入一个绕过 Python <code>finally</code> 的 SIGKILL 窗口，并比较旧 trajectory 与已修改文件。它只验证指定时间点，不覆盖保存中途的其他失败。若异常能够正常沿 Python 栈展开，<code>finally</code> 仍可能保存当时已经进入内存的状态；不能把两类退出混写。</p>
-<p>如果系统直接重做同一个命令，要先问“重复执行会不会多产生一次效果”。这种重复仍得到同一目标结果的性质，后面称为<strong>幂等性</strong>。不同命令可能不同：</p>
-<ul>
-<li>“把确切旧字符串替换为新字符串”第二次可能报告找不到旧字符串；</li>
-<li>“追加一行文本”可能产生重复；</li>
-<li>“创建外部资源”可能产生两份资源；</li>
-<li>一些命令可能只执行了一半。</li>
-</ul>
-<p>trajectory 对定位问题很有价值，却不能单独消除这个外部结果不确定窗口。</p>
-<h3 id="真实任务怎样结束">真实任务怎样结束</h3>
-<p>这里先看后面第22章真实函数与文档修复的最后一步，只用于说明退出协议：那次 mini 修复在第 8 次模型回答中先给中文结果，再发出 <code>echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code>。原生环境把它识别为完成控制，记录中标出 <code>action was not executed</code>；这不是普通 Bash 执行失败。文件修复和测试在之前已经发生，完成标记负责让循环收尾。不要把保存 trajectory 的成功提示当成另一次测试验收。<a href="22-agent-cases.html#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">第22章 完整过程</a></p>
-<span class="heading-alias" id="误区三returncode-0-就代表整个-task-完成" aria-hidden="true"></span><span class="heading-alias" id="基础完成条件与下一步" aria-hidden="true"></span><span class="heading-alias" id="基础自测如何停止记录能说明什么" aria-hidden="true"></span><span class="heading-alias" id="练习退出条件与记录缺口" aria-hidden="true"></span><h3 id="退出条件与记录缺口问答">退出条件与记录缺口问答</h3>
-<p><strong>问题 1。</strong> confirm、human、yolo 分别由谁提出命令？confirm 是否等于 OS Sandbox？</p>
-<p><strong>解释。</strong> human 由用户提出，confirm/yolo 由 Model 提出；confirm 增加执行前决策点，不能强制隔离文件与网络。</p>
-<p><strong>问题 2。</strong> 仅输出“我完成了”会触发退出吗？本地完成标记还要求什么？</p>
-<p><strong>解释。</strong> 不会。LocalEnvironment 要求去掉前导空白后的输出首行匹配完成标记，并且 returncode 为 0，才抛 Submitted。</p>
-<p><strong>问题 3。</strong> 在上面 t0–t4 的假设中，磁盘没有保存写入 observation，能否认定 README 没有改变？</p>
-<p><strong>解释。</strong> 不能。假设中 t2 已写入文件，t3 硬终止使轨迹只保存上一轮；实际效果（effect）与保存之间有窗口。应核对现实，再决定后续工作。下一章将给出这个窗口的实际运行结果。</p>
-<span class="heading-alias" id="实现深化" aria-hidden="true"></span><h2 id="异常预算与保存协议">异常、预算与保存协议</h2>
-<h3 id="拒绝反馈怎样回到外层循环">拒绝反馈怎样回到外层循环</h3>
-<p>InteractiveAgent 把拒绝原因放入 <code>UserInterruption</code> 携带的 user-role message。<code>UserInterruption</code> 属于 <code>InterruptAgentFlow</code>；<code>DefaultAgent.run()</code> 捕获这类控制信号，把消息加入 <code>messages</code>。它表达当前进程的交互控制，不能据此推导跨进程审批已持久保存。</p>
-<h3 id="整批确认的实现条件">整批确认的实现条件</h3>
-<p>当前实现会先收集这一条模型消息中的全部 commands，再调用一次 <code>_ask_confirmation_or_interrupt(commands)</code>。只要其中至少一条 command 不匹配 whitelist，就显示一次 <code>Execute N action(s)?</code>，由用户对整组 actions 作一次确认；确认后再按顺序执行。默认 whitelist 为空。这不是“每条 command 分别弹一次确认”。</p>
-<p><code>confirm_exit</code> 独立控制提交前是否询问，默认 true；<code>--yolo</code> 只移除执行前确认。需要理解立即退出行为时，另查 <code>--exit-immediately</code>。</p>
-<h3 id="完成命令为何会留下-not-executed-占位">完成命令为何会留下 not executed 占位</h3>
-<p>默认 CLI 使用的是 <code>InteractiveAgent</code>，它在这里多一个需要准确记录的 v2.4.6 实现细节：</p>
-<ol>
-<li><code>LocalEnvironment.execute()</code> 识别完成标记后直接抛出 Submitted，没有把普通 output dict 返回给调用方；</li>
-<li><code>InteractiveAgent.execute_actions()</code> 的 <code>finally</code> 仍会格式化 observation；</li>
-<li>tool-call formatter 发现这一条 action 没有对应 output，会补一个 <code>returncode: -1</code>、<code>exception_info: &quot;action was not executed&quot;</code> 的 observation；</li>
-<li>如果用户确认结束，Submitted 随后继续向外传播，<code>DefaultAgent.run()</code> 再追加真正的 exit message。</li>
-</ol>
-<p>所以当前默认 InteractiveAgent 的具体消息序列是：</p>
-<pre><code class="language-text">assistant：完成 tool call
-  ↓
-LocalEnvironment：完成命令确实执行并触发 Submitted
-  ↓
-tool observation：当前实现补出 &quot;action was not executed&quot;
-  ↓
-exit：Submitted</code></pre>
-<p>占位文本描述的是 formatter 没有收到普通 output；实际命令已经执行并触发 Submitted。判断此次执行必须结合 exit，不能仅凭这条 synthetic observation。</p>
-<h4 id="中文说明与-submission-不是同一个字段">中文说明与 <code>submission</code> 不是同一个字段</h4>
-<p>固定案例要求“用中文总结”。在默认 tool-call 响应中，这段中文可以出现在 assistant message 的普通 content 中，并被终端显示、被 trajectory 保存。</p>
-<p><code>submission</code> 则来自完成标记之后的命令标准输出：</p>
-<pre><code class="language-text">第一行：COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT
-后续行：才会被 _check_finished() 拼成 submission</code></pre>
-<p>默认 prompt 又要求完成命令单独执行：</p>
-<pre><code class="language-text">echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code></pre>
-<p>如果严格执行这条单行命令，标记之后没有后续输出，因此 exit extra 中的 <code>submission</code> 通常是空字符串。于是要区分：</p>
-<pre><code class="language-text">assistant content：模型在完成 tool call 同一消息中写出的中文说明
-submission：完成标记之后由命令输出提供的文本</code></pre>
-<p>二者都可能进入 trajectory，但不会因为用户语义上都像“最终回答”就自动成为同一个字段。</p>
-<span class="heading-alias" id="更深一层的常见误区" aria-hidden="true"></span><h3 id="限制怎样阻止无限循环">限制怎样阻止无限循环</h3>
-<p>这一节的三个 Agent limit 都位于 <code>DefaultAgent.query()</code>，所以首先约束的是“准备进行下一次模型调用”的路径。confirm 和 yolo 都会进入这条 Model query 路径；human 模式则在 <code>InteractiveAgent.query()</code> 中直接接收用户命令并提前返回，不调用 <code>super().query()</code>。</p>
-<p>因此，human 模式的 action 不会经过下面三项 query-level limit 检查，也不会增加 <code>n_calls</code>。它仍会进入 Environment，所以仍受单条本地 command timeout 等执行层限制。</p>
-<h4 id="step-limit">Step limit</h4>
-<p><code>step_limit</code> 限制 Model query 次数。<code>0</code> 表示不启用该限制。</p>
-<p>如果限制为 5，系统关注的是已经发生多少次 <code>query()</code>，不是执行了多少条 Bash action。</p>
-<span class="heading-alias" id="误区二达到-cost-limit-可以保证账单绝不超过阈值" aria-hidden="true"></span><h4 id="cost-limit">Cost limit</h4>
-<p><code>cost_limit</code> 根据 Model adapter 报告并累计的 cost 判断是否继续。默认 <code>mini.yaml</code> 当前设置为 3.0。</p>
-<p>成本统计依赖具体模型响应和成本计算。如果模型没有正确注册成本信息，源码中也有相应错误或忽略配置；不能把配置值简单理解成外部账单的绝对保证。</p>
-<p>这里判断的是当前累计成本，无法预知下一次请求的实际费用，因此可能在一次请求后超过阈值，再于下一轮停止。Agent 的 <code>n_calls</code>、<code>cost</code> 和开始时钟属于对象；<code>run()</code> 只重建 messages 等任务输入，不把这些预算归零。<code>GLOBAL_MODEL_STATS</code> 则是同一进程内共享的调用次数与成本统计对象，还支持可选的全局限制。这里的 <code>LitellmModel</code> 在收到响应并计算成本后更新它，检查限制时可能抛出 <code>RuntimeError</code>。这与当前 Agent 对象的预算是两层控制，都不能预留未知费用或在请求中途自动取消。</p>
-<h4 id="wall-time-limit">Wall-time limit</h4>
-<p><code>wall_time_limit_seconds</code> 使用 Agent 持有的开始时间检查经过秒数。开始时间在 Agent 对象构造时记录，而不是每次 <code>run()</code> 开头重新记录；<code>0</code> 表示不启用。</p>
-<p>它在下一次进入 <code>DefaultAgent.query()</code> 前检查，与单个 LocalEnvironment command 的 timeout 不同：</p>
-<pre><code class="language-text">Agent wall-time guard：准备调用模型时，对自 Agent 构造以来经过时间的检查
-Environment timeout：这一条命令最多执行多久</code></pre>
-<p>它不是一个实时抢占计时器：不会在已经开始的 Model request 或 Environment command 中途自动介入。正在执行的 command 仍由 Environment timeout 控制；human 模式若持续输入命令，也不会经过这个 query-level wall-time check。</p>
-<h4 id="达到限制后的控制流">达到限制后的控制流</h4>
-<p><code>query()</code> 在请求下一次模型前检查限制。达到 step/cost 条件时产生 <code>LimitsExceeded</code>；达到 wall-time 条件时产生 <code>TimeExceeded</code>。</p>
-<p>在纯 <code>DefaultAgent</code> 中，它们通过 <code>InterruptAgentFlow</code> 进入 exit message。InteractiveAgent 对 step/cost limit 可以在交互终端询问新的限制；对 TimeExceeded 则不会通过修改 step/cost 继续绕过时钟限制。</p>
-<p>如果没有可交互 stdin，InteractiveAgent 也不会强行调用输入提示造成 EOF 崩溃，而是让限制信号正常退出。</p>
-<h3 id="formaterror-怎样形成反馈循环">FormatError 怎样形成反馈循环</h3>
-<h4 id="哪些情况可能是格式错误">哪些情况可能是格式错误</h4>
-<p>默认 native tool-call 路径中，例如：</p>
-<ul>
-<li>模型没有产生任何 tool call；</li>
-<li>调用了未知工具名；</li>
-<li>arguments 不是合法 JSON；</li>
-<li>arguments 缺少 <code>command</code>。</li>
-</ul>
-<p>文本变体中，找不到恰好一个规定围栏 action 也会形成 FormatError。</p>
-<h4 id="一次-formaterror-不一定立即结束">一次 FormatError 不一定立即结束</h4>
-<p><code>DefaultAgent.run()</code> 单独捕获 FormatError。它会：</p>
-<ol>
-<li>补记这次已发生模型调用的 cost；</li>
-<li>增加连续格式错误计数；</li>
-<li>如果尚未达到上限，把格式反馈消息加入 <code>messages</code>；</li>
-<li>下一轮允许模型根据反馈重新输出。</li>
-</ol>
-<p>只要有一次干净 step，连续格式错误计数就会重置。</p>
-<h4 id="连续错误达到上限">连续错误达到上限</h4>
-<p>如果 <code>max_consecutive_format_errors</code> 为正且达到该数量，Agent 加入 <code>RepeatedFormatError</code> exit message，从而结束循环。</p>
-<p>这是一个简单的活性保护：避免模型持续违反 action 协议而无限消耗调用。</p>
-<h3 id="落入-except-exception-的未处理异常与退出消息">落入 <code>except Exception</code> 的未处理异常与“退出消息”</h3>
-<p>如果异常不是预期的 <code>InterruptAgentFlow</code> 路径、并且落入 <code>run()</code> 的 <code>except Exception</code> 分支，代码会调用 <code>handle_uncaught_exception()</code>，加入包含：</p>
-<ul>
-<li><code>exit_status</code>；</li>
-<li><code>exception_str</code>；</li>
-<li>traceback；</li>
-<li>空 submission；</li>
-</ul>
-<p>的 exit message，然后继续重新抛出原异常。</p>
-<p>这有两个效果：</p>
-<ol>
-<li>trajectory 中尽量留下诊断信息；</li>
-<li>调用者仍能感知未处理异常，而不是被静默吞掉。</li>
-</ol>
-<p>“记录了一条异常 exit”不表示错误已经恢复，只表示诊断上下文被尽量保留下来。</p>
-<p>这个分支不等于捕获所有 <code>BaseException</code>。例如，纯 <code>DefaultAgent</code> 下的 <code>KeyboardInterrupt</code>、<code>SystemExit</code> 不应未经核对就归入这里；<code>InteractiveAgent.step()</code> 对键盘中断另有自己的交互处理。</p>
-<h3 id="serialize-的主结构"><code>serialize()</code> 的主结构</h3>
-<p><code>DefaultAgent.serialize()</code> 生成一个可 JSON 序列化的字典，主要包含：</p>
-<pre><code class="language-text">info
-  ├─ model_stats
-  │    ├─ instance_cost
-  │    └─ api_calls
-  ├─ config
-  │    ├─ agent
-  │    └─ agent_type
-  ├─ mini_version
-  ├─ exit_status
-  └─ submission
-
-messages
-  └─ 当前线性消息序列
-
-trajectory_format
-  └─ &quot;mini-swe-agent-1.1&quot;
-
-model.serialize() 提供的信息
-environment.serialize() 提供的信息</code></pre>
-<p>所以 trajectory 很适合回答：</p>
-<ul>
-<li>Agent 使用了什么配置和实现类；</li>
-<li>调了多少次模型、大致成本是多少；</li>
-<li>每轮模型和工具消息怎样变化；</li>
-<li>最终以什么 exit status 离开；</li>
-<li>submission 是什么。</li>
-</ul>
-<h3 id="保存的是快照式-json">保存的是快照式 JSON</h3>
-<p>当前 <code>save()</code> 使用 <code>Path.write_text(json.dumps(...))</code> 覆盖写入完整序列化结果，而非逐条追加事件。这条路径没有先完整写临时文件、再原子 rename 到目标路径的协议：如果进程恰好在 <code>write_text()</code> 过程中被硬终止，目标 trajectory 文件自身也可能被截断或成为无效 JSON。</p>
-<p>这是由覆盖写入方式推得的另一个失败窗口。<a href="06-crash-window.html">第06章</a>注入的是写 README 后、保存轨迹前的窗口，没有实际注入轨迹覆盖写到一半的情况。快照能保存已进入对象的信息，恢复所需的其他责任列在下面。</p>
-<span class="heading-alias" id="误区三最后一条是-exit所以所有资源都已经结算" aria-hidden="true"></span><h3 id="trajectory-与-durable-ledger-的区别">Trajectory 与 durable ledger 的区别</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · Trajectory 与 durable ledger 的区别"><table><caption>表 3 / Table 3 · Trajectory 与 durable ledger 的区别</caption><thead><tr><th scope="col">问题</th><th scope="col">执行轨迹（Trajectory）当前能帮助什么</th><th scope="col">还不能自动保证什么</th></tr></thead><tbody><tr><td>看见执行过程</td><td>保存 messages、配置、统计与退出摘要</td><td>每个外部效果都有全有或全无的保存边界</td></tr>
-<tr><td>调试格式错误</td><td>保留反馈和部分原始响应信息</td><td>崩溃后一定从精确位置恢复</td></tr>
-<tr><td>复盘命令输出</td><td>保存已进入 observation 的输出</td><td>effect 已发生但 observation 未写时自动裁决</td></tr>
-<tr><td>评测结果</td><td>提供 submission 与轨迹格式</td><td>submission 是否满足任务要求；多次尝试的成功率怎样计算</td></tr>
-<tr><td>重新查看</td><td>JSON 可以再次读取</td><td>任何未完成 action 都可以安全重放</td></tr></tbody></table></div>
-<p>可用于恢复核对的持久执行记录（durable ledger）还需要明确以下合同：</p>
-<ul>
-<li>谁拥有写入权；</li>
-<li>每条工作和 effect 的稳定身份是什么；</li>
-<li>一次记录更新是否原子，即要么完整提交、要么不生效；</li>
-<li>崩溃发生在 effect 前、effect 后还是结果保存后；</li>
-<li>不确定结果如何对账；</li>
-<li>哪些状态可以安全重试；</li>
-<li>多个观察者怎样得到同一终态。</li>
-</ul>
-<h3 id="固定案例的完整退出轨迹">固定案例的完整退出轨迹</h3>
-<p>下面仍是“项目代码正确、修正文档后测试通过”的简化教学序列，不是 第04章 或 第22章 的真实 trace：</p>
-<pre><code class="language-text">system
-  ↓
-user task
-  ↓
-assistant: Bash call，读取文件
-  ↓
-tool: 文件内容
-  ↓
-assistant: Bash call，修改 README
-  ↓
-tool: returncode 0
-  ↓
-assistant: Bash call，运行 npm test
-  ↓
-tool: tests passed
-  ↓
-assistant: Bash call，输出 COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT
-  ↓
-tool: InteractiveAgent 当前补出的 action was not executed observation
-  ↓
-exit: Submitted</code></pre>
-<p>上面这条 synthetic tool observation 来自默认 InteractiveAgent 的补位逻辑；若直接使用 <code>DefaultAgent</code>，Submitted 会从 Environment 越过普通 observation formatting，序列中不会出现这一步。</p>
-<p>这条序列中，assistant 里的命令是模型意图，tool 消息承载 Environment 返回的观察，<code>Submitted</code> 经外层处理才使循环退出。README 的修改发生在文件系统，不在消息列表内部。</p>
-<p>崩溃位置决定最后留下哪份记录：写入前只有旧文件；写入后、保存前可能是新文件加旧 trajectory；本轮保存成功后才有覆盖该轮消息的快照。若硬终止落在 trajectory 的覆盖写入过程中，文件自身还可能不完整，不能假定总能得到一份完整的旧快照。</p>
-<span class="heading-alias" id="深化自测读限制和异常的接线" aria-hidden="true"></span><span class="heading-alias" id="练习限制与异常分支" aria-hidden="true"></span><h3 id="限制与异常分支问答">限制与异常分支问答</h3>
-<p><strong>问题 1。</strong> yolo 是否关闭 confirm_exit？human 命令是否经过 DefaultAgent.query 的预算检查？</p>
-<p><strong>解释。</strong> yolo 只取消执行前确认，confirm_exit 独立；human 输入命令绕开 Model query 及该处预算检查，但仍经过 Environment timeout。</p>
-<p><strong>问题 2。</strong> cost_limit 和 wall_time_limit 是否能中途抢占请求、保证绝不超额？复用对象会重置预算吗？</p>
-<p><strong>解释。</strong> 都不能；guard 在下一次 query 入口按已有统计检查，进行中的操作不受其抢占。run 不重置对象计数、成本与构造时钟。</p>
-<p><strong>问题 3。</strong> InteractiveAgent 为完成 action 填入 not executed，为什么不能据此认定命令没执行？</p>
-<p><strong>解释。</strong> 完成命令已运行，但 Environment 抛 Submitted 而没有普通 output 返回；formatter 对缺口生成占位。它不能证明 effect 未发生。</p>
-<p><strong>问题 4。</strong> 什么错误进入反馈循环，什么普通异常记录 exit 后仍会向调用者抛出？SIGKILL 属于哪一类？</p>
-<p><strong>解释。</strong> FormatError 可作为反馈继续，连续达到上限才退出；落入 except Exception 的异常会记录 exit 后重新抛出。SIGKILL 直接终止进程，两条 Python 路径与 finally 都不会执行。</p>
-<span class="heading-alias" id="继续读源码" aria-hidden="true"></span><span class="heading-alias" id="练习标注控制流跳转" aria-hidden="true"></span><h3 id="确认提交与硬终止分别留下什么">确认、提交与硬终止分别留下什么</h3>
-<p><a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/agents/interactive.py"><code>InteractiveAgent.execute_actions</code></a> 与 <a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/agents/default.py"><code>DefaultAgent.run / save</code></a> 共同形成三种代表路径：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 确认、提交与硬终止分别留下什么"><table><caption>表 4 / Table 4 · 确认、提交与硬终止分别留下什么</caption><thead><tr><th scope="col">路径</th><th scope="col">命令与消息</th><th scope="col">保存结果（Persistence）</th></tr></thead><tbody><tr><td>执行前拒绝</td><td>被拒绝的命令不执行，拒绝信息成为后续反馈</td><td>外层正常走到 <code>finally</code> 时保存当前消息</td></tr>
-<tr><td>完成命令触发 Submitted</td><td>命令已经产生完成输出；没有普通 output 的位置由 formatter 补位，外层记录 exit</td><td>正常退出路径保存当前快照</td></tr>
-<tr><td>写 README 后遭 SIGKILL</td><td>文件可能已改变，进程尚未返回和追加这一轮结果</td><td>Python <code>finally</code> 不执行；此前快照不能代表最后的文件状态</td></tr></tbody></table></div>
-<p>补位文本、退出消息和磁盘文件各描述不同对象，不能用任意一个代替另外两个。</p>
+<p>这里的占位内容描述“没有收到匹配的普通返回”，不能单独证明命令未执行。必须连同执行环境（Environment）的完成判断和最后的退出状态（Exit Status）一起解释。也不能把这个特殊分支推广到所有 <code>returncode: -1</code>：普通命令失败还需要按其实际错误调查。</p>
+<span class="heading-alias" id="真实任务怎样结束" aria-hidden="true"></span><span class="heading-alias" id="中文说明与-submission-不是同一个字段" aria-hidden="true"></span><h3 id="回答文字与-submission-分别来自哪里">回答文字与 <code>submission</code> 分别来自哪里</h3>
+<p>模型（Model）在同一条助手消息（Message）里写的中文总结属于 <code>content</code>，可以显示在终端，也能进入执行轨迹（Trajectory）。<code>submission</code> 则只取完成标记首行之后的标准输出（Standard Output）。</p>
+<p>若命令只有上面的 <code>echo</code>，标准输出（Standard Output）通常只有标记那一行，<code>submission</code> 就是空字符串。空字符串不表示助手没给总结；有总结也不表示它自动被复制进 <code>submission</code>。两个字段的消费者（Consumer）需要按各自来源读取。</p>
+<p>后面的<a href="22-agent-cases.html#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">第22章真实案例</a>保存（Save）了一次原生 mini 命令行界面（CLI） / K3 的限定记录：第 8 次模型（Model）响应给出中文结果说明并发出完成命令，随后出现上述占位内容。这是已有运行片段；修复和测试发生在此前，本章没有重新运行它，也没有把占位内容当作 Bash 失败。</p>
+<span class="heading-alias" id="固定案例的完整退出轨迹" aria-hidden="true"></span><h3 id="把完整完成路径放在一起读">把完整完成路径放在一起读</h3>
+<p>下面是 README 已正确、只需修改实现并通过测试的教学推演，用于说明完整消息（Message）顺序。它既不是第04章八步案例的原始执行轨迹（Trajectory），也不是第22章的真实输出副本。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 把完整完成路径放在一起读"><table><caption>表 4 / Table 4 · 把完整完成路径放在一起读</caption><thead><tr><th scope="col">顺序</th><th scope="col">消息（Message）角色或步骤</th><th scope="col">本步留下什么</th></tr></thead><tbody><tr><td>1</td><td><code>system</code>、<code>user</code></td><td>规则、任务和修改范围</td></tr>
+<tr><td>2</td><td><code>assistant</code></td><td>读取文件的行动请求（Action）</td></tr>
+<tr><td>3</td><td><code>tool</code></td><td>文件内容的观察消息（Observation Message）</td></tr>
+<tr><td>4</td><td><code>assistant</code></td><td>修改实现的行动请求（Action）</td></tr>
+<tr><td>5</td><td><code>tool</code></td><td>修改命令返回码（Return Code）为 0 的观察消息（Observation Message）</td></tr>
+<tr><td>6</td><td><code>assistant</code></td><td>运行 <code>npm test</code> 的行动请求（Action）</td></tr>
+<tr><td>7</td><td><code>tool</code></td><td>测试通过的观察消息（Observation Message）</td></tr>
+<tr><td>8</td><td><code>assistant</code></td><td>说明结果，提出独立完成命令</td></tr>
+<tr><td>9</td><td><code>tool</code>，仅上述交互（Interaction）分支</td><td>缺少普通返回时的占位观察消息（Observation Message）</td></tr>
+<tr><td>10</td><td><code>exit</code></td><td>提交信号（Submission Signal）对应的退出状态（Exit Status）与 <code>submission</code></td></tr></tbody></table></div>
+<p>在各轮能够正常到达 <code>finally</code> 且配置了路径时，程序尝试保存（Save）当时的执行轨迹（Trajectory）。验收要看第 7 步等任务材料；第 10 步只说明完成协议让代理循环（Agent Loop）退出（Exit）。</p>
+<span class="heading-alias" id="实现深化" aria-hidden="true"></span><span class="heading-alias" id="更深一层的常见误区" aria-hidden="true"></span><span class="heading-alias" id="下一次调用为什么也可能被阻止" aria-hidden="true"></span><span class="heading-alias" id="异常预算与保存协议" aria-hidden="true"></span><span class="heading-alias" id="限制怎样阻止无限循环" aria-hidden="true"></span><h2 id="4-预算budget检查发生在哪一个时点">4. 预算（Budget）：检查发生在哪一个时点</h2>
+<span class="heading-alias" id="误区二达到-cost-limit-可以保证账单绝不超过阈值" aria-hidden="true"></span><span class="heading-alias" id="step-limit" aria-hidden="true"></span><span class="heading-alias" id="cost-limit" aria-hidden="true"></span><span class="heading-alias" id="wall-time-limit" aria-hidden="true"></span><h3 id="三种限制分别数什么">三种限制分别数什么</h3>
+<p><code>DefaultAgent.query()</code> 在发起下一次模型调用（Model Query）之前检查限制。先检查调用次数和累计成本，再检查已过时间，通过后才增加 <code>n_calls</code> 并调用模型（Model）。这不是后台随时抢占正在运行工作的计时器。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 三种限制分别数什么"><table><caption>表 5 / Table 5 · 三种限制分别数什么</caption><thead><tr><th scope="col">预算（Budget）或限制</th><th scope="col">实际计量与检查</th><th scope="col">需要保留的条件</th></tr></thead><tbody><tr><td>步数限制（Step Limit）</td><td><code>n_calls</code> 达到 <code>step_limit</code> 后阻止下一次模型调用（Model Query）</td><td>计的是模型调用（Model Query），不是 Bash 命令条数；0 表示不启用此限制</td></tr>
+<tr><td>成本限制（Cost Limit）</td><td>模型调用（Model Query）前检查模型协议适配器（Model Adapter）累计到 <code>self.cost</code> 的成本</td><td>默认配置为 3.0，0 表示不启用此限制；下一次请求费用事前未知，某次响应后累计值可能已经越过限制</td></tr>
+<tr><td>墙钟时间限制（Wall-time Limit）</td><td>模型调用（Model Query）前用当前时间减 <code>_start_time</code></td><td>从对象构造时起算；0 表示不启用，不是每条命令的超时设置</td></tr></tbody></table></div>
+<p>用 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi></mrow><annotation encoding="application/x-tex">n</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">n</span></span></span></span></span> 表示模型调用（Model Query）前对象里的调用次数 <code>n_calls</code>，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>c</mi></mrow><annotation encoding="application/x-tex">c</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">c</span></span></span></span></span> 表示对象里的累计成本 <code>cost</code>，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi></mrow><annotation encoding="application/x-tex">S</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span></span></span></span></span> 和 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi></mrow><annotation encoding="application/x-tex">C</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">C</span></span></span></span></span> 分别表示配置的步数限制（Step Limit）与成本限制（Cost Limit）。阻止本次模型调用（Model Query）的条件是：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mo stretchy="false">(</mo><mi>S</mi><mo>&gt;</mo><mn>0</mn><mo>∧</mo><mi>n</mi><mo>≥</mo><mi>S</mi><mo stretchy="false">)</mo><mo>∨</mo><mo stretchy="false">(</mo><mi>C</mi><mo>&gt;</mo><mn>0</mn><mo>∧</mo><mi>c</mi><mo>≥</mo><mi>C</mi><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">(S &gt; 0 \land n \ge S) \lor (C &gt; 0 \land c \ge C).</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">∧</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7719em;vertical-align:-0.136em;"></span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≥</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">∨</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0715em;">C</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">∧</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7719em;vertical-align:-0.136em;"></span><span class="mord mathnormal">c</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≥</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">C</span><span class="mclose">)</span><span class="mord">.</span></span></span></span></span></div>
+<p>这里两项都包含等于：模型调用（Model Query）之前已经达到正数上限，就不再开始本次请求。限制必须为正值才启用；设为 0 时，对应条件不成立。墙钟时间限制（Wall-time Limit）在后面的独立检查中，以已过整秒数与正数上限比较。</p>
+<p>例如，步数限制（Step Limit）设为 5，一条响应中包含多条 Bash 命令，仍不能把它误读成“最多执行 5 条命令”。而成本限制（Cost Limit）依赖模型协议适配器（Model Adapter）如何登记费用：登记失败是抛错还是忽略还受配置影响，不能据此承诺绝不超过外部账单金额。</p>
+<p><code>n_calls</code>、<code>cost</code> 和 <code>_start_time</code> 属于同一个对象。<code>run()</code> 会重建任务消息（Message），但不会把这三个字段重新归零。因此，复用对象运行新任务，不能直接假定获得全新预算（Budget）。</p>
+<h3 id="模型调用model-query限制与命令超时是两个控制点">模型调用（Model Query）限制与命令超时是两个控制点</h3>
+<p>墙钟时间限制（Wall-time Limit）不会在模型（Model）请求或命令已经执行时主动中断它。命令是否超时，由执行环境（Environment）的独立超时设置处理。</p>
+<p>人工模式（human）接收命令的分支不经过 <code>super().query()</code>：不会执行上述三个模型调用（Model Query）限制检查，也不增加 <code>n_calls</code>，但命令仍受执行环境（Environment）的超时规则约束。这一差别来自调用路径，不能把“人工也在同一个代理循环（Agent Loop）”当成“人工也经过每一个检查点”。</p>
+<p>进程内另有共享统计 <code>GLOBAL_MODEL_STATS</code>，记录调用次数与成本，并可配置共享限制。已核对的 <code>LitellmModel.query()</code> 先取得服务响应、计算成本，再调用 <code>GLOBAL_MODEL_STATS.add()</code>；共享检查通过后，才继续解析行动请求（Action）并返回消息（Message）。共享预算（Budget）在响应后检查，与单对象的模型调用（Model Query）前检查是两个不同位置。</p>
+<p><code>add()</code> 先累加本次成本并把调用次数加 1，再进行判断。用 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi></mrow><annotation encoding="application/x-tex">N</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span></span></span></span></span> 和 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>G</mi></mrow><annotation encoding="application/x-tex">G</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">G</span></span></span></span></span> 表示这次累加后的共享模型调用（Model Query）次数 <code>_n_calls</code> 与成本 <code>_cost</code>，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Q</mi></mrow><annotation encoding="application/x-tex">Q</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">Q</span></span></span></span></span> 和 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>K</mi></mrow><annotation encoding="application/x-tex">K</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">K</span></span></span></span></span> 分别表示共享 <code>call_limit</code> 与 <code>cost_limit</code>，抛出 <code>RuntimeError</code> 的条件是：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mo stretchy="false">(</mo><mi>K</mi><mo>&gt;</mo><mn>0</mn><mo>∧</mo><mi>G</mi><mo>&gt;</mo><mi>K</mi><mo stretchy="false">)</mo><mo>∨</mo><mo stretchy="false">(</mo><mi>Q</mi><mo>&gt;</mo><mn>0</mn><mo>∧</mo><mi>N</mi><mo>+</mo><mn>1</mn><mo>&gt;</mo><mi>Q</mi><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">(K &gt; 0 \land G &gt; K) \lor (Q &gt; 0 \land N + 1 &gt; Q).</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0715em;">K</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">∧</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7224em;vertical-align:-0.0391em;"></span><span class="mord mathnormal">G</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">K</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">∨</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal">Q</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">∧</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6835em;vertical-align:-0.0391em;"></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">Q</span><span class="mclose">)</span><span class="mord">.</span></span></span></span></span></div>
+<p>共享成本使用严格大于；共享模型调用（Model Query）次数虽然也写成严格比较，却比较的是更新后的 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>+</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">N+1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></span>。对正整数调用上限 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Q</mi></mrow><annotation encoding="application/x-tex">Q</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">Q</span></span></span></span></span>，这一项等价于 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>≥</mo><mi>Q</mi></mrow><annotation encoding="application/x-tex">N \ge Q</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8193em;vertical-align:-0.136em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≥</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">Q</span></span></span></span></span>，不能误读成“调用数已经超过 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Q</mi></mrow><annotation encoding="application/x-tex">Q</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">Q</span></span></span></span></span> 才报错”。两种共享限制也只在正值时启用，0 表示关闭对应限制。</p>
+<p>下面逐项隔离观察：每行均为串行教学推演，其他限制关闭，初始计数和成本为 0；这些数字不是新发起的模型调用（Model Query）或实际账单。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 模型调用（Model Query）限制与命令超时是两个控制点"><table><caption>表 6 / Table 6 · 模型调用（Model Query）限制与命令超时是两个控制点</caption><thead><tr><th scope="col">单独启用的条件</th><th scope="col">模型调用（Model Query）或响应时点</th><th scope="col">判断与后果</th></tr></thead><tbody><tr><td>单对象步数限制（Step Limit）<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">S=2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span></span></span></span></span></td><td>前两次模型调用（Model Query）前分别有 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">n=0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span>、<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">n=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></span>；第三次模型调用（Model Query）前 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">n=2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span></span></span></span></span></td><td>第三次开始前满足 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>≥</mo><mi>S</mi></mrow><annotation encoding="application/x-tex">n\ge S</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7719em;vertical-align:-0.136em;"></span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≥</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">S</span></span></span></span></span>，抛出 <code>LimitsExceeded</code>，不发起第三次请求</td></tr>
+<tr><td>共享模型调用（Model Query）上限 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Q</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">Q=2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">Q</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span></span></span></span></span></td><td>第一次响应后 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">N=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></span>，第二次响应后 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">N=2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span></span></span></span></span></td><td>第一次 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>+</mo><mn>1</mn><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">N+1=2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span></span></span></span></span> 未严格大于 2；第二次 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>+</mo><mn>1</mn><mo>=</mo><mn>3</mn><mo>&gt;</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">N+1=3&gt;2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6835em;vertical-align:-0.0391em;"></span><span class="mord">3</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span></span></span></span></span>，第二次响应后即抛出 <code>RuntimeError</code></td></tr>
+<tr><td>单对象成本限制（Cost Limit）<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">C=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">C</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></span></td><td>某次成功响应登记后 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>c</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">c=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">c</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></span>，准备下一次模型调用（Model Query）</td><td>下一次开始前满足 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>c</mi><mo>≥</mo><mi>C</mi></mrow><annotation encoding="application/x-tex">c\ge C</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7719em;vertical-align:-0.136em;"></span><span class="mord mathnormal">c</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≥</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">C</span></span></span></span></span>，请求不会开始</td></tr>
+<tr><td>共享成本上限 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>K</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">K=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">K</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></span></td><td>先有响应使 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>G</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">G=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">G</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></span>，后一次响应增加 0.2，使 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>G</mi><mo>=</mo><mn>1.2</mn></mrow><annotation encoding="application/x-tex">G=1.2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">G</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1.2</span></span></span></span></span></td><td>等于 1 时不因共享成本报错；后一次响应已收到，再因 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>G</mi><mo>&gt;</mo><mi>K</mi></mrow><annotation encoding="application/x-tex">G&gt;K</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7224em;vertical-align:-0.0391em;"></span><span class="mord mathnormal">G</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0715em;">K</span></span></span></span></span> 抛出 <code>RuntimeError</code></td></tr></tbody></table></div>
+<p>特别是共享模型调用（Model Query）上限为 2 的那一行：第二次服务响应已经收到，但共享检查让 <code>LitellmModel.query()</code> 在返回正常消息（Message）之前抛错。不能把它写成“等到第三次响应才发现超限”，也不能认为本次助手消息（Message）必然已经追加进 <code>DefaultAgent.messages</code>。随后走普通异常（Exception）处理，具体记录行为见下一节。并发调用还可能交错更新共享统计，上表只解释串行条件，不承诺并发请求获得精确的全局配额。</p>
+<p>两层预算（Budget）都不是预知下次费用或抢占所有进行中请求的机制；要读懂一次停止，既要看比较运算符，也要看计数更新和检查发生的位置。</p>
+<span class="heading-alias" id="达到限制后的控制流" aria-hidden="true"></span><h3 id="达到限制以后怎样退出exit">达到限制以后怎样退出（Exit）</h3>
+<p>步数限制（Step Limit）或成本限制（Cost Limit）触发 <code>LimitsExceeded</code>，墙钟时间限制（Wall-time Limit）触发 <code>TimeExceeded</code>。默认代理循环（Agent Loop）通过 <code>InterruptAgentFlow</code> 分支接收它们携带的退出消息（Exit Message），再尝试保存（Save）。</p>
+<p>交互（Interaction）分支在有交互式标准输入时，可以询问新的步数限制（Step Limit）与成本限制（Cost Limit）。没有交互式输入时则直接传出限制异常（Exception），避免因为再次读输入而产生 <code>EOFError</code>。墙钟时间限制（Wall-time Limit）单独传出：只增加步数或成本不会重置时钟，反复询问也无法解除它。</p>
+<h2 id="5-异常exception怎样改变消息message与退出exit">5. 异常（Exception）怎样改变消息（Message）与退出（Exit）</h2>
+<h3 id="先读分支框架再读代理循环agent-loop代码">先读分支框架，再读代理循环（Agent Loop）代码</h3>
+<p>这里有三类处理，不能合并成“出错就停”：格式错误（Format Error）可能变成下一轮反馈；控制流异常（Control-flow Exception）携带拒绝或结束等消息（Message）；其余落入 <code>except Exception</code> 的异常（Exception）会留下诊断信息后重新抛出。</p>
+<p>下面摘出 <code>DefaultAgent.run()</code> 的完整代理循环（Agent Loop）分支，省略的是代理循环（Agent Loop）之前的初始消息（Message）构建，添加了中文注释。<code>self.step()</code> 包含本轮模型调用（Model Query）与执行；<code>add_messages()</code> 追加内存消息（Message）；<code>handle_uncaught_exception()</code> 的内容在代码后解释。代码保留格式错误（Format Error）的成本补记、连续计数、终止阈值，以及所有异常（Exception）分支。</p>
+<pre><code class="language-python">while True:
+    try:
+        self.step()
+        # 一轮正常完成后，清零连续格式错误（Format Error）计数。
+        self.n_consecutive_format_errors = 0
+    except FormatError as e:
+        # 模型调用（Model Query）抛错前可能已产生费用；错误消息（Message）携带的成本在此补记。
+        self.cost += e.messages[0].get(&quot;extra&quot;, {}).get(&quot;cost&quot;, 0.0)
+        self.n_consecutive_format_errors += 1
+        if 0 &lt; self.config.max_consecutive_format_errors &lt;= self.n_consecutive_format_errors:
+            self.add_messages(
+                *e.messages,
+                {
+                    &quot;role&quot;: &quot;exit&quot;,
+                    &quot;content&quot;: &quot;RepeatedFormatError&quot;,
+                    &quot;extra&quot;: {&quot;exit_status&quot;: &quot;RepeatedFormatError&quot;, &quot;submission&quot;: &quot;&quot;},
+                },
+            )
+        else:
+            self.add_messages(*e.messages)
+    except InterruptAgentFlow as e:
+        # 消息（Message）决定是继续反馈，还是在本轮末尾退出（Exit）。
+        self.add_messages(*e.messages)
+    except Exception as e:
+        self.handle_uncaught_exception(e)
+        raise
+    finally:
+        # 只有执行到这里，才会尝试把当前状态写入配置路径。
+        self.save(self.config.output_path)
+    if self.messages[-1].get(&quot;role&quot;) == &quot;exit&quot;:
+        break</code></pre>
+<p><code>finally</code> 说明正常展开调用栈（Call Stack）时会尝试这一步，不是“任何情况下必定写成文件”的承诺。没有配置路径时不写文件；写入自身可能失败；硬终止（Hard Termination）不会让 Python 执行这个分支。</p>
+<span class="heading-alias" id="formaterror-怎样形成反馈循环" aria-hidden="true"></span><span class="heading-alias" id="哪些情况可能是格式错误" aria-hidden="true"></span><span class="heading-alias" id="一次-formaterror-不一定立即结束" aria-hidden="true"></span><span class="heading-alias" id="连续错误达到上限" aria-hidden="true"></span><span class="heading-alias" id="格式错误format-error为什么允许再次查询" aria-hidden="true"></span><h3 id="格式错误format-error为什么允许再次模型调用model-query">格式错误（Format Error）为什么允许再次模型调用（Model Query）</h3>
+<p>原生工具调用（Native Tool Calling）的模型协议适配器（Model Adapter）可能在没有工具调用（Tool Call）、工具名未知、参数不符合 JavaScript 对象表示法（JavaScript Object Notation，JSON）的格式，或缺少 <code>command</code> 时产生 <code>FormatError</code>。使用文本代码块的模型协议适配器（Model Adapter），则可能要求响应中恰好存在一个规定格式的行动请求（Action）代码块。具体判定取决于模型协议适配器（Model Adapter），不能把两种输入协议混为一谈。</p>
+<p>第一次格式错误（Format Error）通常还不结束：错误消息（Message）回到上下文，让模型（Model）修正格式。连续次数达到正数阈值后，程序追加 <code>RepeatedFormatError</code> 的退出消息（Exit Message）；阈值为 0 时不启用这个连续错误上限。一轮正常完成会清零连续计数。补记费用则避免把“没解析成功”误当成“没有发生收费请求”。</p>
+<span class="heading-alias" id="落入-except-exception-的未处理异常与退出消息" aria-hidden="true"></span><h3 id="诊断信息保留以后异常exception仍会抛出">诊断信息保留以后，异常（Exception）仍会抛出</h3>
+<p><code>handle_uncaught_exception()</code> 追加退出消息（Exit Message），其中记录异常（Exception）类型对应的 <code>exit_status</code>、<code>exception_str</code>、调用栈（Call Stack） <code>traceback</code> 和空 <code>submission</code>。随后原异常（Exception）重新抛出；若正常展开到 <code>finally</code>，程序还会尝试保存（Save）。这使排查有机会看到失败现场，但没有自动修复或吞掉异常（Exception）。</p>
+<p>这条分支只针对 <code>except Exception</code> 捕获的异常（Exception）。<code>KeyboardInterrupt</code>、<code>SystemExit</code> 等不能一概套入它；<code>InteractiveAgent.step()</code> 另有键盘中断处理。硬终止（Hard Termination）则连这种 Python 处理机会也没有。</p>
+<span class="heading-alias" id="trajectory保存当前已经知道的过程" aria-hidden="true"></span><h2 id="6-执行轨迹trajectory保存save了哪一份已知状态">6. 执行轨迹（Trajectory）：保存（Save）了哪一份已知状态</h2>
+<span class="heading-alias" id="serialize-的主结构" aria-hidden="true"></span><h3 id="快照snapshot包含什么谁会读取">快照（Snapshot）包含什么，谁会读取</h3>
+<p>执行轨迹（Trajectory）是当前对象已知过程的结构化快照（Snapshot），包括消息（Message）、配置、统计和退出（Exit）信息。复盘工具或另有装载入口的程序可以成为消费者（Consumer）；记录存在本身，不表示消费者（Consumer）已经接通自动恢复（Recovery）。</p>
+<p><code>serialize()</code> 先组织主要字段，再合并模型（Model）与执行环境（Environment）各自的序列化（Serialization）结果：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 快照（Snapshot）包含什么，谁会读取"><table><caption>表 7 / Table 7 · 快照（Snapshot）包含什么，谁会读取</caption><thead><tr><th scope="col">字段</th><th scope="col">本例含义</th></tr></thead><tbody><tr><td><code>messages</code></td><td>当前内存消息（Message）序列，包括已追加的行动请求（Action）、观察消息（Observation Message）或退出消息（Exit Message）</td></tr>
+<tr><td><code>info.model_stats.instance_cost</code>、<code>api_calls</code></td><td>当前对象累计成本与调用次数</td></tr>
+<tr><td><code>info.config.agent</code>、<code>agent_type</code></td><td>配置和具体实现类型</td></tr>
+<tr><td><code>info.mini_version</code></td><td>记录使用的 mini 版本</td></tr>
+<tr><td><code>info.exit_status</code>、<code>submission</code></td><td>从结束信息整理出的退出状态（Exit Status）与提交内容</td></tr>
+<tr><td><code>trajectory_format</code></td><td>此处为 <code>mini-swe-agent-1.1</code>，表示格式标识</td></tr></tbody></table></div>
+<p>配置里存在某条预先安排的命令，不等于该命令已经执行。判断一项效果（Effect）还要看执行记录与现实状态；第06章会具体展示这个容易误读的地方。</p>
+<span class="heading-alias" id="误区三最后一条是-exit所以所有资源都已经结算" aria-hidden="true"></span><span class="heading-alias" id="什么时候保存" aria-hidden="true"></span><span class="heading-alias" id="保存的是快照式-json" aria-hidden="true"></span><span class="heading-alias" id="trajectory-与-durable-ledger-的区别" aria-hidden="true"></span><h3 id="为什么是快照snapshot写入而非可靠的执行账本durable-ledger">为什么是快照（Snapshot）写入，而非可靠的执行账本（Durable Ledger）</h3>
+<p><code>save()</code> 的框架很短：先得到序列化（Serialization）数据；有路径时创建父目录，再把整份数据按 JavaScript 对象表示法（JSON）编码并写入该路径；最后返回数据。下面是带教学注释的实现片段，<code>self.serialize(*extra_dicts)</code> 就是上一张表解释的序列化（Serialization）过程，并合并调用者额外提供的数据；<code>path</code> 是传入的 <code>Path</code> 对象或空值。</p>
+<pre><code class="language-python">data = self.serialize(*extra_dicts)
+if path:
+    # 普通文件写入：没有与工具修改文件构成同一个原子事务。
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2))
+return data</code></pre>
+<p>默认代理循环（Agent Loop）每轮在 <code>finally</code> 中调用它；命令行界面（CLI）提供输出路径并显示位置。但这种覆盖写没有先写完临时文件再原子替换的步骤，更没有把工具产生的效果（Effect）与执行轨迹（Trajectory）合成一个不可分割的事务。</p>
+<p>因此有两个不同风险：文件已经修改，本轮记录还没写；或者正在覆盖执行轨迹（Trajectory）时被中断，采用 JavaScript 对象表示法（JSON）的文件内容可能不完整。后者是根据写法作出的推断，下一章没有实际注入这个窗口，不能把两种情况都算作已运行结果。</p>
+<p>可靠的执行账本（Durable Ledger）还要明确：谁负责写记录；怎样标识同一项工作与效果（Effect）；哪些记录更新是原子的；执行前后中断时如何判定未知；何时允许重试；多个消费者（Consumer）怎样看到一致的终态。本例的执行轨迹（Trajectory）不能只凭保存（Save）了采用 JavaScript 对象表示法（JSON）的文件就自动获得这些能力。</p>
+<span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区四trajectory-每轮保存所以命令绝不会重复" aria-hidden="true"></span><span class="heading-alias" id="本章小结" aria-hidden="true"></span><span class="heading-alias" id="一个关键崩溃窗口" aria-hidden="true"></span><h3 id="崩溃窗口crash-window记录为什么会落后一整步">崩溃窗口（Crash Window）：记录为什么会落后一整步</h3>
+<p>把一轮拆开来看，模型调用（Model Query）与执行都在 <code>self.step()</code> 内部，保存（Save）在本轮末尾。于是可能出现下面的顺序：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 崩溃窗口（Crash Window）：记录为什么会落后一整步"><table><caption>表 8 / Table 8 · 崩溃窗口（Crash Window）：记录为什么会落后一整步</caption><thead><tr><th scope="col">时点</th><th scope="col">文件与进程里发生的事情</th><th scope="col">磁盘上的执行轨迹（Trajectory）</th></tr></thead><tbody><tr><td><code>t0</code></td><td>第一轮读取结束，观察消息（Observation Message）已追加</td><td>已记录第一轮读取</td></tr>
+<tr><td><code>t1</code></td><td>第二轮模型调用（Model Query）返回，行动请求（Action）已在内存</td><td>仍是第一轮</td></tr>
+<tr><td><code>t2</code></td><td>执行环境（Environment）写好 README，效果（Effect）已发生</td><td>仍是第一轮</td></tr>
+<tr><td><code>t3</code></td><td>硬终止（Hard Termination）发生，尚未追加本轮观察消息（Observation Message）</td><td>仍是第一轮</td></tr>
+<tr><td><code>t4</code></td><td>已无机会执行本轮 <code>finally</code> 中的保存（Save）</td><td>缺少第二轮行动请求（Action）与观察消息（Observation Message）</td></tr></tbody></table></div>
+<p>这不是“程序已经记录请求，只差结果”那一种窗口：在这里，磁盘记录连第二轮行动请求（Action）都没有。也不能用缺少结果推出完全失败；效果（Effect）可能已经发生，其他任务里还可能只完成了一部分。</p>
+<p>如果是普通异常（Exception）并且调用栈（Call Stack）能正常展开，<code>finally</code> 有机会保存（Save）内存中的行动请求（Action）；这与硬终止（Hard Termination）不同。下一章的完整案例专门验证表中的一个窗口，没有实现自动恢复（Recovery）。</p>
+<h3 id="重试之前为什么要读回效果effect">重试之前为什么要读回效果（Effect）</h3>
+<p>幂等性（Idempotency）指重复执行仍得到相同目标状态的性质。某次精确文本替换重复运行可能不再找到旧文本；追加一行却可能产生两行；远程创建请求还可能建立两个资源。多条命令中途停止，也可能留下部分完成的状态。</p>
+<p>所以，执行轨迹（Trajectory）不足以决定“整步重来”。先读取当前文件、检查差异，再判断剩余工作，才有依据。即使其中一个替换操作具有幂等性（Idempotency），也不能因此推断整个组合命令都适合重放。</p>
+<span class="heading-alias" id="误区三returncode-0-就代表整个-task-完成" aria-hidden="true"></span><span class="heading-alias" id="基础完成条件与下一步" aria-hidden="true"></span><span class="heading-alias" id="基础自测如何停止记录能说明什么" aria-hidden="true"></span><span class="heading-alias" id="深化自测读限制和异常的接线" aria-hidden="true"></span><span class="heading-alias" id="继续读源码" aria-hidden="true"></span><span class="heading-alias" id="练习退出条件与记录缺口" aria-hidden="true"></span><span class="heading-alias" id="练习限制与异常分支" aria-hidden="true"></span><span class="heading-alias" id="练习标注控制流跳转" aria-hidden="true"></span><span class="heading-alias" id="退出条件与记录缺口问答" aria-hidden="true"></span><span class="heading-alias" id="限制与异常分支问答" aria-hidden="true"></span><span class="heading-alias" id="确认提交与硬终止分别留下什么" aria-hidden="true"></span><h2 id="7-直接问答把控制证据与恢复recovery分开判断">7. 直接问答：把控制、证据与恢复（Recovery）分开判断</h2>
+<p><strong>问：命令返回码（Return Code）为 0、提交信号（Submission Signal）、任务成功（Task Success）是同一件事吗？</strong></p>
+<p>答：不是。返回码（Return Code）说明命令按自身约定结束；提交信号（Submission Signal）使代理循环（Agent Loop）进入退出（Exit）协议；任务成功（Task Success）依赖目标和约束的验收。即使完成命令返回码（Return Code）为 0，也不能补出从未执行过的测试结果。</p>
+<p><strong>问：确认模式（confirm）是不是逐条批准，而且批准后就获得沙箱隔离（Sandbox Isolation）？</strong></p>
+<p>答：两个判断都不成立。它对同一条响应里需要询问的整批命令问一次，获准后依次执行。确认（Confirmation）也不会改变操作系统权限；沙箱隔离（Sandbox Isolation）需要执行环境（Environment）另外实施。</p>
+<p><strong>问：免执行前确认模式（yolo）为什么还可能在结束时询问？</strong></p>
+<p>答：执行前确认（Confirmation）与 <code>confirm_exit</code> 是不同控制点。前者由交互模式（Interaction Mode）改变，后者决定是否在退出（Exit）前接收人的追加任务。</p>
+<p><strong>问：助手有中文总结，为什么 <code>submission</code> 仍为空？</strong></p>
+<p>答：总结在助手消息（Message）的 <code>content</code> 中；<code>submission</code> 来自完成标记之后的标准输出（Standard Output）。独立 <code>echo</code> 只有标记时，后者通常为空。消费者（Consumer）必须读对字段，不能把空字段解释成没有回答。</p>
+<p><strong>问：出现 <code>action was not executed</code> 就应重跑完成命令吗？</strong></p>
+<p>答：不能只凭该字符串决定。在已解释的交互（Interaction）完成分支里，它是缺少普通返回时生成的占位观察消息（Observation Message），命令其实已执行。要连同提交信号（Submission Signal）、退出状态（Exit Status）和实际任务材料判断。</p>
+<p><strong>问：设置预算（Budget）后，长命令是否会在整段时间一到就被终止？</strong></p>
+<p>答：模型调用（Model Query）前的墙钟时间限制（Wall-time Limit）不抢占已经开始的命令。命令超时由执行环境（Environment）另行控制。人工模式（human）也绕过模型调用（Model Query）前检查，不能据此宣称所有路径都受同一个总时限约束。</p>
+<p><strong>问：为什么连续格式错误（Format Error）有时会退出（Exit），有时还能继续？</strong></p>
+<p>答：计数尚未达到正数阈值时，错误反馈进入下一轮；达到阈值时追加 <code>RepeatedFormatError</code>。阈值为 0 不启用这项上限，正常一轮会清零连续计数。其他异常（Exception）也不是全走这条可继续的分支。</p>
+<p><strong>问：有 <code>finally</code> 和执行轨迹（Trajectory），为什么还要讨论恢复（Recovery）？</strong></p>
+<p>答：硬终止（Hard Termination）可以让 <code>finally</code> 根本不执行；已经写好的文件也不会因此自动回滚。保存（Save）本身还可能失败。恢复（Recovery）时需要核对效果（Effect），不能把磁盘快照（Snapshot）当成现实的完整复制品。</p>
 <span class="heading-alias" id="上一章与-mini-阶段收尾" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
 <ul>
-<li>相关章节：<a href="03-actions-and-messages.html">第03章｜动作、观察与消息协议</a></li>
-<li>下一站：<a href="06-crash-window.html">第06章｜写入与轨迹保存的崩溃窗口</a></li>
-<li>实验后：<a href="07-loop-boundaries.html#1-%E6%AD%A3%E5%B8%B8%E6%83%85%E5%86%B5%E4%B8%8B%E4%B8%89%E4%BB%B6%E4%BA%8B%E7%B4%A7%E6%8C%A8%E7%9D%80%E5%8F%91%E7%94%9F">第07章｜最小循环的能力边界</a></li>
-<li>mini 收尾导航：<a href="bridge/README.html">从最小循环到 Maka</a></li>
+<li><a href="03-actions-and-messages.html">第03章</a>：行动请求（Action）、执行输出（Output）与观察消息（Observation Message）的转化。</li>
+<li><a href="06-crash-window.html">第06章</a>：同一崩溃窗口（Crash Window）的完整故障注入（Fault Injection）案例。</li>
+<li><a href="07-loop-boundaries.html#1-%E6%AD%A3%E5%B8%B8%E6%83%85%E5%86%B5%E4%B8%8B%E4%B8%89%E4%BB%B6%E4%BA%8B%E7%B4%A7%E6%8C%A8%E7%9D%80%E5%8F%91%E7%94%9F">第07章</a>：从最小代理循环（Agent Loop）进入长期运行需要补足的机制。</li>
+<li><a href="bridge/README.html">进阶路线</a>：后续运行支撑（Agent Harness）的责任地图。</li>
 </ul>
-<hr>
-<p><a href="04-code-repair.html">上一章：第 04 章｜代码修复与测试</a> · <a href="06-crash-window.html">下一章：第 06 章｜写入与轨迹保存的崩溃窗口</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="04-code-repair.html"><span>← 上一章</span><strong>第 04 章｜代码修复与测试</strong></a><a href="06-crash-window.html"><span>下一章 →</span><strong>第 06 章｜写入与轨迹保存的崩溃窗口</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E4%BA%A4%E4%BA%92%E9%80%80%E5%87%BA%E4%B8%8E%E8%BD%A8%E8%BF%B9">交互、退出与轨迹</a></li><li class="toc-level-3"><a href="#%E6%8E%A7%E5%88%B6%E4%B8%8E%E8%AE%B0%E5%BD%95%E7%9A%84%E5%88%86%E5%B7%A5">控制与记录的分工</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E9%BB%98%E8%AE%A4-cli-%E4%BD%BF%E7%94%A8-interactiveagent">为什么默认 CLI 使用 InteractiveAgent</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E4%BA%A4%E4%BA%92%E6%A8%A1%E5%BC%8F">三种交互模式</a></li><li class="toc-level-3"><a href="#%E7%A1%AE%E8%AE%A4%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%AD%89%E4%BA%8E-sandbox">确认为什么不等于 Sandbox</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1%E6%8B%92%E7%BB%9D%E6%80%8E%E6%A0%B7%E5%9B%9E%E5%88%B0%E5%BE%AA%E7%8E%AF">一次拒绝怎样回到循环</a></li><li class="toc-level-3"><a href="#agent-%E6%80%8E%E6%A0%B7%E6%AD%A3%E5%B8%B8%E6%8F%90%E4%BA%A4">Agent 怎样正常提交</a></li><li class="toc-level-3"><a href="#%E4%B8%8B%E4%B8%80%E6%AC%A1%E8%B0%83%E7%94%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B9%9F%E5%8F%AF%E8%83%BD%E8%A2%AB%E9%98%BB%E6%AD%A2">下一次调用为什么也可能被阻止</a></li><li class="toc-level-3"><a href="#trajectory%E4%BF%9D%E5%AD%98%E5%BD%93%E5%89%8D%E5%B7%B2%E7%BB%8F%E7%9F%A5%E9%81%93%E7%9A%84%E8%BF%87%E7%A8%8B">Trajectory：保存当前已经知道的过程</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E4%B8%AA%E5%85%B3%E9%94%AE%E5%B4%A9%E6%BA%83%E7%AA%97%E5%8F%A3">一个关键崩溃窗口</a></li><li class="toc-level-3"><a href="#%E7%9C%9F%E5%AE%9E%E4%BB%BB%E5%8A%A1%E6%80%8E%E6%A0%B7%E7%BB%93%E6%9D%9F">真实任务怎样结束</a></li><li class="toc-level-3"><a href="#%E9%80%80%E5%87%BA%E6%9D%A1%E4%BB%B6%E4%B8%8E%E8%AE%B0%E5%BD%95%E7%BC%BA%E5%8F%A3%E9%97%AE%E7%AD%94">退出条件与记录缺口问答</a></li><li class="toc-level-2"><a href="#%E5%BC%82%E5%B8%B8%E9%A2%84%E7%AE%97%E4%B8%8E%E4%BF%9D%E5%AD%98%E5%8D%8F%E8%AE%AE">异常、预算与保存协议</a></li><li class="toc-level-3"><a href="#%E6%8B%92%E7%BB%9D%E5%8F%8D%E9%A6%88%E6%80%8E%E6%A0%B7%E5%9B%9E%E5%88%B0%E5%A4%96%E5%B1%82%E5%BE%AA%E7%8E%AF">拒绝反馈怎样回到外层循环</a></li><li class="toc-level-3"><a href="#%E6%95%B4%E6%89%B9%E7%A1%AE%E8%AE%A4%E7%9A%84%E5%AE%9E%E7%8E%B0%E6%9D%A1%E4%BB%B6">整批确认的实现条件</a></li><li class="toc-level-3"><a href="#%E5%AE%8C%E6%88%90%E5%91%BD%E4%BB%A4%E4%B8%BA%E4%BD%95%E4%BC%9A%E7%95%99%E4%B8%8B-not-executed-%E5%8D%A0%E4%BD%8D">完成命令为何会留下 not executed 占位</a></li><li class="toc-level-3"><a href="#%E9%99%90%E5%88%B6%E6%80%8E%E6%A0%B7%E9%98%BB%E6%AD%A2%E6%97%A0%E9%99%90%E5%BE%AA%E7%8E%AF">限制怎样阻止无限循环</a></li><li class="toc-level-3"><a href="#formaterror-%E6%80%8E%E6%A0%B7%E5%BD%A2%E6%88%90%E5%8F%8D%E9%A6%88%E5%BE%AA%E7%8E%AF">FormatError 怎样形成反馈循环</a></li><li class="toc-level-3"><a href="#%E8%90%BD%E5%85%A5-except-exception-%E7%9A%84%E6%9C%AA%E5%A4%84%E7%90%86%E5%BC%82%E5%B8%B8%E4%B8%8E%E9%80%80%E5%87%BA%E6%B6%88%E6%81%AF">落入 except Exception 的未处理异常与“退出消息”</a></li><li class="toc-level-3"><a href="#serialize-%E7%9A%84%E4%B8%BB%E7%BB%93%E6%9E%84">serialize() 的主结构</a></li><li class="toc-level-3"><a href="#%E4%BF%9D%E5%AD%98%E7%9A%84%E6%98%AF%E5%BF%AB%E7%85%A7%E5%BC%8F-json">保存的是快照式 JSON</a></li><li class="toc-level-3"><a href="#trajectory-%E4%B8%8E-durable-ledger-%E7%9A%84%E5%8C%BA%E5%88%AB">Trajectory 与 durable ledger 的区别</a></li><li class="toc-level-3"><a href="#%E5%9B%BA%E5%AE%9A%E6%A1%88%E4%BE%8B%E7%9A%84%E5%AE%8C%E6%95%B4%E9%80%80%E5%87%BA%E8%BD%A8%E8%BF%B9">固定案例的完整退出轨迹</a></li><li class="toc-level-3"><a href="#%E9%99%90%E5%88%B6%E4%B8%8E%E5%BC%82%E5%B8%B8%E5%88%86%E6%94%AF%E9%97%AE%E7%AD%94">限制与异常分支问答</a></li><li class="toc-level-3"><a href="#%E7%A1%AE%E8%AE%A4%E6%8F%90%E4%BA%A4%E4%B8%8E%E7%A1%AC%E7%BB%88%E6%AD%A2%E5%88%86%E5%88%AB%E7%95%99%E4%B8%8B%E4%BB%80%E4%B9%88">确认、提交与硬终止分别留下什么</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p>上一章：<a href="04-code-repair.html">第04章</a> · 下一章：<a href="06-crash-window.html">第06章</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="04-code-repair.html"><span>← 上一章</span><strong>第 04 章｜代码修复（Code Repair）与测试（Test）</strong></a><a href="06-crash-window.html"><span>下一章 →</span><strong>第 06 章｜效果（Effect）与执行轨迹（Trajectory）的崩溃窗口（Crash Window）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E4%BB%8E%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82action%E5%88%B0%E4%BB%BB%E5%8A%A1%E6%88%90%E5%8A%9Ftask-success">前情回顾：从行动请求（Action）到任务成功（Task Success）</a></li><li class="toc-level-2"><a href="#1-%E5%85%88%E5%88%86%E6%B8%85%E7%A1%AE%E8%AE%A4confirmation%E9%80%80%E5%87%BAexit%E4%B8%8E%E4%BF%9D%E5%AD%98save">1. 先分清确认（Confirmation）、退出（Exit）与保存（Save）</a></li><li class="toc-level-2"><a href="#2-%E4%BA%A4%E4%BA%92interaction%E8%B0%81%E6%8F%90%E5%87%BA%E5%91%BD%E4%BB%A4%E8%B0%81%E5%85%81%E8%AE%B8%E6%89%A7%E8%A1%8C">2. 交互（Interaction）：谁提出命令，谁允许执行</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E4%BA%A4%E4%BA%92%E6%A8%A1%E5%BC%8Finteraction-mode">三种交互模式（Interaction Mode）</a></li><li class="toc-level-3"><a href="#%E7%A1%AE%E8%AE%A4confirmation%E4%B8%8E%E6%B2%99%E7%AE%B1%E9%9A%94%E7%A6%BBsandbox-isolation%E5%90%84%E7%AE%A1%E4%BB%80%E4%B9%88">确认（Confirmation）与沙箱隔离（Sandbox Isolation）各管什么</a></li><li class="toc-level-3"><a href="#%E6%8B%92%E7%BB%9D%E5%A6%82%E4%BD%95%E6%88%90%E4%B8%BA%E4%B8%8B%E4%B8%80%E8%BD%AE%E5%8F%AF%E8%AF%BB%E7%9A%84%E5%8F%8D%E9%A6%88">拒绝如何成为下一轮可读的反馈</a></li><li class="toc-level-2"><a href="#3-%E9%80%80%E5%87%BAexit%E6%8F%90%E4%BA%A4%E4%BF%A1%E5%8F%B7submission-signal%E6%80%8E%E6%A0%B7%E7%BB%93%E6%9D%9F%E4%BB%A3%E7%90%86%E5%BE%AA%E7%8E%AFagent-loop">3. 退出（Exit）：提交信号（Submission Signal）怎样结束代理循环（Agent Loop）</a></li><li class="toc-level-3"><a href="#%E5%85%88%E7%9C%8B%E5%AE%8C%E6%88%90%E5%91%BD%E4%BB%A4%E5%86%8D%E7%9C%8B%E5%AE%9E%E9%99%85%E6%B6%88%E8%B4%B9%E8%80%85consumer">先看完成命令，再看实际消费者（Consumer）</a></li><li class="toc-level-3"><a href="#%E4%BA%BA%E5%8F%AF%E4%BB%A5%E5%9C%A8%E9%80%80%E5%87%BAexit%E5%89%8D%E8%A1%A5%E5%85%85%E4%BB%BB%E5%8A%A1">人可以在退出（Exit）前补充任务</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E5%AE%8C%E6%88%90%E5%91%BD%E4%BB%A4%E4%BC%9A%E7%95%99%E4%B8%8B-action-was-not-executed">为什么完成命令会留下 action was not executed</a></li><li class="toc-level-3"><a href="#%E5%9B%9E%E7%AD%94%E6%96%87%E5%AD%97%E4%B8%8E-submission-%E5%88%86%E5%88%AB%E6%9D%A5%E8%87%AA%E5%93%AA%E9%87%8C">回答文字与 submission 分别来自哪里</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E5%AE%8C%E6%95%B4%E5%AE%8C%E6%88%90%E8%B7%AF%E5%BE%84%E6%94%BE%E5%9C%A8%E4%B8%80%E8%B5%B7%E8%AF%BB">把完整完成路径放在一起读</a></li><li class="toc-level-2"><a href="#4-%E9%A2%84%E7%AE%97budget%E6%A3%80%E6%9F%A5%E5%8F%91%E7%94%9F%E5%9C%A8%E5%93%AA%E4%B8%80%E4%B8%AA%E6%97%B6%E7%82%B9">4. 预算（Budget）：检查发生在哪一个时点</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E9%99%90%E5%88%B6%E5%88%86%E5%88%AB%E6%95%B0%E4%BB%80%E4%B9%88">三种限制分别数什么</a></li><li class="toc-level-3"><a href="#%E6%A8%A1%E5%9E%8B%E8%B0%83%E7%94%A8model-query%E9%99%90%E5%88%B6%E4%B8%8E%E5%91%BD%E4%BB%A4%E8%B6%85%E6%97%B6%E6%98%AF%E4%B8%A4%E4%B8%AA%E6%8E%A7%E5%88%B6%E7%82%B9">模型调用（Model Query）限制与命令超时是两个控制点</a></li><li class="toc-level-3"><a href="#%E8%BE%BE%E5%88%B0%E9%99%90%E5%88%B6%E4%BB%A5%E5%90%8E%E6%80%8E%E6%A0%B7%E9%80%80%E5%87%BAexit">达到限制以后怎样退出（Exit）</a></li><li class="toc-level-2"><a href="#5-%E5%BC%82%E5%B8%B8exception%E6%80%8E%E6%A0%B7%E6%94%B9%E5%8F%98%E6%B6%88%E6%81%AFmessage%E4%B8%8E%E9%80%80%E5%87%BAexit">5. 异常（Exception）怎样改变消息（Message）与退出（Exit）</a></li><li class="toc-level-3"><a href="#%E5%85%88%E8%AF%BB%E5%88%86%E6%94%AF%E6%A1%86%E6%9E%B6%E5%86%8D%E8%AF%BB%E4%BB%A3%E7%90%86%E5%BE%AA%E7%8E%AFagent-loop%E4%BB%A3%E7%A0%81">先读分支框架，再读代理循环（Agent Loop）代码</a></li><li class="toc-level-3"><a href="#%E6%A0%BC%E5%BC%8F%E9%94%99%E8%AF%AFformat-error%E4%B8%BA%E4%BB%80%E4%B9%88%E5%85%81%E8%AE%B8%E5%86%8D%E6%AC%A1%E6%A8%A1%E5%9E%8B%E8%B0%83%E7%94%A8model-query">格式错误（Format Error）为什么允许再次模型调用（Model Query）</a></li><li class="toc-level-3"><a href="#%E8%AF%8A%E6%96%AD%E4%BF%A1%E6%81%AF%E4%BF%9D%E7%95%99%E4%BB%A5%E5%90%8E%E5%BC%82%E5%B8%B8exception%E4%BB%8D%E4%BC%9A%E6%8A%9B%E5%87%BA">诊断信息保留以后，异常（Exception）仍会抛出</a></li><li class="toc-level-2"><a href="#6-%E6%89%A7%E8%A1%8C%E8%BD%A8%E8%BF%B9trajectory%E4%BF%9D%E5%AD%98save%E4%BA%86%E5%93%AA%E4%B8%80%E4%BB%BD%E5%B7%B2%E7%9F%A5%E7%8A%B6%E6%80%81">6. 执行轨迹（Trajectory）：保存（Save）了哪一份已知状态</a></li><li class="toc-level-3"><a href="#%E5%BF%AB%E7%85%A7snapshot%E5%8C%85%E5%90%AB%E4%BB%80%E4%B9%88%E8%B0%81%E4%BC%9A%E8%AF%BB%E5%8F%96">快照（Snapshot）包含什么，谁会读取</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%98%AF%E5%BF%AB%E7%85%A7snapshot%E5%86%99%E5%85%A5%E8%80%8C%E9%9D%9E%E5%8F%AF%E9%9D%A0%E7%9A%84%E6%89%A7%E8%A1%8C%E8%B4%A6%E6%9C%ACdurable-ledger">为什么是快照（Snapshot）写入，而非可靠的执行账本（Durable Ledger）</a></li><li class="toc-level-3"><a href="#%E5%B4%A9%E6%BA%83%E7%AA%97%E5%8F%A3crash-window%E8%AE%B0%E5%BD%95%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E8%90%BD%E5%90%8E%E4%B8%80%E6%95%B4%E6%AD%A5">崩溃窗口（Crash Window）：记录为什么会落后一整步</a></li><li class="toc-level-3"><a href="#%E9%87%8D%E8%AF%95%E4%B9%8B%E5%89%8D%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E8%AF%BB%E5%9B%9E%E6%95%88%E6%9E%9Ceffect">重试之前为什么要读回效果（Effect）</a></li><li class="toc-level-2"><a href="#7-%E7%9B%B4%E6%8E%A5%E9%97%AE%E7%AD%94%E6%8A%8A%E6%8E%A7%E5%88%B6%E8%AF%81%E6%8D%AE%E4%B8%8E%E6%81%A2%E5%A4%8Drecovery%E5%88%86%E5%BC%80%E5%88%A4%E6%96%AD">7. 直接问答：把控制、证据与恢复（Recovery）分开判断</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

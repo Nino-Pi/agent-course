@@ -11,7 +11,7 @@
 <h2 id="核心路线">核心路线</h2>
 <p>先用第 04 章的代码、测试与轨迹说明一次修复的判定，再把机制、替代设计和失败条件组织成完整的<a href="#%E7%BB%BC%E5%90%88%E8%AE%BE%E8%AE%A1%E8%A7%A3%E9%87%8A%E6%AF%94%E8%BE%83%E4%B8%8E%E9%99%90%E5%AE%9A%E7%BB%93%E8%AE%BA">设计分析卡</a>。第 47 章进一步连接跨模块状态与授权。</p>
 <h3 id="评价最小模型">评价最小模型</h3>
-<p><a href="05-exit-and-trajectory.html#%E9%80%80%E5%87%BA%E6%9D%A1%E4%BB%B6%E4%B8%8E%E8%AE%B0%E5%BD%95%E7%BC%BA%E5%8F%A3%E9%97%AE%E7%AD%94">程序退出</a>和<a href="16-tools-and-execution.html#%E5%B7%A5%E5%85%B7%E7%BB%93%E6%9E%9C%E4%B8%8E%E5%90%8E%E7%BB%AD%E5%88%A4%E6%96%AD">任务验收</a>并不相同；一次修好又与反复委托时的可靠性不同。后者需要在相同条件下观察多次完整任务。</p>
+<p><a href="05-exit-and-trajectory.html#7-%E7%9B%B4%E6%8E%A5%E9%97%AE%E7%AD%94%E6%8A%8A%E6%8E%A7%E5%88%B6%E8%AF%81%E6%8D%AE%E4%B8%8E%E6%81%A2%E5%A4%8Drecovery%E5%88%86%E5%BC%80%E5%88%A4%E6%96%AD">程序退出</a>和<a href="16-tools-and-execution.html#%E5%B7%A5%E5%85%B7%E7%BB%93%E6%9E%9C%E4%B8%8E%E5%90%8E%E7%BB%AD%E5%88%A4%E6%96%AD">任务验收</a>并不相同；一次修好又与反复委托时的可靠性不同。后者需要在相同条件下观察多次完整任务。</p>
 <p>先把任务成功写成可检查的条件。仍用 第04章：正确修复 <code>formatDuration</code> 的一般计算、修正 README 测试入口、保留测试和无关文件。判定器（grader）是执行检查并给出判断的程序或人；oracle 是判定所依据的正确结果或规则。它们只能支持自己覆盖的结论。四个断言全过而 61 秒仍错误，说明判定覆盖不足；不能把这种补丁算作已经满足一般契约。</p>
 <span class="heading-alias" id="先固定统计的单位" aria-hidden="true"></span><h4 id="试次重试与候选的统计单位">试次、重试与候选的统计单位</h4>
 <p>本节约定一次<strong>试次</strong>是从规定初始状态出发，在同一预算和权限下完成的一整项修复，可以包含多次模型调用和工具执行。它不是一次 API 请求，也不是一条测试断言。</p>

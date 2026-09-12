@@ -1,16 +1,25 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 03 章｜动作、观察与消息协议 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 03 / 62</div><article id="main-content"><span class="heading-alias" id="a02actionsobservations-与-messages一句模型请求怎样变成一次真实命令" aria-hidden="true"></span><span class="heading-alias" id="a02动作观察与消息协议" aria-hidden="true"></span><h1 id="第-03-章动作观察与消息协议">第 03 章｜动作、观察与消息协议</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 03 章｜行动请求（Action）、观察结果（Observation）与消息协议（Message Protocol） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 03 / 62</div><article id="main-content"><span class="heading-alias" id="a02actionsobservations-与-messages一句模型请求怎样变成一次真实命令" aria-hidden="true"></span><span class="heading-alias" id="a02动作观察与消息协议" aria-hidden="true"></span><span class="heading-alias" id="第-03-章动作观察与消息协议" aria-hidden="true"></span><h1 id="第-03-章行动请求action观察结果observation与消息协议message-protocol">第 03 章｜行动请求（Action）、观察结果（Observation）与消息协议（Message Protocol）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：模型发出的工具请求，怎样变成命令执行结果和下一轮能够读取的消息？</p>
-<p><strong>关键概念</strong>：Action（动作请求）描述要执行什么；Output（执行输出）包含进程结果；Observation Message（观察消息）把结果交回模型；tool_call_id（调用标识）关联请求与回执。</p>
-<p><strong>关系主线</strong>：解析器提取动作，环境执行命令，格式化逻辑生成观察消息。参数可解析、命令成功退出和消息协议完整分别需要检查，不能用其中一项代替另外两项。</p>
+<p><strong>核心问题</strong>：模型（Model）发出的工具请求，怎样变成命令执行结果和下一轮能够读取的消息（Message）？</p>
+<p><strong>关键概念</strong>：行动请求（Action）描述要执行什么；执行输出（Output）包含进程（Process）结果；观察消息（Observation Message）承载观察结果（Observation），把结果交回模型（Model）；调用标识（Call ID）<code>tool_call_id</code> 关联请求与回执。</p>
+<p><strong>关系主线</strong>：解析器（Parser）提取行动请求（Action），执行环境（Environment）执行命令，格式化逻辑生成观察消息（Observation Message）。参数可解析、命令成功退出和消息协议（Message Protocol）完整分别需要检查，不能用其中一项代替另外两项。</p>
 </blockquote>
-<p>沿用 <a href="02-agent-loop.html">第02章</a> 的控制循环，下面用同一条文件读取命令展开数据转换。</p>
+<h2 id="前情回顾">前情回顾</h2>
+<p><a href="01-agent-components.html">第01章</a>把模型（Model）的决策与运行支撑（Agent Harness）连接执行环境（Environment）的责任分开，<a href="02-agent-loop.html">第02章</a>又追到一轮控制循环：先取得并记录模型（Model）请求，再执行行动请求（Action），最后把普通结果加入下一轮输入。到这里还留下一个接口问题：模型（Model）服务返回的工具调用（Tool Call）、Python 中的行动请求（Action）对象、进程（Process）输出和下一条消息（Message），究竟是不是同一份数据？</p>
+<p>本章沿用“只修 README 测试（Test）命令”的任务，项目代码仍假设正常。先读取配置与说明，追踪同一调用怎样穿过四种表示；再解释多调用配对、进程（Process）状态和协议变体。下一章才增加函数错误，并用固定响应驱动真实执行。这里先建立一个判断顺序：<strong>请求能解析，才谈怎样执行；取得结果以后，还要检查它怎样到达下一位消费者（Consumer）。</strong></p>
 <span class="heading-alias" id="核心阅读" aria-hidden="true"></span><h2 id="请求执行与回执">请求、执行与回执</h2>
 <span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><span class="heading-alias" id="先看一个完整小例子" aria-hidden="true"></span><span class="heading-alias" id="固定案例完整走一遍" aria-hidden="true"></span><span class="heading-alias" id="第一步读取两个文件" aria-hidden="true"></span><span class="heading-alias" id="第二步修改-readme" aria-hidden="true"></span><span class="heading-alias" id="第三步运行测试" aria-hidden="true"></span><span class="heading-alias" id="第四步提交" aria-hidden="true"></span><span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区一action-已经解析成功所以命令成功" aria-hidden="true"></span><span class="heading-alias" id="本章小结" aria-hidden="true"></span><h3 id="一次命令的四份数据">一次命令的四份数据</h3>
-<p>本节继续 README 文档修复：先读取 <code>package.json</code> 中的测试脚本配置和 <code>README.md</code> 中的命令说明，核对二者是否一致。命令沿用第02章的 <code>sed</code> 读法，显示两份小文件按顺序串接后的第1–220行；随后只观察同一请求怎样改变数据表示。</p>
-<h4 id="模型返回-tool-call">模型返回 tool call</h4>
-<p>以下四份数据使用虚构的调用 ID 和省略内容，只演示转换关系，不是实际 trace。<code>arguments</code> 是装着 JSON 的字符串，所以内层引号写成 <code>\&quot;</code>。</p>
+<p>本节继续 README 文档修复：先读取 <code>package.json</code> 中的测试（Test）脚本配置和 <code>README.md</code> 中的命令说明，核对二者是否一致。命令沿用第02章的 <code>sed</code> 读法，显示两份小文件按顺序串接后的第1–220行；随后只观察同一请求怎样改变数据表示。</p>
+<p>先看每份数据交给谁。**消费者（Consumer）**指实际读取并使用这份数据的程序部件；只把数据保存下来，还不能证明下一个部件已经取得它。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 一次命令的四份数据"><table><caption>表 1 / Table 1 · 一次命令的四份数据</caption><thead><tr><th scope="col">数据</th><th scope="col">直接消费者（Consumer）</th><th scope="col">消费者（Consumer）要完成什么</th></tr></thead><tbody><tr><td>工具调用（Tool Call）</td><td>模型协议适配器（Model Adapter）中的解析器（Parser）</td><td>读取工具名与参数，形成内部行动请求（Action）</td></tr>
+<tr><td>行动请求（Action）</td><td>本地执行环境（Environment）</td><td>取得命令，按当前工作目录（Working Directory）和执行环境（Environment）启动进程（Process）</td></tr>
+<tr><td>执行输出（Output）</td><td>模型协议适配器（Model Adapter）中的格式化逻辑</td><td>选择文本并组成模型（Model）服务接受的观察消息（Observation Message）</td></tr>
+<tr><td>观察消息（Observation Message）</td><td>下一轮模型（Model）</td><td>将结果与原调用配对，作为下一步判断的输入</td></tr></tbody></table></div>
+<p>本课程把一次向模型（Model）取下一份响应称为模型调用（Model Query）；代码中的入口通常名为 <code>query()</code>。这四行不是四次模型调用（Model Query）。同一请求在不同接口之间换了表示，只有执行环境（Environment）真正运行命令时，才读到文件内容。</p>
+<span class="heading-alias" id="模型返回-tool-call" aria-hidden="true"></span><h4 id="模型model返回工具调用tool-call">模型（Model）返回工具调用（Tool Call）</h4>
+<p>以下四份数据使用虚构的调用标识（Call ID）和省略内容，只演示转换关系，不是实际执行轨迹（Trajectory）。<code>arguments</code> 是以 JavaScript 对象表示法（JavaScript Object Notation，JSON）编码的字符串；这种格式用字段和值表达结构化数据。因为这一层仍是字符串，内层引号写成 <code>\&quot;</code>。</p>
+<p>从外向内读这个对象：<code>id</code> 给本次调用命名；<code>function.name</code> 指定当前提供的 <code>bash</code> 工具；<code>function.arguments</code> 才装着待解释的参数。看到其中有一条文件命令，只能说明模型（Model）提出了请求。</p>
 <pre><code class="language-json">{
   &quot;id&quot;: &quot;call-read-files&quot;,
   &quot;function&quot;: {
@@ -18,18 +27,21 @@
     &quot;arguments&quot;: &quot;{\&quot;command\&quot;:\&quot;sed -n &#39;1,220p&#39; package.json README.md\&quot;}&quot;
   }
 }</code></pre>
-<h4 id="model-adapter-解析成-action">Model adapter 解析成 action</h4>
+<span class="heading-alias" id="model-adapter-解析成-action" aria-hidden="true"></span><h4 id="模型协议适配器model-adapter解析成行动请求action">模型协议适配器（Model Adapter）解析成行动请求（Action）</h4>
+<p>解析器（Parser）把 <code>arguments</code> 中按对象表示法（JSON）编码的字符串读成字典，取出 <code>command</code>，再把外层调用标识（Call ID）记入 <code>tool_call_id</code>。下面的命令内容没有改变，也尚未执行；改变的是执行环境（Environment）接收的数据形状。</p>
 <pre><code class="language-json">{
   &quot;command&quot;: &quot;sed -n &#39;1,220p&#39; package.json README.md&quot;,
   &quot;tool_call_id&quot;: &quot;call-read-files&quot;
 }</code></pre>
-<h4 id="localenvironment-执行并返回-output">LocalEnvironment 执行并返回 output</h4>
+<span class="heading-alias" id="localenvironment-执行并返回-output" aria-hidden="true"></span><h4 id="localenvironment-执行并返回执行输出output"><code>LocalEnvironment</code> 执行并返回执行输出（Output）</h4>
+<p>执行环境（Environment）这时才启动命令并取得结果。<code>output</code> 是返回文本，<code>returncode</code> 是进程（Process）结束状态，<code>exception_info</code> 说明执行异常。本例假设命令正常返回，所以退出码（Exit Code）为 0；省略号不是实际文件正文。</p>
 <pre><code class="language-json">{
   &quot;output&quot;: &quot;...两份文件的真实内容...&quot;,
   &quot;returncode&quot;: 0,
   &quot;exception_info&quot;: &quot;&quot;
 }</code></pre>
-<h4 id="model-adapter-格式化-observation-message">Model adapter 格式化 observation message</h4>
+<span class="heading-alias" id="model-adapter-格式化-observation-message" aria-hidden="true"></span><h4 id="模型协议适配器model-adapter格式化观察消息observation-message">模型协议适配器（Model Adapter）格式化观察消息（Observation Message）</h4>
+<p>下一位消费者（Consumer）是模型（Model）服务，因此还要按它接受的协议组装消息（Message）。<code>role: &quot;tool&quot;</code> 表示这是工具结果；相同的 <code>tool_call_id</code> 指回原请求；<code>content</code> 是提供给模型（Model）的表示，<code>extra</code> 则是内部辅助字段。两者不必包含同样多的文本。</p>
 <pre><code class="language-json">{
   &quot;role&quot;: &quot;tool&quot;,
   &quot;tool_call_id&quot;: &quot;call-read-files&quot;,
@@ -39,89 +51,86 @@
     &quot;returncode&quot;: 0
   }
 }</code></pre>
-<p>下一次 Model query 才会同时看到：</p>
+<p>下一次模型调用（Model Query）才会同时看到：</p>
 <ul>
-<li>assistant 发出的 <code>call-read-files</code>；</li>
-<li>tool 返回的同一个 <code>call-read-files</code> 的结果。</li>
+<li><code>role: assistant</code> 消息（Message）发出的 <code>call-read-files</code>；</li>
+<li><code>role: tool</code> 消息（Message）返回的同一个 <code>call-read-files</code> 的结果。</li>
 </ul>
-<p>把上面同一个调用的四份数据连起来：解析改变请求的表示，执行才取得环境结果，格式化再把结果交给下一次模型。<code>tool_call_id</code> 沿这条转换链关联同一次请求与回执。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="一次工具调用的四份数据：可滚动示意图"><a href="../../../assets/diagrams/03-actions-and-messages-1.svg"><img src="../../../assets/diagrams/03-actions-and-messages-1.svg" alt="同一个模型工具调用先解析为动作，再由环境执行得到原始输出，适配器将它格式化为保留同一 tool_call_id 的观察消息，供下一次模型请求读取。" width="720" height="1214" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><span class="heading-alias" id="先分清三个对象" aria-hidden="true"></span><h3 id="actionoutput-与-observation-message">Action、Output 与 Observation Message</h3>
-<h4 id="action希望环境做什么">Action：希望环境做什么</h4>
-<p>Action 是从模型响应中解析出的执行请求。在默认 Bash 路径中，核心字段是：</p>
+<p>把上面同一个调用的四份数据连起来：解析改变请求的表示，执行才取得执行环境（Environment）结果，格式化再把结果交给下一次模型（Model）。<code>tool_call_id</code> 沿这条转换链关联同一次请求与回执。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="四份数据 · Four Data Representations：可滚动示意图"><a href="../../../assets/diagrams/03-actions-and-messages-1.svg"><img src="../../../assets/diagrams/03-actions-and-messages-1.svg" alt="同一工具调用（Tool Call）的四份表示：解析器（Parser）形成行动请求（Action），执行环境（Environment）取得执行输出（Output），模型协议适配器（Model Adapter）生成观察消息（Observation Message），后续模型调用（Model Query）消费结果；调用标识沿转换链关联请求与回执。" width="720" height="1271" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><span class="heading-alias" id="先分清三个对象" aria-hidden="true"></span><span class="heading-alias" id="actionoutput-与-observation-message" aria-hidden="true"></span><h3 id="行动请求action执行输出output与观察消息observation-message">行动请求（Action）、执行输出（Output）与观察消息（Observation Message）</h3>
+<span class="heading-alias" id="action希望环境做什么" aria-hidden="true"></span><h4 id="行动请求action希望执行环境environment做什么">行动请求（Action）：希望执行环境（Environment）做什么</h4>
+<p>行动请求（Action）是从模型（Model）响应中解析出的执行请求。在默认 Bash 路径中，核心字段是：</p>
 <pre><code class="language-json">{
   &quot;command&quot;: &quot;某条 shell 命令&quot;,
   &quot;tool_call_id&quot;: &quot;对应的调用 ID&quot;
 }</code></pre>
-<p>Action 可以被记录、检查或拒绝；仅仅存在于消息中不会自动改变现实。</p>
-<h4 id="outputenvironment-实际观察到什么">Output：Environment 实际观察到什么</h4>
-<p><code>LocalEnvironment.execute()</code> 返回的 output 主要包含：</p>
+<p>行动请求（Action）可以被记录、检查或拒绝；仅仅存在于消息（Message）中不会自动改变现实。</p>
+<span class="heading-alias" id="outputenvironment-实际观察到什么" aria-hidden="true"></span><h4 id="执行输出output执行环境environment实际观察到什么">执行输出（Output）：执行环境（Environment）实际观察到什么</h4>
+<p><code>LocalEnvironment.execute()</code> 返回的执行输出（Output）主要包含：</p>
 <ul>
-<li><code>output</code>：合并后的标准输出和标准错误文本；</li>
-<li><code>returncode</code>：进程返回码；</li>
+<li><code>output</code>：合并后的标准输出（Standard Output）和标准错误（Standard Error）文本；</li>
+<li><code>returncode</code>：进程（Process）退出码（Exit Code）；</li>
 <li><code>exception_info</code>：执行异常的解释；</li>
 <li>某些异常情况下的 <code>extra</code>：异常类型和字符串。</li>
 </ul>
-<p>Output 描述 Environment 这一层的执行结果。</p>
-<h4 id="observation-message下一轮模型怎样看到-output">Observation Message：下一轮模型怎样看到 Output</h4>
-<p>模型 provider 不一定接受任意 Python 字典。Model adapter 必须按照当前 API 的 tool-result 约定，把 output 转成消息。</p>
-<p>因此：</p>
-<pre><code class="language-text">Output 是执行层结果
-Observation Message 是模型输入层表示</code></pre>
-<p>两者有关联，但不能混为同一个对象。</p>
+<p>执行输出（Output）描述执行环境（Environment）这一层的执行结果。</p>
+<span class="heading-alias" id="observation-message下一轮模型怎样看到-output" aria-hidden="true"></span><h4 id="观察消息observation-message下一轮模型model怎样看到执行输出output">观察消息（Observation Message）：下一轮模型（Model）怎样看到执行输出（Output）</h4>
+<p>模型服务提供方（Provider）不一定接受任意 Python 字典。模型协议适配器（Model Adapter）必须按照当前 API 的工具结果约定（<code>role: tool</code>），把执行输出（Output）转成消息（Message）。</p>
+<p>执行输出（Output）服务于执行层，观察消息（Observation Message）服务于下一次模型（Model）输入。比如进程（Process）产生了一万多字符日志，执行输出（Output）可以保存完整文本，观察消息（Observation Message）则按模板（Template）只展示头尾，并说明省略量。两者仍关联同一调用，内容范围却不同。判断“模型（Model）当时知道什么”时，应检查实际发送的消息（Message），不能只看内部保存的对象。</p>
 <span class="heading-alias" id="v246-默认路径一个-bash-工具类型" aria-hidden="true"></span><span class="heading-alias" id="误区二只有一个-bash-工具所以每个-step-只能执行一次" aria-hidden="true"></span><h3 id="默认路径一个-bash-工具类型">默认路径：一个 Bash 工具类型</h3>
-<p>默认配置给模型一种名为 <code>bash</code> 的工具，参数 <code>command</code> 表示希望执行的命令。工具类型只有一种，一条响应仍可能请求调用它多次；比如分别读取两个文件。schema（参数结构声明）规定允许的字段和类型，parser（解析器）负责实际提取和检查；两者是否覆盖同样约束仍需分开核对。</p>
-<h4 id="bash-是一个宽工具表面">Bash 是一个宽工具表面</h4>
-<p>虽然只有一个工具名，Bash 本身可以表达很多操作：</p>
+<p>默认配置给模型（Model）一种名为 <code>bash</code> 的工具，参数 <code>command</code> 表示希望执行的命令。工具类型只有一种，一条响应仍可能请求调用它多次；比如分别读取两个文件。参数结构（Schema）规定允许的字段和类型，解析器（Parser）负责实际提取和检查；两者是否覆盖同样约束仍需分开核对。</p>
+<span class="heading-alias" id="bash-是一个宽工具表面" aria-hidden="true"></span><h4 id="bash-工具的工具表面tool-surface很宽">Bash 工具的工具表面（Tool Surface）很宽</h4>
+<p>工具表面（Tool Surface）是模型（Model）能够请求的工具及参数范围。这里虽然只暴露名为 <code>bash</code> 的一种工具，命令字符串仍可以表达很多操作：</p>
 <ul>
 <li>读取文件；</li>
 <li>搜索代码；</li>
 <li>修改文件；</li>
-<li>启动测试；</li>
+<li>启动测试（Test）；</li>
 <li>调用其他本地程序；</li>
-<li>在宿主环境允许时接触网络或系统资源。</li>
+<li>在宿主执行环境（Environment）允许时接触网络或系统资源。</li>
 </ul>
-<p>所以“工具数量少”不等于“能力范围窄”。一个宽泛的 shell 工具可能比十个小工具拥有更大的现实影响面。</p>
-<p>人工确认不能替代执行时的强制隔离。</p>
+<p>所以“工具数量少”不等于“能力范围窄”。一个宽泛的命令解释器（Shell）工具可能比十个小工具拥有更大的现实影响面。</p>
+<p>人工确认（Confirmation）不能替代执行时的强制隔离（Isolation）。</p>
 <h3 id="为什么必须保留-tool_call_id">为什么必须保留 <code>tool_call_id</code></h3>
-<p>假设一条 assistant message 请求了两个 Bash calls：</p>
+<p>假设一条 <code>role: assistant</code> 消息（Message）请求了两个 Bash 工具调用（Tool Call）：</p>
 <pre><code class="language-text">call-A：查看 package.json
 call-B：查看 README.md</code></pre>
-<p>下一轮模型不能只看到两段没有身份的文本，否则无法可靠判断哪段 output 对应哪个请求。</p>
-<p>配对关系应该是：</p>
-<pre><code class="language-text">assistant tool call A ───── tool result A
-assistant tool call B ───── tool result B</code></pre>
+<p>下一轮模型（Model）不能只看到两段没有身份的文本，否则无法可靠判断哪段执行输出（Output）对应哪个请求。</p>
+<p>配对时必须同时保留来源请求和对应回执：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 为什么必须保留 `tool_call_id`"><table><caption>表 2 / Table 2 · 为什么必须保留 `tool_call_id`</caption><thead><tr><th scope="col">调用标识（Call ID）</th><th scope="col">原工具调用（Tool Call）</th><th scope="col">对应观察消息（Observation Message）</th></tr></thead><tbody><tr><td><code>call-A</code></td><td>读取 <code>package.json</code></td><td>该次读取 <code>package.json</code> 的结果</td></tr>
+<tr><td><code>call-B</code></td><td>读取 <code>README.md</code></td><td>该次读取 <code>README.md</code> 的结果</td></tr></tbody></table></div>
 <p><code>tool_call_id</code> 就是这条局部配对键。</p>
-<p>这个 ID 只关联局部工具请求与结果，不承担整个用户任务或一次完整执行的身份语义。</p>
-<span class="heading-alias" id="误区二每次是-fresh-subprocess所以前一次修改会消失" aria-hidden="true"></span><h3 id="每次执行换进程文件变化却可以留下">每次执行换进程，文件变化却可以留下</h3>
-<h4 id="每个-action-都创建-fresh-subprocess">每个 action 都创建 fresh subprocess</h4>
-<p>v2.4.6 的 <code>_run()</code> 对每次 action 调用 <code>subprocess.Popen(...)</code>。因此每个 action 都启动新的 shell 进程，而不是在一个长期存活的交互式终端中连续敲命令。</p>
-<p>进程状态与文件状态的寿命不同：</p>
-<pre><code class="language-text">会持续的：写入磁盘的文件变化
-不会自动持续的：只存在于某个 shell 进程里的 cd、export、临时 shell 变量</code></pre>
+<p>这个调用标识（Call ID）只关联局部工具请求与结果，不承担整个用户任务或一次完整执行的身份语义。</p>
+<span class="heading-alias" id="误区二每次是-fresh-subprocess所以前一次修改会消失" aria-hidden="true"></span><span class="heading-alias" id="每次执行换进程文件变化却可以留下" aria-hidden="true"></span><h3 id="每次执行换进程process文件变化却可以留下">每次执行换进程（Process），文件变化却可以留下</h3>
+<span class="heading-alias" id="每个-action-都创建-fresh-subprocess" aria-hidden="true"></span><h4 id="每个行动请求action都创建新子进程subprocess">每个行动请求（Action）都创建新子进程（Subprocess）</h4>
+<p>v2.4.6 的 <code>_run()</code> 对每次行动请求（Action）调用 <code>subprocess.Popen(...)</code>。因此每个行动请求（Action）都启动新的命令解释器（Shell）进程（Process），而不是在一个长期存活的交互式终端中连续敲命令。</p>
+<p>进程（Process）状态与文件状态的寿命不同。<code>cd</code> 改的是当前命令进程（Process）的工作目录（Working Directory），<code>export</code> 改的是该进程（Process）向后续子进程（Subprocess）传递的环境变量（Environment Variable）；这两项不会自动写回负责下一次启动的 Python 主进程（Process）。文件写入则作用于共享文件系统，原进程（Process）结束后，文件仍可能保留。</p>
 <p>例如第一轮执行：</p>
 <pre><code class="language-bash">cd packages/app</code></pre>
-<p>下一轮新的 subprocess 不会自动留在 <code>packages/app</code>。如果后续命令依赖该目录，需要在同一个 action 中写 <code>cd packages/app &amp;&amp; npm test</code>，或者让 Environment 使用明确的工作目录（cwd）。这里用 <code>&amp;&amp;</code> 表示只有切换目录成功才运行测试，避免目录不存在时在错误位置继续执行。</p>
-<p>相反，如果第一轮确实修改了 <code>README.md</code>，文件位于共享文件系统中，第二轮新进程通常仍能看到这个修改。</p>
-<p>“fresh subprocess”与“全新文件系统”不是同一个概念。</p>
-<span class="heading-alias" id="误区三environment-接口统一所以-localdocker-的安全保证一样" aria-hidden="true"></span><span class="heading-alias" id="误区四用户确认一次-bash-就等于操作系统-sandbox" aria-hidden="true"></span><h3 id="localenvironment-为什么不是生产级隔离">LocalEnvironment 为什么不是生产级隔离</h3>
-<p>执行部件可以配置工作目录、收集输出并处理超时；这些行为并没有自动把程序限制在工作区中。对于本机文件、网络和子进程，仍要看实际执行边界。</p>
-<p><strong>每次启动新进程，不会自动获得新的隔离边界。</strong> 人工确认见 <a href="05-exit-and-trajectory.html">第05章</a>，权限与强制隔离见 <a href="17-permissions-and-sandbox.html">第17章</a>。</p>
-<h3 id="把输出变成下一轮能读的消息">把输出变成下一轮能读的消息</h3>
-<p>Environment 返回输出、返回码和异常说明；Model adapter 再把它们组织成当前 provider 接受的 observation。默认 native 路径使用 <code>role: tool</code>，并保留相同的 <code>tool_call_id</code>，这样结果才配回原来的请求。</p>
-<p>模型需要有用的输出，却不一定需要整份长日志。模板可以缩短发给模型的文本；内部调试字段还可保存更多信息。因此“模型这一刻看见的内容”和“内部对象记录的内容”也要分清。模型可见文本由模板生成，内部字段是否保留则由记录路径决定。</p>
-<h3 id="真实-observation-中一个容易误读的-0">真实 observation 中一个容易误读的 0</h3>
-<p>下面摘取后面第22章的真实命令片段，只观察命令失败怎样被消息表示，不需要先读完整修复过程。</p>
-<p>该次模型实际运行 <code>npm run check 2&gt;&amp;1 | head -10; echo &quot;---exit: $?---&quot;</code>。返回正文中有 <code>Missing script: &quot;check&quot;</code>，外层命令却返回 0。管道末端及后续 <code>echo</code> 掩盖了原命令的失败；这说明读取 observation 要把命令结构、正文、退出状态放在一起。不能看到 0 就写“测试成功”。<a href="22-agent-cases.html#%E4%B8%80%E4%B8%AA%E7%9C%9F%E5%AE%9E%E7%9A%84%E5%B0%8F%E6%8F%92%E6%9B%B2%E4%B8%BA%E4%BB%80%E4%B9%88%E9%80%80%E5%87%BA%E7%A0%81%E4%B8%8D%E8%83%BD%E8%84%B1%E7%A6%BB%E5%91%BD%E4%BB%A4%E7%9C%8B">原片段与解释</a></p>
-<span class="heading-alias" id="基础完成条件与下一步" aria-hidden="true"></span><span class="heading-alias" id="基础自测解释-l00-中一条测试命令" aria-hidden="true"></span><span class="heading-alias" id="练习解释测试命令的结果" aria-hidden="true"></span><h3 id="测试命令的结果解析">测试命令的结果解析</h3>
-<p><strong>问题 1。</strong> 对 npm test，分别指出 action、output、observation 是什么。</p>
-<p><strong>解释。</strong> action 携带 command；output 是 Environment 返回的输出、返回码等；observation 是 adapter 转成下一轮模型可接受的消息。</p>
-<p><strong>问题 2。</strong> 同样 returncode 1，若输出分别是 <code>Missing script</code>（未找到脚本）和测试断言失败，为什么要采取不同动作？</p>
-<p><strong>解释。</strong> 前者未找到入口脚本，后者已运行测试并暴露程序行为。需要阅读输出，不能只用退出码分类；接下来的第04章会完整展示这两种情况。</p>
-<p><strong>问题 3。</strong> 第一次 action 执行 cd subdir，第二次会自动处于该目录吗？第一次写入的文件会消失吗？</p>
-<p><strong>解释。</strong> 不会继承进程里的 cd；每次都是 fresh subprocess。文件系统上的修改会保留，这和进程工作目录状态不同。</p>
-<span class="heading-alias" id="实现深化" aria-hidden="true"></span><h2 id="解析器进程与协议变体">解析器、进程与协议变体</h2>
-<h3 id="bash_tool-定义了工具-schema"><code>BASH_TOOL</code> 定义了工具 schema</h3>
-<p><code>LitellmModel._query()</code> 调用 LiteLLM completion 时，传入的 tools 列表只有一个定义：<code>BASH_TOOL</code>。</p>
+<p>下一轮新的子进程（Subprocess）不会自动留在 <code>packages/app</code>。如果后续命令依赖该目录，需要在同一个行动请求（Action）中写 <code>cd packages/app &amp;&amp; npm test</code>，或者让执行环境（Environment）使用明确的工作目录（Working Directory），即 <code>cwd</code>。这里用 <code>&amp;&amp;</code> 表示只有切换目录成功才运行测试（Test），避免目录不存在时在错误位置继续执行。</p>
+<p>相反，如果第一轮确实修改了 <code>README.md</code>，文件位于共享文件系统中，第二轮新进程（Process）通常仍能看到这个修改。</p>
+<p>“新子进程（Subprocess）”与“全新文件系统”不是同一个概念。</p>
+<span class="heading-alias" id="误区三environment-接口统一所以-localdocker-的安全保证一样" aria-hidden="true"></span><span class="heading-alias" id="误区四用户确认一次-bash-就等于操作系统-sandbox" aria-hidden="true"></span><span class="heading-alias" id="localenvironment-为什么不是生产级隔离" aria-hidden="true"></span><h3 id="localenvironment-为什么不是生产级隔离isolation"><code>LocalEnvironment</code> 为什么不是生产级隔离（Isolation）</h3>
+<p>执行部件可以配置工作目录（Working Directory）、收集输出并处理超时；这些行为并没有自动把程序限制在工作区（Workspace）中。对于本机文件、网络和子进程（Subprocess），仍要看实际执行边界。</p>
+<p><strong>每次启动新进程（Process），不会自动获得新的隔离（Isolation）边界。</strong> 人工确认（Confirmation）见 <a href="05-exit-and-trajectory.html">第05章</a>，权限与强制隔离（Isolation）见 <a href="17-permissions-and-sandbox.html">第17章</a>。</p>
+<span class="heading-alias" id="把输出变成下一轮能读的消息" aria-hidden="true"></span><h3 id="把输出变成下一轮能读的消息message">把输出变成下一轮能读的消息（Message）</h3>
+<p>执行环境（Environment）返回输出、退出码（Exit Code）和异常说明；模型协议适配器（Model Adapter）再把它们组织成当前模型服务提供方（Provider）接受的观察消息（Observation Message）。默认原生工具调用（Native Tool Calling）路径使用 <code>role: tool</code>，并保留相同的 <code>tool_call_id</code>，这样结果才配回原来的请求。</p>
+<p>模型（Model）需要有用的输出，却不一定需要整份长日志。模板（Template）可以缩短发给模型（Model）的文本；内部调试字段还可保存更多信息。因此“模型（Model）这一刻看见的内容”和“内部对象记录的内容”也要分清。模型（Model）可见文本由模板（Template）生成，内部字段是否保留则由记录路径决定。</p>
+<span class="heading-alias" id="真实-observation-中一个容易误读的-0" aria-hidden="true"></span><h3 id="真实观察消息observation-message中一个容易误读的-0">真实观察消息（Observation Message）中一个容易误读的 0</h3>
+<p>下面摘取后面第22章的真实命令片段，只观察命令失败怎样被消息（Message）表示，不需要先读完整修复过程。</p>
+<p>该次模型（Model）实际运行 <code>npm run check 2&gt;&amp;1 | head -10; echo &quot;---exit: $?---&quot;</code>。返回正文中有 <code>Missing script: &quot;check&quot;</code>，外层命令却返回 0。管道末端及后续 <code>echo</code> 掩盖了原命令的失败；这说明读取观察消息（Observation Message）要把命令结构、正文、退出状态放在一起。不能看到 0 就写“测试（Test）成功”。<a href="22-agent-cases.html#%E4%B8%80%E4%B8%AA%E7%9C%9F%E5%AE%9E%E7%9A%84%E5%B0%8F%E6%8F%92%E6%9B%B2%E4%B8%BA%E4%BB%80%E4%B9%88%E9%80%80%E5%87%BA%E7%A0%81%E4%B8%8D%E8%83%BD%E8%84%B1%E7%A6%BB%E5%91%BD%E4%BB%A4%E7%9C%8B">原片段与解释</a></p>
+<p>这里的证据链可以拆成三问：输出正文说明 npm 没找到 <code>check</code>；命令结构说明原始退出状态可能被后续程序遮住；因此这个 0 只对应外层命令的结束，不能证明测试（Test）断言（Assertion）已经运行。下一步先确认项目配置中的测试入口（Test Entry），再取得真正的行为检查结果。</p>
+<span class="heading-alias" id="基础完成条件与下一步" aria-hidden="true"></span><span class="heading-alias" id="基础自测解释-l00-中一条测试命令" aria-hidden="true"></span><span class="heading-alias" id="练习解释测试命令的结果" aria-hidden="true"></span><span class="heading-alias" id="测试命令的结果解析" aria-hidden="true"></span><h3 id="测试test命令的结果解析">测试（Test）命令的结果解析</h3>
+<p><strong>问题 1。</strong> 对 <code>npm test</code>，分别指出行动请求（Action）、执行输出（Output）、观察消息（Observation Message）是什么。</p>
+<p><strong>解释。</strong> 行动请求（Action）携带 <code>command</code>；执行输出（Output）是执行环境（Environment）返回的输出、退出码（Exit Code）等；观察消息（Observation Message）由模型协议适配器（Model Adapter）转成下一轮模型（Model）可接受的消息（Message）。</p>
+<p><strong>问题 2。</strong> 同样退出码（Exit Code）为 1，若输出分别是 <code>Missing script</code>（未找到脚本）和测试（Test）断言（Assertion）失败，为什么要采取不同行动请求（Action）？</p>
+<p><strong>解释。</strong> 前者未找到入口脚本，后者已运行测试（Test）并暴露程序行为。需要阅读输出，不能只用退出码（Exit Code）分类；接下来的第04章会完整展示这两种情况。</p>
+<p><strong>问题 3。</strong> 第一次行动请求（Action）执行 <code>cd subdir</code>，第二次会自动处于该目录吗？第一次写入的文件会消失吗？</p>
+<p><strong>解释。</strong> 不会继承进程（Process）里的 <code>cd</code>；每次都是新子进程（Subprocess）。文件系统上的修改会保留，这和进程（Process）工作目录（Working Directory）状态不同。</p>
+<span class="heading-alias" id="实现深化" aria-hidden="true"></span><span class="heading-alias" id="解析器进程与协议变体" aria-hidden="true"></span><h2 id="解析器parser进程process与协议变体">解析器（Parser）、进程（Process）与协议变体</h2>
+<p>前半章已经把四份数据接起来，下面只展开三个容易改变结论的位置：参数实际检查到哪一层，命令进程（Process）继承哪些状态，以及结果遵循哪种消息协议（Message Protocol）。类名与字段用于定位这三项责任，不要求先记住全部调用链。</p>
+<span class="heading-alias" id="bash_tool-定义了工具-schema" aria-hidden="true"></span><h3 id="bash_tool-定义了工具参数结构schema"><code>BASH_TOOL</code> 定义了工具参数结构（Schema）</h3>
+<p><code>LitellmModel._query()</code> 调用 LiteLLM 的生成接口时，传入的 <code>tools</code> 列表只有一个定义：<code>BASH_TOOL</code>。</p>
 <p>它的核心形状是：</p>
 <pre><code class="language-json">{
   &quot;type&quot;: &quot;function&quot;,
@@ -137,58 +146,52 @@ assistant tool call B ───── tool result B</code></pre>
     }
   }
 }</code></pre>
-<p>这表示默认 Model 看到的工具表面非常小：</p>
+<p>这表示默认模型（Model）看到的工具表面（Tool Surface）的声明非常小：</p>
 <pre><code class="language-text">可用工具类型：bash
 必填参数：command 字符串</code></pre>
-<p>这里的 <code>bash</code> 是协议名称，不保证实际解释器固定为 <code>/bin/bash</code>；不要仅凭工具名依赖某种 shell 独有语法。下面的 LocalEnvironment 小节继续核对实际启动方式。</p>
-<p>不要把“单一 Bash function/tool”误读成“每个模型响应的数据结构只能出现一个调用”。parser 会遍历 tool calls 列表；这里的单一，指的是只暴露一个工具名称和 schema。</p>
-<h3 id="tool-call-怎样被解析成-action">tool call 怎样被解析成 action</h3>
-<p><code>LitellmModel.query()</code> 取得 provider response 后，会调用 <code>_parse_actions()</code>，最终进入 <code>parse_toolcall_actions()</code>。</p>
-<h4 id="没有-tool-call不是正常空动作">没有 tool call：不是正常空动作</h4>
-<p>默认配置要求模型响应至少包含一个 Bash tool call。如果 parser 找不到任何 tool call，会产生 <code>FormatError</code> 消息。</p>
-<p>为什么不把它当成“模型只是说了一段话”？因为这条 Agent 协议把行动循环定义为：每次响应必须继续以工具调用推进，完成也通过一条约定 Bash 命令表达。</p>
-<h4 id="arguments-必须是合法-json">arguments 必须是合法 JSON</h4>
-<p>parser 会读取 <code>tool_call.function.arguments</code> 并做 JSON 解析。如果模型给出：</p>
+<p>这里的 <code>bash</code> 是协议名称，不保证实际解释器固定为 <code>/bin/bash</code>；不要仅凭工具名依赖某种命令解释器（Shell）独有语法。下面的 <code>LocalEnvironment</code> 小节继续核对实际启动方式。</p>
+<p>不要把“单一 Bash 工具类型”误读成“每个模型（Model）响应的数据结构只能出现一个调用”。解析器（Parser）会遍历工具调用（Tool Call）列表；这里的单一，指的是只暴露一个工具名称和参数结构（Schema）。</p>
+<span class="heading-alias" id="tool-call-怎样被解析成-action" aria-hidden="true"></span><h3 id="工具调用tool-call怎样被解析成行动请求action">工具调用（Tool Call）怎样被解析成行动请求（Action）</h3>
+<p><code>LitellmModel.query()</code> 取得模型服务提供方（Provider）的响应后，会调用 <code>_parse_actions()</code>，最终进入 <code>parse_toolcall_actions()</code>。</p>
+<span class="heading-alias" id="没有-tool-call不是正常空动作" aria-hidden="true"></span><h4 id="没有工具调用tool-call不是正常空行动请求action">没有工具调用（Tool Call）：不是正常空行动请求（Action）</h4>
+<p>默认配置要求模型（Model）响应至少包含一个 Bash 工具调用（Tool Call）。如果解析器（Parser）找不到任何工具调用（Tool Call），会产生格式错误（Format Error）<code>FormatError</code>，控制循环随后将错误反馈给模型（Model）。</p>
+<p>为什么不把它当成“模型（Model）只是说了一段话”？因为这条智能代理（Agent）协议把代理循环（Agent Loop）定义为：每次响应必须继续以工具调用（Tool Call）推进，完成也通过一条约定 Bash 命令表达。</p>
+<span class="heading-alias" id="arguments-必须是合法-json" aria-hidden="true"></span><h4 id="arguments-必须符合对象表示法json的语法"><code>arguments</code> 必须符合对象表示法（JSON）的语法</h4>
+<p>解析器（Parser）会读取 <code>tool_call.function.arguments</code> 并按对象表示法（JSON）解析。如果模型（Model）给出：</p>
 <pre><code class="language-text">{command: npm test}</code></pre>
-<p>它不是合法 JSON；正常形式应类似：</p>
+<p>它不符合对象表示法（JSON）的语法；正常形式应类似：</p>
 <pre><code class="language-json">{&quot;command&quot;: &quot;npm test&quot;}</code></pre>
-<p>解析失败会形成 FormatError，而不是把原始字符串直接交给 shell。</p>
+<p>解析失败会形成格式错误（Format Error）<code>FormatError</code>，而不是把原始字符串直接交给命令解释器（Shell）。</p>
 <h4 id="工具名必须是-bash">工具名必须是 <code>bash</code></h4>
-<p>如果响应请求了未知名字，例如 <code>read_file</code>，parser 会拒绝，因为当前工具表面没有这个工具。</p>
+<p>如果响应请求了未知名字，例如 <code>read_file</code>，解析器（Parser）会拒绝，因为当前工具表面（Tool Surface）没有这个工具。</p>
 <p>这说明：</p>
-<blockquote><p>模型能够生成某个工具名称，不等于 Agent 当前配置真的提供了该工具。</p>
+<blockquote><p>模型（Model）能够生成某个工具名称，不等于智能代理（Agent）当前配置真的提供了该工具。</p>
 </blockquote>
 <h4 id="command-必须存在"><code>command</code> 必须存在</h4>
-<p>即使工具名正确，arguments 中缺少 <code>command</code> 也会被视为格式错误。</p>
-<p>但“存在”不等于“完成严格类型校验”。<code>BASH_TOOL</code> schema 声明 <code>command</code> 是 string，当前 Python parser 实际检查 JSON 可解析、工具名为 bash、参数是含 command 的字典；它没有再检查值是否为字符串。<code>{&quot;command&quot;: 123}</code> 仍能通过这个 parser。不要从 schema 声明推导出运行时已经强制了全部参数约束，也不要把格式解析成功当成执行安全或执行成功。</p>
-<p>通过所有检查后，parser 为每个调用产生：</p>
+<p>即使工具名正确，<code>arguments</code> 中缺少 <code>command</code> 也会被视为格式错误（Format Error）。</p>
+<p>但“存在”不等于“完成严格类型校验”。<code>BASH_TOOL</code> 参数结构（Schema）声明 <code>command</code> 是字符串类型 <code>string</code>，当前 Python 解析器（Parser）实际检查对象表示法（JSON）数据可解析、工具名为 <code>bash</code>、参数是含 <code>command</code> 的字典；它没有再检查值是否为字符串。<code>{&quot;command&quot;: 123}</code> 仍能通过这个解析器（Parser）。不要从参数结构（Schema）声明推导出运行时已经强制了全部参数约束，也不要把格式解析成功当成执行安全或执行成功。</p>
+<p>通过所有检查后，解析器（Parser）为每个调用产生：</p>
 <pre><code class="language-json">{
   &quot;command&quot;: &quot;...&quot;,
   &quot;tool_call_id&quot;: &quot;...&quot;
 }</code></pre>
-<h3 id="localenvironment-怎样执行-action"><code>LocalEnvironment</code> 怎样执行 action</h3>
-<h4 id="先选择-command-与-cwd">先选择 command 与 cwd</h4>
-<p><code>execute(action, cwd=&quot;&quot;, *, timeout=None)</code> 从 action 中读取 <code>command</code>；<code>*</code> 表示 <code>timeout</code> 只能用关键字传入，例如 <code>timeout=15</code>。工作目录按下面的优先顺序选择：</p>
-<pre><code class="language-text">本次 execute 显式传入的 cwd
-  ↓ 如果没有
-Environment config 中的 cwd
-  ↓ 如果也没有
-os.getcwd()</code></pre>
-<p>这让同一个 Environment 可以有默认目录，也允许某次调用覆盖它。</p>
-<h4 id="合并环境变量">合并环境变量</h4>
-<p>启动命令时使用：</p>
-<pre><code class="language-text">当前进程 os.environ
-  +
-LocalEnvironment config.env 覆盖项</code></pre>
-<p>这表示配置项可以覆盖同名宿主环境变量。</p>
-<p>但请注意：这只是传入子进程的环境。Agent 不会因为模型在某一次 shell 中执行 <code>export X=1</code>，就自动把这个变化写回 Python 主进程或下一次新 shell。</p>
-<h4 id="shelltrue-表示命令由-shell-解释"><code>shell=True</code> 表示命令由 shell 解释</h4>
-<p><code>Popen</code> 使用 <code>shell=True</code>，所以管道、重定向和命令组合等 shell 语法可以工作。这也意味着 action 的能力面很宽，不能把它当成一个只允许读取文件的结构化工具。</p>
-<p>再次注意：工具 schema 名叫 <code>bash</code>，不等于 <code>_run()</code> 固定启动 <code>/bin/bash</code>。当前实现没有显式设置 shell executable。</p>
-<h4 id="stdout-与-stderr-合并">stdout 与 stderr 合并</h4>
-<p>源码把 stderr 重定向到 stdout，所以返回的 <code>output</code> 是合并流。这样模型可以在一个文本字段里看到常规输出和错误信息，但也失去了两个流的独立结构。</p>
-<h4 id="超时会尝试终止进程组">超时会尝试终止进程组</h4>
-<p>默认 timeout 是 30 秒。在采用 POSIX 类 Unix 进程接口的环境中，进程在新的 OS 进程会话（session）中启动；这里的 session 是操作系统组织进程组的单位。超时时尝试对进程组发送 <code>SIGKILL</code>，减少 shell 子进程遗留的风险。其他平台则调用 process kill。</p>
+<span class="heading-alias" id="localenvironment-怎样执行-action" aria-hidden="true"></span><h3 id="localenvironment-怎样执行行动请求action"><code>LocalEnvironment</code> 怎样执行行动请求（Action）</h3>
+<span class="heading-alias" id="先选择-command-与-cwd" aria-hidden="true"></span><h4 id="先选择命令参数-command-与工作目录working-directorycwd">先选择命令参数 <code>command</code> 与工作目录（Working Directory）<code>cwd</code></h4>
+<p><code>execute(action, cwd=&quot;&quot;, *, timeout=None)</code> 从行动请求（Action）中读取 <code>command</code>；<code>*</code> 表示 <code>timeout</code> 只能用关键字传入，例如 <code>timeout=15</code>。工作目录（Working Directory）按下面的优先顺序选择：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 先选择命令参数 `command` 与工作目录（Working Directory）`cwd`"><table><caption>表 3 / Table 3 · 先选择命令参数 `command` 与工作目录（Working Directory）`cwd`</caption><thead><tr><th scope="col">优先级</th><th scope="col">工作目录（Working Directory）的来源</th><th scope="col">何时使用</th></tr></thead><tbody><tr><td>1</td><td>本次 <code>execute()</code> 传入的 <code>cwd</code></td><td>值非空时</td></tr>
+<tr><td>2</td><td>执行环境（Environment）配置的 <code>cwd</code></td><td>本次参数为空、配置非空时</td></tr>
+<tr><td>3</td><td>Python 主进程（Process）的 <code>os.getcwd()</code></td><td>前两项都为空时</td></tr></tbody></table></div>
+<p>这让同一个执行环境（Environment）可以有默认目录，也允许某次调用覆盖它。</p>
+<span class="heading-alias" id="合并环境变量" aria-hidden="true"></span><h4 id="合并环境变量environment-variable">合并环境变量（Environment Variable）</h4>
+<p>启动命令时，先复制当前进程（Process）的 <code>os.environ</code>，再用 <code>LocalEnvironment</code> 的 <code>config.env</code> 更新它。这表示配置项可以覆盖同名宿主环境变量（Environment Variable）；没有被覆盖的项继续沿用。</p>
+<p>这里传递的是子进程（Subprocess）的环境变量（Environment Variable），不是重新配置整个执行环境（Environment）。智能代理（Agent）不会因为模型（Model）在某一次命令解释器（Shell）中执行 <code>export X=1</code>，就自动把这个变化写回 Python 主进程（Process）或下一次新命令解释器（Shell）。</p>
+<span class="heading-alias" id="shelltrue-表示命令由-shell-解释" aria-hidden="true"></span><h4 id="shelltrue-表示命令由命令解释器shell解释"><code>shell=True</code> 表示命令由命令解释器（Shell）解释</h4>
+<p><code>Popen</code> 使用 <code>shell=True</code>，所以管道、重定向和命令组合等命令解释器（Shell）语法可以工作。这也意味着行动请求（Action）的能力面很宽，不能把它当成一个只允许读取文件的结构化工具。</p>
+<p>再次注意：工具参数结构（Schema）名叫 <code>bash</code>，不等于 <code>_run()</code> 固定启动 <code>/bin/bash</code>。当前实现没有显式设置命令解释器（Shell）的可执行文件。</p>
+<span class="heading-alias" id="stdout-与-stderr-合并" aria-hidden="true"></span><h4 id="标准输出standard-output与标准错误standard-error合并">标准输出（Standard Output）与标准错误（Standard Error）合并</h4>
+<p>源码把标准错误（Standard Error）重定向到标准输出（Standard Output），所以返回的 <code>output</code> 是合并流。这样模型（Model）可以在一个文本字段里看到常规输出和错误信息，但也失去了两个流的独立结构。</p>
+<span class="heading-alias" id="超时会尝试终止进程组" aria-hidden="true"></span><h4 id="超时会尝试终止进程组process-group">超时会尝试终止进程组（Process Group）</h4>
+<p>默认超时参数 <code>timeout</code> 是 30 秒。在采用 POSIX 类 Unix 进程（Process）接口的执行环境（Environment）中，进程（Process）在新的操作系统（Operating System，OS）进程会话（Process Session）中启动；这里的进程会话（Process Session）是操作系统（OS）组织进程组（Process Group）的单位。超时时尝试对进程组（Process Group）发送 <code>SIGKILL</code>，减少命令解释器（Shell）子进程（Subprocess）遗留的风险。其他平台则终止相应进程（Process）。</p>
 <p>随后 <code>execute()</code> 捕获异常，并返回结构化错误：</p>
 <pre><code class="language-json">{
   &quot;output&quot;: &quot;超时前已经产生的输出&quot;,
@@ -198,76 +201,76 @@ LocalEnvironment config.env 覆盖项</code></pre>
     &quot;exception_type&quot;: &quot;TimeoutExpired&quot;
   }
 }</code></pre>
-<p>注意：这里的命令超时通常被转成 output，而不是直接让整个 Agent Python 进程因为该异常退出。</p>
-<h3 id="output-怎样变成-observation-message">output 怎样变成 observation message</h3>
+<p>注意：这里的命令超时通常被转成执行输出（Output），而不是直接让整个智能代理（Agent） Python 进程（Process）因为该异常退出。</p>
+<span class="heading-alias" id="output-怎样变成-observation-message" aria-hidden="true"></span><h3 id="执行输出output怎样变成观察消息observation-message">执行输出（Output）怎样变成观察消息（Observation Message）</h3>
 <h4 id="使用-observation_template">使用 <code>observation_template</code></h4>
-<p><code>format_toolcall_observation_messages()</code> 用 Jinja 模板把每个 output 的字段填成 observation 消息；Jinja 是这里使用的模板库。</p>
+<p><code>format_toolcall_observation_messages()</code> 用 Jinja 模板（Template）把每个执行输出（Output）的字段填成观察消息（Observation Message）；Jinja 是这里使用的模板（Template）库。</p>
 <p>默认 <code>mini.yaml</code> 中，短输出大致渲染为：</p>
 <pre><code class="language-json">{
   &quot;returncode&quot;: 0,
   &quot;output&quot;: &quot;...&quot;
 }</code></pre>
-<p>如果 output 超过配置模板中的阈值，模型可见的 content 会保留头部与尾部并报告省略字符数。当前 <code>mini.yaml</code> 使用 10,000 字符阈值，保留前 5,000 和后 5,000 字符。</p>
+<p>如果执行输出（Output）超过配置模板（Template）中的阈值，模型（Model）可见的 <code>content</code> 会保留头部与尾部并报告省略字符数。当前 <code>mini.yaml</code> 使用 10,000 字符阈值，保留前 5,000 和后 5,000 字符。</p>
 <p>这体现了一个重要原则：</p>
-<blockquote><p>Environment 可以产生很大的原始输出，但下一次 Model query 不一定适合看到全部文本。</p>
+<blockquote><p>执行环境（Environment）可以产生很大的原始输出，但下一次模型调用（Model Query）不一定适合看到全部文本。</p>
 </blockquote>
 <h4 id="请求和结果重新配对">请求和结果重新配对</h4>
-<p>tool-call 路径把原 action 的 <code>tool_call_id</code> 放进 tool result message。下一次 provider 请求才能把结果归属到正确调用。</p>
+<p>工具调用（Tool Call）路径把原行动请求（Action）的 <code>tool_call_id</code> 放进工具结果消息（Tool Result Message）。下一次模型服务提供方（Provider）请求才能把结果归属到正确调用。</p>
 <span class="heading-alias" id="误区三模型可见的截断-output-就是系统保存的全部-output" aria-hidden="true"></span><h4 id="extra-保存执行辅助字段"><code>extra</code> 保存执行辅助字段</h4>
-<p>内部 observation message 的 <code>extra</code> 还可以保存：</p>
+<p>内部观察消息（Observation Message）的 <code>extra</code> 还可以保存：</p>
 <ul>
 <li><code>raw_output</code>；</li>
 <li><code>returncode</code>；</li>
 <li><code>timestamp</code>；</li>
 <li><code>exception_info</code>。</li>
 </ul>
-<p>这些字段有助于 trajectory 和调试，但发送给 provider 前，Model adapter 通常会移除内部 <code>extra</code>。不要因为内部消息保存了更多字段，就假设模型 API 每次都收到完整内部对象。</p>
-<span class="heading-alias" id="协议与投影的常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区一mini-swe-agent-v2-默认从-markdown-代码块提取-bash" aria-hidden="true"></span><h3 id="默认-tool-call-与文本代码块变体">默认 tool call 与文本代码块变体</h3>
-<p>结构化工具调用与文本围栏使用不同的解析器和结果格式。</p>
-<h4 id="默认路径native-tool-calling">默认路径：native tool calling</h4>
+<p>这些字段有助于执行轨迹（Trajectory）和调试，但发送给模型服务提供方（Provider）前，模型协议适配器（Model Adapter）通常会移除内部 <code>extra</code>。不要因为内部消息（Message）保存了更多字段，就假设模型（Model） API 每次都收到完整内部对象。</p>
+<span class="heading-alias" id="协议与投影的常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区一mini-swe-agent-v2-默认从-markdown-代码块提取-bash" aria-hidden="true"></span><span class="heading-alias" id="默认-tool-call-与文本代码块变体" aria-hidden="true"></span><h3 id="默认工具调用tool-call与文本代码块变体">默认工具调用（Tool Call）与文本代码块变体</h3>
+<p>结构化工具调用（Tool Call）与文本围栏使用不同的解析器（Parser）和结果格式。</p>
+<span class="heading-alias" id="默认路径native-tool-calling" aria-hidden="true"></span><h4 id="默认路径原生工具调用native-tool-calling">默认路径：原生工具调用（Native Tool Calling）</h4>
 <p>当前 <code>mini</code> 默认配置文件是 <code>mini.yaml</code>。配合默认 <code>LitellmModel</code> 时：</p>
 <ol>
-<li>请求向模型暴露名为 <code>bash</code> 的 function/tool schema；</li>
-<li>模型通过 provider 的 tool call 字段表达 action；</li>
-<li>parser 从结构化 tool calls 中读取 name 与 JSON arguments；</li>
-<li>observation 以 tool result message 返回。</li>
+<li>请求向模型（Model）暴露名为 <code>bash</code> 的工具参数结构（Schema）；</li>
+<li>模型（Model）通过模型服务提供方（Provider）的工具调用（Tool Call）字段表达行动请求（Action）；</li>
+<li>解析器（Parser）从结构化工具调用（Tool Call）中读取工具名与对象表示法（JSON）参数；</li>
+<li>观察消息（Observation Message）以工具结果消息（Tool Result Message）返回。</li>
 </ol>
 <p>所以不要把默认路径描述成“从回答里的三反引号代码块抓命令”。</p>
-<h4 id="变体路径text-based-parsing">变体路径：text-based parsing</h4>
-<p><code>mini_textbased.yaml</code> 提供要求模型输出 <code>mswea_bash_command</code> 围栏代码块的 prompt/config 变体；对应的 <code>LitellmTextbasedModel</code> 不向 provider 传 tools，而是在响应文本中用正则提取 action。</p>
-<p>在 v2.4.6 中，<code>mini_textbased.yaml</code> 文件自身没有设置 <code>model.model_class</code>。因此，通过当前 CLI 真正选择这条路径时，还必须同时指定 <code>--model-class litellm_textbased</code>，或者在合并的自定义配置里写入等价字段。只加载这份 YAML 而仍使用默认 <code>LitellmModel</code>，不会仅凭 prompt 自动切换 parser。</p>
-<p>该 parser 要求恰好匹配一个 action：</p>
+<span class="heading-alias" id="变体路径text-based-parsing" aria-hidden="true"></span><h4 id="变体路径文本解析text-based-parsing">变体路径：文本解析（Text-based Parsing）</h4>
+<p><code>mini_textbased.yaml</code> 提供要求模型（Model）输出 <code>mswea_bash_command</code> 围栏代码块的提示与配置变体；对应的 <code>LitellmTextbasedModel</code> 不向模型服务提供方（Provider）传 <code>tools</code>，而是在响应文本中用正则提取行动请求（Action）。</p>
+<p>在 v2.4.6 中，<code>mini_textbased.yaml</code> 文件自身没有设置 <code>model.model_class</code>。因此，通过当前命令行接口（Command-Line Interface，CLI）真正选择这条路径时，还必须同时指定 <code>--model-class litellm_textbased</code>，或者在合并的自定义配置里写入等价字段。只加载这份 YAML 而仍使用默认 <code>LitellmModel</code>，不会仅凭提示文本自动切换解析器（Parser）。</p>
+<p>该解析器（Parser）要求恰好匹配一个行动请求（Action）：</p>
 <pre><code class="language-text">0 个匹配 → FormatError
 1 个匹配 → 形成 {command: ...}
 2 个或更多匹配 → FormatError</code></pre>
-<p>因此，无论通过 CLI 参数还是自定义配置，文本 prompt 和 <code>model_class: litellm_textbased</code> 都必须作为同一协议理解。仅仅看见代码块模板，不应该自动假设当前 Model adapter 已切到文本解析。</p>
+<p>因此，无论通过命令行接口（CLI）参数还是自定义配置，文本提示与 <code>model_class: litellm_textbased</code> 都必须作为同一协议理解。仅仅看见代码块模板（Template），不应该自动假设当前模型协议适配器（Model Adapter）已切到文本解析（Text-based Parsing）。</p>
 <h4 id="两条路径共享什么">两条路径共享什么</h4>
-<p>不管 action 来自结构化 tool call 还是文本代码块，进入 Agent 核心后都尽量收敛为：</p>
+<p>不管行动请求（Action）来自结构化工具调用（Tool Call）还是文本代码块，进入智能代理（Agent）核心后都尽量收敛为：</p>
 <pre><code class="language-json">{&quot;command&quot;: &quot;...&quot;}</code></pre>
-<p>随后仍由 Environment execute，再由对应 Model adapter 格式化 observation。</p>
+<p>随后仍由执行环境（Environment）的 <code>execute()</code> 执行，再由对应模型协议适配器（Model Adapter）格式化观察消息（Observation Message）。</p>
 <h4 id="两条路径不能混写什么">两条路径不能混写什么</h4>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 两条路径不能混写什么"><table><caption>表 1 / Table 1 · 两条路径不能混写什么</caption><thead><tr><th scope="col">问题</th><th scope="col">原生工具调用（Tool Call）默认路径</th><th scope="col">文本解析（Text-based Parsing）变体</th></tr></thead><tbody><tr><td>动作（Action）在哪里</td><td>provider tool call 字段</td><td>assistant content 的围栏代码块</td></tr>
-<tr><td>怎样解析</td><td>tool name + JSON arguments</td><td>regex</td></tr>
-<tr><td>调用配对（Call / Result Pairing）</td><td><code>tool_call_id</code></td><td>通常作为 user observation 顺序连接</td></tr>
-<tr><td>动作数量（Action Count）</td><td>parser 可遍历多个 calls</td><td>必须恰好一个正则匹配</td></tr>
-<tr><td>观察消息角色（Observation Role）</td><td>tool result</td><td>user message</td></tr></tbody></table></div>
-<p>两者共享 Action 抽象，具体消息格式不能互换。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 两条路径不能混写什么"><table><caption>表 4 / Table 4 · 两条路径不能混写什么</caption><thead><tr><th scope="col">问题</th><th scope="col">原生工具调用（Native Tool Calling）默认路径</th><th scope="col">文本解析（Text-based Parsing）变体</th></tr></thead><tbody><tr><td>行动请求（Action）在哪里</td><td>模型服务提供方（Provider）的工具调用（Tool Call）字段</td><td><code>role: assistant</code> 消息（Message）的 <code>content</code> 围栏代码块</td></tr>
+<tr><td>怎样解析</td><td>检查工具名、解析对象表示法（JSON）参数</td><td>在文本中匹配约定的围栏</td></tr>
+<tr><td>请求与结果怎样配对</td><td><code>tool_call_id</code></td><td>以 <code>role: user</code> 的观察消息（Observation Message）按顺序接回</td></tr>
+<tr><td>行动请求（Action）数量</td><td>解析器（Parser）可遍历多个工具调用（Tool Call）</td><td>必须恰好一个正则匹配</td></tr>
+<tr><td>观察消息（Observation Message）的角色</td><td><code>role: tool</code></td><td><code>role: user</code></td></tr></tbody></table></div>
+<p>两者共享行动请求（Action）抽象，具体消息（Message）格式不能互换。</p>
 <span class="heading-alias" id="深化自测核对协议避免额外保证" aria-hidden="true"></span><span class="heading-alias" id="练习协议约束与实际校验" aria-hidden="true"></span><h3 id="协议约束与实际校验问答">协议约束与实际校验问答</h3>
-<p><strong>问题 1。</strong> BASH_TOOL 声明 command 是 string，当前 parser 会拒绝数字 123 吗？</p>
-<p><strong>解释。</strong> 不会仅因其为数字而拒绝；当前 parser 检查 JSON、工具名和含 command 的字典，未检查 command 值的字符串类型。</p>
-<p><strong>问题 2。</strong> 一个 bash 工具类型是否只能产生一次调用？一个文本围栏是否只能含一条 shell 命令？</p>
-<p><strong>解释。</strong> 都不是。native 响应可含多个 bash calls；文本 parser 要求恰好一个匹配围栏，但没有把围栏内部解析成只能一条 shell 命令。</p>
-<p><strong>问题 3。</strong> tool_call_id 的作用是什么？只换 mini_textbased.yaml 会自动换模型类吗？</p>
-<p><strong>解释。</strong> 用于把 result 配回 request。配置文件不会自动切换 model_class，必须显式选择相应 text-based wrapper。</p>
+<p><strong>问题 1。</strong> <code>BASH_TOOL</code> 声明 <code>command</code> 是字符串类型 <code>string</code>，当前解析器（Parser）会拒绝数字 123 吗？</p>
+<p><strong>解释。</strong> 不会仅因其为数字而拒绝；当前解析器（Parser）检查对象表示法（JSON）数据、工具名和含 <code>command</code> 的字典，未检查 <code>command</code> 值的字符串类型。</p>
+<p><strong>问题 2。</strong> 一个 <code>bash</code> 工具类型是否只能产生一次调用？一个文本围栏是否只能含一条命令解释器（Shell）命令？</p>
+<p><strong>解释。</strong> 都不是。原生工具调用（Native Tool Calling）响应可含多个 <code>bash</code> 工具调用（Tool Call）；文本解析（Text-based Parsing）路径的解析器（Parser）要求恰好一个匹配围栏，但没有把围栏内部解析成只能一条命令解释器（Shell）命令。</p>
+<p><strong>问题 3。</strong> <code>tool_call_id</code> 的作用是什么？只换 <code>mini_textbased.yaml</code> 会自动换模型（Model）类吗？</p>
+<p><strong>解释。</strong> 调用标识（Call ID）把结果配回原请求。配置文件不会自动切换 <code>model_class</code>，必须显式选择对应的文本解析（Text-based Parsing）模型协议适配器（Model Adapter）。</p>
 <span class="heading-alias" id="继续读源码" aria-hidden="true"></span><span class="heading-alias" id="练习标注三次数据转换" aria-hidden="true"></span><h3 id="同一命令的三次数据转换">同一命令的三次数据转换</h3>
-<p>以 <code>npm test</code> 为例，provider 的 tool call 最初用 JSON 字符串表达 <code>{&quot;command&quot;:&quot;npm test&quot;}</code>，并带调用 ID。<code>parse_toolcall_actions</code> 解析后得到含 <code>command</code> 与调用关联信息的 action；<code>LocalEnvironment.execute / _run</code> 执行命令，返回含 <code>output</code>、<code>returncode</code> 等字段的原始结果；<code>format_toolcall_observation_messages</code> 再把结果变成带相同 <code>tool_call_id</code> 的 <code>role: tool</code> 消息。</p>
-<p>因此，JSON 合法只说明请求能被解析，<code>returncode</code> 属于执行器观察，最终 tool 消息才是下一次 provider 请求可消费的协议表示。相关实现位于 <a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/models/utils/actions_toolcall.py"><code>actions_toolcall.py</code></a> 与 <a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/environments/local.py"><code>LocalEnvironment</code></a>。</p>
+<p>以 <code>npm test</code> 为例，模型服务提供方（Provider）的工具调用（Tool Call）最初用按对象表示法（JSON）编码的字符串表达 <code>{&quot;command&quot;:&quot;npm test&quot;}</code>，并带调用标识（Call ID）。<code>parse_toolcall_actions</code> 解析后得到含 <code>command</code> 与调用关联信息的行动请求（Action）；<code>LocalEnvironment.execute / _run</code> 执行命令，返回含 <code>output</code>、<code>returncode</code> 等字段的原始结果；<code>format_toolcall_observation_messages</code> 再把结果变成带相同 <code>tool_call_id</code> 的 <code>role: tool</code> 消息（Message）。</p>
+<p>因此，符合对象表示法（JSON）的语法只说明请求能被解析，<code>returncode</code> 属于执行器观察，最终的 <code>role: tool</code> 消息（Message）才是下一次模型服务提供方（Provider）请求可消费的协议表示。相关实现位于 <a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/models/utils/actions_toolcall.py"><code>actions_toolcall.py</code></a> 与 <a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/environments/local.py"><code>LocalEnvironment</code></a>。</p>
 <span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
 <ul>
-<li>相关章节：<a href="02-agent-loop.html">第02章｜Agent Loop 的执行过程</a></li>
-<li>下一站：<a href="04-code-repair.html">第04章｜代码修复与测试</a></li>
-<li>实验后：<a href="05-exit-and-trajectory.html#%E4%BA%A4%E4%BA%92%E9%80%80%E5%87%BA%E4%B8%8E%E8%BD%A8%E8%BF%B9">第05章｜Interaction、Exit、Limits 与 Trajectory</a></li>
+<li>相关章节：<a href="02-agent-loop.html">第02章｜代理循环（Agent Loop）的执行过程</a></li>
+<li>下一站：<a href="04-code-repair.html">第04章｜代码修复（Code Repair）与测试（Test）</a></li>
+<li>实验后：<a href="05-exit-and-trajectory.html#1-%E5%85%88%E5%88%86%E6%B8%85%E7%A1%AE%E8%AE%A4confirmation%E9%80%80%E5%87%BAexit%E4%B8%8E%E4%BF%9D%E5%AD%98save">第05章｜交互（Interaction）、退出（Exit）、限制（Limits）与执行轨迹（Trajectory）</a></li>
 </ul>
 <hr>
-<p><a href="02-agent-loop.html">上一章：第 02 章｜Agent Loop 的执行过程</a> · <a href="04-code-repair.html">下一章：第 04 章｜代码修复与测试</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="02-agent-loop.html"><span>← 上一章</span><strong>第 02 章｜Agent Loop 的执行过程</strong></a><a href="04-code-repair.html"><span>下一章 →</span><strong>第 04 章｜代码修复与测试</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%9B%9E%E6%89%A7">请求、执行与回执</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1%E5%91%BD%E4%BB%A4%E7%9A%84%E5%9B%9B%E4%BB%BD%E6%95%B0%E6%8D%AE">一次命令的四份数据</a></li><li class="toc-level-3"><a href="#actionoutput-%E4%B8%8E-observation-message">Action、Output 与 Observation Message</a></li><li class="toc-level-3"><a href="#%E9%BB%98%E8%AE%A4%E8%B7%AF%E5%BE%84%E4%B8%80%E4%B8%AA-bash-%E5%B7%A5%E5%85%B7%E7%B1%BB%E5%9E%8B">默认路径：一个 Bash 工具类型</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%85%E9%A1%BB%E4%BF%9D%E7%95%99-tool_call_id">为什么必须保留 tool_call_id</a></li><li class="toc-level-3"><a href="#%E6%AF%8F%E6%AC%A1%E6%89%A7%E8%A1%8C%E6%8D%A2%E8%BF%9B%E7%A8%8B%E6%96%87%E4%BB%B6%E5%8F%98%E5%8C%96%E5%8D%B4%E5%8F%AF%E4%BB%A5%E7%95%99%E4%B8%8B">每次执行换进程，文件变化却可以留下</a></li><li class="toc-level-3"><a href="#localenvironment-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E6%98%AF%E7%94%9F%E4%BA%A7%E7%BA%A7%E9%9A%94%E7%A6%BB">LocalEnvironment 为什么不是生产级隔离</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E8%BE%93%E5%87%BA%E5%8F%98%E6%88%90%E4%B8%8B%E4%B8%80%E8%BD%AE%E8%83%BD%E8%AF%BB%E7%9A%84%E6%B6%88%E6%81%AF">把输出变成下一轮能读的消息</a></li><li class="toc-level-3"><a href="#%E7%9C%9F%E5%AE%9E-observation-%E4%B8%AD%E4%B8%80%E4%B8%AA%E5%AE%B9%E6%98%93%E8%AF%AF%E8%AF%BB%E7%9A%84-0">真实 observation 中一个容易误读的 0</a></li><li class="toc-level-3"><a href="#%E6%B5%8B%E8%AF%95%E5%91%BD%E4%BB%A4%E7%9A%84%E7%BB%93%E6%9E%9C%E8%A7%A3%E6%9E%90">测试命令的结果解析</a></li><li class="toc-level-2"><a href="#%E8%A7%A3%E6%9E%90%E5%99%A8%E8%BF%9B%E7%A8%8B%E4%B8%8E%E5%8D%8F%E8%AE%AE%E5%8F%98%E4%BD%93">解析器、进程与协议变体</a></li><li class="toc-level-3"><a href="#bash_tool-%E5%AE%9A%E4%B9%89%E4%BA%86%E5%B7%A5%E5%85%B7-schema">BASH_TOOL 定义了工具 schema</a></li><li class="toc-level-3"><a href="#tool-call-%E6%80%8E%E6%A0%B7%E8%A2%AB%E8%A7%A3%E6%9E%90%E6%88%90-action">tool call 怎样被解析成 action</a></li><li class="toc-level-3"><a href="#localenvironment-%E6%80%8E%E6%A0%B7%E6%89%A7%E8%A1%8C-action">LocalEnvironment 怎样执行 action</a></li><li class="toc-level-3"><a href="#output-%E6%80%8E%E6%A0%B7%E5%8F%98%E6%88%90-observation-message">output 怎样变成 observation message</a></li><li class="toc-level-3"><a href="#%E9%BB%98%E8%AE%A4-tool-call-%E4%B8%8E%E6%96%87%E6%9C%AC%E4%BB%A3%E7%A0%81%E5%9D%97%E5%8F%98%E4%BD%93">默认 tool call 与文本代码块变体</a></li><li class="toc-level-3"><a href="#%E5%8D%8F%E8%AE%AE%E7%BA%A6%E6%9D%9F%E4%B8%8E%E5%AE%9E%E9%99%85%E6%A0%A1%E9%AA%8C%E9%97%AE%E7%AD%94">协议约束与实际校验问答</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E5%91%BD%E4%BB%A4%E7%9A%84%E4%B8%89%E6%AC%A1%E6%95%B0%E6%8D%AE%E8%BD%AC%E6%8D%A2">同一命令的三次数据转换</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="02-agent-loop.html">上一章：第 02 章｜代理循环（Agent Loop）的执行过程</a> · <a href="04-code-repair.html">下一章：第 04 章｜代码修复（Code Repair）与测试（Test）</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="02-agent-loop.html"><span>← 上一章</span><strong>第 02 章｜代理循环（Agent Loop）的执行过程</strong></a><a href="04-code-repair.html"><span>下一章 →</span><strong>第 04 章｜代码修复（Code Repair）与测试（Test）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE">前情回顾</a></li><li class="toc-level-2"><a href="#%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%9B%9E%E6%89%A7">请求、执行与回执</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1%E5%91%BD%E4%BB%A4%E7%9A%84%E5%9B%9B%E4%BB%BD%E6%95%B0%E6%8D%AE">一次命令的四份数据</a></li><li class="toc-level-3"><a href="#%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82action%E6%89%A7%E8%A1%8C%E8%BE%93%E5%87%BAoutput%E4%B8%8E%E8%A7%82%E5%AF%9F%E6%B6%88%E6%81%AFobservation-message">行动请求（Action）、执行输出（Output）与观察消息（Observation Message）</a></li><li class="toc-level-3"><a href="#%E9%BB%98%E8%AE%A4%E8%B7%AF%E5%BE%84%E4%B8%80%E4%B8%AA-bash-%E5%B7%A5%E5%85%B7%E7%B1%BB%E5%9E%8B">默认路径：一个 Bash 工具类型</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%85%E9%A1%BB%E4%BF%9D%E7%95%99-tool_call_id">为什么必须保留 tool_call_id</a></li><li class="toc-level-3"><a href="#%E6%AF%8F%E6%AC%A1%E6%89%A7%E8%A1%8C%E6%8D%A2%E8%BF%9B%E7%A8%8Bprocess%E6%96%87%E4%BB%B6%E5%8F%98%E5%8C%96%E5%8D%B4%E5%8F%AF%E4%BB%A5%E7%95%99%E4%B8%8B">每次执行换进程（Process），文件变化却可以留下</a></li><li class="toc-level-3"><a href="#localenvironment-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E6%98%AF%E7%94%9F%E4%BA%A7%E7%BA%A7%E9%9A%94%E7%A6%BBisolation">LocalEnvironment 为什么不是生产级隔离（Isolation）</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E8%BE%93%E5%87%BA%E5%8F%98%E6%88%90%E4%B8%8B%E4%B8%80%E8%BD%AE%E8%83%BD%E8%AF%BB%E7%9A%84%E6%B6%88%E6%81%AFmessage">把输出变成下一轮能读的消息（Message）</a></li><li class="toc-level-3"><a href="#%E7%9C%9F%E5%AE%9E%E8%A7%82%E5%AF%9F%E6%B6%88%E6%81%AFobservation-message%E4%B8%AD%E4%B8%80%E4%B8%AA%E5%AE%B9%E6%98%93%E8%AF%AF%E8%AF%BB%E7%9A%84-0">真实观察消息（Observation Message）中一个容易误读的 0</a></li><li class="toc-level-3"><a href="#%E6%B5%8B%E8%AF%95test%E5%91%BD%E4%BB%A4%E7%9A%84%E7%BB%93%E6%9E%9C%E8%A7%A3%E6%9E%90">测试（Test）命令的结果解析</a></li><li class="toc-level-2"><a href="#%E8%A7%A3%E6%9E%90%E5%99%A8parser%E8%BF%9B%E7%A8%8Bprocess%E4%B8%8E%E5%8D%8F%E8%AE%AE%E5%8F%98%E4%BD%93">解析器（Parser）、进程（Process）与协议变体</a></li><li class="toc-level-3"><a href="#bash_tool-%E5%AE%9A%E4%B9%89%E4%BA%86%E5%B7%A5%E5%85%B7%E5%8F%82%E6%95%B0%E7%BB%93%E6%9E%84schema">BASH_TOOL 定义了工具参数结构（Schema）</a></li><li class="toc-level-3"><a href="#%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8tool-call%E6%80%8E%E6%A0%B7%E8%A2%AB%E8%A7%A3%E6%9E%90%E6%88%90%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82action">工具调用（Tool Call）怎样被解析成行动请求（Action）</a></li><li class="toc-level-3"><a href="#localenvironment-%E6%80%8E%E6%A0%B7%E6%89%A7%E8%A1%8C%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82action">LocalEnvironment 怎样执行行动请求（Action）</a></li><li class="toc-level-3"><a href="#%E6%89%A7%E8%A1%8C%E8%BE%93%E5%87%BAoutput%E6%80%8E%E6%A0%B7%E5%8F%98%E6%88%90%E8%A7%82%E5%AF%9F%E6%B6%88%E6%81%AFobservation-message">执行输出（Output）怎样变成观察消息（Observation Message）</a></li><li class="toc-level-3"><a href="#%E9%BB%98%E8%AE%A4%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8tool-call%E4%B8%8E%E6%96%87%E6%9C%AC%E4%BB%A3%E7%A0%81%E5%9D%97%E5%8F%98%E4%BD%93">默认工具调用（Tool Call）与文本代码块变体</a></li><li class="toc-level-3"><a href="#%E5%8D%8F%E8%AE%AE%E7%BA%A6%E6%9D%9F%E4%B8%8E%E5%AE%9E%E9%99%85%E6%A0%A1%E9%AA%8C%E9%97%AE%E7%AD%94">协议约束与实际校验问答</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E5%91%BD%E4%BB%A4%E7%9A%84%E4%B8%89%E6%AC%A1%E6%95%B0%E6%8D%AE%E8%BD%AC%E6%8D%A2">同一命令的三次数据转换</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

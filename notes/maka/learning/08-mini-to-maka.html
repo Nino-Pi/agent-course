@@ -1,69 +1,72 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 08 章｜从 mini 到 Maka 的机制对应 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 08 / 62</div><article id="main-content"><span class="heading-alias" id="b01把问题带入-maka分阶段使用概念地图" aria-hidden="true"></span><span class="heading-alias" id="b01从-mini-到-maka-的机制对应" aria-hidden="true"></span><h1 id="第-08-章从-mini-到-maka-的机制对应">第 08 章｜从 mini 到 Maka 的机制对应</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：Maka 怎样分配同一行动循环中的责任，并依据状态和结果继续工作？</p>
-<p><strong>关键概念</strong>：Harness（运行支撑）：连接模型与环境；工作身份：关联会话和执行；持久事实：供后续查询的记录；owner（负责者）：持有对应决定权；评价：按结果判断任务。</p>
-<p><strong>关系主线</strong>：六组责任把 mini 的简单实现接到 Maka；中断、长任务和协作分别引入新的状态与控制。</p>
+<p><strong>核心问题</strong>：当一次修复扩展为可中断、多轮和协作的工作，运行支撑（Agent Harness）怎样分配新增责任？</p>
+<p><strong>关键概念</strong>：运行支撑（Agent Harness）连接模型（Model）与执行环境（Environment）；工作身份（Work Identity）关联归属与执行；持久事实（Durable Fact）为后续判断保留记录；负责者（Owner）管理相应状态（State）；消费者（Consumer）实际读取并使用某份材料。</p>
+<p><strong>关系主线</strong>：先把共同循环放回六组教学职责，再用同一修复比较两种实现。新增机制要连接具体对象和消费者（Consumer），名称相同或一次修复成功都不能替代保证核对。</p>
 </blockquote>
-<p>mini 已经展示了输入、模型请求、真实命令与观察怎样连接。<a href="07-loop-boundaries.html">第07章</a>又暴露了写入发生而记录落后的窗口。转到 Maka，问题从“循环能否运行”扩展为“多轮工作由谁接纳，哪些结果可信，失败后依据什么继续”。</p>
+<h2 id="前情回顾把第07章的问题带入新的实现">前情回顾：把第07章的问题带入新的实现</h2>
+<p>最小循环（Minimal Loop）已经走通“行动请求（Action）→执行→观察结果（Observation）→下一次判断”。第06–07章又说明：效果（Effect）可以先于记录保存；停止也不等于任务成功。因此，继续工作需要知道当前状态（State）、可用证据（Evidence）以及谁来决定下一步。</p>
+<p>本章把这些问题带到 Maka。目的不是记住更多类名，而是理解同一个问题怎样由不同组件承担。先沿职责地图阅读，再看两条真实修复链，最后判断新需求还要求哪些连接；具体字段和调用细节留到对应机制章。</p>
 <h2 id="从共同闭环到六组责任">从共同闭环到六组责任</h2>
-<p>第01章把 Harness 分成六组学习责任。下面的箭头从共同闭环指向职责地图，框内六组并列，不是必须顺序执行的步骤；一份观察可以同时参与输入、恢复和评价。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从共同闭环到六组责任：可滚动示意图"><a href="../../../assets/diagrams/08-mini-to-maka-1.svg"><img src="../../../assets/diagrams/08-mini-to-maka-1.svg" alt="目标驱动的 Agent 闭环按学习问题拆成 Harness 的六组职责；输入、循环、状态恢复、权限隔离、任务协作和观察评价为并列责任，不是六步流水线。" width="1104" height="783" loading="lazy" style="width:1104px;min-width:939px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 从共同闭环到六组责任"><table><caption>表 1 / Table 1 · 从共同闭环到六组责任</caption><thead><tr><th scope="col">责任组</th><th scope="col">mini 已给出的起点</th><th scope="col">Maka 中继续追踪的问题</th></tr></thead><tbody><tr><td>输入组织（Input Composition）</td><td>任务、消息与命令结果组成下一输入</td><td><a href="15-model-context.html">第15章</a>追当前输入，<a href="19-context-compaction.html">第19章</a>处理长历史；哪些材料入选、怎样保持可用？</td></tr>
-<tr><td>模型与工具循环（Model / Tool Loop）</td><td>Model 提出动作，Environment 执行并反馈</td><td><a href="12-request-lifecycle.html">第12章</a>、<a href="16-tools-and-execution.html">第16章</a>追请求准入、工具绑定和下一步消费</td></tr>
-<tr><td>状态与恢复（State / Recovery）</td><td>内存消息、轨迹快照与文件效果</td><td><a href="13-session-turn-run.html">第13章</a>、<a href="14-events-and-projections.html">第14章</a>、<a href="18-effects-and-recovery.html">第18章</a>区分身份、事实、未知与恢复；<a href="20-memory.html">第20章</a>另管长期信息</td></tr>
-<tr><td>权限与隔离（Permissions / Isolation）</td><td>执行前确认和具体环境能力</td><td><a href="17-permissions-and-sandbox.html">第17章</a>区分准许动作与实际资源限制</td></tr>
-<tr><td>任务推进与协作（Task Progress / Collaboration）</td><td>一次 run 的循环与简单退出规则</td><td><a href="23-skills-and-subagents.html">第23章</a>解释方法复用与委派，<a href="24-continuation-and-orchestration.html">第24章</a>解释持续工作与触发</td></tr>
-<tr><td>观察与评价（Observation / Evaluation）</td><td>output、退出状态、测试和差异</td><td><a href="26-evaluation-and-design.html">第26章</a>把任务结果、判断范围和总成本连接起来</td></tr></tbody></table></div>
-<p>Maka 的 Host（宿主）负责接纳和协调工作，Client（客户端）负责提交请求和展示结果。<a href="25-host-and-client.html">Host 与 Client</a>跨越多组责任，把连接、执行与状态观察接起来。Skills 的正文装载连接输入与方法复用，Memory 的读取连接长期状态与当前输入；边界之间需要真实的消费者。</p>
-<p>发现和检索也跨越这些责任：挑选相关代码证据参与输入组织，提出并执行搜索参与模型与工具循环，能发现和调用哪些方法或工具还受可用性与准入限制。后面的<a href="37-code-retrieval.html">第37章代码检索</a>、<a href="16-tools-and-execution.html">第16章工具调用</a>与<a href="23-skills-and-subagents.html">第23章方法发现</a>都能放回这张地图，不需要为它们另设一组固定职责。</p>
-<p>短任务可以在简单循环里完成；持久恢复、长期记忆、子任务和定时调度分别针对增加的需求。组件更多是否值得，要看它解决的失败、节省的工作和新增的成本。</p>
-<span class="heading-alias" id="第一遍只带三条对应关系入场" aria-hidden="true"></span><h2 id="工作身份记录与控制责任">工作身份、记录与控制责任</h2>
-<p>一次 mini <code>run(task)</code> 与 Maka 的 Session、Turn、Run 分别处在不同层次。到 <a href="11-agent-architecture.html">第11章</a>后，同一修复将逐步固定会话归属、用户工作和执行身份，而不是只按相同英文名称对应类。</p>
-<p>轨迹快照与持久事实的边界也不同。mini 的 messages 让下一次模型获得已加入的材料；trajectory 保存的是某个时点的状态。Maka 还要区分执行事实、模型输入与界面投影，以及各自负责更新的组件。</p>
-<p>模型说“完成”、界面仍在运行和文件已经改变可以同时出现。要解释它们，需分别查当前执行、实际效果与任务验收，不能用一个标签覆盖全部状态。</p>
+<p>第01章给出了运行支撑（Agent Harness）的六组教学职责。它们是按“需要解决什么问题”分组，不规定组件数量，也不是六步执行流程。一个工具结果（Tool Result）可以同时进入当前模型输入（Model Input）、帮助恢复（Recovery），并作为评价（Evaluation）的材料。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从循环到职责 · From Loop to Responsibilities：可滚动示意图"><a href="../../../assets/diagrams/08-mini-to-maka-1.svg"><img src="../../../assets/diagrams/08-mini-to-maka-1.svg" alt="代理循环（Agent Loop）按问题拆为六组并列教学职责，箭头表示职责分解而非运行顺序；一份工具结果（Tool Result）可以同时参与模型输入（Model Input）、恢复（Recovery）与评价（Evaluation）。" width="1104" height="783" loading="lazy" style="width:1104px;min-width:939px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>读图时先看上方共同循环，再看下方六个并列框。真正的实现会跨框连接：例如选择一份测试结果作为输入，既涉及记录从哪里来，也涉及本次判断需要看什么。图中布局用于并列职责，不要求运行时逐框经过。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 从共同闭环到六组责任"><table><caption>表 1 / Table 1 · 从共同闭环到六组责任</caption><thead><tr><th scope="col">责任组</th><th scope="col">mini 已给出的起点</th><th scope="col">Maka 中继续追踪的问题</th></tr></thead><tbody><tr><td>输入组织（Input Composition）</td><td>任务、消息（Message）与命令结果组成下一次输入</td><td><a href="15-model-context.html">第15章</a>追实际入选材料，<a href="19-context-compaction.html">第19章</a>处理长历史（History）；保存过的内容怎样进入当前判断？</td></tr>
+<tr><td>模型与工具循环（Model / Tool Loop）</td><td>模型（Model）提出行动请求（Action），执行环境（Environment）运行并反馈</td><td><a href="12-request-lifecycle.html">第12章</a>、<a href="16-tools-and-execution.html">第16章</a>追接纳、绑定、执行和下一步消费；一段请求文本怎样找到真正的执行者？</td></tr>
+<tr><td>状态与恢复（State / Recovery）</td><td>内存消息（Message）、执行轨迹（Trajectory）快照（Snapshot）与文件效果（Effect）</td><td><a href="13-session-turn-run.html">第13章</a>、<a href="14-events-and-projections.html">第14章</a>、<a href="18-effects-and-recovery.html">第18章</a>区分身份（Identity）、事实（Fact）和未知结果；<a href="20-memory.html">第20章</a>另管长期信息</td></tr>
+<tr><td>权限与隔离（Permissions / Isolation）</td><td>执行前的确认（Confirmation）与环境实际能力</td><td><a href="17-permissions-and-sandbox.html">第17章</a>区分准许哪些操作与资源限制怎样被强制执行</td></tr>
+<tr><td>任务推进与协作（Task Progress / Collaboration）</td><td>一次 <code>run</code> 调用的循环与退出规则</td><td><a href="23-skills-and-subagents.html">第23章</a>解释方法复用与委派（Delegation），<a href="24-continuation-and-orchestration.html">第24章</a>解释继续工作的触发与管理</td></tr>
+<tr><td>观察与评价（Observation / Evaluation）</td><td>执行输出（Output）、退出状态（Exit Status）、测试与差异（Diff）</td><td><a href="26-evaluation-and-design.html">第26章</a>连接结果、判断范围和总成本；哪些材料足以支持“完成”？</td></tr></tbody></table></div>
+<p>宿主（Host）负责接纳与协调工作，客户端（Client）负责提交请求和展示结果；<a href="25-host-and-client.html">第25章</a>会解释它们怎样跨越多组职责。技能说明包（Skill）的正文装载连接输入与方法复用，记忆（Memory）的读取连接长期记录与当前判断。这里的消费者（Consumer）指实际读取并使用材料的人或程序：只有文件存在，没有读取和使用链，能力就还没有进入本次工作。</p>
+<p>发现与检索也能放回这张地图。代码检索（Code Retrieval）选择相关证据（Evidence），工具发现（Tool Discovery）确定可以请求哪些能力；前者参与输入组织（Input Composition），后者与调用格式、可用性（Availability）及接纳条件有关。后续<a href="37-code-retrieval.html">第37章</a>、<a href="16-tools-and-execution.html">第16章</a>和<a href="23-skills-and-subagents.html">第23章</a>再展开它们，不需要为每个新名词新增一组固定职责。</p>
+<p>短任务可以在简单循环中完成。引入更多组件的理由应落在新增需求上：中断以后依据什么继续，长期信息何时被使用，子任务（Subtask）的结果由谁接纳。判断设计是否值得，要同时看解决了哪些失败和新增了什么成本。</p>
+<span class="heading-alias" id="第一遍只带三条对应关系入场" aria-hidden="true"></span><span class="heading-alias" id="工作身份记录与控制责任" aria-hidden="true"></span><h2 id="工作身份work-identity记录与控制责任">工作身份（Work Identity）、记录与控制责任</h2>
+<p>mini 的 <code>run(task)</code> 是一个入口调用。Maka 的会话（Session）、工作轮次（Turn）和执行（Run）分别关联交互归属、用户可观察的一项工作与一次具体运行。它们回答不同问题，不能因为都出现了 <code>run</code> 就把对象画等号；<a href="11-agent-architecture.html">第11章</a>以后会逐步展开。</p>
+<p>记录也要按用途区分。mini 的消息列表（Message List）为下一次模型（Model）请求提供材料，执行轨迹（Trajectory）保存某个时点的快照（Snapshot）。Maka 进一步区分执行事实（Execution Fact）、模型输入（Model Input）与界面投影（UI Projection），每种表示都有负责更新的组件。</p>
+<p>例如界面仍写“运行中”，模型（Model）却说“完成”，文件也已经改变。这三个描述可以同时出现，因为它们分别来自展示、生成文本与实际效果（Effect）。要判断整项工作，仍需核对当前执行（Run）、可信工具结果（Tool Result）及验收条件；某个标签不能替所有对象结账。</p>
 <span class="heading-alias" id="用同一真实任务走过这座桥" aria-hidden="true"></span><h2 id="同一修复任务的两条执行链">同一修复任务的两条执行链</h2>
-<p>这里先摘取将在<a href="22-agent-cases.html">第22章</a>展开的真实任务作对照：修正 README 命令，并修复 <code>formatDuration</code> 的余秒计算（<code>% 100</code> → <code>% 60</code>）。mini 与 Maka 都完成了这两处修改，过程却不同。</p>
-<p>下表中的 Maka 工具 Read 表示读取文件，Edit 表示修改文件，Bash 表示执行命令；本节只比较它们在闭环中的职责，具体参数与执行过程在第16章展开。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 同一修复任务的两条执行链"><table><caption>表 2 / Table 2 · 同一修复任务的两条执行链</caption><thead><tr><th scope="col">同一个学习问题</th><th scope="col">mini 实际片段</th><th scope="col">Maka 实际片段</th></tr></thead><tbody><tr><td>文件内容从哪里来？</td><td>Bash 中 <code>cat</code> 四份文件</td><td>一次回答提出四个 Read</td></tr>
-<tr><td>谁真正修改文件？</td><td>Bash 执行 <code>sed</code></td><td>两个原生 Edit 调用</td></tr>
+<p>这里摘取将在<a href="22-agent-cases.html">第22章</a>展开的真实案例作对照。任务包括修正 README 的命令，以及把 <code>formatDuration</code> 的余秒计算从 <code>% 100</code> 改为 <code>% 60</code>；测试和差异（Diff）共同支持结果判断。mini 与 Maka 都完成了这两处修改，使用的请求表达和执行顺序不同。</p>
+<p>Maka 的 <code>Read</code>、<code>Edit</code>、<code>Bash</code> 是工具标识，分别承担读取文件、修改文件、运行命令。mini 则可通过命令工具完成对应操作；标识保留原文，具体参数与结果合同在第16章展开。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 同一修复任务的两条执行链"><table><caption>表 2 / Table 2 · 同一修复任务的两条执行链</caption><thead><tr><th scope="col">同一个学习问题</th><th scope="col">mini 实际片段</th><th scope="col">Maka 实际片段</th></tr></thead><tbody><tr><td>文件内容从哪里来？</td><td>命令工具（Command Tool）中用 <code>cat</code> 读取四份文件</td><td>一次回答提出四个 <code>Read</code> 请求</td></tr>
+<tr><td>谁真正修改文件？</td><td>命令工具（Command Tool）执行 <code>sed</code></td><td>两个原生 <code>Edit</code> 调用</td></tr>
 <tr><td>测试在什么时候发生？</td><td>修改前观察失败，修改后复测</td><td>读源码后先修改，再运行测试</td></tr>
-<tr><td>怎么继续？</td><td>环境结果进入下一次 messages</td><td>工具结果形成原生记录并进入后续模型请求</td></tr></tbody></table></div>
-<p>两条真实路线都能讲清“动作 → 观察 → 下一步”，不需要逐步相同。这次修复支持给定场景的结果；任意崩溃窗口是否得到解决，还要检查相应身份、记录和恢复合同。</p>
+<tr><td>怎么继续？</td><td>环境结果加入 <code>messages</code>，进入下一次模型输入（Model Input）</td><td>工具结果（Tool Result）形成原生记录，进入后续请求</td></tr></tbody></table></div>
+<p>两条路线都闭合了“行动请求（Action）→观察结果（Observation）→下一步”。职责相同不要求调用形式、次数和顺序相同。反过来，给定场景中修复成功，也不证明任意中断都可恢复（Recovery）；那还需要核对具体执行路径的身份（Identity）、持久记录和失败处理。</p>
 <span class="heading-alias" id="自测" aria-hidden="true"></span><h2 id="问题解析">问题解析</h2>
-<span class="heading-alias" id="基础自测" aria-hidden="true"></span><h3 id="身份与记录">身份与记录</h3>
-<p><strong>问题 1。</strong> 用户在断开后重发同一句修复要求。为什么仅看文本，不能判断是在继续原来的工作还是发起新尝试？</p>
-<p><strong>解释。</strong> 相同文本没有提供工作身份与执行尝试的关系。要查系统怎样标识、接纳这次请求，不能把 mini run 与 Maka Run 直接画等号。</p>
-<p><strong>问题 2。</strong> 磁盘保存着测试日志，下一次模型回答却没提到它。应该继续检查什么？</p>
-<p><strong>解释。</strong> 检查它是否实际进入本次模型输入，以及以什么形式进入。保存着一份日志，不能证明模型已经看到它；回答没提到，也不能单独证明它没看到。</p>
-<p><strong>问题 3。</strong> 界面写着“运行中”，模型说“完成”，README 已改而测试记录缺席。哪些负责者和记录能说明当前状态？</p>
-<p><strong>解释。</strong> 找到负责推进执行、保存状态的组件，核对实际文件、已有工具结果与退出记录。分别说明已证实与待确认的部分；三个表面描述不能互相代替。</p>
-<span class="heading-alias" id="第二遍第一组从行动走向可解释的工具执行" aria-hidden="true"></span><h2 id="工具权限与效果恢复">工具、权限与效果恢复</h2>
-<p>沿同一修复继续追踪：模型请求修改 README，首先要有可解释、可绑定的工具；动作允许后，由相应执行环境操作文件；得到或丢失回执，又决定后续能确认什么。人工批准、执行隔离、持久结算分别解决许可、访问和记录问题。</p>
-<p>例如写入已经发生而回执缺失，重新看到旧轨迹只说明恢复了一部分记录。第18章将解释怎样保存已知与未知、核对效果并选择后续动作。具体保证取决于该执行路径；同一接口接入不同后端，不能自动继承相同的恢复能力。</p>
-<span class="heading-alias" id="主链之后的路线总览首读收束与二读扩展" aria-hidden="true"></span><h2 id="输入委派与宿主机制">输入、委派与宿主机制</h2>
-<p>长日志需要选择与压缩，未来任务需要保存和读取长期信息，复用方法与委派工作则分别改变输入和执行。这些都是在共同闭环上增加特定能力。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 输入、委派与宿主机制"><table><caption>表 3 / Table 3 · 输入、委派与宿主机制</caption><thead><tr><th scope="col">新条件</th><th scope="col">应追问的连接</th></tr></thead><tbody><tr><td>保存了一个偏好</td><td>哪次读取会选择它，何时进入模型输入？</td></tr>
-<tr><td>加载了一个 Skill</td><td>正文提供了什么方法，后续工具是否实际执行？</td></tr>
-<tr><td>交给一个子任务</td><td>它收到哪些材料、能修改什么、结果由谁采纳？</td></tr>
-<tr><td>到了定时时间</td><td>本次触发是否已认领，当前任务与权限是否仍有效？</td></tr>
-<tr><td>Client 断开</td><td>工作归谁管理，当前状态如何重新观察？</td></tr></tbody></table></div>
-<p>另起 mini 进程可以承担独立工作，但父子关系、交付状态和恢复合同仍需另外建立；给 prompt 加一段方法，也不自动获得 Skill 的发现和装载机制。比较从实际状态与连接开始。</p>
+<span class="heading-alias" id="基础自测" aria-hidden="true"></span><span class="heading-alias" id="身份与记录" aria-hidden="true"></span><h3 id="身份identity与记录">身份（Identity）与记录</h3>
+<p><strong>问题1。</strong> 用户断开后重发相同要求，为什么仅看文本不能判断是继续原工作还是新建尝试？</p>
+<p><strong>参考答案。</strong> 相同文本没有说明工作身份（Work Identity）与执行尝试的关联。应查系统如何标识并接纳这次请求，不能把 mini 的 <code>run</code> 调用与 Maka 的执行（Run）直接等同。</p>
+<p><strong>问题2。</strong> 磁盘有测试日志，下一次回答却没提到。应继续检查什么？</p>
+<p><strong>参考答案。</strong> 检查它是否被选入当前模型输入（Model Input）、以什么形式进入。保存不能证明已被消费；回答没有提到，也不能单独证明模型（Model）没有看到。</p>
+<p><strong>问题3。</strong> 界面写“运行中”，生成文本说“完成”，README 已改而测试记录缺席，怎样描述现状？</p>
+<p><strong>参考答案。</strong> 查相应负责者（Owner）掌握的状态（State），核对文件、工具结果（Tool Result）与退出记录。已知修改发生，但测试结论仍待确认；界面标签和生成文本不能补出缺失证据（Evidence）。</p>
+<span class="heading-alias" id="第二遍第一组从行动走向可解释的工具执行" aria-hidden="true"></span><span class="heading-alias" id="工具权限与效果恢复" aria-hidden="true"></span><h2 id="工具tool权限permissions与效果恢复effect-recovery">工具（Tool）、权限（Permissions）与效果恢复（Effect Recovery）</h2>
+<p>沿同一修复继续追踪：行动请求（Action）首先要能被解释并绑定到执行者；允许以后，由执行环境（Environment）操作文件；返回或缺失的观察结果（Observation）决定当前可以确认什么。批准（Approval）、隔离（Isolation）和持久结算（Durable Settlement）分别处理许可、资源访问和记录，不能压成一个“安全”开关。</p>
+<p>如果写入发生而反馈缺失，重新装载旧执行轨迹（Trajectory）只说明恢复了一部分记录。<a href="18-effects-and-recovery.html">第18章</a>会解释如何保留已知与未知、核对效果（Effect），再选择后续动作。同一接口接到不同适配器（Adapter）时，实际执行与返回逻辑可以不同；共享接口不自动保证相同恢复（Recovery）能力。</p>
+<span class="heading-alias" id="主链之后的路线总览首读收束与二读扩展" aria-hidden="true"></span><span class="heading-alias" id="输入委派与宿主机制" aria-hidden="true"></span><h2 id="输入委派delegation与宿主host机制">输入、委派（Delegation）与宿主（Host）机制</h2>
+<p>长输出需要选择与压缩，未来任务可能需要记忆（Memory），可复用方法与子任务（Subtask）则分别改变输入内容和执行分工。每种扩展都应追到实际消费者（Consumer），而不是停在“已经配置了一个组件”。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 输入、委派（Delegation）与宿主（Host）机制"><table><caption>表 3 / Table 3 · 输入、委派（Delegation）与宿主（Host）机制</caption><thead><tr><th scope="col">新条件</th><th scope="col">应追问的连接</th></tr></thead><tbody><tr><td>保存了一个偏好</td><td>哪次召回（Recall）会选中它，何时进入当前模型输入（Model Input）？</td></tr>
+<tr><td>加载了一个技能说明包（Skill）</td><td>正文提供什么方法，后续工具（Tool）是否实际执行？</td></tr>
+<tr><td>委派了一个子任务（Subtask）</td><td>它收到哪些材料、允许修改什么，结果由谁采纳？</td></tr>
+<tr><td>到了定时时间</td><td>触发（Trigger）是否已经被认领，任务与权限（Permissions）是否仍有效？</td></tr>
+<tr><td>客户端（Client）断开</td><td>工作由哪个负责者（Owner）管理，怎样重新观察当前状态（State）？</td></tr></tbody></table></div>
+<p>另起 mini 进程可以承担独立工作，但父子关系、交付状态（Delivery State）与恢复（Recovery）合同仍需另外建立。向提示词（Prompt）加一段方法，也不自动获得技能说明包（Skill）的发现与装载机制。比较应从真实对象与连接开始。</p>
 <span class="heading-alias" id="第二遍" aria-hidden="true"></span><span class="heading-alias" id="练习比较具体执行路径" aria-hidden="true"></span><h3 id="具体执行路径的比较">具体执行路径的比较</h3>
-<p><strong>问题 1。</strong> 为什么确认（Confirmation）、工具可见性（Tool Visibility）与执行隔离（Execution Isolation）不能合成一个开关？</p>
-<p><strong>解释。</strong> 确认（Confirmation）让用户对已展示的候选动作决定是否继续；第05章的 mini 确认模式针对一组动作询问，不会因此新增 OS 隔离。工具可见性（Tool Visibility）决定本步向模型展示哪些工具及其请求格式，工具出现不等于具体调用已经获准。执行隔离（Execution Isolation）由实际执行环境限制资源访问，要看越界行为能否被强制阻止。三者各有作用；一次确认不替代当前权限与边界检查，隐藏工具也不能代替执行隔离。</p>
-<p><strong>问题 2。</strong> 从保存日志走到构造模型输入，新增了哪一个决定？</p>
-<p><strong>解释。</strong> 决定这一次判断需要看到哪些信息，如何表示并控制大小；持久存在并不等于实际进入模型输入。</p>
-<p><strong>问题 3。</strong> 如何判断某项 Maka 保证可以应用于一个具体 adapter？</p>
-<p><strong>解释。</strong> 查该路径的真实接线、状态负责者和失败处理，并分开源码推导与实际运行范围。共享接口或另一条路径通过检查，都不足以覆盖它。</p>
-<h2 id="项目环境怎样接到这张地图">项目环境怎样接到这张地图</h2>
-<p>Harness 的能力需要在具体仓库中取得材料和反馈。项目入口规则、测试脚本、代码结构和当前改动说明分别提供工作约定、执行入口和当前事实；它们仍需被发现、读取与核对，规则文字也不代替硬权限。</p>
-<p><a href="09-project-workspace.html">Agent 可操作的项目环境</a>将把这些材料组织成一份完整仓库案例，展示“可以开始诊断”与“业务已经正确”的区别。随后，语言桥解释 TypeScript 控制流，Maka 章节再逐步展开上面的机制。</p>
+<p><strong>问题1。</strong> 为什么确认（Confirmation）、工具可见性（Tool Visibility）和执行隔离（Execution Isolation）不能合并？</p>
+<p><strong>参考答案。</strong> 确认（Confirmation）让用户对已经展示的候选操作决定是否继续；第05章的 mini 模式针对一组操作询问，不会因此新增操作系统（Operating System，OS）隔离。工具可见性（Tool Visibility）决定本步展示哪些工具（Tool）及请求格式，不代表具体调用已获准。执行隔离（Execution Isolation）由环境强制限制资源访问。三者分别回答“是否继续、可以请求什么、执行时能访问什么”。</p>
+<p><strong>问题2。</strong> 从保存日志到构造模型输入（Model Input），多了哪一个决定？</p>
+<p><strong>参考答案。</strong> 决定本次判断需要哪些信息，以及怎样表示并控制大小。持久存在不等于实际进入这次请求。</p>
+<p><strong>问题3。</strong> 某项 Maka 保证能否应用到具体适配器（Adapter），该怎样判断？</p>
+<p><strong>参考答案。</strong> 查这条执行路径的实际接线、状态负责者（State Owner）和失败处理，分别说明源码推导与运行核验范围。另一条路径通过检查，不能替代当前路径的证据（Evidence）。</p>
+<span class="heading-alias" id="项目环境怎样接到这张地图" aria-hidden="true"></span><h2 id="项目环境project-environment怎样接到这张地图">项目环境（Project Environment）怎样接到这张地图</h2>
+<p>运行支撑（Agent Harness）需要在具体仓库中取得材料和反馈。入口规则说明工作约定，测试脚本提供执行入口，源码与已有差异（Diff）说明当前事实（Fact）。这些材料仍需被发现、读取和核对；规则文字本身也不替代权限（Permissions）的强制执行。</p>
+<p><a href="09-project-workspace.html">第09章的项目环境（Project Environment）</a>将用一个完整仓库案例展示接手过程：怎样确认可以开始诊断，以及为什么这还不是业务已经正确。随后第10章补 TypeScript 的语言读法，再逐步进入 Maka 的具体机制。</p>
 <span class="heading-alias" id="接下来读" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
 <ul>
-<li>相关章节：<a href="07-loop-boundaries.html">第07章</a></li>
-<li>Maka 起点：<a href="11-agent-architecture.html">第11章｜Maka 的 Agent Harness 结构</a></li>
-<li>返回：<a href="README.html">总学习入口</a></li>
+<li>前置回顾：<a href="07-loop-boundaries.html">第07章</a></li>
+<li>Maka 起点：<a href="11-agent-architecture.html">第11章｜Maka 的运行支撑（Agent Harness）结构</a></li>
+<li>阅读路线：<a href="README.html">总学习入口</a></li>
 </ul>
 <hr>
-<p><a href="07-loop-boundaries.html">上一章：第 07 章｜最小循环的能力边界</a> · <a href="09-project-workspace.html">下一章：第 09 章｜Code Agent 的项目工作环境</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="07-loop-boundaries.html"><span>← 上一章</span><strong>第 07 章｜最小循环的能力边界</strong></a><a href="09-project-workspace.html"><span>下一章 →</span><strong>第 09 章｜Code Agent 的项目工作环境</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E4%BB%8E%E5%85%B1%E5%90%8C%E9%97%AD%E7%8E%AF%E5%88%B0%E5%85%AD%E7%BB%84%E8%B4%A3%E4%BB%BB">从共同闭环到六组责任</a></li><li class="toc-level-2"><a href="#%E5%B7%A5%E4%BD%9C%E8%BA%AB%E4%BB%BD%E8%AE%B0%E5%BD%95%E4%B8%8E%E6%8E%A7%E5%88%B6%E8%B4%A3%E4%BB%BB">工作身份、记录与控制责任</a></li><li class="toc-level-2"><a href="#%E5%90%8C%E4%B8%80%E4%BF%AE%E5%A4%8D%E4%BB%BB%E5%8A%A1%E7%9A%84%E4%B8%A4%E6%9D%A1%E6%89%A7%E8%A1%8C%E9%93%BE">同一修复任务的两条执行链</a></li><li class="toc-level-2"><a href="#%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">问题解析</a></li><li class="toc-level-3"><a href="#%E8%BA%AB%E4%BB%BD%E4%B8%8E%E8%AE%B0%E5%BD%95">身份与记录</a></li><li class="toc-level-2"><a href="#%E5%B7%A5%E5%85%B7%E6%9D%83%E9%99%90%E4%B8%8E%E6%95%88%E6%9E%9C%E6%81%A2%E5%A4%8D">工具、权限与效果恢复</a></li><li class="toc-level-2"><a href="#%E8%BE%93%E5%85%A5%E5%A7%94%E6%B4%BE%E4%B8%8E%E5%AE%BF%E4%B8%BB%E6%9C%BA%E5%88%B6">输入、委派与宿主机制</a></li><li class="toc-level-3"><a href="#%E5%85%B7%E4%BD%93%E6%89%A7%E8%A1%8C%E8%B7%AF%E5%BE%84%E7%9A%84%E6%AF%94%E8%BE%83">具体执行路径的比较</a></li><li class="toc-level-2"><a href="#%E9%A1%B9%E7%9B%AE%E7%8E%AF%E5%A2%83%E6%80%8E%E6%A0%B7%E6%8E%A5%E5%88%B0%E8%BF%99%E5%BC%A0%E5%9C%B0%E5%9B%BE">项目环境怎样接到这张地图</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="07-loop-boundaries.html">上一章：第07章｜最小循环（Minimal Loop）的能力边界</a> · <a href="09-project-workspace.html">下一章：第09章｜代码代理（Code Agent）的项目工作环境</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="07-loop-boundaries.html"><span>← 上一章</span><strong>第 07 章｜最小循环（Minimal Loop）的能力边界</strong></a><a href="09-project-workspace.html"><span>下一章 →</span><strong>第 09 章｜Code Agent 的项目工作环境</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E6%8A%8A%E7%AC%AC07%E7%AB%A0%E7%9A%84%E9%97%AE%E9%A2%98%E5%B8%A6%E5%85%A5%E6%96%B0%E7%9A%84%E5%AE%9E%E7%8E%B0">前情回顾：把第07章的问题带入新的实现</a></li><li class="toc-level-2"><a href="#%E4%BB%8E%E5%85%B1%E5%90%8C%E9%97%AD%E7%8E%AF%E5%88%B0%E5%85%AD%E7%BB%84%E8%B4%A3%E4%BB%BB">从共同闭环到六组责任</a></li><li class="toc-level-2"><a href="#%E5%B7%A5%E4%BD%9C%E8%BA%AB%E4%BB%BDwork-identity%E8%AE%B0%E5%BD%95%E4%B8%8E%E6%8E%A7%E5%88%B6%E8%B4%A3%E4%BB%BB">工作身份（Work Identity）、记录与控制责任</a></li><li class="toc-level-2"><a href="#%E5%90%8C%E4%B8%80%E4%BF%AE%E5%A4%8D%E4%BB%BB%E5%8A%A1%E7%9A%84%E4%B8%A4%E6%9D%A1%E6%89%A7%E8%A1%8C%E9%93%BE">同一修复任务的两条执行链</a></li><li class="toc-level-2"><a href="#%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">问题解析</a></li><li class="toc-level-3"><a href="#%E8%BA%AB%E4%BB%BDidentity%E4%B8%8E%E8%AE%B0%E5%BD%95">身份（Identity）与记录</a></li><li class="toc-level-2"><a href="#%E5%B7%A5%E5%85%B7tool%E6%9D%83%E9%99%90permissions%E4%B8%8E%E6%95%88%E6%9E%9C%E6%81%A2%E5%A4%8Deffect-recovery">工具（Tool）、权限（Permissions）与效果恢复（Effect Recovery）</a></li><li class="toc-level-2"><a href="#%E8%BE%93%E5%85%A5%E5%A7%94%E6%B4%BEdelegation%E4%B8%8E%E5%AE%BF%E4%B8%BBhost%E6%9C%BA%E5%88%B6">输入、委派（Delegation）与宿主（Host）机制</a></li><li class="toc-level-3"><a href="#%E5%85%B7%E4%BD%93%E6%89%A7%E8%A1%8C%E8%B7%AF%E5%BE%84%E7%9A%84%E6%AF%94%E8%BE%83">具体执行路径的比较</a></li><li class="toc-level-2"><a href="#%E9%A1%B9%E7%9B%AE%E7%8E%AF%E5%A2%83project-environment%E6%80%8E%E6%A0%B7%E6%8E%A5%E5%88%B0%E8%BF%99%E5%BC%A0%E5%9C%B0%E5%9B%BE">项目环境（Project Environment）怎样接到这张地图</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

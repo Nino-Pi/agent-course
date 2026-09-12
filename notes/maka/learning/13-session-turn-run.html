@@ -19,7 +19,7 @@
 <li>谁有资格决定它能否开始、是否结束？</li>
 <li>一次 Run 里的第几个模型请求出了问题？</li>
 </ul>
-<p>只更新 README 的例子用 S1 / T7 / R7 分别标识会话、工作和执行，<a href="glossary.html#owner%E6%89%80%E6%9C%89%E8%80%85">所有者（Owner）</a>则标识谁负责决定状态变化。完整 <code>formatDuration</code> 修复的工具步骤更多，但区分身份的方法相同。</p>
+<p>只更新 README 的例子用 S1 / T7 / R7 分别标识会话、工作和执行，<a href="glossary.html#%E8%B4%9F%E8%B4%A3%E8%80%85owner">所有者（Owner）</a>则标识谁负责决定状态变化。完整 <code>formatDuration</code> 修复的工具步骤更多，但区分身份的方法相同。</p>
 <span class="heading-alias" id="先看结论" aria-hidden="true"></span><h3 id="工作归属顶层意图与具体执行">工作归属、顶层意图与具体执行</h3>
 <p>三个身份分别标识不同时间尺度。先把它们放进同一项 README 任务，后面再看重发请求时哪些身份应该保持：</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 工作归属、顶层意图与具体执行"><table><caption>表 1 / Table 1 · 工作归属、顶层意图与具体执行</caption><thead><tr><th scope="col">身份</th><th scope="col">回答的问题</th><th scope="col">本例中的对象</th></tr></thead><tbody><tr><td>Session（会话）S1</td><td>这些前后相关的工作归到哪里？</td><td>同一项目的长期会话，还可容纳后来的新任务</td></tr>
@@ -88,7 +88,7 @@
 <p>同一 Session 中的多项工作可以表示为：</p>
 <figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="三种身份怎样嵌套：可滚动示意图"><a href="../../../assets/diagrams/13-session-turn-run-1.svg"><img src="../../../assets/diagrams/13-session-turn-run-1.svg" alt="外框表示身份归属：长期 Session S1 包含以前 T6、当前 T7 与将来 T8；本例 T7 的 Run R7 包含模型步骤、工具调用及执行记录和终态。归属关系不代表所有恢复路径的固定数量，也不替代 Owner 的裁决责任。" width="859" height="1080" loading="lazy" style="width:859px;min-width:731px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>外框表示归属，内部卡片列出执行内容与记录，并不把存储记录当成下一执行步骤。图帮助区分长期归属、用户工作与具体执行，不是对所有恢复路径的数量关系作承诺；Owner（负责者）另行说明谁有权决定这些状态。</p>
 <h3 id="owner谁有资格拍板">Owner：谁有资格拍板</h3>
-<p><a href="glossary.html#owner%E6%89%80%E6%9C%89%E8%80%85">所有者（Owner）</a>不是“代码文件归谁维护”，而是某种状态或决定的权威负责者。</p>
+<p><a href="glossary.html#%E8%B4%9F%E8%B4%A3%E8%80%85owner">所有者（Owner）</a>不是“代码文件归谁维护”，而是某种状态或决定的权威负责者。</p>
 <p>最简单的判断题是：</p>
 <blockquote><p>当不同部件意见不一致时，谁的记录或决定算数？</p>
 </blockquote>
