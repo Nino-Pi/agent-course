@@ -26,13 +26,13 @@
 <p>对本题的普通文件/Bash 方案，范围不足先形成明确结果；只有任务确实需要该能力、且政策和入口允许申请时，模型才提出目的、对象和所需范围。显式 deny 应按拒绝处理，不能靠普通扩边请求绕过。Host 将用户决定与当前 revision 原子核对并保存，后续调用再读取新边界。批准不会把上一条失败变成成功，也不会自动改变已经运行的进程。</p>
 <p>权限收紧后，系统要定义如何处理排队任务与正在运行的工作：后续 admission 使用新边界；运行中任务可能需要停止、重建执行环境或依能力重新检查。一次 live read 不能自动撤销已经发生的访问。revision 变化不能让所有远端效果立即消失。</p>
 <span class="heading-alias" id="4-写接口结果未知是正式状态" aria-hidden="true"></span><h2 id="4-接口结果未知是正式状态">4. 接口：结果未知是正式状态</h2>
-<p>以下为教学伪代码。<code>executeAndClassify</code> 必须根据执行者证据分类；不能把任意异常都转换成“未执行”。持久边界失败需要停止当前循环，不当作普通工具错误继续交给模型。</p>
+<p>以下为教学伪代码。先定义执行结果的三种状态：成功、效果已知的失败、效果未知。失败中的 <code>partial_known</code> 要保留已知的部分效果；不能把任意异常都转换成“未执行”。<code>result: unknown</code> 中的 <code>unknown</code> 是 TypeScript 类型，表示这里没有限定结果值的结构；<code>status: &quot;unknown&quot;</code> 则是业务标签，表示无法确认效果，两处含义不同。</p>
 <pre><code class="language-ts">type Outcome =
   | { status: &quot;succeeded&quot;; result: unknown; receipt?: string }
   | { status: &quot;failed&quot;; code: string; effect: &quot;none&quot; | &quot;partial_known&quot; }
-  | { status: &quot;unknown&quot;; reason: string; operationId: string }
-
-async function dispatch(call, runtime) {
+  | { status: &quot;unknown&quot;; reason: string; operationId: string }</code></pre>
+<p>接着沿一次 <code>dispatch</code> 看这些状态怎样进入账本。输入是工具调用和 Runtime；准备成功后才读取当前边界并执行，<code>executeAndClassify</code> 必须根据执行者证据形成上面的结果，随后保存 T2，最后生成模型观察。读代码时注意两个 <code>await</code> 的位置：<code>prepare</code> 之前不能调用实现，<code>acceptOutcome</code> 之前不能交付结果。持久边界失败需要停止当前循环，不当作普通工具错误继续交给模型。</p>
+<pre><code class="language-ts">async function dispatch(call, runtime) {
   const refusal = runtime.validateBeforeDispatch(call)
   if (refusal) {
     await runtime.storeSyntheticPair(call, refusal) // 没有 T1 dispatch

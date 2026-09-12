@@ -65,9 +65,9 @@ type StepSurface = {
 }
 
 type State = &quot;pending&quot; | &quot;running&quot; | &quot;succeeded&quot; |
-  &quot;failed&quot; | &quot;unknown&quot; | &quot;blocked&quot;
-
-async function runReadyBatch(plan, states, step, runtime) {
+  &quot;failed&quot; | &quot;unknown&quot; | &quot;blocked&quot;</code></pre>
+<p><code>Task</code> 描述一个已形成具体参数的动作，<code>states</code> 另行保存每个动作当前走到哪里。<code>dependsOn</code> 回答“必须先拿到谁的成功结果”，<code>resources</code> 回答“本动作可能读写哪些资源”；前者不能代替后者。下面一轮依次做三件事：选出依赖已满足且工具仍可用的候选，在资源与数量限制内选一批，再逐项保存执行结果。</p>
+<pre><code class="language-ts">async function runReadyBatch(plan, states, step, runtime) {
   validatePlan(plan)
   const candidates = plan.filter(t =&gt;
     states[t.id] === &quot;pending&quot; &amp;&amp;
@@ -83,6 +83,12 @@ async function runReadyBatch(plan, states, step, runtime) {
   blockDescendantsOfFailedOrUnknown(plan, states)
   return settled // 逐项保留结果，不压成单一 batch success
 }</code></pre>
+<p>把它放回上一节的修复图。假定文件和失败断言已经读完，模型已经形成两个具体编辑：<code>edit_readme</code> 修改文档，<code>edit_function</code> 修改实现；两者的观察版本均有效，工具也在当前快照内。下面只摘取两个编辑与测试三个节点：测试需等待两项修改成功，图中的 diff 核对也有这两个前置，最终验收还要等待两条检查链。局部状态变化如下：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 6. 最小批次调度骨架"><table><caption>表 2 / Table 2 · 6. 最小批次调度骨架</caption><thead><tr><th scope="col">节点</th><th scope="col">调度前</th><th scope="col">本轮筛选与结果</th></tr></thead><tbody><tr><td><code>edit_readme</code></td><td>pending；前置观察已完成</td><td>成为候选；若资源策略允许，与另一个编辑同批启动</td></tr>
+<tr><td><code>edit_function</code></td><td>pending；前置观察已完成</td><td>成为候选；可信资源信息不足时由选择器拆成不同批</td></tr>
+<tr><td><code>test</code></td><td>pending；依赖两个编辑成功</td><td>本轮不入选；即使某个编辑先完成，也不提前运行</td></tr></tbody></table></div>
+<p>若本轮 README 编辑成功、函数编辑明确失败，循环逐项写回 <code>succeeded</code> 和 <code>failed</code>，再把依赖两者的测试标为 <code>blocked</code>。成功的 README 编辑不会因为同批有失败就被重做。下一步要重新读取和判断函数问题，再形成后续动作；这个函数没有替模型完成重新规划。</p>
+<p><code>validatePlan</code>、资源选择和阻塞传播都只给出了职责，未在这里实现。候选为空也不等于任务完成：可能仍有前置在运行，或工具不在当前快照内。调用者必须根据这些状态决定等待、刷新下一步工具面或重新规划。此处用于读懂调度条件，不能直接当作可运行的完整调度器。</p>
 <p><code>executeAndSettleBatch</code> 必须等待已启动调用的可完成结算；如果一个调用出现持久化边界错误，不能把其余结果丢掉，或把异常普通化后继续下一轮。这个抽象的效果与取消语义需要实际实现和测试。</p>
 <p><a href="16-tools-and-execution.html#%E5%90%8C%E4%B8%80%E6%AD%A5%E7%8B%AC%E5%8D%A0%E4%B8%8E%E5%B5%8C%E5%A5%97%E8%AE%B8%E5%8F%AF%E6%98%AF%E4%B8%A4%E4%B8%AA%E7%BB%B4%E5%BA%A6">第16章</a>已说明 Maka 的两类准入：<code>exclusive_step</code> 限制同一 assistant step 的外层调用共存，<code>direct_only</code> 限制代码组合里的嵌套入口。资源锁则协调实际资源冲突，本文 DAG 还负责表达行动依赖。这些职责不能互相代替：外层 <code>exec</code> 可以独占该步，其获准子调用仍能并发；已有准入声明也不能证明普通批次会自动推断本题的完整 DAG。</p>
 <h2 id="7-正常走读搜索与并行都要等待相应观察">7. 正常走读：搜索与并行都要等待相应观察</h2>
@@ -106,7 +112,7 @@ async function runReadyBatch(plan, states, step, runtime) {
 <p><strong>追问五：搜索到的第三方工具自称 readOnly，可以直接并行吗？</strong></p>
 <p>不能只相信非受信描述。Host 需绑定可信执行事实和保守权限上限；无法核实的操作按较强效果处理。协议的发现字段不自动证明实现行为，也不赋予业务授权。</p>
 <h2 id="10-取舍与验证">10. 取舍与验证</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 10. 取舍与验证"><table><caption>表 2 / Table 2 · 10. 取舍与验证</caption><thead><tr><th scope="col">方案</th><th scope="col">更适合</th><th scope="col">新增成本或失败</th><th scope="col">应固定条件比较的指标</th></tr></thead><tbody><tr><td>少量声明全量提供（Schema）</td><td>工具少、名字区别明确</td><td>工具增长后的成本和选择噪声</td><td>schema 字节、错误工具率、完成率</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 10. 取舍与验证"><table><caption>表 3 / Table 3 · 10. 取舍与验证</caption><thead><tr><th scope="col">方案</th><th scope="col">更适合</th><th scope="col">新增成本或失败</th><th scope="col">应固定条件比较的指标</th></tr></thead><tbody><tr><td>少量声明全量提供（Schema）</td><td>工具少、名字区别明确</td><td>工具增长后的成本和选择噪声</td><td>schema 字节、错误工具率、完成率</td></tr>
 <tr><td>高频直接与低频检索（Discovery）</td><td>大目录且任务只用少数能力</td><td>检索遗漏、多一步延迟、激活竞态</td><td>必需工具召回、额外步数、任务成功率</td></tr>
 <tr><td>普通逐步工具循环（Tool Loop）</td><td>决策依赖新观察</td><td>机械工作可能轮次多</td><td>诊断准确率、证据完整、延迟</td></tr>
 <tr><td>受控代码组合（Code Mode）</td><td>大量已知格式的机械调用与筛选</td><td>组合代码错误、部分成功和输出丢失</td><td>相同证据下的成本、取消与子效果</td></tr></tbody></table></div>

@@ -5,8 +5,13 @@
 <p><strong>关键概念</strong>：Seatbelt：本章 macOS 进程限制后端；文件执行子进程：承接受控文件操作；T0 身份：排队前接受的文件对象；fd（文件描述符）：已打开对象的句柄；未知效果：写入可能发生但回执不完整；规则组合：多条允许与拒绝的共同结果。</p>
 <p><strong>关系主线</strong>：沿已有探针核对策略、进程访问和文件字节，区分启动前拒绝、真实写入与回复丢失，并用允许项重叠的反例说明组合边界。</p>
 </blockquote>
-<p>前置：<a href="17-permissions-and-sandbox.html">第17章权限与隔离</a>、<a href="18-effects-and-recovery.html">第18章未知效果</a>。本章已有执行记录不含模型参与，具体环境与范围在下文说明。</p>
+<p>前置：<a href="17-permissions-and-sandbox.html">第17章权限与隔离</a>、<a href="18-effects-and-recovery.html">第18章未知效果</a>。沿用两章的区别：权限规则表达允许范围，执行边界实际限制访问，结果记录说明调用方知道了什么。本章用已有文件与本地网络探针逐层检查这三件事，已有执行记录不含模型参与。</p>
 <span class="heading-alias" id="1-准备与范围" aria-hidden="true"></span><h2 id="1-已有记录的环境与范围">1. 已有记录的环境与范围</h2>
+<p>先把一次“读取指定文件”的请求放到三个位置。它们可能给出不同答案，因而不能只看最后的退出码：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 已有记录的环境与范围"><table><caption>表 1 / Table 1 · 1. 已有记录的环境与范围</caption><thead><tr><th scope="col">位置</th><th scope="col">负责回答什么</th><th scope="col">本章怎样观察</th></tr></thead><tbody><tr><td>应用内的权限判断</td><td>这条请求按当前规则是否获准？</td><td>Core 的 <code>canReadPath</code> 判断或 worker 启动前的拒绝</td></tr>
+<tr><td>受限子进程</td><td>进程实际能访问哪些文件和网络？</td><td>将规则交给 Seatbelt 后，读取固定字节或访问本地服务</td></tr>
+<tr><td>资源与回执</td><td>效果是否发生，调用方是否收到完整结果？</td><td>同时检查文件内容、worker 回复与上层错误</td></tr></tbody></table></div>
+<p>Seatbelt 是这里使用的 macOS 进程限制机制。文件 worker 是负责实际文件操作的子进程；它由宿主启动，因此“请求被应用拒绝”和“已启动的进程被 OS 拒绝”发生在不同位置。第 3 节先用允许访问的样本确认探针能运行，再改变规则；第 4 节保留真实写入，只改变回复是否送达。</p>
 <p>下面是 macOS Seatbelt 与文件 worker 的已有本地案例，使用与所说明实现匹配的编译产物，不含模型或 Desktop。结果只覆盖这些场景，不能直接推广到其他平台或后续实现。</p>
 <p>本机进程由 Maka 生成的 Seatbelt 限制。外层执行环境若先阻止进程启动、测试目录访问或本机回环网络（loopback）连接，尚未到达被测策略；它与应用边界拒绝、OS 拒绝、写入后回复丢失是不同失败位置。改变限制后的结果不能替代原场景。</p>
 <p>文件样本均为案例自有数据，不读取个人凭据，也不访问外网。第 3 节的网络探针使用活跃的 loopback HTTP 服务，以允许访问的正对照确认目标和连接本身可用；它补足第 2 节原有网络 smoke 的限制。</p>
@@ -15,23 +20,25 @@
 <p>这些断言也有层次：worker的outside path可以在client的profile检查时被拒绝，未必已经由OS拒绝；Seatbelt直接shell写入的outside拒绝则确实来自受限子进程。一个用例标题不能代替拒绝位置。</p>
 <p>官方网络smoke连接loopback的9端口并只检查非零退出。端口没有服务也会失败，所以单独看这条断言，不足以证明是network policy拦截。下一节的已有记录使用活跃服务提供正对照。</p>
 <h2 id="3-活跃网络对照与一个规则组合反例">3. 活跃网络对照与一个规则组合反例</h2>
-<p>网络与文件探针直接调用 <code>SandboxManager.transform</code> 与 <code>MacosSeatbeltBackend</code>，保存实际 argv 和 SBPL。它先创建自有文件，再启动本地 HTTP 服务，按下表测试。表中的 runtime-readable roots 是为执行依赖额外开放的可读根目录，grant 表示授予的访问范围。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 3. 活跃网络对照与一个规则组合反例"><table><caption>表 1 / Table 1 · 3. 活跃网络对照与一个规则组合反例</caption><thead><tr><th scope="col">改变的条件</th><th scope="col">观察示例（Observation）</th><th scope="col">怎样解释</th></tr></thead><tbody><tr><td>允许读取fixture</td><td>能读到固定测试字符串</td><td>程序可启动，目标确实存在且可读</td></tr>
+<p>网络与文件探针直接调用 <code>SandboxManager.transform</code> 与 <code>MacosSeatbeltBackend</code>，保存实际 argv（启动程序的参数）和 SBPL（交给 Seatbelt 的策略文本）。它先创建自有文件，再启动本地 HTTP 服务，按下表测试。表中的 runtime-readable roots 是为执行依赖额外开放的可读根目录，grant 表示授予的访问范围。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 3. 活跃网络对照与一个规则组合反例"><table><caption>表 2 / Table 2 · 3. 活跃网络对照与一个规则组合反例</caption><thead><tr><th scope="col">改变的条件</th><th scope="col">观察示例（Observation）</th><th scope="col">怎样解释</th></tr></thead><tbody><tr><td>允许读取fixture</td><td>能读到固定测试字符串</td><td>程序可启动，目标确实存在且可读</td></tr>
 <tr><td>对同一fixture增加exact deny</td><td>受限进程读失败</td><td>普通动态路径grant中的deny排除确实生效</td></tr>
 <tr><td>同时把该目录加入可信runtime-readable roots</td><td>Core <code>canReadPath=false</code>，OS却读成功</td><td>当前额外runtime grant没有完整继承profile deny</td></tr>
 <tr><td>同一活跃loopback服务，network enabled</td><td>返回指定正文，服务计数为1</td><td>连接路径和server确实可用</td></tr>
 <tr><td>同一服务，network restricted</td><td>调用失败，服务计数仍为1</td><td>失败不是“端口无人监听”；HTTP 服务处理器未收到这次受限请求</td></tr></tbody></table></div>
 <p>第三行暴露了规则组合缺口：<code>buildReadableRootsPolicy()</code> 的dynamic allow排除了deny，<code>buildRuntimeRootsPolicy()</code> 却另建独立allow；后者覆盖同一路径时出现组合缺口。脚本将<code>osReadSucceeded</code>的实际值写进JSON，不能把“脚本退出0”理解为deny保证已通过。</p>
+<p>可以把该组合按同一个样本文件读一遍：普通动态规则说“允许这个目录，但排除该文件”，额外的运行依赖规则又说“允许这个目录”，第二条没有带上同一排除条件。在这个已测组合里，文件便仍处于 OS 的允许范围。Core 的单次判断返回 false，只说明应用规则拒绝它，不能替另一份最终策略作保证。这也解释了为何需要同时记录应用判断与实际读取结果。</p>
 <p>这个探针向**可信宿主提供的路径上下文 <code>pathContext</code>**手工加入一个自有 helper 目录。它证明编译器对这种输入组合的限制，没有证明模型能修改实际产品的 pathContext，也没有利用带类型的 worker 操作执行任意读取。worker 启动依赖为何需要额外 grant、应用检查怎样限制操作，必须继续沿实现核对。其他基础 allow/deny 交集需逐项检查，不能从这个组合推到所有路径。</p>
 <h2 id="4-把文件写入追到真实worker和响应">4. 把文件写入追到真实worker和响应</h2>
 <p>这张图先定位本节已有“写后丢回复”探针的窗口：真实 worker 已写入并返回成功，包装器丢弃回复后，上层收到未知效果错误；它不表示执行了 OS 强杀或完整 T1/T2。</p>
 <figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="把文件写入追到真实worker和响应：可滚动示意图"><a href="../../../assets/diagrams/35-sandbox-enforcement-1.svg"><img src="../../../assets/diagrams/35-sandbox-enforcement-1.svg" alt="文件执行器交给真实 worker，文件写入和成功回复已发生；测试包装器随后丢弃回复，使调用方收到 ToolOutcomeUnknownError，文件效果并未回滚。" width="720" height="1062" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>调用失败并不意味着文件未变。下面的探针使用真实 <code>createBoundaryFilesystemExecutor</code>、<code>FilesystemWorkerClient</code>、默认 SandboxManager、launch-spec、process-runner 和编译出的 worker，保存请求、实际 argv 及 worker 结果。文件操作由真实子进程完成，表中另行标明人为改变时序的位置。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 4. 把文件写入追到真实worker和响应"><table><caption>表 2 / Table 2 · 4. 把文件写入追到真实worker和响应</caption><thead><tr><th scope="col">时序（Timeline）</th><th scope="col">观察示例（Observation）</th><th scope="col">文件变化（File effect）</th></tr></thead><tbody><tr><td>目标原本不存在，executor捕获missing并启动worker</td><td>创建成功</td><td>文件内容为第一份fixture文本，wire identity为<code>missing</code></td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 4. 把文件写入追到真实worker和响应"><table><caption>表 3 / Table 3 · 4. 把文件写入追到真实worker和响应</caption><thead><tr><th scope="col">时序（Timeline）</th><th scope="col">观察示例（Observation）</th><th scope="col">文件变化（File effect）</th></tr></thead><tbody><tr><td>目标原本不存在，executor捕获missing并启动worker</td><td>创建成功</td><td>文件内容为第一份fixture文本，wire identity为<code>missing</code></td></tr>
 <tr><td>目标位于当前profile之外</td><td><code>sandbox_boundary_required</code>，worker launch数不增加</td><td>没有进行这次文件写入</td></tr>
 <tr><td>executor已捕获inode A，脚本在启动worker前把名字换成inode B</td><td><code>path_changed</code></td><td>B保留替换文本，移走的A仍保留旧文本，两者都没被本次写入覆盖</td></tr>
 <tr><td>真实worker完成写入并返回成功，脚本此时丢弃回复</td><td><code>ToolOutcomeUnknownError</code></td><td>文件已是新文本，调用失败没有回滚该effect</td></tr></tbody></table></div>
 <p>共3次真实worker launch；第二行在launch前拒绝，不能算第四次受限进程运行。替换操作是确定性的测试时点；丢响应是脚本包装<code>runProcess</code>后注入的异常，底层真实worker已成功。这<strong>不是OS强杀、断电或Host crash实验</strong>，也没有运行完整ToolRuntime T1/T2或approval UI。</p>
 <p><strong>文件身份与失败分类的实现解释</strong></p>
+<p>先区分路径、对象和内容：路径是用来寻找文件的名字；inode 是文件系统中的对象编号，通常与设备编号 dev 一起识别对象；内容是该对象当前保存的字节。把名字从对象 A 改为指向对象 B，与在对象 A 内改写字节，是两种不同变化。这里的 T0 捕获前一种身份，不能据此判断后一种内容版本是否仍和上次 Read 相同。</p>
 <p><code>filesystem-executor.ts</code> 在等写锁前捕获 T0，是为了固定排队前接受的文件对象。等锁后才取身份，会把等待期间换来的对象当成原目标。</p>
 <p><code>filesystem-worker/client.ts</code> 要求写操作显式提供 identity。<code>missing</code> 要求原目标不存在，并以独占创建防止覆盖新出现的文件；<code>unchecked</code> 则明确放弃这项身份比较。</p>
 <p><code>file-stable-write.ts::openStableTarget</code> 先不截断地 open，再对同一 fd 执行 fstat 比较，最后写入，从而避免“尚未确认是原文件就先清空它”。这些检查约束对象身份，不保证同一 inode 内的字节从未被其他进程修改。</p>

@@ -1,0 +1,7 @@
+/* Formula panels scroll independently; surrounding prose keeps its readable width. */
+.course-math-block{max-width:100%;overflow-x:auto;overflow-y:hidden;margin:1.4rem 0;padding:1rem .8rem;background:#faf9f7;border-left:3px solid #c9b8bc;border-radius:.3rem;-webkit-overflow-scrolling:touch}
+.course-math-block .katex-display{margin:.2rem 0;text-align:left}
+.course-math-block .katex-display>.katex{text-align:left}
+.course-math-inline .katex{font-size:1.05em}
+.course-math-block:focus-visible{outline:2px solid #e9103d;outline-offset:3px}
+@media(max-width:640px){.course-math-block{padding:.85rem .6rem}.course-math-block .katex{font-size:1.06em}}

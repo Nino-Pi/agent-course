@@ -5,29 +5,22 @@
 <p><strong>关键概念</strong>：Hook（钩子）：在事件时点执行扩展处理；权限：约束可采取的动作；压缩：整理当前上下文；Memory（记忆）：保留跨会话背景；Skill（技能说明）：复用方法；子任务：承担有边界的独立工作。</p>
 <p><strong>关系主线</strong>：工具观察推动下一次选择，材料经读取才参与请求，子任务结果仍由父任务验收；公开能力说明不能补出未披露的内部事务，教学扩展也不等于产品默认行为。</p>
 </blockquote>
-<p>前置：<a href="16-tools-and-execution.html">第16章 工具</a>、<a href="19-context-compaction.html">第19章 压缩</a>、<a href="20-memory.html">第20章 Memory</a>、<a href="23-skills-and-subagents.html">第23章 Skills 与子任务</a>。工具、压缩和 Memory 的通用设计分别见 <a href="50-tool-contracts.html">第50章</a>、<a href="54-context-compaction.html">第54章</a>、<a href="55-memory.html">第55章</a>。</p>
+<p>前置：<a href="16-tools-and-execution.html">第16章 工具</a>、<a href="19-context-compaction.html">第19章 压缩</a>、<a href="20-memory.html">第20章 Memory</a>、<a href="23-skills-and-subagents.html">第23章 Skills 与子任务</a>。这些章节已经给出三条关系：工具结果成为下一步的观察，外部材料要经过读取才进入输入，独立子任务的结果还需主任务核对。本章用一次Claude Code修复案例，把三条关系放回同一项工作，看它们分别在什么时候有用。</p>
 <p>以下以 Claude Code 公开产品行为为实例；未公开的内部事务和调度机制不作实现断言，扩展方案另标为教学设计。</p>
-<p>相关机制章节：</p>
-<ol>
-<li><a href="30-claude-code-loop-and-context.html">循环与上下文</a>：逐步代码修复、请求预算、压缩后的输入重建、会话连续性。</li>
-<li><a href="33-claude-code-tools-and-safety.html">工具与安全</a>：工具发现、Hooks 前后时序、权限冲突、Bash 与远端 MCP 边界。</li>
-<li><a href="42-claude-code-memory-and-skills.html">Memory 与 Skills</a>：四种保存对象、范围与冲突、写读应用闭环、方法装载与临时权限。</li>
-<li><a href="43-claude-code-subagents-and-recovery.html">子任务与恢复</a>：brief/fork、工作区隔离、父任务验收、取消、checkpoint 与未知效果。</li>
-</ol>
 <span class="heading-alias" id="1-面试原题与需要确认的约束" aria-hidden="true"></span><h2 id="1-设计问题与适用条件">1. 设计问题与适用条件</h2>
 <blockquote><p>Claude Code 完成代码修复时，长对话、跨会话记忆与子 Agent 分别怎么参与？类似系统可以采用哪些责任划分？</p>
 </blockquote>
-<p>以下限定为一次本地代码修复，并明确任务授权、网络需求、委派条件与产品资料边界：</p>
+<p>沿用<a href="04-code-repair.html">第04章的四文件任务</a>：<code>package.json</code>定义命令，README说明怎样运行，测试规定非负整数秒应格式化为<code>m:ss</code>，<code>src/duration.js</code>负责计算。以下是使用这些需求与故障的教学推演，没有启动Claude Code。先固定正常修复所需的条件：</p>
 <ul>
-<li>用户授权修 README 和目标函数，要求运行相关测试、给出 diff，并用中文说明结果。</li>
+<li>用户授权修<code>README.md</code>和<code>src/duration.js</code>中的目标函数，要求运行相关测试、给出diff，并用中文说明结果；测试和项目配置只读。</li>
 <li>当前工作区可能有用户改动，因此新观察不能被旧记忆替代。</li>
-<li>产品行为以官方公开资料为限；未公开的内部机制保留未知，教学参考设计另行标明。</li>
 <li>先用一个主 Agent 闭环；只有出现独立且费上下文的任务才考虑委派。</li>
 </ul>
 <p>这些是题设，不是 Claude Code 默认权限或默认调度策略。</p>
 <span class="heading-alias" id="2-两分钟主答" aria-hidden="true"></span><h2 id="2-参考方案">2. 参考方案</h2>
 <p>一次修复从反馈环推进。Claude 模型根据当前材料决定下一步，Claude Code 提供读文件、搜索、编辑和命令等能力，把真实结果再交回模型。读到失败断言后，下一步可能改变定位或修改方案；最终要用测试与 diff 支撑完成判断。该过程依据公开产品行为，不能推出未公开的全部内部源码接线。</p>
 <p>当前上下文与跨会话背景是两类状态。长对话需要整理输入；项目指令、长期记录、当前错误日志承担不同责任。<code>CLAUDE.md</code> 与 auto memory 也要分开解释。参考设计要求当前约束、未完成状态与证据入口仍可核对，而不会把“摘要生成成功”当成任务完成。</p>
+<p>例如同一条“125秒应为2:05、实际为2:25”的观察，在反馈环里提示继续定位，在上下文整理里应保留为未解决证据，委派调查时又可能成为子任务需要的背景。材料会跨越几种机制，含义不能在转交时悄悄改变；第7节把这项修复从头走到交付。</p>
 <p>扩展与控制承担另一组责任。Skill 适合复用步骤，子 Agent 适合有边界的独立工作；委派前应明确它拿到什么背景、能改什么文件、交回什么证据。权限决策和执行隔离分开讨论。内部事务与远端效果恢复没有完整公开接线时，保留未知；下文提出的 operation identity、对账和失败保留属于教学设计，不能把 Maka 的实现名词移植成 Claude Code 事实。</p>
 <p>行动循环、材料连续性、分工与控制分别由以下三张图展开。</p>
 <span class="heading-alias" id="3-第一张白板产品能力怎样组成反馈环" aria-hidden="true"></span><h2 id="3-产品能力怎样组成反馈环">3. 产品能力怎样组成反馈环</h2>
@@ -50,7 +43,7 @@ next: 核对余秒计算，修改后复测并检查 diff</code></pre>
 <p>当前官方区分 non-fork 子 Agent 与继承父对话的 conversation fork；Skill 的 <code>context: fork</code> 又不能直接按后者理解。fork 的可用性取决于运行方式、版本和 fork mode，不能将交互模式选项当成所有入口默认能力。</p>
 <figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Skill 与子任务怎样参与主任务：可滚动示意图"><a href="../../../assets/diagrams/61-claude-code-3.svg"><img src="../../../assets/diagrams/61-claude-code-3.svg" alt="主任务可复用 Skill，并先判断是否值得委派；委派后按自足说明或可用的对话分叉提供背景，结果汇回主任务核对。文件工作区隔离或只读范围另行选择，不由独立上下文自动保证。" width="856" height="1562" loading="lazy" style="width:856px;min-width:728px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中先决定是否值得独立委派：不委派就由主任务继续处理；决定委派后，再选择自足说明或可用的对话分叉来提供背景。这是本课设计判断，不是声称模型固定执行这棵决策树。文件隔离使用虚线，因为独立上下文不自动创建独立文件系统。</p>
 <p>两个子上下文的结果都汇入主任务核对点；工作区边界另行标注，因为独立上下文仍可能修改同一份文件。</p>
-<p>本题只把“核对 README 中的命令”委派成只读子任务，主任务保留函数修改权。子任务输出应含文件位置、当前内容与结论依据，不必交回所有搜索噪声。</p>
+<p>为了看清交接，本题单独展示“核对README中的命令”这个只读子任务，主任务保留函数修改权。四文件规模下由主任务直接读取也合理；这个拆分用于说明背景与结果怎样交接，不预设委派能加速。子任务输出应含文件位置、当前内容与结论依据，不必交回所有搜索噪声。</p>
 <span class="heading-alias" id="6-写一份概念接口先把交接责任讲清楚" aria-hidden="true"></span><h2 id="6-委派接口与交接责任">6. 委派接口与交接责任</h2>
 <p>下面是<strong>自拟 TypeScript 教学类型，不是 Claude Code API，也不是可直接使用的 subagent 配置</strong>。它只约束本题想传递和验收的内容，未执行。</p>
 <pre><code class="language-ts">type DelegatedTask = {
@@ -70,10 +63,15 @@ type DelegatedResult = {
   remaining: string[];
 };</code></pre>
 <p><code>contextMode</code> 固定输入来源；<code>writeScope</code> 使并行文件责任可检查；<code>checks</code> 让“任务返回了”与“测试通过了”成为不同状态。</p>
+<p>将这些字段填回同一个只读调查，关键内容如下。它们是上面类型的具体值，仍是教学交接约定：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 6. 委派接口与交接责任"><table><caption>表 1 / Table 1 · 6. 委派接口与交接责任</caption><thead><tr><th scope="col">字段或结果</th><th scope="col">本题传递的内容</th><th scope="col">主任务据此核对什么</th></tr></thead><tbody><tr><td>objective、relevantFacts</td><td>核对README命令与项目scripts是否一致；当前修复同时要求文档入口正确</td><td>子任务只判断入口，不接管函数修复</td></tr>
+<tr><td>contextMode、readScope、writeScope</td><td>brief；读取<code>README.md</code>和<code>package.json</code>；可写集合为空</td><td>输入自足，工作范围可检查</td></tr>
+<tr><td>findings</td><td>README写<code>npm run check</code>；配置只有<code>test: node --test</code>，没有check，并附字段位置</td><td>结论能否由实际返回的两份内容支持</td></tr>
+<tr><td>changedFiles、checks、remaining</td><td>无修改；文件内容核对完成，执行测试为not-run；README待主任务更新</td><td>只读调查完成不等于整个修复已经通过测试</td></tr></tbody></table></div>
 <p>这个类型没有实现 enforcement。若要做生产系统，还需把工具执行能力绑定到 scope、决定取消和部分完成语义，并验证返回内容。不能仅凭类型字段宣称隔离已经成立。</p>
 <h2 id="7-具体走读一次修复中逐步增加证据">7. 具体走读：一次修复中逐步增加证据</h2>
 <p>以下是纸面推演，使用课程 fixture 的需求和故障，不是 Claude Code 真实轨迹。题设初态为 README 指向缺失脚本、实现用 <code>% 100</code> 计算余秒。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 7. 具体走读：一次修复中逐步增加证据"><table><caption>表 1 / Table 1 · 7. 具体走读：一次修复中逐步增加证据</caption><thead><tr><th scope="col">步骤</th><th scope="col">输入与观察（Input · Observation）</th><th scope="col">现在能得出的结论</th><th scope="col">下一步</th></tr></thead><tbody><tr><td>1</td><td>用户要求修入口和函数</td><td>两项修改在题设授权内</td><td>核对文件与用户已有改动</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 7. 具体走读：一次修复中逐步增加证据"><table><caption>表 2 / Table 2 · 7. 具体走读：一次修复中逐步增加证据</caption><thead><tr><th scope="col">步骤</th><th scope="col">输入与观察（Input · Observation）</th><th scope="col">现在能得出的结论</th><th scope="col">下一步</th></tr></thead><tbody><tr><td>1</td><td>用户要求修入口和函数</td><td>两项修改在题设授权内</td><td>核对文件与用户已有改动</td></tr>
 <tr><td>2</td><td>package 定义 <code>test: node --test</code></td><td>测试入口可确定</td><td>更新 README 的错误命令</td></tr>
 <tr><td>3</td><td>125 秒输出 <code>2:25</code>，期望 <code>2:05</code></td><td>至少有功能断言失败</td><td>读实现并排除分钟、补零等候选</td></tr>
 <tr><td>4</td><td>已读代码的余秒为 <code>% 100</code></td><td>当前观察支持修改周期</td><td>根据非负整数秒契约改为 <code>% 60</code></td></tr>
@@ -96,7 +94,7 @@ type DelegatedResult = {
 <p>API 支持什么与 Claude Code 默认调用什么是两种证据。公开产品资料不足以给出全部默认请求接线；默认请求形式、feature 与 provider 选路仍需具体配置或请求证据。可以比较机制，不能补写调用链。</p>
 <h2 id="9-取舍与验证怎样把方案变成可反驳的判断">9. 取舍与验证：怎样把方案变成可反驳的判断</h2>
 <p>下表是教学评估设计，不是 Claude Code 性能报告。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 9. 取舍与验证：怎样把方案变成可反驳的判断"><table><caption>表 2 / Table 2 · 9. 取舍与验证：怎样把方案变成可反驳的判断</caption><thead><tr><th scope="col">选择</th><th scope="col">在什么约束下值得试</th><th scope="col">主要代价</th><th scope="col">如何比较</th></tr></thead><tbody><tr><td>主任务直接查代码 / 只读子任务查代码</td><td>后者适合独立、输出量大的调查</td><td>委派遗漏背景、额外推理和整合</td><td>同任务比较定位正确率、总调用与整合错误</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 9. 取舍与验证：怎样把方案变成可反驳的判断"><table><caption>表 3 / Table 3 · 9. 取舍与验证：怎样把方案变成可反驳的判断</caption><thead><tr><th scope="col">选择</th><th scope="col">在什么约束下值得试</th><th scope="col">主要代价</th><th scope="col">如何比较</th></tr></thead><tbody><tr><td>主任务直接查代码 / 只读子任务查代码</td><td>后者适合独立、输出量大的调查</td><td>委派遗漏背景、额外推理和整合</td><td>同任务比较定位正确率、总调用与整合错误</td></tr>
 <tr><td>常驻短背景 / 目录加按需条目</td><td>条目多且多数不相关时考虑后者</td><td>漏读和额外往返</td><td>新会话是否选中正确例外、是否误用旧偏好</td></tr>
 <tr><td>自足说明／复制对话（Brief / Fork）</td><td>相关背景能否清晰提炼决定选择</td><td>brief 丢条件；复制携带噪声</td><td>注入一条关键约束，检查结果是否保留</td></tr>
 <tr><td>大日志／定位片段（Logs / Excerpts）</td><td>关键证据可定位时考虑后者</td><td>过滤遗漏与来源失效</td><td>保持同一失败，测能否正确解释并修复</td></tr></tbody></table></div>
@@ -105,11 +103,19 @@ type DelegatedResult = {
 <span class="heading-alias" id="10-评分自测与常见失分点" aria-hidden="true"></span><h2 id="10-十个配置文件的只读核对案例">10. 十个配置文件的只读核对案例</h2>
 <p>将任务改为“核对十个配置文件的部署域名，输出报告，不修改”。本例给定十个文件 <code>deploy/app01.yaml</code> 至 <code>deploy/app10.yaml</code>，规则要求 <code>api.example.test</code>；实际读取显示 app07 为 <code>staging.example.test</code>，其余九个为要求值。这些是教学输入，不是实际仓库扫描结果。</p>
 <p>参考流程是先确认十个路径属于允许范围，按资源与工具并发条件读取，保留每份内容的字段位置；然后比较规则与实际值。发现不一致不触发 Edit，读取动作也不需要对域名发网络请求。若文件由用户并发修改，结论注明对应观察，关键交付前可重新读取发生变化的文件。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 10. 十个配置文件的只读核对案例"><table><caption>表 3 / Table 3 · 10. 十个配置文件的只读核对案例</caption><thead><tr><th scope="col">文件范围（File Scope）</th><th scope="col">读到的部署域名</th><th scope="col">完整参考结论</th></tr></thead><tbody><tr><td>app01–app06、app08–app10</td><td>api.example.test</td><td>9 项与给定规则一致</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 10. 十个配置文件的只读核对案例"><table><caption>表 4 / Table 4 · 10. 十个配置文件的只读核对案例</caption><thead><tr><th scope="col">文件范围（File Scope）</th><th scope="col">读到的部署域名</th><th scope="col">完整参考结论</th></tr></thead><tbody><tr><td>app01–app06、app08–app10</td><td>api.example.test</td><td>9 项与给定规则一致</td></tr>
 <tr><td>app07</td><td>staging.example.test</td><td>1 项不一致；报告路径和对应字段，未修改</td></tr></tbody></table></div>
 <p>交付可以明确写为：“已读取十个给定配置；九项符合要求，app07 的部署域名不一致。所有结论来自本次文件观察，未发网络请求，未修改文件；未核对运行中的实际部署。”若某个文件读取失败，则把它列为无法判定，不能计入九项一致或忽略分母。</p>
 <p>该任务可直接用并行只读工具；只有文件调查需要独立多步解释时才委派只读子任务。子任务 brief 固定文件集合、预期域名、禁止修改、返回路径与原值；父任务合并十项结果并检查缺项。由于没有写入需求，Edit、写入批准和 rewind 不进入正常执行链。</p>
 <span class="heading-alias" id="11-按薄弱点回读" aria-hidden="true"></span><h2 id="11-相关机制与完整案例">11. 相关机制与完整案例</h2>
+<p>Claude Code的展开机制可按当前问题回读：</p>
+<ul>
+<li><a href="30-claude-code-loop-and-context.html">循环与上下文</a>：逐步代码修复、请求预算、压缩后的输入重建、会话连续性。</li>
+<li><a href="33-claude-code-tools-and-safety.html">工具与安全</a>：工具发现、Hooks前后时序、权限冲突、Bash与远端MCP边界。</li>
+<li><a href="42-claude-code-memory-and-skills.html">Memory与Skills</a>：四种保存对象、范围与冲突、写读应用闭环、方法装载与临时权限。</li>
+<li><a href="43-claude-code-subagents-and-recovery.html">子任务与恢复</a>：brief/fork、工作区隔离、父任务验收、取消、checkpoint与未知效果。</li>
+</ul>
+<p>通用设计与综合案例：</p>
 <ul>
 <li>工具与执行：<a href="50-tool-contracts.html">第50章</a>、<a href="51-file-and-shell-tools.html">第51章</a>、<a href="52-permissions-and-recovery.html">第52章</a>。</li>
 <li>工作输入与记忆：<a href="53-context-composition.html">第53章</a>、<a href="54-context-compaction.html">第54章</a>、<a href="55-memory.html">第55章</a>。</li>

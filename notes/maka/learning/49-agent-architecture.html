@@ -25,6 +25,7 @@
 <tr><td><code>begin_dispatch_atomically</code></td><td>执行 owner 核对该 Run 的派发凭证、取消状态及当前派发状态；只有本次调用取得唯一启动权时返回 <code>may_run=True</code>。竞争失败或已启动时不能进入下面的循环。</td></tr>
 <tr><td><code>dispatch_or_reconcile</code></td><td>按原 Run 恢复派发或核对已有执行；运行中只观察，任何终态只读取既有结果，派发或效果未知先对账。具体分支见<a href="58-orchestration-and-continuity.html#4-%E6%8E%A7%E5%88%B6%E5%A5%91%E7%BA%A6%E4%B8%8E%E5%85%B7%E4%BD%93%E7%8A%B6%E6%80%81">第58章的控制契约</a>。</td></tr></tbody></table></div>
 <p>这里的派发凭证只限制谁能启动这一份 Run；<code>record</code> 只表示保存机制。二者都不保证外部效果 exactly-once（恰好一次）。</p>
+<p>先读入口。它的输入是用户任务、策略和预算，输出可能是既有结果、订阅或恢复处理；<strong>只有取得唯一派发权的分支才调用下一段执行循环</strong>。因此，第一段最需要检查的是每个重复请求有没有在进入模型前离开：</p>
 <pre><code class="language-python">def run(task, policy, budget):
     request = authorize_and_freeze(task, policy)
     claim = claim_or_observe_atomically(
@@ -42,6 +43,9 @@
     execution = begin_dispatch_atomically(claim.run_id, claim.dispatch_token)
     if not execution.may_run:
         return dispatch_or_reconcile(claim.run_id)
+    return run_claimed_execution(execution, budget)</code></pre>
+<p>再读已取得派发权的执行。<code>execution</code> 带着已接受的 Run 身份和冻结输入，<code>observations</code> 保存本次执行已经知道的结果。循环每请求一次模型就消耗一步额度；有工具时先取得、保存结果，再把它加入下一次输入；没有工具时进入完成证据检查。这段的阅读重点是<strong>观察如何从工具回到下一次模型请求</strong>：</p>
+<pre><code class="language-python">def run_claimed_execution(execution, budget):
     run_id = execution.run_id
     task, policy = execution.accepted_input  # 已冻结任务及本次有效的受限策略
     observations = load_known_observations(run_id)
@@ -59,10 +63,10 @@
                 if cancellation_requested(run_id):
                     return finish(run_id, &quot;cancelled&quot;, observations)
                 result = execute_with_policy(call, policy, cancel_signal(run_id))
-                record(run_id, call.id, result)
+                record(run_id, call.id, result)  # 保存完成后，才进入后续观察
                 observations.append(result)
         else:
-            report = assess_evidence(task.acceptance, observations)
+            report = assess_evidence(task.acceptance, observations)  # 完成候选需验收
             return finish(run_id, report.status, response.text, report)
     return finish(run_id, &quot;budget_exhausted&quot;, observations)</code></pre>
 <p>这段代码只展开模型步数的扣减；实际费用应按返回的 usage 或账单记录，工具时间与整体期限另行检查。请求失败也不能把已发生的尝试和费用抹掉。</p>
@@ -79,10 +83,11 @@
 <p>本题在模型返回后和每次工具接纳前再次检查停止意图，避免等待期间收到取消后仍启动后续调用；执行器也接收取消信号。检查与实际启动间的竞争仍需由执行入口处理。已开始的工具先结算实际结果或未知状态，取消不抹去既有效果。生产实现还须处理 provider/存储异常与终态竞争，这段循环只展开本题的决策骨架。</p>
 <p>无工具返回是本题协议的结束候选。mini 的完成 marker 和其他产品的停止语义不同，不能把该分支当跨产品规则。</p>
 <h2 id="5-用一个任务走完">5. 用一个任务走完</h2>
+<p>下面把两段伪代码放回同一任务，按设计合同作教学推演，不是这份伪代码的实跑日志。仓库中的 <code>formatDuration</code> 应把非负整数秒显示为“分钟:两位余秒”；错误实现用 <code>% 100</code> 算余秒，使 125 秒显示为 <code>2:25</code>，正确余秒应按 <code>% 60</code> 计算。README 另有错误测试入口，需要从配置确认实际命令；本题沿用“只修改指定源码与 README、保留测试作为验证依据”的授权。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 5. 用一个任务走完"><table><caption>表 3 / Table 3 · 5. 用一个任务走完</caption><thead><tr><th scope="col">时点</th><th scope="col">新获得的观察（Observation）</th><th scope="col">可以得出的结论</th></tr></thead><tbody><tr><td>用户提交</td><td>125 秒应显示为 2:05，当前错误</td><td>用户给出目标，尚无定位根因的观察</td></tr>
 <tr><td>读取配置与相关代码</td><td>测试入口、格式化函数与断言</td><td>能选择复现方法</td></tr>
 <tr><td>正确入口运行测试</td><td>实际出现 expected 2:05 / actual 2:25</td><td>问题已复现</td></tr>
-<tr><td>编辑取余逻辑与 README</td><td>工具给出修改报告</td><td>文件发生指定修改</td></tr>
+<tr><td>编辑取余逻辑与 README</td><td>假设工具返回可确认的成功结果，且结果已保存</td><td>可把本次修改结果加入后续观察；仍需复测与核对 diff</td></tr>
 <tr><td>复测并检查 diff</td><td>断言通过，修改范围符合要求</td><td>支持本次受测范围内完成</td></tr></tbody></table></div>
 <p>若只给定四个测试，硬编码四个输入也可能通过。因此验收还要看行为要求和补充边界输入，不能把已有测试数当完整业务定义。</p>
 <p>失败走读：第一次运行不存在的测试脚本，错误发生在测试入口，尚未运行断言。模型应回读配置定位正确入口；把这一步计作“代码测试失败，因此修改函数”会引入无依据修改。</p>

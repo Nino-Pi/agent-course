@@ -16,9 +16,7 @@ await saveToolResult({ ok: true, result })</code></pre>
               进程崩溃
                  ↓
 saveToolResult 从未执行</code></pre>
-<p>故事已经告诉我们效果发生在崩溃前；恢复程序却读不到这份旁白，只看到数据库中没有成功结果。单凭这份记录，它不能区分下面两种执行过程：</p>
-<pre><code class="language-text">情况 A：编辑根本没开始
-情况 B：编辑已经完成，只是结果没保存</code></pre>
+<p>故事已经告诉我们效果发生在崩溃前；恢复程序却读不到这份旁白，只看到数据库中没有成功结果。单凭这份记录，它不能区分两种执行过程：<strong>A，编辑根本没开始；B，编辑已经完成，只是结果没保存。</strong> A 中第一次执行可能仍有必要，B 中同样的调用却可能造成重复效果；账本相同，安全的下一动作未必相同。</p>
 <p>若 Recovery 看到“没有结果”就自动重做：</p>
 <ul>
 <li>对精确替换，第二次可能报“旧文本不存在”；</li>
@@ -39,10 +37,7 @@ UI 显示完成
 Run 形成 terminal fact</code></pre>
 <p>需要跨进程恢复的 Agent，必须说明这些时刻中自己实际保证了哪几个，不能只用一个模糊的“done”代替。</p>
 <span class="heading-alias" id="误区二缺少-success-记录说明工具没执行" aria-hidden="true"></span><h4 id="没有成功记录不等于没有执行">“没有成功记录”不等于“没有执行”</h4>
-<p>记录缺失支持的判断只有：</p>
-<pre><code class="language-text">没有看到已保存的执行结果
-只能说明：当前记录没有证明结果已提交
-不能推出：真实效果没有发生</code></pre>
+<p>记录缺失只说明<strong>当前记录没有证明结果已提交</strong>，不能推出真实效果没有发生。恢复时要把两个问题分开：账本保存了什么，以及文件或外部服务实际变成了什么。</p>
 <p>Recovery 要先确定安全的继续条件，避免为了补一条结果记录而制造第二次不可逆效果。</p>
 <span class="heading-alias" id="误区四t2-保证外部-exactly-once" aria-hidden="true"></span><h3 id="一种具体做法在副作用前后各留下一个持久边界">一种具体做法：在副作用前后各留下一个持久边界</h3>
 <p>为缩小重启后的不确定范围，Maka 在已接入持久存储的普通工具路径中采用“先记准备，再做操作，再记结果”的协议。图中实线表示正常提交顺序，虚线表示故障窗口。一条待查分支尚未确认 T2，另一条已有 T2 却记录了效果未知；两者都不能直接要求工具再执行一次。</p>
@@ -59,10 +54,7 @@ Run 形成 terminal fact</code></pre>
 正确顺序：T1 → effect → T2</code></pre>
 <h4 id="为什么-t2-必须在结果回到模型之前">为什么 T2 必须在结果回到模型之前</h4>
 <p>假设模型先看到了“README 已修改”，于是继续运行测试；随后 Runtime 在持久化编辑结果之前崩溃。重启后，账本只留下测试的后续事实，却没有模型赖以作决定的编辑结果，会破坏可重放性。</p>
-<p>所以应当：</p>
-<pre><code class="language-text">工具结果 → durable T2 → 下一模型 step</code></pre>
-<p>而不是：</p>
-<pre><code class="language-text">工具结果 → 下一模型 step → 有空再落盘</code></pre>
+<p>因此正确的依赖顺序是<strong>工具结果 → durable T2 → 下一模型 step</strong>。若先让模型继续、再找时间落盘，后续动作就可能依赖重启后找不回来的依据。</p>
 <span class="heading-alias" id="误区五所有读操作都可以无脑重试" aria-hidden="true"></span><h4 id="idempotency-不等于随便重试">Idempotency 不等于“随便重试”</h4>
 <p><a href="glossary.html#idempotency%E5%B9%82%E7%AD%89%E6%80%A7">idempotent（幂等）</a> 通常指同一个操作重复执行，最终状态与执行一次相同。例如“把状态设置为 closed”可能幂等；“余额减 10”通常不幂等。</p>
 <p>但仅凭工具名字叫 <code>set_status</code> 还不够。真实系统还要确认：</p>
@@ -298,7 +290,7 @@ never_auto_retry</code></pre>
 <p>这也不保证执行期间任意外部写者都被排除：工具的路径锁只协调参与该锁的调用。更强的设计需要在负责提交的资源层检查观察版本，并定义检查与写入的原子边界。对当前工具，涉及并发变化时应重新读取、保留他人改动并核对后置状态；该增强方案不是默认 Edit 已有的保证。</p>
 <h3 id="真实源码短读为什么要等-t2-提交完">真实源码短读：为什么要等 T2 提交完</h3>
 <p>普通工具产生规范化结果后，必须等待注入的 durable sink 完成结算，才能发布结果。可嵌入 ToolRuntime 不注入 sink 时，不具备这里的持久保证。</p>
-<p><code>ToolRuntime.prepareDurableToolAttempt</code> 返回的 <code>commitOutcome</code> 用 <code>await</code> 等待持久提交：</p>
+<p>下面只截取 <code>ToolRuntime.prepareDurableToolAttempt</code> 返回的 <code>commitOutcome</code> 中一个连续窗口；开头的 <code>try</code> 在原函数后面还有 <code>catch</code>，这里没有展示完整函数，不能独立运行。先看一个关键点：<code>await</code> 等待持久提交完成，才允许调用路径继续发布结果；各字段只是把待保存结果关联回这次操作。</p>
 <pre><code class="language-ts">        try {
           await sink.commitToolOutcome({
             operationId,

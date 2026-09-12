@@ -30,7 +30,7 @@
 </ol>
 <p>图上的不变量：<strong>未通过执行准入的参数不进入效果操作；只有实际接受的结果才能成为后续模型观察。</strong> 持久化失败时如何停止循环，交给 <a href="52-permissions-and-recovery.html">第52章</a>。</p>
 <span class="heading-alias" id="4-写接口哪些给模型哪些由系统提供" aria-hidden="true"></span><h2 id="4-接口模型参数与可信执行上下文">4. 接口：模型参数与可信执行上下文</h2>
-<p>以下 TypeScript 是教学接口。<code>Version</code> 是资源 owner 发放的观察标识；其作用域和有效性必须由该 owner 定义。<code>Schema</code>、<code>Boundary</code> 等是省略底层实现的抽象类型。</p>
+<p>以下 TypeScript 是教学接口，先把输入分成两组。<code>EditArgs</code> 是模型根据 Read 结果提出的编辑意图；<code>ToolContext</code> 是运行时注入的执行身份与边界。其中 <code>observedVersion</code> 用字符串保存资源 owner 发放的观察标识，其作用域和有效性由该 owner 定义；它不是模型可以自行编造并要求生效的版本。</p>
 <pre><code class="language-ts">type EditArgs = {
   path: string
   observedVersion: string
@@ -43,8 +43,10 @@ type ToolContext = {
   callId: string
   boundary: Boundary
   signal: AbortSignal
-}
-
+}</code></pre>
+<p>例如，Read 已返回 <code>README.md</code> 的 <code>v17</code>，正文中有一处 <code>Run npm run check.</code>，而 <code>package.json</code> 的 <code>scripts.test</code> 是 <code>node --test</code>。模型据此提出 <code>oldText</code> 与 <code>newText = &quot;Run npm test.&quot;</code>；当前工作区、调用编号和权限边界仍由运行时填入 <code>ctx</code>。知道文件路径和版本，只足以表达一次修改请求，不能授予该请求写入权限。</p>
+<p>接下来才定义执行返回什么，以及工具怎样把输入和输出接起来：</p>
+<pre><code class="language-ts">
 type Outcome&lt;T&gt; =
   | { status: &quot;succeeded&quot;; value: T; evidenceRef?: string }
   | { status: &quot;failed&quot;; code: string; message: string;
@@ -58,6 +60,7 @@ type Tool&lt;A, T&gt; = {
   inputSchema: Schema&lt;A&gt;
   execute(args: A, ctx: ToolContext): Promise&lt;Outcome&lt;T&gt;&gt;
 }</code></pre>
+<p>这里的 <code>A</code> 代表该工具的参数类型，对 Edit 就是上面的 <code>EditArgs</code>；<code>T</code> 代表成功后的结果值，例如新观察版本与变更摘要。<code>Promise&lt;Outcome&lt;T&gt;&gt;</code> 表示调用要等待异步执行，完成后再判断 <code>status</code>。只有 <code>succeeded</code> 分支有 <code>value</code>，可选的 <code>evidenceRef</code> 则用于定位完整证据。<code>Schema</code>、<code>Boundary</code> 等仍是省略底层实现的抽象类型，类型声明本身不会完成权限校验、文件写入或证据保存。</p>
 <p><code>failed</code> 表示已知的失败结果，不保证所有工具都没有部分效果，因此单独写 <code>effect</code>。若到底改没改无法确认，就用 <code>unknown</code>，不能塞进 <code>failed/no-effect</code>。取消是一个控制请求，也不能直接决定结果属于哪一类。</p>
 <p>模型看到的声明可以这样写；限制值是本题起点，不是通用最优值：</p>
 <pre><code class="language-json">{

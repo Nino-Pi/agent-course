@@ -63,18 +63,18 @@
 <p>这个表比“失败时指数退避”更接近 Agent 工具问题。指数退避能控制请求频率，却无法判断重发一笔转账或再次覆盖文件是否正确。对具有副作用的调用，需要领域的幂等键、条件写入、状态查询或补偿机制。读取到 common orchestrator 和 rollout 记录，并不能证明这些合同已被每一种工具实现。</p>
 <p>也不能把 sandbox denial 直接归为“效果前拒绝”：多文件补丁可能已写完前面的文件才在后面被拒。要按具体尝试解释错误与 delta；是否允许后续尝试和是否能安全重复业务是两项判断。</p>
 <span class="heading-alias" id="7-将问题写成一个教学接口" aria-hidden="true"></span><h2 id="7-执行效果与反馈的参考接口">7. 执行效果与反馈的参考接口</h2>
-<p>下面的接口刻意把“执行效果”与“调用反馈”分开。它是本例的参考抽象，不是 Codex 源码的翻译。</p>
+<p>下面的接口刻意把“执行效果”与“调用反馈”分开。它是本例的参考抽象，不是 Codex 源码的翻译。先看结果：<code>effect</code> 表示对效果的认识，<code>accepted</code> 表示这份反馈是否被接受，两者不能互相推导。例如文件已改、事后检查拒绝结果，可以同时保留确认的效果和 <code>accepted=false</code>。</p>
 <pre><code class="language-typescript">type EffectState = &quot;none&quot; | &quot;confirmed&quot; | &quot;unknown&quot;;
 type ToolOutcome = {
   callId: string;
   phase: &quot;precheck&quot; | &quot;execution&quot; | &quot;postcheck&quot;;
-  effect: EffectState;
-  accepted: boolean;
+  effect: EffectState; // none 需要无效果证据；无法确认时保留 unknown。
+  accepted: boolean; // 接受反馈不等于用户任务已通过业务验收。
   observation: string;
   nextAction?: &quot;revise_input&quot; | &quot;query_effect&quot; | &quot;verify_artifact&quot;;
-};
-
-async function perform(call: ToolCall, step: StepSnapshot): Promise&lt;ToolOutcome&gt; {
+};</code></pre>
+<p>再看生成这份结果的过程。输入是工具调用和本步冻结计划；先解析、处理 pre hook，再对实际输入作权限判断。只有得到 <code>granted</code> 才到达 <code>runtime.attempt</code>，该行之后的反馈处理必须保留已发生效果。这些辅助函数按前文合同理解，以下不是可独立运行的程序。</p>
+<pre><code class="language-typescript">async function perform(call: ToolCall, step: StepSnapshot): Promise&lt;ToolOutcome&gt; {
   const runtime = step.registry.resolve(call.identity);
   const parsed = runtime.parse(call.payload);
   const revised = await hooks.before(parsed);

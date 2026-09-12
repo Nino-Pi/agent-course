@@ -7,7 +7,7 @@
 </blockquote>
 <p>输入、接口与预期结果是教学设计，不是产品运行记录；Codex 与 Claude Code 的对照保留各自公开实现或产品资料的范围。</p>
 <span class="heading-alias" id="1-模拟-a工具与代码修复35-分钟" aria-hidden="true"></span><h2 id="1-案例-a路径包含空格的代码修复">1. 案例 A：路径包含空格的代码修复</h2>
-<p>相关机制：<a href="49-agent-architecture.html">第49章</a>至<a href="52-permissions-and-recovery.html">第52章</a>。</p>
+<p><strong>前情回顾。</strong> <a href="49-agent-architecture.html">第 49–52 章</a>围绕一条执行链展开：模型提出动作，工具层保留参数与结果，权限裁决限定能执行的范围，资源 owner 才实际改变文件。读取与修改之间，文件可能已被别人更新，因此修改要核对读取时的条件；命令结束后，还要另行验收任务。本案用一个含空格的路径串起这几个环节。</p>
 <span class="heading-alias" id="面试官题面" aria-hidden="true"></span><h3 id="设计问题与条件">设计问题与条件</h3>
 <blockquote><p>一个 Python 文档检查器在路径包含空格时失败。用户允许修改检查器和 README，要求保留已有改动，确认相关行为后报告 diff。</p>
 </blockquote>
@@ -21,12 +21,13 @@ import sys
 
 def run_checker(path: str, cwd: str):
     return subprocess.run(
+        # 每个列表元素都是一个参数；path 中的空格不再拆分参数。
         [sys.executable, &quot;checker.py&quot;, path],
         cwd=cwd,
         shell=False,
         capture_output=True,
         text=True,
-        check=False,
+        check=False,  # 将非零退出码和诊断交回上层判定，而不是吞掉失败。
     )</code></pre>
 <p><code>path</code> 作为列表中的一个元素传递，即使包含空格也不会被 shell 分词。<code>check=False</code> 保留非零退出状态供调用者解释，不把它伪装成成功；上层应读取 returncode、stdout 和 stderr。<code>shell=False</code> 减少 shell 解释，仍不证明 checker 本身没有文件或网络副作用。</p>
 <p>实际编辑交给资源 owner 的条件提交：Read 返回内容与 v7；模型形成仅修改包装函数的补丁；owner 在同一受保护操作中核对当前版本仍为 v7、目标唯一，再提交 v8。普通文件系统若没有覆盖竞争写者的合同，就必须保留并发风险或使用隔离工作副本；不能把普通 rename 叫作版本 CAS。</p>
@@ -44,7 +45,7 @@ def run_checker(path: str, cwd: str):
 <span class="heading-alias" id="本题评分20-分" aria-hidden="true"></span><h3 id="方案验收结果">方案验收结果</h3>
 <p>本方案将“错误测试入口”“断言失败”“陈旧版本”“停止请求”“效果未知”分成不同结果，分别导向找入口、诊断、重读、停止新调用和对账。完整验收不是只看最终 exit 0，而是同时核对行为、实际测试执行、diff 范围和未确认的效果。</p>
 <span class="heading-alias" id="2-模拟-b长任务与-memory40-分钟" aria-hidden="true"></span><h2 id="2-案例-b巨型日志与长期偏好撤回">2. 案例 B：巨型日志与长期偏好撤回</h2>
-<p>相关机制：<a href="53-context-composition.html">第53章</a>至<a href="55-memory.html">第55章</a>、<a href="59-evaluation-and-progress.html">第59章</a>。</p>
+<p><strong>前情回顾。</strong> <a href="53-context-composition.html">第 53–55 章</a>区分了当前输入与长期存储：模型只看到本次真正装入请求的材料，保存过的日志或 Memory 不会自动全部进入上下文。压缩旧历史与缩短一个巨大工具结果也是两个操作。再结合<a href="59-evaluation-and-progress.html">第 59 章</a>的证据判断，本案要同时回答“下一次看见什么”与“哪些长期变化已经得到确认”。</p>
 <span class="heading-alias" id="面试官题面-1" aria-hidden="true"></span><h3 id="设计问题与条件-1">设计问题与条件</h3>
 <blockquote><p>历史接近窗口上限，最新工具返回 20 万字符。当前只允许改文档；Memory 已保存“全局中文、工作区 A 英文”，用户现在撤回 A 的例外。下一请求与长期更新怎样形成？</p>
 </blockquote>
@@ -80,7 +81,7 @@ Memory 后续工作：撤回 A 例外，取得提交确认后才报告长期更�
 <p>本轮请求保留“只改文档”、b1 的失败与可靠来源，不把工具结果截短当作任务成功。Memory 的长期完成要求撤回提交成功；后续新读取排除 M2，才能得到跟随 global 的行为。</p>
 <p>比较另一方案时同时记录输入/输出成本、压缩与回读延迟、约束保留、错误细节可找回率、M1/M2 更新状态和最终回答。只减少 token 却越权改源码，或者写成功却没有被读取，都不能判为全面改善。</p>
 <span class="heading-alias" id="3-模拟-c协作连续性与产品比较45-分钟" aria-hidden="true"></span><h2 id="3-案例-c定时协作批准与跨客户端观察">3. 案例 C：定时协作、批准与跨客户端观察</h2>
-<p>相关机制：<a href="56-tool-scheduling.html">第56章</a>至<a href="61-claude-code.html">第61章</a>。</p>
+<p><strong>前情回顾。</strong> <a href="56-tool-scheduling.html">第 56–61 章</a>把长任务拆成触发、执行、交付与观察：到点触发只决定何时接纳工作，不自动增加写入权限；子任务完成只表示已有局部产物，还要由父任务检查并采纳；客户端重连取得的是状态快照，不应重新执行原动作。本案把这三条区别放进一次定时检查，先给只读流程，再解释批准后的修改变体。</p>
 <span class="heading-alias" id="面试官题面-2" aria-hidden="true"></span><h3 id="设计问题与条件-2">设计问题与条件</h3>
 <blockquote><p>系统每天核对文档与测试入口，可派子任务检查不同模块；任何修改都要用户批准。用户从桌面端发起，也可能换一个客户端查看。</p>
 </blockquote>
@@ -90,11 +91,14 @@ Memory 后续工作：撤回 A 例外，取得提交确认后才报告长期更�
 <p>三个 owner 分开：Schedule owner 决定某次触发；权限裁决者（Permissions Authority）决定当前允许的动作；Run/资源 owner 管理执行和结果。共用持久存储不意味着这三者可以用一个 <code>pending → run</code> 规则替代。</p>
 <p>教学接纳骨架如下；<code>claim_fire_atomically</code> 的实现必须与取消/修订经过同一事务或串行 owner，单独的先查后写不满足合同。</p>
 <pre><code class="language-python">def resume_fire(fire_id, payload, revision):
+    # 在同一受保护操作中检查触发身份、请求内容与当前修订。
     decision = claim_fire_atomically(fire_id, payload, revision)
     if decision.kind == &quot;existing&quot;:
+        # 重复送达复用原 Run；恢复观察或尚未完成的派发。
         return query_or_resume_dispatch(decision.run_id)
     if decision.kind == &quot;rejected&quot;:
         return decision.reason
+    # 新接纳也只派发刚绑定的 Run，不再另建执行身份。
     return query_or_resume_dispatch(decision.run_id)</code></pre>
 <p><code>query_or_resume_dispatch</code> 按原 Run 身份处理已认领但未开始的派发；运行中或已 terminal 的 Run 只查询与收敛。它还必须在执行 owner 处与停止请求仲裁，不能每次恢复都创建新进程。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 正常流程与完整参考方案"><table><caption>表 3 / Table 3 · 正常流程与完整参考方案</caption><thead><tr><th scope="col">里程碑（Milestone）</th><th scope="col">已确认状态（State）</th><th scope="col">尚不能推出</th></tr></thead><tbody><tr><td>f7 被接纳为 r7</td><td>本次 fire 有唯一执行归属</td><td>child 已完成或用户允许修改</td></tr>

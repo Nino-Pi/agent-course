@@ -21,16 +21,11 @@
 </ul>
 <p>只更新 README 的例子用 S1 / T7 / R7 分别标识会话、工作和执行，<a href="glossary.html#owner%E6%89%80%E6%9C%89%E8%80%85">所有者（Owner）</a>则标识谁负责决定状态变化。完整 <code>formatDuration</code> 修复的工具步骤更多，但区分身份的方法相同。</p>
 <span class="heading-alias" id="先看结论" aria-hidden="true"></span><h3 id="工作归属顶层意图与具体执行">工作归属、顶层意图与具体执行</h3>
-<p>三个身份分别标识不同时间尺度：</p>
-<pre><code class="language-text">Session：长期会话与工作归属
-Turn：用户或系统发起的一项顶层工作
-Run：这项工作的一次具体执行，以及可保存、恢复的身份和记录</code></pre>
-<p>放进统一案例：</p>
-<pre><code class="language-text">Session S1
-  └─ Turn T7：“读配置和现有 README、修改、跑测试、中文总结”
-       └─ Run R7：真正驱动模型和工具的这次执行</code></pre>
-<p>而 Owner 回答另一类问题：</p>
-<pre><code class="language-text">谁有资格为某种状态作最终决定？</code></pre>
+<p>三个身份分别标识不同时间尺度。先把它们放进同一项 README 任务，后面再看重发请求时哪些身份应该保持：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 工作归属、顶层意图与具体执行"><table><caption>表 1 / Table 1 · 工作归属、顶层意图与具体执行</caption><thead><tr><th scope="col">身份</th><th scope="col">回答的问题</th><th scope="col">本例中的对象</th></tr></thead><tbody><tr><td>Session（会话）S1</td><td>这些前后相关的工作归到哪里？</td><td>同一项目的长期会话，还可容纳后来的新任务</td></tr>
+<tr><td>Turn（顶层工作）T7</td><td>用户这次要求完成什么？</td><td>读配置和 README、修改测试说明、跑测试、中文总结</td></tr>
+<tr><td>Run（具体执行）R7</td><td>哪次执行在落实这项工作？</td><td>驱动模型与工具，并保存本次执行身份、过程和结果</td></tr></tbody></table></div>
+<p>Owner 回答的是<strong>谁有资格为某种状态作最终决定</strong>。身份把事实归到正确对象，owner 再决定这个对象能否进入下一状态。</p>
 <p>例如，Storage 可以帮忙写入 Run 状态，但不因为“它会写数据库”就有资格自行决定新工作应该开始。机制和决定权不是一回事。</p>
 <h3 id="为什么不能只用一个-taskid">为什么不能只用一个 <code>taskId</code></h3>
 <p>初学项目常常会设计一个万能 <code>taskId</code>，既表示聊天，又表示用户消息，又表示一次模型调用。Demo 阶段很方便，进入真实生命周期后就会出现歧义。</p>
@@ -52,12 +47,7 @@ Run：这项工作的一次具体执行，以及可保存、恢复的身份和�
 <p>Session、Turn、Run 是把不同时间尺度分开的三把尺子。</p>
 <h3 id="session长期存在的工作房间">Session：长期存在的工作房间</h3>
 <p><a href="glossary.html#session%E4%BC%9A%E8%AF%9D">会话（Session）</a>保留长期对话及关联的项目背景，身份是 <code>sessionId</code>。这里的“工作房间”是逻辑归属，不是磁盘上的目录。</p>
-<p>可以把 S1 想成一间项目工作室：</p>
-<pre><code class="language-text">Session S1
-  ├─ 项目与会话设置
-  ├─ 以前完成的 Turn
-  ├─ 当前可观察的工作状态
-  └─ 未来还会发生的 Turn</code></pre>
+<p>可以把 S1 想成一间项目工作室：项目与会话设置、以前完成的 Turn、当前工作状态和未来的新 Turn 都归到这间工作室。某次工作结束，房间仍可继续使用。</p>
 <h4 id="session-解决什么问题">Session 解决什么问题</h4>
 <p>Session 把多项前后相关的工作放进同一长期边界。关闭 Client 再打开，S1 仍可以从持久存储中被识别；它不是某个 React 组件或某条 WebSocket 连接的寿命。</p>
 <h4 id="session-不是什么">Session 不是什么</h4>
@@ -86,14 +76,7 @@ Run：这项工作的一次具体执行，以及可保存、恢复的身份和�
 <p>四次模型交互仍服务于同一项用户工作 T7。</p>
 <h3 id="run执行工作的持久运行封套">Run：执行工作的持久运行封套</h3>
 <p><a href="glossary.html#run--agentrun%E8%BF%90%E8%A1%8C--%E6%89%A7%E8%A1%8C%E5%B0%81%E5%A5%97">运行（Run）</a>包含这项工作的一次具体执行，以及随执行保存的身份、状态与记录，身份是 <code>runId</code>。教学案例使用 R7。“持久运行封套”（durable execution envelope）只是强调：同一次执行的记录放在一起，进程退出后还能读取。能读回记录，不表示已经恢复原来正在运行的函数；恢复未完成工作需要 第18章 的额外判断。</p>
-<p>“封套”意味着 R7 把同一次执行产生的事实包在一起：</p>
-<pre><code class="language-text">Run R7
-  ├─ 固定的 S1 / T7 归属
-  ├─ 这次执行的组成信息
-  ├─ 多个模型 step
-  ├─ Read / Edit / Bash 调用与结果
-  ├─ 使用量或运行事件
-  └─ completed / failed / cancelled 终态</code></pre>
+<p>“封套”意味着 R7 把同一次执行产生的事实包在一起：固定的 S1 / T7 归属、执行组成信息、多个模型 step、Read / Edit / Bash 的调用与结果，以及使用量、运行事件和最终的 completed / failed / cancelled 状态。后面的嵌套图把这些归属放在同一视野里。</p>
 <h4 id="run-的典型生命周期">Run 的典型生命周期</h4>
 <p>下面的教学状态图表示一次执行可能经过的阶段，不列出产品的完整状态枚举：</p>
 <pre><code class="language-text">created
@@ -160,7 +143,7 @@ Run：这项工作的一次具体执行，以及可保存、恢复的身份和�
 <p>所以看到 provider 发出两次请求，不能立刻推断系统建立了两个 Turn 或两个 Run。</p>
 <h3 id="预算限制的是哪一个单位">预算限制的是哪一个单位？</h3>
 <p>区分身份之后，再问“最多还能运行几次”才有明确含义。当前默认 AiSdkTurn 的几种限制作用在不同单位上：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 预算限制的是哪一个单位？"><table><caption>表 1 / Table 1 · 预算限制的是哪一个单位？</caption><thead><tr><th scope="col">限制</th><th scope="col">计算什么</th><th scope="col">不应推导什么</th></tr></thead><tbody><tr><td><code>maxSteps</code></td><td>一次 send 中已完成的模型 step；本次输入可覆盖 backend 配置</td><td>一个 step 只有一个工具，或它是所有网络请求的次数上限</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 预算限制的是哪一个单位？"><table><caption>表 2 / Table 2 · 预算限制的是哪一个单位？</caption><thead><tr><th scope="col">限制</th><th scope="col">计算什么</th><th scope="col">不应推导什么</th></tr></thead><tbody><tr><td><code>maxSteps</code></td><td>一次 send 中已完成的模型 step；本次输入可覆盖 backend 配置</td><td>一个 step 只有一个工具，或它是所有网络请求的次数上限</td></tr>
 <tr><td>provider attempt 限制与恢复条件</td><td>同一步中能否再发一个物理请求</td><td>有剩余 attempt 就必定安全；还需检查输出/效果、错误类型与剩余 step budget</td></tr>
 <tr><td>Context window / 输入容量</td><td>一次模型请求能否容纳当前输入</td><td>还有输入空间就允许无限循环，或压缩成功等于得到更多执行步骤</td></tr></tbody></table></div>
 <p>这些限制各自解决一个问题，也都不直接等于金额预算。此处没有假定产品默认固定为三步；下面是<strong>调用者提供 <code>maxSteps=3</code> 的源码推演</strong>，不是实际执行记录：</p>
@@ -180,7 +163,7 @@ Run：这项工作的一次具体执行，以及可保存、恢复的身份和�
 <p>再改变一个条件：P1 留下了 R7 的回答文字，却没保存 terminal 就退出。S1/T7/R7 的身份仍可找到，但它只帮助恢复程序定位该查哪份记录，并不证明 R7 成功。当前普通恢复路径若没有续接认领（continuation claim，即已有控制者声明负责后续推进）或执行交接（handoff），会把这种开放执行收束为 <code>failed / app_restarted</code>；如果原 terminal 已经存在，则保留原结果。新进程先读事实，再由相应 owner 决定接下来做什么，不能因为重新找到 R7 就重放全部动作。</p>
 <p>这里的“恢复成功”可能只表示正确记录了中断。恢复观察读取已有结果，重建输入准备后续请求，收束中断保存失败终态，继续执行则需要相应 owner 的准入决定。<a href="14-events-and-projections.html#%E5%90%8C%E4%B8%80%E4%BB%BD%E5%9B%9E%E7%AD%94%E6%80%8E%E6%A0%B7%E4%BB%8E-running-%E5%8F%98%E6%88%90%E4%B8%AD%E6%96%AD%E8%AE%B0%E5%BD%95">一份回答和四条持久记录</a>展示了这些操作怎样分开。</p>
 <h3 id="maka-中的责任分配">Maka 中的责任分配</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · Maka 中的责任分配"><table><caption>表 2 / Table 2 · Maka 中的责任分配</caption><thead><tr><th scope="col">问题</th><th scope="col">主要负责者 / 裁决权（Owner / Authority）</th><th scope="col">其他部件能做什么</th></tr></thead><tbody><tr><td>S1 的 root 工作能否开始</td><td>Host 侧 root admission / execution authority</td><td>Client 提交请求；Storage 原子写入</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · Maka 中的责任分配"><table><caption>表 3 / Table 3 · Maka 中的责任分配</caption><thead><tr><th scope="col">问题</th><th scope="col">主要负责者 / 裁决权（Owner / Authority）</th><th scope="col">其他部件能做什么</th></tr></thead><tbody><tr><td>S1 的 root 工作能否开始</td><td>Host 侧 root admission / execution authority</td><td>Client 提交请求；Storage 原子写入</td></tr>
 <tr><td>R7 的活跃模型—工具循环</td><td>RuntimeKernel / AgentRun</td><td>Backend、Tool Runtime 参与执行</td></tr>
 <tr><td>R7 的 canonical terminal</td><td>Run 的终态认领与提交屏障（terminal claim/barrier）及持久 RuntimeEvent 事实</td><td>Host/Client 读取并发布、展示</td></tr>
 <tr><td>数据怎样可靠写入 SQLite</td><td>Storage mechanism</td><td>上层 owner 决定写什么业务事实</td></tr>
@@ -225,7 +208,7 @@ invocationId          是 opening / events / terminal 的执行事实坐标</cod
 <pre><code class="language-text">T7 = “只读取 package.json”</code></pre>
 <p>网络超时后，第二次却提交：</p>
 <pre><code class="language-text">T7 = “删除整个项目”</code></pre>
-<p>如果 Host 只检查 <code>turnId</code> 相同，就可能把完全不同的意图伪装成同一个重试。Maka 因此要求 exact retry 匹配已经固定的 payload 和 descriptor；内容漂移应被拒绝。</p>
+<p>如果 Host 只检查 <code>turnId</code> 相同，就可能把完全不同的意图伪装成同一个重试。Maka 因此要求 exact retry（原请求的精确重试）匹配已经固定的 payload 和 descriptor：payload 是提交的任务内容，descriptor 是本次执行的描述。这里先抓住共同作用——身份相同时，内容也必须与已经接受的那一份匹配；内容漂移应被拒绝。</p>
 <p>这条规则同时保护：</p>
 <ul>
 <li>幂等重试；</li>
@@ -249,7 +232,7 @@ invocationId          是 opening / events / terminal 的执行事实坐标</cod
 <h4 id="失败例子三ui-显示-running但-r7-已-terminal">失败例子三：UI 显示 running，但 R7 已 terminal</h4>
 <p>这可能只是 Client 断线或投影未更新。恢复时应从 canonical facts 重建，而不是要求 Runtime 再执行一次。</p>
 <h3 id="容易混淆的相邻概念">容易混淆的相邻概念</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 容易混淆的相邻概念"><table><caption>表 3 / Table 3 · 容易混淆的相邻概念</caption><thead><tr><th scope="col">概念</th><th scope="col">不等于</th><th scope="col">原因</th></tr></thead><tbody><tr><td>会话（Session）</td><td>Client 连接</td><td>连接会断开，Session 可长期存在</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 容易混淆的相邻概念"><table><caption>表 4 / Table 4 · 容易混淆的相邻概念</caption><thead><tr><th scope="col">概念</th><th scope="col">不等于</th><th scope="col">原因</th></tr></thead><tbody><tr><td>会话（Session）</td><td>Client 连接</td><td>连接会断开，Session 可长期存在</td></tr>
 <tr><td>轮次（Turn）</td><td>HTTP / IPC 请求</td><td>网络层可能重试同一 Turn</td></tr>
 <tr><td>轮次（Turn）</td><td>模型 step</td><td>一个 Turn 可以有多个 step</td></tr>
 <tr><td>运行（Run）</td><td>provider attempt</td><td>一个 Run 可有多个逻辑调用与物理 attempt</td></tr>
