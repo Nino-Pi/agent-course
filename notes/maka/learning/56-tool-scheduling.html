@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 56 章｜设计工具发现与调度 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 56 / 62</div><article id="main-content"><span class="heading-alias" id="i08工具发现与调度找到能力以后怎样正确安排调用" aria-hidden="true"></span><span class="heading-alias" id="i08设计工具发现与调度" aria-hidden="true"></span><span class="heading-alias" id="第-53-章设计工具发现与调度" aria-hidden="true"></span><span class="heading-alias" id="第-55-章设计工具发现与调度" aria-hidden="true"></span><h1 id="第-56-章设计工具发现与调度">第 56 章｜设计工具发现与调度</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：工具数量增多、一次提出多个调用时，怎样减少输入开销而不破坏权限与依赖？</p>
+<p><strong>关键概念</strong>：工具目录：可发现能力的集合；Active snapshot（本步快照）：当前可用声明；激活：让候选进入后续请求；DAG（有向无环图）：表达依赖先后；资源冲突：并行访问可能互相干扰；逐项结算：分别保留每个调用的结果。</p>
+<p><strong>关系主线</strong>：发现从已绑定能力中选择工具，调用仍检查当前边界；调度同时考虑依赖、冲突和并发上限，部分失败不能覆盖其他调用的成功或未知效果。</p>
+</blockquote>
+<p>前置：<a href="50-tool-contracts.html">第50章 Tool 合同</a>、<a href="51-file-and-shell-tools.html">第51章 文件与 Shell</a>、<a href="52-permissions-and-recovery.html">第52章 权限与恢复</a>。跨 Agent 的任务依赖、触发和 owner 见 <a href="57-skills-and-subagents.html">第57章</a> 与 <a href="58-orchestration-and-continuity.html">第58章</a>。</p>
+<p>本文算法、类型和参数用于教学设计；DAG 调度示例不是 Maka 普通工具批次的实际 API。</p>
+<h2 id="1-原题约束与最小起点">1. 原题、约束与最小起点</h2>
+<blockquote><p>现在接入数百个工具，全部放进 prompt 太贵，模型还会选错。你怎么让它发现工具？一次返回多个工具调用，怎样决定哪些可以并行？</p>
+</blockquote>
+<p>发现负责让模型知道可用动作，调度负责让已提出的动作在正确顺序和资源条件下执行。减少 schema 成本不会自动解决参数依赖；允许并行也不会使未授权工具获得权限。</p>
+<p>本题仍修正 README 和函数，但远端能力从几项增长为数百项。用户还给出已经存在的 CI 测试任务 <code>j9</code>，要求只读查询它的状态，不创建另一份远端任务。常用 Read/Edit/Bash 直接可见，低频的远端 CI 查询等能力按需发现。若任务实际只需要三个工具，最小方案仍是全部直接暴露，不强加搜索步骤。</p>
+<p>需要确认目录来源是否可信、工具是否动态变更、schema 总预算、服务限流、允许的并发数量，以及调用之间是否读写同一资源。</p>
+<span class="heading-alias" id="2-两分钟完整主答" aria-hidden="true"></span><h2 id="2-完整参考方案">2. 完整参考方案</h2>
+<blockquote><p>我会把完整工具目录、本次任务的能力上限和本步可见 schema 分开。少量高频工具直接提供，低频工具通过名字、描述和能力分类检索。搜索返回明确候选、限制和下一步可用状态；激活后的 schema 在下一次模型请求中出现，本步快照不被异步修改。</p>
+<p>搜索只从任务已经绑定的能力上限里挑工具，不创造权限。调用时还要校验当前快照、工具版本、参数和实时执行边界。找不到、未激活、未授权和服务离线分别反馈，否则模型不知道应该换检索词还是处理环境。</p>
+<p>调度时，我先看依赖，再看资源冲突和并发上限。读取 package 与 README 可以并行；Edit 依赖读到的内容，测试依赖编辑完成，因此必须跨过对应结果。工具的可并行声明只是上限，两次调用写同一文件仍需串行或资源条件提交。任意 Bash 的资源效果无法完整静态推断时，用保守策略。</p>
+<p>多调用中的部分成功要逐项保留。一个节点失败，其依赖节点暂停；不依赖它的工作是否继续由任务策略决定。取消需要停止新调度并处理已启动调用，不能丢弃它们的结果。代码组合能减少机械轮次，但每个子调用仍要通过权限和效果边界，并保留需要模型重新诊断的观察点。</p>
+<p>我会固定任务与能力集合，分别测检索遗漏、选错率、schema 开销、依赖违规、取消后效果和最终完成率，避免只看工具数量或并行速度。</p>
+</blockquote>
+<span class="heading-alias" id="3-白板一发现和执行分成两层" aria-hidden="true"></span><h2 id="3-工具发现与执行的两层合同">3. 工具发现与执行的两层合同</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="工具发现与执行的两层合同：可滚动示意图"><a href="../../../assets/diagrams/56-tool-scheduling-1.svg"><img src="../../../assets/diagrams/56-tool-scheduling-1.svg" alt="完整目录先经任务能力绑定，高频声明与低频搜索分路；搜索候选只在下一步构建可用快照，模型调用仍须检查可用性、版本、参数与实时权限，每项执行结果独立结算。" width="720" height="2133" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>三条关键箭头分别说明绑定、激活与执行准入：目录 → 上限表示 Host 的可信绑定；搜索结果 → 下一步 schema 表示激活时机；调用 → 权限准入表示即使被发现也要检查实际执行边界。</p>
+<p>这里存在三个不应混淆的集合：系统知道的工具、任务允许绑定的工具、当前步骤激活的工具。为了清楚表达，本题把 schema 激活视为下一步发生的变化；正在执行的 step 使用不可变快照，避免搜索和调用发生竞态。</p>
+<p>Maka 的事实是最终 bound surface、<code>providerTools</code> registry 与 <code>activeTools</code> snapshot 分离，搜索结果在下一次 projection 激活；同一批次搜索并调用刚找到的 deferred tool 会被拒绝。</p>
+<span class="heading-alias" id="4-写发现契约不要把四种故障合成-not-found" aria-hidden="true"></span><h2 id="4-发现契约与不同故障">4. 发现契约与不同故障</h2>
+<p>教学返回类型：</p>
+<pre><code class="language-ts">type ToolRef = { name: string; generation: string }
+type SearchResult = {
+  matches: Array&lt;{
+    ref: ToolRef
+    purpose: string
+    activation: &quot;next_step&quot; | &quot;already_active&quot; | &quot;not_activated&quot;
+    reason?: &quot;schema_budget&quot; | &quot;schema_too_large&quot; | &quot;unavailable&quot;
+  }&gt;
+  searchedWithin: string       // 本次可信绑定集合的标识
+  moreCandidates: boolean
+}
+
+type StepSurface = {
+  stepId: string
+  active: ReadonlyMap&lt;string, ToolRef&gt;
+}</code></pre>
+<p><code>generation</code> 用于将描述与实际实现绑定到一致的一代；具体版本策略由 Host 定义。搜索结果不能把本次任务没有绑定的工具自动加进来；第三方声明的“安全只读”也不能覆盖 Host 的可信执行分类。</p>
+<p>一种最小检索方案是规范化名字、用途和可信分类的词项检索，先验证容易混淆的工具描述。只有确实出现同义词与语义召回缺口，再比较 embedding 或混合检索；不预先把向量检索当唯一方案。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 4. 发现契约与不同故障"><table><caption>表 1 / Table 1 · 4. 发现契约与不同故障</caption><thead><tr><th scope="col">观察（Observation）</th><th scope="col">说明什么</th><th scope="col">模型下一步</th></tr></thead><tbody><tr><td>没有候选</td><td>当前范围和检索表达未命中</td><td>换具体任务词或使用现有工具；不臆造工具名</td></tr>
+<tr><td>找到但 schema 超预算</td><td>目录存在，当前未激活</td><td>收窄搜索或释放低相关 schema，等待新快照</td></tr>
+<tr><td>已激活但权限拒绝</td><td>能提出调用，现实边界不覆盖</td><td>判断是否有边界内替代；必要时走明确授权</td></tr>
+<tr><td>已激活但服务离线</td><td>能力绑定存在，连接暂不可用</td><td>按服务合同查询状态或重连，不继续扩权</td></tr>
+<tr><td>generation 已失效</td><td>描述和实际实现不能保证同代</td><td>刷新绑定并重新观察，避免静默换实现</td></tr></tbody></table></div>
+<p>schema 预算要计入编码后的实际请求成本，不能只计工具数量。返回前几个匹配时应说明截断或未激活理由，避免模型把“没有展示”误判成“系统没有能力”。</p>
+<span class="heading-alias" id="5-白板二先画依赖再决定并行" aria-hidden="true"></span><h2 id="5-依赖与并行的边界">5. 依赖与并行的边界</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="依赖与并行的边界：可滚动示意图"><a href="../../../assets/diagrams/56-tool-scheduling-2.svg"><img src="../../../assets/diagrams/56-tool-scheduling-2.svg" alt="三个读取结果汇合为模型诊断，两项编辑分别修改 README 与实现；相关测试和 diff 检查都依赖所需编辑完成，二者汇合后按证据判断交付。并列节点只是满足资源条件时的并行候选。" width="865" height="907" loading="lazy" style="width:865px;min-width:736px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>实线表示输出决定下一步输入的依赖关系；同一层的节点只是并行候选。三个 Read 在输入和资源独立时可以并行；两个 Edit 写不同文件时可能并行，但要确认工具与资源策略允许；测试要等待要求的修改都完成。</p>
+<p>图中的“判断”是模型决策点，不是假装已知根因的固定 patch。若测试暴露陌生断言，应该把具体输入、actual/expected 和源码交给模型再判断，不能为了减少轮次预先把所有修复写死。</p>
+<p><strong>依赖不只来自文件名。</strong> 测试可能读取整个仓库，两次不同文件的写入也可能影响同一测试；Bash 可能写缓存、配置或远端资源。调度器需要可信资源信息，无法闭合效果时保守串行。资源条件提交仍是最后防线，并行许可不是并发安全证明。</p>
+<h2 id="6-最小批次调度骨架">6. 最小批次调度骨架</h2>
+<p>下面伪代码只展示如何选择一批可运行任务，不是生产调度器。规划器先基于已有观察形成具体参数；它要验证 ID 唯一、依赖存在、无环和工具 generation。图中未完成的模型诊断节点不会凭空变成预知参数。</p>
+<pre><code class="language-ts">type Task = {
+  id: string
+  tool: ToolRef
+  args: unknown
+  dependsOn: string[]
+  resources: TrustedResourceClaims // 由可信实现计算，不能仅信模型自报
+}
+
+type State = &quot;pending&quot; | &quot;running&quot; | &quot;succeeded&quot; |
+  &quot;failed&quot; | &quot;unknown&quot; | &quot;blocked&quot;
+
+async function runReadyBatch(plan, states, step, runtime) {
+  validatePlan(plan)
+  const candidates = plan.filter(t =&gt;
+    states[t.id] === &quot;pending&quot; &amp;&amp;
+    t.dependsOn.every(id =&gt; states[id] === &quot;succeeded&quot;) &amp;&amp;
+    isActiveSameGeneration(t.tool, step.active)
+  )
+  const batch = selectWithinLimitsAndNoConflicts(candidates)
+  for (const task of batch) states[task.id] = &quot;running&quot;
+
+  // Runtime 保留每个调用的身份、权限与结算；durability 失败中止调度。
+  const settled = await runtime.executeAndSettleBatch(batch)
+  for (const item of settled) states[item.id] = item.outcome.status
+  blockDescendantsOfFailedOrUnknown(plan, states)
+  return settled // 逐项保留结果，不压成单一 batch success
+}</code></pre>
+<p><code>executeAndSettleBatch</code> 必须等待已启动调用的可完成结算；如果一个调用出现持久化边界错误，不能把其余结果丢掉，或把异常普通化后继续下一轮。这个抽象的效果与取消语义需要实际实现和测试。</p>
+<p><a href="16-tools-and-execution.html#%E5%90%8C%E4%B8%80%E6%AD%A5%E7%8B%AC%E5%8D%A0%E4%B8%8E%E5%B5%8C%E5%A5%97%E8%AE%B8%E5%8F%AF%E6%98%AF%E4%B8%A4%E4%B8%AA%E7%BB%B4%E5%BA%A6">第16章</a>已说明 Maka 的两类准入：<code>exclusive_step</code> 限制同一 assistant step 的外层调用共存，<code>direct_only</code> 限制代码组合里的嵌套入口。资源锁则协调实际资源冲突，本文 DAG 还负责表达行动依赖。这些职责不能互相代替：外层 <code>exec</code> 可以独占该步，其获准子调用仍能并发；已有准入声明也不能证明普通批次会自动推断本题的完整 DAG。</p>
+<h2 id="7-正常走读搜索与并行都要等待相应观察">7. 正常走读：搜索与并行都要等待相应观察</h2>
+<p>第 0 步只有 Read/Edit/Bash 和搜索能力直接可见。模型并行读取 package 与 README，得到真实入口和错误文档。它还发现任务要求查看远端 CI 状态，于是请求搜索“query existing CI job status”，得到 <code>QueryCI</code> 候选、generation=g3 和 next_step 标记。</p>
+<p>第 1 步 schema 才包含 g3 的 QueryCI。模型用用户给定的 job ID <code>j9</code> 提出只读查询，同时执行独立的本地 Read；两个结果分别保存。基于读取的文件和失败断言定位问题，再提出允许范围内的编辑。</p>
+<p>编辑结果都确认以后，模型运行相关测试并检查 diff。调度优化缩短了独立等待，但没有消除“观察 → 判断 → 修改”的依赖。远端查询失败也不能抹去已得到的本地事实。</p>
+<h2 id="8-失败走读一批调用不能只有一个布尔值">8. 失败走读：一批调用不能只有一个布尔值</h2>
+<p>失败分支 A：模型在同一步同时 <code>tool_search(QueryCI)</code> 和 <code>QueryCI(jobId)</code>。当前 snapshot 里尚无 QueryCI，后者在效果前被拒绝；搜索本身可以成功并影响下一步。不能因为执行顺序碰巧先跑完搜索就让后者越过冻结快照。</p>
+<p>失败分支 B：README 编辑成功，函数编辑遇到陈旧版本冲突。结果应保留 README 的成功与函数的明确失败；依赖两项修改的最终测试节点暂时阻塞。模型先重读函数、保留用户改动并重新定位，而不是整批重新执行 README 编辑。</p>
+<p>失败分支 C：函数编辑回执丢失，状态为 unknown。其依赖工作不能当作修改已完成来推进；先对账。与它独立的只读信息收集可以在任务策略允许时继续，但不能用其他节点成功来“投票”消除不确定性。</p>
+<p>取消时，停止调度新节点，对已经启动的节点发送取消并收集可得结果。串行化和 await 也不保证远端效果回滚，详情回到 <a href="52-permissions-and-recovery.html">第52章</a>。</p>
+<h2 id="9-递进追问与参考答案">9. 递进追问与参考答案</h2>
+<p><strong>追问一：数百个工具，直接 top-5 搜索就够吗？</strong></p>
+<p>不一定。要看必要工具是否被召回、相似候选是否误导、被预算挤出的 schema 是否可见说明。可以从小 top-k 开始，提供继续搜索和激活状态，但 k 是待评估参数，不能用“模型更专注”代替证据。</p>
+<p><strong>追问二：工具标了 parallel，两个调用就一定能并行吗？</strong></p>
+<p>不一定。工具级声明允许并行不代表特定调用之间没有参数依赖或资源冲突。同一路径两次 Edit、写后立刻测试、同一个远端限额资源都可能要求顺序或限流；未知 Bash 效果应保守处理。</p>
+<p><strong>追问三：把所有调用放进 Promise.all，有什么问题？</strong></p>
+<p>它不表达业务依赖和资源锁；普通 Promise.all 在一个 reject 时提前返回，还可能让其他已启动操作继续产生效果。需要逐项结算、取消和持久记录协议，不能因主 promise 失败就当整批没执行。</p>
+<p><strong>追问四：Code Mode 能否绕过工具 Runtime 省开销？</strong></p>
+<p>不应绕过已有权限与效果边界。代码负责机械循环、条件和过滤；每个真实子调用仍经可信执行路径。Maka 的 nested calls 回到 ToolRuntime；整个代码 cell 不会因此原子成功。若中间失败需要模型诊断，要明确返回观察和控制权。</p>
+<p><strong>追问五：搜索到的第三方工具自称 readOnly，可以直接并行吗？</strong></p>
+<p>不能只相信非受信描述。Host 需绑定可信执行事实和保守权限上限；无法核实的操作按较强效果处理。协议的发现字段不自动证明实现行为，也不赋予业务授权。</p>
+<h2 id="10-取舍与验证">10. 取舍与验证</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 10. 取舍与验证"><table><caption>表 2 / Table 2 · 10. 取舍与验证</caption><thead><tr><th scope="col">方案</th><th scope="col">更适合</th><th scope="col">新增成本或失败</th><th scope="col">应固定条件比较的指标</th></tr></thead><tbody><tr><td>少量声明全量提供（Schema）</td><td>工具少、名字区别明确</td><td>工具增长后的成本和选择噪声</td><td>schema 字节、错误工具率、完成率</td></tr>
+<tr><td>高频直接与低频检索（Discovery）</td><td>大目录且任务只用少数能力</td><td>检索遗漏、多一步延迟、激活竞态</td><td>必需工具召回、额外步数、任务成功率</td></tr>
+<tr><td>普通逐步工具循环（Tool Loop）</td><td>决策依赖新观察</td><td>机械工作可能轮次多</td><td>诊断准确率、证据完整、延迟</td></tr>
+<tr><td>受控代码组合（Code Mode）</td><td>大量已知格式的机械调用与筛选</td><td>组合代码错误、部分成功和输出丢失</td><td>相同证据下的成本、取消与子效果</td></tr></tbody></table></div>
+<p>验证数据至少包含：相似名字工具、描述过时、schema 超预算、搜索和调用同批、两个独立 Read、两个同文件 Edit、Edit→测试、服务限流、一项明确失败、一项 unknown、取消后仍运行的子调用。</p>
+<p>依赖正确性要检查实际开始时间和资源状态；检索效果要检查完成所需工具是否进入可用步骤；输出压缩要检查失败 input/actual/expected 是否保留。步骤数与执行时间另计，不能替代这些正确性指标。</p>
+<span class="heading-alias" id="11-评分自测与回读" aria-hidden="true"></span><h2 id="11-查询-100-个订单更新其中-3-个的完整方案">11. 查询 100 个订单、更新其中 3 个的完整方案</h2>
+<p>假设可信服务允许最多 10 个并发只读查询；100 个订单均在当前账户授权范围内，只有状态与业务条件满足的订单才可申请更新。查询结果表明 o7、o28、o93 满足条件，其余 97 个不需要修改。数字与订单身份均为教学值。</p>
+<p>第一阶段分批查询，每条结果保留订单 ID、观察版本和错误状态。某条查询失败不代表该订单不符合条件，而是尚不能决定；其余已成功查询的结果可以保留。第二阶段基于具体结果形成三个更新候选，并取得覆盖账户、对象、动作及有效期限的许可。不能在查询尚未返回时预先启动全部更新。</p>
+<p>第三阶段以各自 observedVersion 条件提交：o7 成功；o28 的版本被其他写者更新，返回 conflict/no-effect，需重读后重新判断；o93 的提交回执丢失，保留 unknown 并按业务身份查询。最终报告为“1 项确认更新、1 项冲突未更新、1 项效果未知、97 项无需更新”，不能把整批写成成功或全部失败。</p>
+<p>代码组合可以承担批次循环与过滤，但每个子调用仍经过权限、版本与结算；一次外层异常不抹去 o7 的效果。重跑时只处理未解决项，不能重新更新所有 100 个订单。</p>
+<p>相关机制：<a href="57-skills-and-subagents.html">第57章 Skill 与子 Agent</a>。</p>
+<hr>
+<p><a href="55-memory.html">上一章：第 55 章｜设计记忆的写入与读取</a> · <a href="57-skills-and-subagents.html">下一章：第 57 章｜选择 Skills 与子 Agent</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="55-memory.html"><span>← 上一章</span><strong>第 55 章｜设计记忆的写入与读取</strong></a><a href="57-skills-and-subagents.html"><span>下一章 →</span><strong>第 57 章｜选择 Skills 与子 Agent</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E7%BA%A6%E6%9D%9F%E4%B8%8E%E6%9C%80%E5%B0%8F%E8%B5%B7%E7%82%B9">1. 原题、约束与最小起点</a></li><li class="toc-level-2"><a href="#2-%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 完整参考方案</a></li><li class="toc-level-2"><a href="#3-%E5%B7%A5%E5%85%B7%E5%8F%91%E7%8E%B0%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%9A%84%E4%B8%A4%E5%B1%82%E5%90%88%E5%90%8C">3. 工具发现与执行的两层合同</a></li><li class="toc-level-2"><a href="#4-%E5%8F%91%E7%8E%B0%E5%A5%91%E7%BA%A6%E4%B8%8E%E4%B8%8D%E5%90%8C%E6%95%85%E9%9A%9C">4. 发现契约与不同故障</a></li><li class="toc-level-2"><a href="#5-%E4%BE%9D%E8%B5%96%E4%B8%8E%E5%B9%B6%E8%A1%8C%E7%9A%84%E8%BE%B9%E7%95%8C">5. 依赖与并行的边界</a></li><li class="toc-level-2"><a href="#6-%E6%9C%80%E5%B0%8F%E6%89%B9%E6%AC%A1%E8%B0%83%E5%BA%A6%E9%AA%A8%E6%9E%B6">6. 最小批次调度骨架</a></li><li class="toc-level-2"><a href="#7-%E6%AD%A3%E5%B8%B8%E8%B5%B0%E8%AF%BB%E6%90%9C%E7%B4%A2%E4%B8%8E%E5%B9%B6%E8%A1%8C%E9%83%BD%E8%A6%81%E7%AD%89%E5%BE%85%E7%9B%B8%E5%BA%94%E8%A7%82%E5%AF%9F">7. 正常走读：搜索与并行都要等待相应观察</a></li><li class="toc-level-2"><a href="#8-%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB%E4%B8%80%E6%89%B9%E8%B0%83%E7%94%A8%E4%B8%8D%E8%83%BD%E5%8F%AA%E6%9C%89%E4%B8%80%E4%B8%AA%E5%B8%83%E5%B0%94%E5%80%BC">8. 失败走读：一批调用不能只有一个布尔值</a></li><li class="toc-level-2"><a href="#9-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE%E4%B8%8E%E5%8F%82%E8%80%83%E7%AD%94%E6%A1%88">9. 递进追问与参考答案</a></li><li class="toc-level-2"><a href="#10-%E5%8F%96%E8%88%8D%E4%B8%8E%E9%AA%8C%E8%AF%81">10. 取舍与验证</a></li><li class="toc-level-2"><a href="#11-%E6%9F%A5%E8%AF%A2-100-%E4%B8%AA%E8%AE%A2%E5%8D%95%E6%9B%B4%E6%96%B0%E5%85%B6%E4%B8%AD-3-%E4%B8%AA%E7%9A%84%E5%AE%8C%E6%95%B4%E6%96%B9%E6%A1%88">11. 查询 100 个订单、更新其中 3 个的完整方案</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

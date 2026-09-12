@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 05 章｜交互、退出、预算与执行轨迹 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 05 / 62</div><article id="main-content"><span class="heading-alias" id="a03interactionexitlimits-与-trajectoryagent-怎样停下以及记录能证明什么" aria-hidden="true"></span><span class="heading-alias" id="a03交互退出预算与执行轨迹" aria-hidden="true"></span><h1 id="第-05-章交互退出预算与执行轨迹">第 05 章｜交互、退出、预算与执行轨迹</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：人工确认、完成标记、预算超限和异常，各自怎样改变循环与保存结果？</p>
+<p><strong>关键概念</strong>：Interaction（交互）影响动作是否执行；Submitted（提交信号）触发完成退出；预算限制资源消耗；trajectory（执行轨迹）保存 Agent 对象中的过程。</p>
+<p><strong>关系主线</strong>：执行前的交互、循环中的退出判断与外层保存各有时点。轨迹反映已进入对象并被保存的内容，不是与外部文件同步提交的账本；循环结束也不等于任务正确。</p>
+</blockquote>
+<p>动作与消息的转换见 <a href="03-actions-and-messages.html">第03章</a>；<a href="04-code-repair.html">第04章</a>提供实际命令和测试结果。</p>
+<span class="heading-alias" id="核心阅读" aria-hidden="true"></span><span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><h2 id="交互退出与轨迹">交互、退出与轨迹</h2>
+<span class="heading-alias" id="先分清控制与记录" aria-hidden="true"></span><h3 id="控制与记录的分工">控制与记录的分工</h3>
+<p>第04章 使用 <code>DefaultAgent</code> 让固定响应经过真实循环。日常命令行 <code>mini</code> 默认再加一层 <code>InteractiveAgent</code>，让人在命令执行前参与选择。预算检查由 <code>DefaultAgent</code> 提供，交互层可在部分限制到达时增加询问。运行中的消息可以保存成 trajectory JSON，供之后检查。</p>
+<h3 id="为什么默认-cli-使用-interactiveagent">为什么默认 CLI 使用 <code>InteractiveAgent</code></h3>
+<p><code>run/mini.py</code> 组装 Agent 时使用：</p>
+<pre><code class="language-text">get_agent(..., default_type=&quot;interactive&quot;)</code></pre>
+<p><code>InteractiveAgent</code> 继承 <code>DefaultAgent</code>。这里的<strong>继承</strong>表示在已有类的基础上复用和扩展行为，因此不需要重新写一套 Agent loop。它主要在最小循环上增加：</p>
+<ul>
+<li>把消息打印到终端；</li>
+<li>支持人直接输入命令；</li>
+<li>在执行模型命令前询问确认；</li>
+<li>处理键盘中断；</li>
+<li>在 Agent 想结束时询问用户是否还有补充任务；</li>
+<li>在某些限制到达时允许用户调整限制。</li>
+</ul>
+<p>可以把关系画成：</p>
+<pre><code class="language-text">DefaultAgent
+  └─ query → execute → observation 的最小循环
+
+InteractiveAgent(DefaultAgent)
+  └─ 在若干边界插入人类交互</code></pre>
+<h3 id="三种交互模式">三种交互模式</h3>
+<h4 id="confirm模型提命令人在执行前确认"><code>confirm</code>：模型提命令，人在执行前确认</h4>
+<p>这是默认 <code>mini.yaml</code> 的模式。</p>
+<p>沿用第01章的 README 文档任务，假设模型提出下面的读取命令；这里说明 confirm 模式的处理方式，不复用第04章的固定响应运行：</p>
+<pre><code class="language-text">sed -n &#39;1,220p&#39; package.json README.md</code></pre>
+<p>在执行前，InteractiveAgent 可以显示命令并询问是否执行。用户可以：</p>
+<ul>
+<li>直接确认；</li>
+<li>输入说明拒绝本次命令；</li>
+<li>切换模式；</li>
+<li>中断并补充新的上下文。</li>
+</ul>
+<p>确认模式的价值是把人放进关键动作之前：模型不会在一组 actions 生成后都无条件立即执行。</p>
+<p>当前实现对同一条模型消息中的整组 actions 作一次确认，再按顺序执行，不是每条 command 分别弹窗。</p>
+<span class="heading-alias" id="误区一yolo-只是少点一次按钮不改变风险" aria-hidden="true"></span><h4 id="yolo模型命令无需执行前批量确认"><code>yolo</code>：模型命令无需执行前批量确认</h4>
+<p>在 yolo 模式中，模型生成的 action 直接进入 Environment。</p>
+<p>它只取消命令执行前确认，结束前是否再询问是独立设置。因此切到 yolo，不意味着所有人工交互都会消失。<code>confirm_exit</code> 独立控制结束前询问。</p>
+<p>实际命令仍交给同一个 Environment 执行。</p>
+<h4 id="human由人直接提供命令"><code>human</code>：由人直接提供命令</h4>
+<p>human 模式不请求模型来决定当前 action，而是提示用户输入命令。InteractiveAgent 把用户命令包装成带 action 的 user message，随后仍复用 Environment execution 和 observation formatting。</p>
+<p>因此 human 模式不是“退出 Agent 系统去开另一个终端”。它仍然走当前 Agent 的消息与执行通道，只是 action 的提出者从 Model 换成了人。</p>
+<h4 id="模式改变了什么没有改变什么">模式改变了什么，没有改变什么</h4>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 模式改变了什么，没有改变什么"><table><caption>表 1 / Table 1 · 模式改变了什么，没有改变什么</caption><thead><tr><th scope="col">模式</th><th scope="col">谁提出命令</th><th scope="col">模型动作批次（Action Batch）执行前是否询问</th><th scope="col">执行环境（Environment）是否仍负责执行</th></tr></thead><tbody><tr><td>人工模式（human）</td><td>用户</td><td>用户本身输入</td><td>是</td></tr>
+<tr><td>确认模式（confirm）</td><td>模型（Model）</td><td>通常是</td><td>是</td></tr>
+<tr><td>免执行前确认（yolo）</td><td>模型（Model）</td><td>否</td><td>是</td></tr></tbody></table></div>
+<p>三种模式都没有改变一个事实：现实副作用仍由具体 Environment 产生。</p>
+<span class="heading-alias" id="误区一confirm-模式等于安全沙箱" aria-hidden="true"></span><h3 id="确认为什么不等于-sandbox">确认为什么不等于 Sandbox</h3>
+<h4 id="确认解决人是否同意这段可见命令">确认解决“人是否同意这段可见命令”</h4>
+<p>确认对话让用户看到模型准备执行的 command，并决定是否继续。它属于人机控制层。</p>
+<h4 id="sandbox-解决命令实际越界时能否被强制挡住">Sandbox 解决“命令实际越界时能否被强制挡住”</h4>
+<p>如果一条看似普通的命令：</p>
+<ul>
+<li>通过脚本间接访问工作区外文件；</li>
+<li>启动另一个程序；</li>
+<li>在宿主允许时访问网络；</li>
+<li>展开到用户没有预见的路径；</li>
+</ul>
+<p>仅仅点击“确认”不会额外建立 OS 级隔离。</p>
+<p>确认也不能证明用户已经理解命令内部所有动态行为。</p>
+<p>所以必须保留下面的边界：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · Sandbox 解决“命令实际越界时能否被强制挡住”"><table><caption>表 2 / Table 2 · Sandbox 解决“命令实际越界时能否被强制挡住”</caption><thead><tr><th scope="col">控制概念</th><th scope="col">生效时点与责任</th><th scope="col">仍需核对什么</th></tr></thead><tbody><tr><td>确认（Confirmation）</td><td>执行前由人判断是否接受可见命令</td><td>不自动限制脚本间接产生的文件、网络和子进程行为</td></tr>
+<tr><td>沙箱隔离（Sandbox Isolation）</td><td>执行时由具体后端落实资源限制</td><td>要检查所选 Environment 的实际能力；普通 LocalEnvironment 不因确认而获得隔离</td></tr></tbody></table></div>
+<p>mini-SWE-agent 支持选择不同 Environment，但每个 Environment 的实际隔离保证必须独立核对。</p>
+<h3 id="一次拒绝怎样回到循环">一次拒绝怎样回到循环</h3>
+<p>在 confirm 模式中，用户可以拒绝当前命令并写明原因。InteractiveAgent 把反馈变成用户消息，交回外层循环。例如：</p>
+<pre><code class="language-text">用户：先不要修改，请先读取测试文件。
+    ↓
+反馈进入 messages
+    ↓
+下一轮模型看见反馈，再决定动作</code></pre>
+<p>因此，拒绝命令不一定等于结束任务。反馈可以成为下一轮的判断依据。该反馈经控制流异常回到外层循环，而不是执行已被拒绝的命令。</p>
+<span class="heading-alias" id="误区二模型输出最终中文说明就会停止" aria-hidden="true"></span><h3 id="agent-怎样正常提交">Agent 怎样正常提交</h3>
+<h4 id="完成也通过-bash-协议表达">完成也通过 Bash 协议表达</h4>
+<p>默认任务模板要求 Agent 完成后执行：</p>
+<pre><code class="language-text">echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code></pre>
+<p>并要求不要与其他命令组合。</p>
+<p>这条命令不是为了修改项目。它是 Environment 能识别的完成信号。</p>
+<h4 id="localenvironment_check_finished-检查什么"><code>LocalEnvironment._check_finished()</code> 检查什么</h4>
+<p>执行命令以后，LocalEnvironment：</p>
+<ol>
+<li>去掉输出开头的空白；</li>
+<li>按行拆分；</li>
+<li>检查第一行是否正好是 <code>COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code>；</li>
+<li>检查 return code 是否为 0。</li>
+</ol>
+<p>满足条件时，它抛出 <code>Submitted</code>，并把第一行之后的内容作为 submission。</p>
+<h4 id="submitted-为什么是控制流异常"><code>Submitted</code> 为什么是控制流异常</h4>
+<p><code>Submitted</code> 继承 <code>InterruptAgentFlow</code>。它不是“程序出现意外 bug”的普通错误，而是一种从深层 Environment execution 跳回外层 Agent loop 的控制信号。</p>
+<p><code>DefaultAgent.run()</code> 捕获后把携带的 exit message 加入 <code>messages</code>。最后一条消息 role 为 <code>exit</code>，循环随即结束。</p>
+<p>如果直接使用 <code>DefaultAgent</code>，主路径可以画成：</p>
+<pre><code class="language-text">Model 请求完成命令
+  ↓
+LocalEnvironment 真正执行
+  ↓
+输出首行匹配 + returncode 0
+  ↓
+raise Submitted(exit message)
+  ↓
+DefaultAgent.run 捕获并追加消息
+  ↓
+last role == exit
+  ↓
+break</code></pre>
+<h4 id="interactiveagent-还能在退出前询问">InteractiveAgent 还能在退出前询问</h4>
+<p>默认 <code>confirm_exit</code> 为 true。InteractiveAgent 捕获 Submitted 后，可以询问用户：</p>
+<ul>
+<li>直接确认结束；</li>
+<li>补充新任务；</li>
+<li>切换到 human 等模式继续。</li>
+</ul>
+<p>因此“模型认为完成”与“交互用户同意结束”在该 CLI 中可以是两个时点。</p>
+<h3 id="下一次调用为什么也可能被阻止">下一次调用为什么也可能被阻止</h3>
+<p>即使尚未正常提交，系统也不能无限请求模型。DefaultAgent 在下一次模型 query 前检查已有步数、成本与经过时间；格式错误（例如模型响应不符合工具调用协议）可以先反馈给模型，连续达到上限才退出。这些检查发生在指定控制点，不是能随时打断所有进行中操作的万能计时器。human 命令绕过模型 query，不能把模型调用预算当作所有人工命令的限制。</p>
+<h3 id="trajectory保存当前已经知道的过程">Trajectory：保存当前已经知道的过程</h3>
+<p>Trajectory 是本次运行的结构化轨迹快照。它保存当前 <code>messages</code>，以及配置、模型统计和退出摘要，用来调试和复盘。它记录已经进入 Agent 对象的信息；不会自动知道消息之外的文件变化。</p>
+<h4 id="什么时候保存">什么时候保存</h4>
+<p><code>run()</code> 的循环在 <code>finally</code> 中调用 <code>save(output_path)</code>。配置了 path 且控制流走到 <code>finally</code> 时，程序会尝试把当前序列化数据写到该路径。硬终止会跳过这一步，写入自身也可能失败。</p>
+<p>命令行 <code>mini</code> 默认也提供 trajectory 输出文件位置，并在结束时提示保存位置。</p>
+<p>这比只在最后保存更有利于调试：中途出现预期错误或退出时，通常仍能看到已经进入 Agent 对象的消息。</p>
+<p>保存时会覆盖同一个 JSON 快照，而不是为每个现实副作用建立独立的恢复协议。因此，实际效果与下一份快照之间可能存在记录缺口。</p>
+<span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区四trajectory-每轮保存所以命令绝不会重复" aria-hidden="true"></span><span class="heading-alias" id="本章小结" aria-hidden="true"></span><h3 id="一个关键崩溃窗口">一个关键崩溃窗口</h3>
+<p>固定案例中，假设 Environment 正在执行修改 README 的命令：</p>
+<pre><code class="language-text">t0  上一轮 observation 已经成功保存
+t1  query() 把本轮 assistant action 加入内存 messages
+t2  LocalEnvironment 启动 shell，shell 把 README 写到磁盘
+t3  Python 进程被硬终止，output 尚未追加为 observation
+t4  硬终止绕过本轮 finally/save，磁盘 snapshot 仍停在 t0</code></pre>
+<p>重新启动后，可能出现：</p>
+<ul>
+<li>文件系统中的 README 已经改变；</li>
+<li>因为 assistant action 与 Environment execution 位于同一个 <code>step()</code>，而该轮保存发生在外层 <code>finally</code>，上一次成功落盘的 trajectory 通常只到前一轮 observation，甚至还看不到本轮“准备执行修改”的 assistant action；</li>
+<li>没有本轮 action/observation 的落盘配对能直接证明命令成功、失败还是部分完成。</li>
+</ul>
+<p><a href="06-crash-window.html">第06章</a> 已实际注入一个绕过 Python <code>finally</code> 的 SIGKILL 窗口，并比较旧 trajectory 与已修改文件。它只验证指定时间点，不覆盖保存中途的其他失败。若异常能够正常沿 Python 栈展开，<code>finally</code> 仍可能保存当时已经进入内存的状态；不能把两类退出混写。</p>
+<p>如果系统直接重做同一个命令，要先问“重复执行会不会多产生一次效果”。这种重复仍得到同一目标结果的性质，后面称为<strong>幂等性</strong>。不同命令可能不同：</p>
+<ul>
+<li>“把确切旧字符串替换为新字符串”第二次可能报告找不到旧字符串；</li>
+<li>“追加一行文本”可能产生重复；</li>
+<li>“创建外部资源”可能产生两份资源；</li>
+<li>一些命令可能只执行了一半。</li>
+</ul>
+<p>trajectory 对定位问题很有价值，却不能单独消除这个外部结果不确定窗口。</p>
+<h3 id="真实任务怎样结束">真实任务怎样结束</h3>
+<p>这里先看后面第22章真实函数与文档修复的最后一步，只用于说明退出协议：那次 mini 修复在第 8 次模型回答中先给中文结果，再发出 <code>echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code>。原生环境把它识别为完成控制，记录中标出 <code>action was not executed</code>；这不是普通 Bash 执行失败。文件修复和测试在之前已经发生，完成标记负责让循环收尾。不要把保存 trajectory 的成功提示当成另一次测试验收。<a href="22-agent-cases.html#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">第22章 完整过程</a></p>
+<span class="heading-alias" id="误区三returncode-0-就代表整个-task-完成" aria-hidden="true"></span><span class="heading-alias" id="基础完成条件与下一步" aria-hidden="true"></span><span class="heading-alias" id="基础自测如何停止记录能说明什么" aria-hidden="true"></span><span class="heading-alias" id="练习退出条件与记录缺口" aria-hidden="true"></span><h3 id="退出条件与记录缺口问答">退出条件与记录缺口问答</h3>
+<p><strong>问题 1。</strong> confirm、human、yolo 分别由谁提出命令？confirm 是否等于 OS Sandbox？</p>
+<p><strong>解释。</strong> human 由用户提出，confirm/yolo 由 Model 提出；confirm 增加执行前决策点，不能强制隔离文件与网络。</p>
+<p><strong>问题 2。</strong> 仅输出“我完成了”会触发退出吗？本地完成标记还要求什么？</p>
+<p><strong>解释。</strong> 不会。LocalEnvironment 要求去掉前导空白后的输出首行匹配完成标记，并且 returncode 为 0，才抛 Submitted。</p>
+<p><strong>问题 3。</strong> 在上面 t0–t4 的假设中，磁盘没有保存写入 observation，能否认定 README 没有改变？</p>
+<p><strong>解释。</strong> 不能。假设中 t2 已写入文件，t3 硬终止使轨迹只保存上一轮；实际效果（effect）与保存之间有窗口。应核对现实，再决定后续工作。下一章将给出这个窗口的实际运行结果。</p>
+<span class="heading-alias" id="实现深化" aria-hidden="true"></span><h2 id="异常预算与保存协议">异常、预算与保存协议</h2>
+<h3 id="拒绝反馈怎样回到外层循环">拒绝反馈怎样回到外层循环</h3>
+<p>InteractiveAgent 把拒绝原因放入 <code>UserInterruption</code> 携带的 user-role message。<code>UserInterruption</code> 属于 <code>InterruptAgentFlow</code>；<code>DefaultAgent.run()</code> 捕获这类控制信号，把消息加入 <code>messages</code>。它表达当前进程的交互控制，不能据此推导跨进程审批已持久保存。</p>
+<h3 id="整批确认的实现条件">整批确认的实现条件</h3>
+<p>当前实现会先收集这一条模型消息中的全部 commands，再调用一次 <code>_ask_confirmation_or_interrupt(commands)</code>。只要其中至少一条 command 不匹配 whitelist，就显示一次 <code>Execute N action(s)?</code>，由用户对整组 actions 作一次确认；确认后再按顺序执行。默认 whitelist 为空。这不是“每条 command 分别弹一次确认”。</p>
+<p><code>confirm_exit</code> 独立控制提交前是否询问，默认 true；<code>--yolo</code> 只移除执行前确认。需要理解立即退出行为时，另查 <code>--exit-immediately</code>。</p>
+<h3 id="完成命令为何会留下-not-executed-占位">完成命令为何会留下 not executed 占位</h3>
+<p>默认 CLI 使用的是 <code>InteractiveAgent</code>，它在这里多一个需要准确记录的 v2.4.6 实现细节：</p>
+<ol>
+<li><code>LocalEnvironment.execute()</code> 识别完成标记后直接抛出 Submitted，没有把普通 output dict 返回给调用方；</li>
+<li><code>InteractiveAgent.execute_actions()</code> 的 <code>finally</code> 仍会格式化 observation；</li>
+<li>tool-call formatter 发现这一条 action 没有对应 output，会补一个 <code>returncode: -1</code>、<code>exception_info: &quot;action was not executed&quot;</code> 的 observation；</li>
+<li>如果用户确认结束，Submitted 随后继续向外传播，<code>DefaultAgent.run()</code> 再追加真正的 exit message。</li>
+</ol>
+<p>所以当前默认 InteractiveAgent 的具体消息序列是：</p>
+<pre><code class="language-text">assistant：完成 tool call
+  ↓
+LocalEnvironment：完成命令确实执行并触发 Submitted
+  ↓
+tool observation：当前实现补出 &quot;action was not executed&quot;
+  ↓
+exit：Submitted</code></pre>
+<p>占位文本描述的是 formatter 没有收到普通 output；实际命令已经执行并触发 Submitted。判断此次执行必须结合 exit，不能仅凭这条 synthetic observation。</p>
+<h4 id="中文说明与-submission-不是同一个字段">中文说明与 <code>submission</code> 不是同一个字段</h4>
+<p>固定案例要求“用中文总结”。在默认 tool-call 响应中，这段中文可以出现在 assistant message 的普通 content 中，并被终端显示、被 trajectory 保存。</p>
+<p><code>submission</code> 则来自完成标记之后的命令标准输出：</p>
+<pre><code class="language-text">第一行：COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT
+后续行：才会被 _check_finished() 拼成 submission</code></pre>
+<p>默认 prompt 又要求完成命令单独执行：</p>
+<pre><code class="language-text">echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code></pre>
+<p>如果严格执行这条单行命令，标记之后没有后续输出，因此 exit extra 中的 <code>submission</code> 通常是空字符串。于是要区分：</p>
+<pre><code class="language-text">assistant content：模型在完成 tool call 同一消息中写出的中文说明
+submission：完成标记之后由命令输出提供的文本</code></pre>
+<p>二者都可能进入 trajectory，但不会因为用户语义上都像“最终回答”就自动成为同一个字段。</p>
+<span class="heading-alias" id="更深一层的常见误区" aria-hidden="true"></span><h3 id="限制怎样阻止无限循环">限制怎样阻止无限循环</h3>
+<p>这一节的三个 Agent limit 都位于 <code>DefaultAgent.query()</code>，所以首先约束的是“准备进行下一次模型调用”的路径。confirm 和 yolo 都会进入这条 Model query 路径；human 模式则在 <code>InteractiveAgent.query()</code> 中直接接收用户命令并提前返回，不调用 <code>super().query()</code>。</p>
+<p>因此，human 模式的 action 不会经过下面三项 query-level limit 检查，也不会增加 <code>n_calls</code>。它仍会进入 Environment，所以仍受单条本地 command timeout 等执行层限制。</p>
+<h4 id="step-limit">Step limit</h4>
+<p><code>step_limit</code> 限制 Model query 次数。<code>0</code> 表示不启用该限制。</p>
+<p>如果限制为 5，系统关注的是已经发生多少次 <code>query()</code>，不是执行了多少条 Bash action。</p>
+<span class="heading-alias" id="误区二达到-cost-limit-可以保证账单绝不超过阈值" aria-hidden="true"></span><h4 id="cost-limit">Cost limit</h4>
+<p><code>cost_limit</code> 根据 Model adapter 报告并累计的 cost 判断是否继续。默认 <code>mini.yaml</code> 当前设置为 3.0。</p>
+<p>成本统计依赖具体模型响应和成本计算。如果模型没有正确注册成本信息，源码中也有相应错误或忽略配置；不能把配置值简单理解成外部账单的绝对保证。</p>
+<p>这里判断的是当前累计成本，无法预知下一次请求的实际费用，因此可能在一次请求后超过阈值，再于下一轮停止。Agent 的 <code>n_calls</code>、<code>cost</code> 和开始时钟属于对象；<code>run()</code> 只重建 messages 等任务输入，不把这些预算归零。<code>GLOBAL_MODEL_STATS</code> 则是同一进程内共享的调用次数与成本统计对象，还支持可选的全局限制。这里的 <code>LitellmModel</code> 在收到响应并计算成本后更新它，检查限制时可能抛出 <code>RuntimeError</code>。这与当前 Agent 对象的预算是两层控制，都不能预留未知费用或在请求中途自动取消。</p>
+<h4 id="wall-time-limit">Wall-time limit</h4>
+<p><code>wall_time_limit_seconds</code> 使用 Agent 持有的开始时间检查经过秒数。开始时间在 Agent 对象构造时记录，而不是每次 <code>run()</code> 开头重新记录；<code>0</code> 表示不启用。</p>
+<p>它在下一次进入 <code>DefaultAgent.query()</code> 前检查，与单个 LocalEnvironment command 的 timeout 不同：</p>
+<pre><code class="language-text">Agent wall-time guard：准备调用模型时，对自 Agent 构造以来经过时间的检查
+Environment timeout：这一条命令最多执行多久</code></pre>
+<p>它不是一个实时抢占计时器：不会在已经开始的 Model request 或 Environment command 中途自动介入。正在执行的 command 仍由 Environment timeout 控制；human 模式若持续输入命令，也不会经过这个 query-level wall-time check。</p>
+<h4 id="达到限制后的控制流">达到限制后的控制流</h4>
+<p><code>query()</code> 在请求下一次模型前检查限制。达到 step/cost 条件时产生 <code>LimitsExceeded</code>；达到 wall-time 条件时产生 <code>TimeExceeded</code>。</p>
+<p>在纯 <code>DefaultAgent</code> 中，它们通过 <code>InterruptAgentFlow</code> 进入 exit message。InteractiveAgent 对 step/cost limit 可以在交互终端询问新的限制；对 TimeExceeded 则不会通过修改 step/cost 继续绕过时钟限制。</p>
+<p>如果没有可交互 stdin，InteractiveAgent 也不会强行调用输入提示造成 EOF 崩溃，而是让限制信号正常退出。</p>
+<h3 id="formaterror-怎样形成反馈循环">FormatError 怎样形成反馈循环</h3>
+<h4 id="哪些情况可能是格式错误">哪些情况可能是格式错误</h4>
+<p>默认 native tool-call 路径中，例如：</p>
+<ul>
+<li>模型没有产生任何 tool call；</li>
+<li>调用了未知工具名；</li>
+<li>arguments 不是合法 JSON；</li>
+<li>arguments 缺少 <code>command</code>。</li>
+</ul>
+<p>文本变体中，找不到恰好一个规定围栏 action 也会形成 FormatError。</p>
+<h4 id="一次-formaterror-不一定立即结束">一次 FormatError 不一定立即结束</h4>
+<p><code>DefaultAgent.run()</code> 单独捕获 FormatError。它会：</p>
+<ol>
+<li>补记这次已发生模型调用的 cost；</li>
+<li>增加连续格式错误计数；</li>
+<li>如果尚未达到上限，把格式反馈消息加入 <code>messages</code>；</li>
+<li>下一轮允许模型根据反馈重新输出。</li>
+</ol>
+<p>只要有一次干净 step，连续格式错误计数就会重置。</p>
+<h4 id="连续错误达到上限">连续错误达到上限</h4>
+<p>如果 <code>max_consecutive_format_errors</code> 为正且达到该数量，Agent 加入 <code>RepeatedFormatError</code> exit message，从而结束循环。</p>
+<p>这是一个简单的活性保护：避免模型持续违反 action 协议而无限消耗调用。</p>
+<h3 id="落入-except-exception-的未处理异常与退出消息">落入 <code>except Exception</code> 的未处理异常与“退出消息”</h3>
+<p>如果异常不是预期的 <code>InterruptAgentFlow</code> 路径、并且落入 <code>run()</code> 的 <code>except Exception</code> 分支，代码会调用 <code>handle_uncaught_exception()</code>，加入包含：</p>
+<ul>
+<li><code>exit_status</code>；</li>
+<li><code>exception_str</code>；</li>
+<li>traceback；</li>
+<li>空 submission；</li>
+</ul>
+<p>的 exit message，然后继续重新抛出原异常。</p>
+<p>这有两个效果：</p>
+<ol>
+<li>trajectory 中尽量留下诊断信息；</li>
+<li>调用者仍能感知未处理异常，而不是被静默吞掉。</li>
+</ol>
+<p>“记录了一条异常 exit”不表示错误已经恢复，只表示诊断上下文被尽量保留下来。</p>
+<p>这个分支不等于捕获所有 <code>BaseException</code>。例如，纯 <code>DefaultAgent</code> 下的 <code>KeyboardInterrupt</code>、<code>SystemExit</code> 不应未经核对就归入这里；<code>InteractiveAgent.step()</code> 对键盘中断另有自己的交互处理。</p>
+<h3 id="serialize-的主结构"><code>serialize()</code> 的主结构</h3>
+<p><code>DefaultAgent.serialize()</code> 生成一个可 JSON 序列化的字典，主要包含：</p>
+<pre><code class="language-text">info
+  ├─ model_stats
+  │    ├─ instance_cost
+  │    └─ api_calls
+  ├─ config
+  │    ├─ agent
+  │    └─ agent_type
+  ├─ mini_version
+  ├─ exit_status
+  └─ submission
+
+messages
+  └─ 当前线性消息序列
+
+trajectory_format
+  └─ &quot;mini-swe-agent-1.1&quot;
+
+model.serialize() 提供的信息
+environment.serialize() 提供的信息</code></pre>
+<p>所以 trajectory 很适合回答：</p>
+<ul>
+<li>Agent 使用了什么配置和实现类；</li>
+<li>调了多少次模型、大致成本是多少；</li>
+<li>每轮模型和工具消息怎样变化；</li>
+<li>最终以什么 exit status 离开；</li>
+<li>submission 是什么。</li>
+</ul>
+<h3 id="保存的是快照式-json">保存的是快照式 JSON</h3>
+<p>当前 <code>save()</code> 使用 <code>Path.write_text(json.dumps(...))</code> 覆盖写入完整序列化结果，而非逐条追加事件。这条路径没有先完整写临时文件、再原子 rename 到目标路径的协议：如果进程恰好在 <code>write_text()</code> 过程中被硬终止，目标 trajectory 文件自身也可能被截断或成为无效 JSON。</p>
+<p>这是由覆盖写入方式推得的另一个失败窗口。<a href="06-crash-window.html">第06章</a>注入的是写 README 后、保存轨迹前的窗口，没有实际注入轨迹覆盖写到一半的情况。快照能保存已进入对象的信息，恢复所需的其他责任列在下面。</p>
+<span class="heading-alias" id="误区三最后一条是-exit所以所有资源都已经结算" aria-hidden="true"></span><h3 id="trajectory-与-durable-ledger-的区别">Trajectory 与 durable ledger 的区别</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · Trajectory 与 durable ledger 的区别"><table><caption>表 3 / Table 3 · Trajectory 与 durable ledger 的区别</caption><thead><tr><th scope="col">问题</th><th scope="col">执行轨迹（Trajectory）当前能帮助什么</th><th scope="col">还不能自动保证什么</th></tr></thead><tbody><tr><td>看见执行过程</td><td>保存 messages、配置、统计与退出摘要</td><td>每个外部效果都有全有或全无的保存边界</td></tr>
+<tr><td>调试格式错误</td><td>保留反馈和部分原始响应信息</td><td>崩溃后一定从精确位置恢复</td></tr>
+<tr><td>复盘命令输出</td><td>保存已进入 observation 的输出</td><td>effect 已发生但 observation 未写时自动裁决</td></tr>
+<tr><td>评测结果</td><td>提供 submission 与轨迹格式</td><td>submission 是否满足任务要求；多次尝试的成功率怎样计算</td></tr>
+<tr><td>重新查看</td><td>JSON 可以再次读取</td><td>任何未完成 action 都可以安全重放</td></tr></tbody></table></div>
+<p>可用于恢复核对的持久执行记录（durable ledger）还需要明确以下合同：</p>
+<ul>
+<li>谁拥有写入权；</li>
+<li>每条工作和 effect 的稳定身份是什么；</li>
+<li>一次记录更新是否原子，即要么完整提交、要么不生效；</li>
+<li>崩溃发生在 effect 前、effect 后还是结果保存后；</li>
+<li>不确定结果如何对账；</li>
+<li>哪些状态可以安全重试；</li>
+<li>多个观察者怎样得到同一终态。</li>
+</ul>
+<h3 id="固定案例的完整退出轨迹">固定案例的完整退出轨迹</h3>
+<p>下面仍是“项目代码正确、修正文档后测试通过”的简化教学序列，不是 第04章 或 第22章 的真实 trace：</p>
+<pre><code class="language-text">system
+  ↓
+user task
+  ↓
+assistant: Bash call，读取文件
+  ↓
+tool: 文件内容
+  ↓
+assistant: Bash call，修改 README
+  ↓
+tool: returncode 0
+  ↓
+assistant: Bash call，运行 npm test
+  ↓
+tool: tests passed
+  ↓
+assistant: Bash call，输出 COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT
+  ↓
+tool: InteractiveAgent 当前补出的 action was not executed observation
+  ↓
+exit: Submitted</code></pre>
+<p>上面这条 synthetic tool observation 来自默认 InteractiveAgent 的补位逻辑；若直接使用 <code>DefaultAgent</code>，Submitted 会从 Environment 越过普通 observation formatting，序列中不会出现这一步。</p>
+<p>这条序列中，assistant 里的命令是模型意图，tool 消息承载 Environment 返回的观察，<code>Submitted</code> 经外层处理才使循环退出。README 的修改发生在文件系统，不在消息列表内部。</p>
+<p>崩溃位置决定最后留下哪份记录：写入前只有旧文件；写入后、保存前可能是新文件加旧 trajectory；本轮保存成功后才有覆盖该轮消息的快照。若硬终止落在 trajectory 的覆盖写入过程中，文件自身还可能不完整，不能假定总能得到一份完整的旧快照。</p>
+<span class="heading-alias" id="深化自测读限制和异常的接线" aria-hidden="true"></span><span class="heading-alias" id="练习限制与异常分支" aria-hidden="true"></span><h3 id="限制与异常分支问答">限制与异常分支问答</h3>
+<p><strong>问题 1。</strong> yolo 是否关闭 confirm_exit？human 命令是否经过 DefaultAgent.query 的预算检查？</p>
+<p><strong>解释。</strong> yolo 只取消执行前确认，confirm_exit 独立；human 输入命令绕开 Model query 及该处预算检查，但仍经过 Environment timeout。</p>
+<p><strong>问题 2。</strong> cost_limit 和 wall_time_limit 是否能中途抢占请求、保证绝不超额？复用对象会重置预算吗？</p>
+<p><strong>解释。</strong> 都不能；guard 在下一次 query 入口按已有统计检查，进行中的操作不受其抢占。run 不重置对象计数、成本与构造时钟。</p>
+<p><strong>问题 3。</strong> InteractiveAgent 为完成 action 填入 not executed，为什么不能据此认定命令没执行？</p>
+<p><strong>解释。</strong> 完成命令已运行，但 Environment 抛 Submitted 而没有普通 output 返回；formatter 对缺口生成占位。它不能证明 effect 未发生。</p>
+<p><strong>问题 4。</strong> 什么错误进入反馈循环，什么普通异常记录 exit 后仍会向调用者抛出？SIGKILL 属于哪一类？</p>
+<p><strong>解释。</strong> FormatError 可作为反馈继续，连续达到上限才退出；落入 except Exception 的异常会记录 exit 后重新抛出。SIGKILL 直接终止进程，两条 Python 路径与 finally 都不会执行。</p>
+<span class="heading-alias" id="继续读源码" aria-hidden="true"></span><span class="heading-alias" id="练习标注控制流跳转" aria-hidden="true"></span><h3 id="确认提交与硬终止分别留下什么">确认、提交与硬终止分别留下什么</h3>
+<p><a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/agents/interactive.py"><code>InteractiveAgent.execute_actions</code></a> 与 <a href="https://github.com/SWE-agent/mini-swe-agent/blob/HEAD/src/minisweagent/agents/default.py"><code>DefaultAgent.run / save</code></a> 共同形成三种代表路径：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 确认、提交与硬终止分别留下什么"><table><caption>表 4 / Table 4 · 确认、提交与硬终止分别留下什么</caption><thead><tr><th scope="col">路径</th><th scope="col">命令与消息</th><th scope="col">保存结果（Persistence）</th></tr></thead><tbody><tr><td>执行前拒绝</td><td>被拒绝的命令不执行，拒绝信息成为后续反馈</td><td>外层正常走到 <code>finally</code> 时保存当前消息</td></tr>
+<tr><td>完成命令触发 Submitted</td><td>命令已经产生完成输出；没有普通 output 的位置由 formatter 补位，外层记录 exit</td><td>正常退出路径保存当前快照</td></tr>
+<tr><td>写 README 后遭 SIGKILL</td><td>文件可能已改变，进程尚未返回和追加这一轮结果</td><td>Python <code>finally</code> 不执行；此前快照不能代表最后的文件状态</td></tr></tbody></table></div>
+<p>补位文本、退出消息和磁盘文件各描述不同对象，不能用任意一个代替另外两个。</p>
+<span class="heading-alias" id="上一章与-mini-阶段收尾" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
+<ul>
+<li>相关章节：<a href="03-actions-and-messages.html">第03章｜动作、观察与消息协议</a></li>
+<li>下一站：<a href="06-crash-window.html">第06章｜写入与轨迹保存的崩溃窗口</a></li>
+<li>实验后：<a href="07-loop-boundaries.html#1-%E6%AD%A3%E5%B8%B8%E6%83%85%E5%86%B5%E4%B8%8B%E4%B8%89%E4%BB%B6%E4%BA%8B%E7%B4%A7%E6%8C%A8%E7%9D%80%E5%8F%91%E7%94%9F">第07章｜最小循环的能力边界</a></li>
+<li>mini 收尾导航：<a href="bridge/README.html">从最小循环到 Maka</a></li>
+</ul>
+<hr>
+<p><a href="04-code-repair.html">上一章：第 04 章｜代码修复与测试</a> · <a href="06-crash-window.html">下一章：第 06 章｜写入与轨迹保存的崩溃窗口</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="04-code-repair.html"><span>← 上一章</span><strong>第 04 章｜代码修复与测试</strong></a><a href="06-crash-window.html"><span>下一章 →</span><strong>第 06 章｜写入与轨迹保存的崩溃窗口</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E4%BA%A4%E4%BA%92%E9%80%80%E5%87%BA%E4%B8%8E%E8%BD%A8%E8%BF%B9">交互、退出与轨迹</a></li><li class="toc-level-3"><a href="#%E6%8E%A7%E5%88%B6%E4%B8%8E%E8%AE%B0%E5%BD%95%E7%9A%84%E5%88%86%E5%B7%A5">控制与记录的分工</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E9%BB%98%E8%AE%A4-cli-%E4%BD%BF%E7%94%A8-interactiveagent">为什么默认 CLI 使用 InteractiveAgent</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E4%BA%A4%E4%BA%92%E6%A8%A1%E5%BC%8F">三种交互模式</a></li><li class="toc-level-3"><a href="#%E7%A1%AE%E8%AE%A4%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%AD%89%E4%BA%8E-sandbox">确认为什么不等于 Sandbox</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1%E6%8B%92%E7%BB%9D%E6%80%8E%E6%A0%B7%E5%9B%9E%E5%88%B0%E5%BE%AA%E7%8E%AF">一次拒绝怎样回到循环</a></li><li class="toc-level-3"><a href="#agent-%E6%80%8E%E6%A0%B7%E6%AD%A3%E5%B8%B8%E6%8F%90%E4%BA%A4">Agent 怎样正常提交</a></li><li class="toc-level-3"><a href="#%E4%B8%8B%E4%B8%80%E6%AC%A1%E8%B0%83%E7%94%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B9%9F%E5%8F%AF%E8%83%BD%E8%A2%AB%E9%98%BB%E6%AD%A2">下一次调用为什么也可能被阻止</a></li><li class="toc-level-3"><a href="#trajectory%E4%BF%9D%E5%AD%98%E5%BD%93%E5%89%8D%E5%B7%B2%E7%BB%8F%E7%9F%A5%E9%81%93%E7%9A%84%E8%BF%87%E7%A8%8B">Trajectory：保存当前已经知道的过程</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E4%B8%AA%E5%85%B3%E9%94%AE%E5%B4%A9%E6%BA%83%E7%AA%97%E5%8F%A3">一个关键崩溃窗口</a></li><li class="toc-level-3"><a href="#%E7%9C%9F%E5%AE%9E%E4%BB%BB%E5%8A%A1%E6%80%8E%E6%A0%B7%E7%BB%93%E6%9D%9F">真实任务怎样结束</a></li><li class="toc-level-3"><a href="#%E9%80%80%E5%87%BA%E6%9D%A1%E4%BB%B6%E4%B8%8E%E8%AE%B0%E5%BD%95%E7%BC%BA%E5%8F%A3%E9%97%AE%E7%AD%94">退出条件与记录缺口问答</a></li><li class="toc-level-2"><a href="#%E5%BC%82%E5%B8%B8%E9%A2%84%E7%AE%97%E4%B8%8E%E4%BF%9D%E5%AD%98%E5%8D%8F%E8%AE%AE">异常、预算与保存协议</a></li><li class="toc-level-3"><a href="#%E6%8B%92%E7%BB%9D%E5%8F%8D%E9%A6%88%E6%80%8E%E6%A0%B7%E5%9B%9E%E5%88%B0%E5%A4%96%E5%B1%82%E5%BE%AA%E7%8E%AF">拒绝反馈怎样回到外层循环</a></li><li class="toc-level-3"><a href="#%E6%95%B4%E6%89%B9%E7%A1%AE%E8%AE%A4%E7%9A%84%E5%AE%9E%E7%8E%B0%E6%9D%A1%E4%BB%B6">整批确认的实现条件</a></li><li class="toc-level-3"><a href="#%E5%AE%8C%E6%88%90%E5%91%BD%E4%BB%A4%E4%B8%BA%E4%BD%95%E4%BC%9A%E7%95%99%E4%B8%8B-not-executed-%E5%8D%A0%E4%BD%8D">完成命令为何会留下 not executed 占位</a></li><li class="toc-level-3"><a href="#%E9%99%90%E5%88%B6%E6%80%8E%E6%A0%B7%E9%98%BB%E6%AD%A2%E6%97%A0%E9%99%90%E5%BE%AA%E7%8E%AF">限制怎样阻止无限循环</a></li><li class="toc-level-3"><a href="#formaterror-%E6%80%8E%E6%A0%B7%E5%BD%A2%E6%88%90%E5%8F%8D%E9%A6%88%E5%BE%AA%E7%8E%AF">FormatError 怎样形成反馈循环</a></li><li class="toc-level-3"><a href="#%E8%90%BD%E5%85%A5-except-exception-%E7%9A%84%E6%9C%AA%E5%A4%84%E7%90%86%E5%BC%82%E5%B8%B8%E4%B8%8E%E9%80%80%E5%87%BA%E6%B6%88%E6%81%AF">落入 except Exception 的未处理异常与“退出消息”</a></li><li class="toc-level-3"><a href="#serialize-%E7%9A%84%E4%B8%BB%E7%BB%93%E6%9E%84">serialize() 的主结构</a></li><li class="toc-level-3"><a href="#%E4%BF%9D%E5%AD%98%E7%9A%84%E6%98%AF%E5%BF%AB%E7%85%A7%E5%BC%8F-json">保存的是快照式 JSON</a></li><li class="toc-level-3"><a href="#trajectory-%E4%B8%8E-durable-ledger-%E7%9A%84%E5%8C%BA%E5%88%AB">Trajectory 与 durable ledger 的区别</a></li><li class="toc-level-3"><a href="#%E5%9B%BA%E5%AE%9A%E6%A1%88%E4%BE%8B%E7%9A%84%E5%AE%8C%E6%95%B4%E9%80%80%E5%87%BA%E8%BD%A8%E8%BF%B9">固定案例的完整退出轨迹</a></li><li class="toc-level-3"><a href="#%E9%99%90%E5%88%B6%E4%B8%8E%E5%BC%82%E5%B8%B8%E5%88%86%E6%94%AF%E9%97%AE%E7%AD%94">限制与异常分支问答</a></li><li class="toc-level-3"><a href="#%E7%A1%AE%E8%AE%A4%E6%8F%90%E4%BA%A4%E4%B8%8E%E7%A1%AC%E7%BB%88%E6%AD%A2%E5%88%86%E5%88%AB%E7%95%99%E4%B8%8B%E4%BB%80%E4%B9%88">确认、提交与硬终止分别留下什么</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

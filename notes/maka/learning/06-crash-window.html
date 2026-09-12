@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 06 章｜写入与轨迹保存的崩溃窗口 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 06 / 62</div><article id="main-content"><span class="heading-alias" id="l01readme-已经写了为什么轨迹还停在读取" aria-hidden="true"></span><span class="heading-alias" id="l01写入与轨迹保存的崩溃窗口" aria-hidden="true"></span><h1 id="第-06-章写入与轨迹保存的崩溃窗口">第 06 章｜写入与轨迹保存的崩溃窗口</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：文件已经改了，为什么重开后看到的执行轨迹仍可能停在修改之前？</p>
+<p><strong>关键概念</strong>：effect（效果）是实际文件变化；observation（观察）是返回给 Agent 的结果；trajectory（轨迹）是已保存的过程；SIGKILL（硬终止）会跳过 finally 收尾。</p>
+<p><strong>关系主线</strong>：本例在写入后、结果返回和保存前终止子进程，对照文件效果、进程内消息与已保存轨迹。记录缺口不能证明未执行；继续前需要核对现实，故障注入通过也不代表修复任务成功。</p>
+</blockquote>
+<p>案例从 <a href="04-code-repair.html">第04章</a> 的同一项目模板建立独立 fixture，只改 README 并打断进程，不把函数是否修好作为验收项。PASS 表示观察到了指定记录缺口，不表示 Agent 成功完成修复。</p>
+<span class="heading-alias" id="先预测两份证据" aria-hidden="true"></span><span class="heading-alias" id="练习预测文件与轨迹状态" aria-hidden="true"></span><h2 id="场景文件写入早于轨迹保存">场景：文件写入早于轨迹保存</h2>
+<p>这次先完成第一轮读取，让 observation 进入 messages 并保存 trajectory；再让第二轮命令修改 README，随即终止子 Agent。下图的三行对应同一过程中的三种状态，箭头只表示时间向右推进。每一行从中间到右侧经过的是<strong>同一次 SIGKILL</strong>，不是三次不同的故障：</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="场景：文件写入早于轨迹保存：可滚动示意图"><a href="../../../assets/diagrams/06-crash-window-1.svg"><img src="../../../assets/diagrams/06-crash-window-1.svg" alt="同一次 SIGKILL 的三个平行状态：README 的新命令已经写入并保留，进程内第二轮 action 尚无 observation 且内存随子 Agent 退出而失去，磁盘轨迹仍只有第一轮快照。" width="994" height="730" loading="lazy" style="width:994px;min-width:845px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>第一轮留下的是读取旧 README 的结果。第二轮的 action 已进入进程内消息并启动命令，但观察尚未返回，这一轮的新消息也还没保存。SIGKILL 不会替程序把内存补写到轨迹文件；控制进程仍能读到已经改过的 README 与较旧的 trajectory。</p>
+<p>在这个指定窗口，README 已含新测试命令；trajectory 仍是第一轮快照，没有第二轮修改 action、成功 tool observation 或 exit。下面的控制进程结果把这些判断逐项对应到实际产物。</p>
+<span class="heading-alias" id="运行一次明确的故障注入" aria-hidden="true"></span><h2 id="故障注入的关键动作">故障注入的关键动作</h2>
+<p>案例通过以下入口启动故障注入，输出参数是示例目录；关键行为是脚本控制写入与终止的先后时点：</p>
+<pre><code class="language-sh">.workspace/learning-labs/.venv/bin/python notes/maka/learning/labs/assets/mini-code-lab.py crash --output .workspace/learning-labs/mini/my-crash-run</code></pre>
+<p>实验仅支持 POSIX 环境，即本例采用的类 Unix 进程接口。控制进程创建独立 fixture 并启动一个子 Python Agent。上游真实 <code>LocalEnvironment</code> 启动的第二条 Shell 命令先同步写入生成目录中的 README 与实验标记，再向<strong>该子 Agent 的具体进程标识（PID）</strong> 发送 SIGKILL。Shell 随后结束；控制进程保留并检查产物。这不是模拟一次普通 Python <code>Exception</code>：SIGKILL 不会执行 <code>finally</code>。</p>
+<p>命令可在 <a href="../../../attachments/mini-code-lab.py.html">脚本的 <code>crash_worker()</code></a> 中完整阅读。这里不启动远程工具、不连接模型服务，也不终止其他 Agent 或用户进程。</p>
+<span class="heading-alias" id="对照结果不用一条状态概括全部现实" aria-hidden="true"></span><h2 id="文件轨迹与退出状态">文件、轨迹与退出状态</h2>
+<p>这份故障注入案例的验证结果为：</p>
+<pre><code class="language-text">worker_returncode: -9
+saved_roles: [system, user, assistant, tool]
+saved_model_calls: 1
+saved_observation_has_old_command: true
+filesystem_has_corrected_command: true
+saved_write_action_in_messages: false
+saved_write_observation: false
+saved_exit: false
+acceptance: PASS</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 文件、轨迹与退出状态"><table><caption>表 1 / Table 1 · 文件、轨迹与退出状态</caption><thead><tr><th scope="col">检查位置</th><th scope="col">实际看到</th><th scope="col">可以得出的结论</th></tr></thead><tbody><tr><td><code>repo/README.md</code>、<code>diff.patch</code></td><td><code>npm run check</code> 已改为 <code>npm test</code></td><td>这次本地文件 effect 已发生</td></tr>
+<tr><td><code>trajectory.json</code> 的 <code>messages</code></td><td>第一轮读到的旧 README；没有第二轮 action/result</td><td>保存的历史落后于现实</td></tr>
+<tr><td><code>info.model_stats.api_calls</code></td><td>1</td><td>快照只反映第一步；不是进程退出前真实总调用次数</td></tr>
+<tr><td>控制进程的 <code>worker_returncode</code></td><td>-9</td><td>这是本实验已知的强制退出方式</td></tr>
+<tr><td>trajectory 中的 <code>exit</code></td><td>不存在</td><td>正常退出协议与保存没有完成</td></tr></tbody></table></div>
+<p>有一个确定性模型特有的细节：它的 <code>serialize()</code> 会把预设 <code>outputs</code> 一起写进 <code>info.config.model</code>。所以配置里可能已经看见“准备修改”的脚本；那是预先安排的计划，不是执行记录。上表的“未保存 action”严格指 <code>messages</code> 中没有实际追加的第二轮 assistant 消息，不能把配置中的计划当成已发生事实。</p>
+<span class="heading-alias" id="下一步先核对现实" aria-hidden="true"></span><h2 id="读回现实后决定下一步">读回现实后决定下一步</h2>
+<p>对这份可直接读回的 README，下一步可以检查实际内容与 diff，确定目标文本已出现，决定接着测试还是补完修改。这个实验没有实现通用自动恢复，也没有自动重放第二条命令。</p>
+<p>如果 action 是“在日志追加一行”，盲目重试会追加两次。如果 action 是外部系统操作，而系统无法查询是否已完成，单凭缺少 observation 就更不能猜它没发生。应把结果记为“尚未确认”，再讨论查询、去重或人工处理办法。</p>
+<p><strong>effect 是现实已经改变，observation 是 Agent 得到的结果信息。它们之间存在时间窗口。</strong></p>
+<span class="heading-alias" id="自测与答案" aria-hidden="true"></span><h2 id="问题解析">问题解析</h2>
+<p><strong>问题 1。</strong> 为什么这个实验没有触发 <code>DefaultAgent.run()</code> 的 <code>except Exception</code> 并保存 exit？</p>
+<p><strong>解释。</strong> SIGKILL 在进程层面直接终止子 Agent，不是可由 Python 捕获的 Exception，也不会执行 finally。</p>
+<p><strong>问题 2。</strong> 磁盘上的 trajectory 没有记录写入 action，为什么 README 文件还是改变了？</p>
+<p><strong>解释。</strong> 第二轮 assistant/action 已在进程内存中产生，Environment 已启动命令并产生 effect；正常路径要等 output 格式化并追加 messages 后，再在该轮 finally 中保存。这个窗口中的修改还没有落入旧 trajectory。</p>
+<p><strong>问题 3。</strong> 只考虑 README 文本替换，重复执行后内容不再变化，是否就证明整条故障注入命令可以作为恢复方案重放？</p>
+<p><strong>解释。</strong> 不能。此处文本替换第二次不再改变 README，但整条实验命令还写标记并向特定子 Agent PID 发送 SIGKILL；不要从轨迹复制它作为恢复命令。案例由 <code>crash</code> 入口在独立目录中创建并管理子进程，命令里的 PID 只属于那次注入。真实恢复先读回目标，再执行仍需完成的工作；追加、计费或提交又有各自的重复效果。</p>
+<p>相关分析：<a href="07-loop-boundaries.html#1-%E6%AD%A3%E5%B8%B8%E6%83%85%E5%86%B5%E4%B8%8B%E4%B8%89%E4%BB%B6%E4%BA%8B%E7%B4%A7%E6%8C%A8%E7%9D%80%E5%8F%91%E7%94%9F">第07章｜最小循环的记录缺口</a>。</p>
+<hr>
+<p><a href="05-exit-and-trajectory.html">上一章：第 05 章｜交互、退出、预算与执行轨迹</a> · <a href="07-loop-boundaries.html">下一章：第 07 章｜最小循环的能力边界</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="05-exit-and-trajectory.html"><span>← 上一章</span><strong>第 05 章｜交互、退出、预算与执行轨迹</strong></a><a href="07-loop-boundaries.html"><span>下一章 →</span><strong>第 07 章｜最小循环的能力边界</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%9C%BA%E6%99%AF%E6%96%87%E4%BB%B6%E5%86%99%E5%85%A5%E6%97%A9%E4%BA%8E%E8%BD%A8%E8%BF%B9%E4%BF%9D%E5%AD%98">场景：文件写入早于轨迹保存</a></li><li class="toc-level-2"><a href="#%E6%95%85%E9%9A%9C%E6%B3%A8%E5%85%A5%E7%9A%84%E5%85%B3%E9%94%AE%E5%8A%A8%E4%BD%9C">故障注入的关键动作</a></li><li class="toc-level-2"><a href="#%E6%96%87%E4%BB%B6%E8%BD%A8%E8%BF%B9%E4%B8%8E%E9%80%80%E5%87%BA%E7%8A%B6%E6%80%81">文件、轨迹与退出状态</a></li><li class="toc-level-2"><a href="#%E8%AF%BB%E5%9B%9E%E7%8E%B0%E5%AE%9E%E5%90%8E%E5%86%B3%E5%AE%9A%E4%B8%8B%E4%B8%80%E6%AD%A5">读回现实后决定下一步</a></li><li class="toc-level-2"><a href="#%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">问题解析</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

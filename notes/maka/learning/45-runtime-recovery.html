@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 45 章｜运行时恢复与 Host 交接 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 45 / 62</div><article id="main-content"><span class="heading-alias" id="l05从杀进程到换-host用实际状态验证恢复" aria-hidden="true"></span><span class="heading-alias" id="l05运行时恢复与-host-交接" aria-hidden="true"></span><span class="heading-alias" id="第-42-章运行时恢复与-host-交接" aria-hidden="true"></span><span class="heading-alias" id="第-44-章运行时恢复与-host-交接" aria-hidden="true"></span><h1 id="第-45-章运行时恢复与-host-交接">第 45 章｜运行时恢复与 Host 交接</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：Maka 的已有恢复实验，分别证明了持久前缀、Host 交接与任务准入的哪些行为？</p>
+<p><strong>关键概念</strong>：持久前缀：崩溃前已提交的事件；恢复计划：由记录推导的接续分类；Ready（就绪）：到达候选交接边界；Commit（提交决定）：接受交接请求；Sealed（封存确认）：交接事实已持久保存；Fixture backend（模型替身）：代替模型提供可控响应。</p>
+<p><strong>关系主线</strong>：重开存储后读取事实，再构造恢复计划或接续执行；就绪、提交和封存逐层增强可确认的状态，局部通过不能抹去整组失败。</p>
+</blockquote>
+<p>前置机制是 <a href="18-effects-and-recovery.html">第18章 的未知效果</a>与 <a href="25-host-and-client.html">第25章 的 Host 所有权</a>。</p>
+<p>实验直接调用 Maka 的 Runtime、SQLite 和 Host composition；模型由 fixture backend 替代，便于观察运行与持久化规则。部分测试会终止真实子进程，另一些通过重开 fixture 模拟恢复；不要因为名字含 recovery 就认定它一定杀了进程。这组实验不产生真实远端工具效果。</p>
+<span class="heading-alias" id="1-准备当前源码的构建" aria-hidden="true"></span><span class="heading-alias" id="1-已有运行的构建与环境" aria-hidden="true"></span><h2 id="1-案例范围与环境边界">1. 案例范围与环境边界</h2>
+<p>测试使用与所说明实现匹配的编译产物，调用真实本地存储与进程；结果只覆盖这组本地场景，不能推广为其他平台或完整 Desktop 的保证。</p>
+<p>取得状态根使用资格还依赖本地控制资源。如果外层执行环境先阻止相关文件访问或本地连接，测试可能在进入恢复断言前就以 <code>lock_failed</code> 失败。它说明环境准入尚未完成，不能据此判断后面的恢复逻辑。</p>
+<span class="heading-alias" id="2-第一组持久前缀到底保存了什么" aria-hidden="true"></span><h2 id="2-持久前缀与恢复计划">2. 持久前缀与恢复计划</h2>
+<p><code>runtime-resume-crash.test.ts</code> 的 <code>reopens every fully committed P0-P11 ledger prefix after SIGKILL</code> 并不是连续操纵十二次真实 Bash 效果。父进程为每个失败点选择一段预制 RuntimeEvent 前缀，启动子进程逐项提交；等子进程输出 <code>READY</code> 后再发送 <code>SIGKILL</code>。</p>
+<p>测试的数据链是：</p>
+<pre><code class="language-text">ledgerEvents → 按 committedPrefix 截取事件
+→ 子进程 appendRuntimeEvent 逐项提交
+→ READY → 父进程 SIGKILL
+→ 新 store 重开 → readRuntimeEvents
+→ buildResumePlanFromRuntimeEvents</code></pre>
+<p>实际断言有四层：子进程的 finally 标记不存在；重开的事件 ID 与已提交前缀一致；同一输入重复投影得到相同恢复计划；投影之后再次读账本，原始事实没有变化。这支持“已提交前缀可以恢复并确定性分类”，不支持“任意写文件窗口都不会重复”。预制事件里出现 <code>touch marker</code> 只是事件内容，本测试没有执行那个 Shell 命令。</p>
+<p>测试中的 <code>runCrashChild</code> 负责提交，<code>crashWriterAfterCommit</code> 等待 READY 后杀进程，<code>assertResumePlanForPrefix</code> 检查恢复分类。P4/P5 给出一个具体对照：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 2. 持久前缀与恢复计划"><table><caption>表 1 / Table 1 · 2. 持久前缀与恢复计划</caption><thead><tr><th scope="col">前缀（Prefix）</th><th scope="col">真正保存的事件 ID</th><th scope="col">恢复计划与重放（Recovery · Replay）</th></tr></thead><tbody><tr><td>P4：<code>after_function_call</code></td><td><code>user, call</code></td><td><code>blocked</code>；工具为 <code>indeterminate</code>，拒绝原因 <code>dangling_tool_state</code>；可重放事件只保留 <code>user</code></td></tr>
+<tr><td>P5：<code>after_function_response</code></td><td><code>user, call, response</code></td><td><code>safe_replay</code>；该预制成功 response 使工具分类为 <code>succeeded</code>，三项进入重放</td></tr></tbody></table></div>
+<p>P4 的边界名描述“效果完成、T2 之前”，但本测试仍只提交预制的两项事件，不执行其中的 <code>touch marker</code>。P5 多出的 response 改变了可判定事实；<code>safe_replay</code> 指已有事件可安全用于重建，不是重新执行一次 Shell 的许可。</p>
+<span class="heading-alias" id="3-第二组准备交接提交交接与完成工作不是一件事" aria-hidden="true"></span><h2 id="3-交接准备提交与持久确认">3. 交接准备、提交与持久确认</h2>
+<p>交接测试用 fixture backend 让 Run 停在可交接边界，真实 store 保存 Runtime 事实。<code>requestRunHandoff</code> 返回的 <code>ready</code> 表示已到边界；<code>commit()</code> 决定进入提交路径；<code>sealed</code> 等待持久结果。三者不能合并成一个 success 布尔值。</p>
+<p>正常分支保存 <code>runtime_handoff_pause_v1</code> 与剩余步数；源 invocation 的 terminal 不表示逻辑任务成功。后继 Run 沿同一 logical Turn 继续，模型、工具、可用性、上下文窗口等 composition 必须通过相应一致性检查。</p>
+<p>失败分支中，测试把实际 store 的 <code>appendRuntimeEvent</code> 包装成只在写入 <code>handoffPause</code> 时抛错：</p>
+<p>下图把正常保存和注入写入失败并列展示；仅展开本节这两条路径，取消与停止仍按各自测试判断。<code>commit</code> 是提交决定，<code>sealed</code> 才给出持久封存的结果。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="交接准备、提交与持久确认：可滚动示意图"><a href="../../../assets/diagrams/45-runtime-recovery-1.svg"><img src="../../../assets/diagrams/45-runtime-recovery-1.svg" alt="交接先到达 ready 边界，再接受 commit 决定；暂停记录保存成功后取得 sealed 确认并由后继接续，注入保存失败时 running 与 sealed 均拒绝。" width="720" height="1140" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这证明“commit 返回 true”还不是“交接记录已落盘”。cancel 与 stop 分支另有断言，不能从成功分支推导它们。</p>
+<p>Host 组装测试再向外走一层，使用 production composition 关闭存储、释放 owner 并让 successor 重开。它覆盖本机组装和接续，尚未包含跨机器 Peer 换路或真实模型流。</p>
+<span class="heading-alias" id="4-第三组域状态为什么不能自己重发工作" aria-hidden="true"></span><h2 id="4-域状态与工作准入">4. 域状态与工作准入</h2>
+<p>两份测试分别检查以下场景：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 4. 域状态与工作准入"><table><caption>表 2 / Table 2 · 4. 域状态与工作准入</caption><thead><tr><th scope="col">场景</th><th scope="col">输入与检查点（Input · Checkpoint）</th><th scope="col">要解释的行为</th></tr></thead><tbody><tr><td>Goal 已有 admission、还没有 Run</td><td>写入 durable admission 后调用 <code>prepareRecovery</code>；检查 opening、<code>failed/app_restarted</code>、user origin 和 root idle</td><td>恢复会收口孤立 admission，不凭 Goal 存在就重放工作</td></tr>
+<tr><td>Goal 与待准入 Schedule 竞争</td><td>同一 fixture 内控制 admission 的先后</td><td>continuation 仍须经过统一 root authority</td></tr>
+<tr><td>Schedule 已 settle 后重启</td><td>store 保留旧 fire 与更新的 pending fire，再启动恢复协调</td><td>两次 fire 的身份不能混同，已完成项不会仅因重启再次派发</td></tr>
+<tr><td>Connection 身份被替换</td><td>配置中的精确绑定与当前 Connection 不匹配</td><td>自动任务 fail closed，不能只凭同名连接继续</td></tr></tbody></table></div>
+<p>这里的重启多数是重开 fixture 或调用恢复入口，不等于杀掉完整 Desktop。</p>
+<span class="heading-alias" id="5-测试失败时先定位断言发生在哪一步" aria-hidden="true"></span><h2 id="5-实际运行结果与失败位置">5. 实际运行结果与失败位置</h2>
+<p>看一个实际诊断例子：<code>WorkHub correction replaces its link without stopping a shared manual Turn</code> 曾报 <code>false !== true</code>。名字提到了 correction，但失败的断言是 <strong>correction 之前的 <code>delegated.ok</code></strong>。因此不能仅凭标题断言“更正错误停止了用户工作”：执行还没到那个检查点。</p>
+<p>该用例在整组运行时失败，单独重跑却通过。这可以提示我们检查时序和共享条件，但不能据此宣布根因就是竞态。缺少当时的错误码，就还无法解释为何委派没有成功。诊断应保留原失败，记录实际分支与输入，再一次只改变一个条件缩小范围。</p>
+<p><strong>单例通过是否表示问题已解决？</strong> 不能。这里的完整结论是“整组在委派前置断言失败，单例重跑通过，原始委派错误码缺失，根因未确定”。两种运行条件的结果都保留，单例通过不能抹去整组失败。</p>
+<span class="heading-alias" id="6-工程验收" aria-hidden="true"></span><h2 id="6-完整结果与保证范围">6. 完整结果与保证范围</h2>
+<p>这次已有运行的结果如下，合计 83 tests：82 pass、1 fail、0 skip。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 6. 完整结果与保证范围"><table><caption>表 3 / Table 3 · 6. 完整结果与保证范围</caption><thead><tr><th scope="col">运行组</th><th scope="col">结果（Result）</th><th scope="col">解释范围</th></tr></thead><tbody><tr><td>Runtime resume + handoff</td><td>17 pass，0 fail，0 skip</td><td>已提交前缀、交接成功/取消/持久写入失败等选定合同</td></tr>
+<tr><td>Host composition + WorkHub</td><td>52 pass，1 fail，0 skip</td><td>本地 owner 与存储接手、组装及 authority；整组未通过</td></tr>
+<tr><td>Goal root authority + Schedule recovery</td><td>13 pass，0 fail，0 skip</td><td>准入、身份绑定与恢复收口</td></tr></tbody></table></div>
+<p>一条完整的失败链是：fixture Run 到达边界 → Runtime 接受 commit → store 写 <code>handoffPause</code> 时被注入失败 → <code>running</code> 与 <code>sealed</code> 都拒绝。输入、执行 owner、持久写入和最终观察在这里闭合，因此能明确反驳“commit 已接受就能安全交给 successor”。仅有 ready 更弱，它只说明源 Run 到达候选边界。</p>
+<p>P4/P5 则说明持久前缀决定恢复分类，但没有调用远端支付、没有提交支付幂等键，也没有查询接收方，所以不能证明支付 exactly-once。整组记录使用 fixture 模型，亦不能证明真实模型会正确选择恢复动作；跨机器 Peer 换路与完整 Desktop 生命周期不在这组运行范围内。</p>
+<hr>
+<p><a href="44-checkpoints-and-replay.html">上一章：第 44 章｜检查点、重放与工作流恢复</a> · <a href="46-trajectories-and-learning.html">下一章：第 46 章｜执行轨迹与学习信号</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="44-checkpoints-and-replay.html"><span>← 上一章</span><strong>第 44 章｜检查点、重放与工作流恢复</strong></a><a href="46-trajectories-and-learning.html"><span>下一章 →</span><strong>第 46 章｜执行轨迹与学习信号</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E6%A1%88%E4%BE%8B%E8%8C%83%E5%9B%B4%E4%B8%8E%E7%8E%AF%E5%A2%83%E8%BE%B9%E7%95%8C">1. 案例范围与环境边界</a></li><li class="toc-level-2"><a href="#2-%E6%8C%81%E4%B9%85%E5%89%8D%E7%BC%80%E4%B8%8E%E6%81%A2%E5%A4%8D%E8%AE%A1%E5%88%92">2. 持久前缀与恢复计划</a></li><li class="toc-level-2"><a href="#3-%E4%BA%A4%E6%8E%A5%E5%87%86%E5%A4%87%E6%8F%90%E4%BA%A4%E4%B8%8E%E6%8C%81%E4%B9%85%E7%A1%AE%E8%AE%A4">3. 交接准备、提交与持久确认</a></li><li class="toc-level-2"><a href="#4-%E5%9F%9F%E7%8A%B6%E6%80%81%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%87%86%E5%85%A5">4. 域状态与工作准入</a></li><li class="toc-level-2"><a href="#5-%E5%AE%9E%E9%99%85%E8%BF%90%E8%A1%8C%E7%BB%93%E6%9E%9C%E4%B8%8E%E5%A4%B1%E8%B4%A5%E4%BD%8D%E7%BD%AE">5. 实际运行结果与失败位置</a></li><li class="toc-level-2"><a href="#6-%E5%AE%8C%E6%95%B4%E7%BB%93%E6%9E%9C%E4%B8%8E%E4%BF%9D%E8%AF%81%E8%8C%83%E5%9B%B4">6. 完整结果与保证范围</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

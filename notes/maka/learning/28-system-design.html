@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 28 章｜Agent 系统的设计方法 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 28 / 62</div><article id="main-content"><span class="heading-alias" id="d00从理解-agent-到设计一个可交付系统" aria-hidden="true"></span><span class="heading-alias" id="d00agent-系统的设计方法" aria-hidden="true"></span><span class="heading-alias" id="第-26-章agent-系统的设计方法" aria-hidden="true"></span><h1 id="第-28-章agent-系统的设计方法">第 28 章｜Agent 系统的设计方法</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：怎样把一次代码修复的目标和新增约束，转换成必要的组件、状态与恢复规则？</p>
+<p><strong>关键概念</strong>：任务合同：明确目标、范围与验收；身份：关联会话、要求和执行尝试；owner（负责者）：拥有某类决定权；投影：由事实重建的视图；效果窗口：操作与结果记录之间的间隙；设计记录：写明选择、代价与失效条件。</p>
+<p><strong>关系主线</strong>：从任务合同确定身份和负责者，连接模型输入、工具与结果，再沿故障时间线检验哪些保证成立、哪些复杂度值得增加。</p>
+</blockquote>
+<p><a href="27-task-continuity.html">第27章</a>把已知状态和下一步条件交给后续工作；本章继续追问，系统应怎样把目标、权限、状态与完成证据组织成明确的任务合同。相关基础见<a href="26-evaluation-and-design.html#%E4%B8%80%E6%AC%A1%E5%AE%8C%E6%95%B4%E4%BF%AE%E5%A4%8D%E7%9A%84%E4%BA%94%E9%A1%B9%E5%88%A4%E6%96%AD">任务评价与综合设计</a>。下面的完整示例把同一项修复依次表示为需求表、负责者图和设计记录。</p>
+<span class="heading-alias" id="1-先把做一个代码-agent变成任务合同" aria-hidden="true"></span><h2 id="1-从修复目标到任务合同">1. 从修复目标到任务合同</h2>
+<p>统一案例是修复 <code>formatDuration</code>：输入 125 秒应该显示 <code>2:05</code>，当前显示 <code>2:25</code>；同时修正 README 的测试步骤，保留用户新增的说明，用中文汇报。</p>
+<p>“能修改代码”只说明一种动作。要判断工作是否完成，还必须知道允许修改哪里、怎样识别正确结果、谁可能同时改文件、停止时如何处理已经发生的效果。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 从修复目标到任务合同"><table><caption>表 1 / Table 1 · 1. 从修复目标到任务合同</caption><thead><tr><th scope="col">问题</th><th scope="col">本例的明确约定</th><th scope="col">对设计的影响</th></tr></thead><tbody><tr><td>功能目标（Goal）</td><td>修复格式化函数和测试入口</td><td>需要读取、编辑、测试、差异检查</td></tr>
+<tr><td>写入范围（Write scope）</td><td>指定工作区；保留用户新增 README 段落</td><td>修改应绑定观察到的文件状态</td></tr>
+<tr><td>正确性（Correctness）</td><td>既满足示例，也满足非负整数秒的函数合同</td><td>不能只让一个断言通过</td></tr>
+<tr><td>停止（Stop）</td><td>用户可随时要求停止</td><td>新效果停止准入，已开始效果需要结算</td></tr>
+<tr><td>资源（Resources）</td><td>单任务有 token、时长和输出预算</td><td>大结果应有界，循环需要预算和终止条件</td></tr>
+<tr><td>交付（Delivery）</td><td>说明修改、验证与残留问题</td><td>文本总结必须能对应实际动作和结果</td></tr></tbody></table></div>
+<p>表中的预算大小由具体部署决定。本课后续出现的数值用于算例，不能当成产品默认值。未知项先保留为设计假设，并说明假设改变后要重做哪一部分。</p>
+<h2 id="2-用最小链条检查必要组件">2. 用最小链条检查必要组件</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="用最小链条检查必要组件：可滚动示意图"><a href="../../../assets/diagrams/28-system-design-1.svg"><img src="../../../assets/diagrams/28-system-design-1.svg" alt="任务准入后组装模型输入，模型的动作候选通过执行边界产生结果和有界观察；完成候选另外按任务合同验收，预算允许时继续，或交付结果与未完成项。" width="720" height="1795" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中间是模型与工具的反馈环，接纳位于循环之前，验收决定何时结束。<code>执行 → 观察</code>解释下一步凭什么改变；<code>完成候选 → 验收</code>解释为什么模型说“完成”还不够。</p>
+<p>子 Agent、向量库和工作流引擎是否必要，取决于任务是否需要分工、检索或持久编排。执行边界和失败表示则直接影响这次修复能否安全完成，即使最小方案也需要明确。</p>
+<h3 id="从反馈决策理论看哪些是模型的工作哪些必须由程序完成">从反馈决策理论看：哪些是模型的工作，哪些必须由程序完成</h3>
+<p>沿用修复任务：第一次只知道输出错误；读函数后知道余数表达式；测试后又得到边界输入。下一步应根据新观察调整。若在第一次请求中把所有动作排好再盲目执行，就无法利用第二步刚得到的证据。这是闭环决策相对于固定动作列表的价值。</p>
+<p>ReAct 把基于已有上下文的行动，与对观察的语言推理交错起来；外部动作改变环境或取得新信息，内部推理帮助选择下一步。论文提供的是决策组织方法，不提供文件事务、进程隔离或工具幂等协议。</p>
+<p>用下面的<strong>课程抽象</strong>把这个思想与工程模块接起来，记号不是任何框架的 API。<code>t</code> 表示决策步，<code>a_t</code> 是模型提出的动作，<code>o_next</code> 是执行层返回的下一份观察；<code>~</code> 表示从模型输出中采样选择，<code>Select</code> 是输入选择，<code>Executor</code> 是执行层：</p>
+<pre><code class="language-text">H_t = 已记录的观察、动作和反馈
+L_t = 执行账本中已知的动作身份与效果状态
+C_t = Select(H_t, 长期信息, 当前任务, 输入预算)
+a_t ~ Model(C_t, 当前工具声明)
+(o_next, effect_state) = Executor(a_t, 当前授权, 当前资源状态)
+L_next = RecordEffect(L_t, a_t, effect_state)
+H_next = Record(H_t, a_t, o_next)</code></pre>
+<p><code>L</code> 保存可用于恢复和对账的已知效果状态，<code>H</code> 保存可供后续输入选择的观察；两者可以关联，不能相互替代。这份简式省略了执行前的 intent/claim 等转换，且不假定外部效果、<code>L_next</code> 与 <code>H_next</code> 原子提交。回执丢失时，账本可能只能记为 unknown，不能从缺少观察推断动作没有发生。</p>
+<p>这里有三个不能省掉的分界。<code>H_t</code> 不等于世界当前状态：文件可能被别人修改；<code>C_t</code> 不等于全部历史：选择与压缩可能丢信息；模型提出 <code>a_t</code> 不等于动作被准许或成功：执行层还要检查真实资源并产生结果。<strong>这是把论文的决策视角扩展到工程问题的推导，不是论文声称已经解决这些保证。</strong></p>
+<p>Context 决定模型观察什么；Memory 决定哪些信息能跨任务被选用；Tools 决定动作与反馈的形式；Sandbox 限制动作能触及的资源；Runtime 记录实际发生到哪一步；编排决定下一项工作何时可开始。它们控制不同变量，不能相互替代。</p>
+<h3 id="看两份真实循环理解框架更复杂究竟增加了什么">看两份真实循环，理解“框架更复杂”究竟增加了什么</h3>
+<p>mini 的 <code>DefaultAgent.step()</code> 直接连接 <code>query()</code> 与 <code>execute_actions()</code>：模型收到 <code>messages</code>，Environment 执行动作，格式化后的 observation 追加回去；外层 <code>run()</code> 处理停止与异常，并在 finally 中保存。代码短，使反馈链容易看清；但轨迹写入不与外部文件效果组成事务。保存聊天记录与安全恢复副作用是两个问题。</p>
+<p>Pi 是另一种开源 Code Agent。它的 <code>runLoop</code> 在工具反馈之外插入步骤间准备、steering（运行中补充输入）和 follow-up（当前工作将结束时取用的后续输入）；<code>streamAssistantResponse</code> 先按配置做可选的 <code>transformContext</code>，再用 <code>convertToLlm</code> 转成 pi-ai 的通用消息，交给具体模型适配器编码请求。Session 层的 <code>buildContextEntries</code> 又按当前 leaf（所选分支的末端条目）和 compaction 重建参与本轮的记录。这样扩展了<strong>输入选择与交互控制的接缝</strong>，而不是给模型增加一个神秘的持久记忆器。</p>
+<p>具体推演：用户在一次工具运行时追加“不改 README”。模型已经发出的动作不会因此从历史中消失；Pi 在后续边界取队列并组成新输入。需要保护尚未发生的写入，还要由执行层检查当前权限。由此可以看出，输入队列解决“何时看见”，权限系统解决“此刻能否做”，两者并不重复。</p>
+<p>mini/Pi 虽然都有循环，持久恢复机制却不同；后续用 <a href="39-orchestration-and-continuation.html">第39章</a> 和 <a href="44-checkpoints-and-replay.html">checkpoint/replay 深化</a>讨论不同恢复单位。</p>
+<h3 id="再追到消费者收到用户消息具体承诺了什么">再追到消费者：“收到用户消息”具体承诺了什么</h3>
+<p>在 Pi 中，把“不改 README”交给 <code>AgentSession.steer</code> 后，<code>_queueSteer</code> 把消息交给 <code>Agent.steer</code>；<code>PendingMessageQueue.enqueue</code> 将它放进内存数组。<code>Agent</code> 把队列的 <code>drain</code> 接成 <code>getSteeringMessages</code>，<code>runLoop</code> 在允许的边界取出消息，先追加到 <code>currentContext.messages</code>，随后才调用 <code>streamAssistantResponse</code>。follow-up 走另一条队列，在当前工作将要结束时取用。这条链闭合到了<strong>下一次模型请求的输入消费者</strong>，不能缩写成“接纳后立即改变在途请求”。</p>
+<p><code>one-at-a-time</code> 和 <code>all</code> 控制一次取一条还是取全部；<code>enqueue</code> 没有容量上限，队列本身也没有写盘。这说明的是该队列对象的合同，不否定外围 UI 可以限制输入。Session 历史能重建，不足以证明尚未消费的这些内存消息能跨进程恢复；同样，“每次取一条”不会让生产者自动变慢。</p>
+<p>DeepSeek Harness（下文简称 DSH）把待处理消息也记为事件。这里的投影是从事件计算出的当前队列状态；它能重建什么，取决于哪些事件实际保存。<code>send</code> 通过 <code>ReactLoopInbox.splice</code> 追加 <code>agent/inbox/spliced</code> 事件，<code>inboxProjectionDefinition.apply</code> 按事件重建 next-step/next-turn 列表。<code>preStep</code> 从这个投影 <code>claim</code>，移除本次消息并发出 claimed 通知；允许进入步骤后，<code>step</code> 把消息记成 <code>user/message</code>，<code>buildRequest</code> 通过 <code>Session.deriveMessages</code> 得到模型历史，最终传给 prepared stream 或 <code>llm.stream</code>。因此 pending 投影、claimed 通知与模型消息是三种不同状态。</p>
+<p>事件接纳与持久保存之间还有间隔：<code>Session.append</code> 同步接纳到内存 log，存储插件异步缓冲；<code>SessionStore.flush</code> 才等待已注册的持久化监听者。base 配置接入的 checkpoint policy 在 pre-step、模型下游 stream 构造前和顶层工具 body 前等待 flush；失败会阻止相应下游派发。自定义组合仍须确认该 policy 和存储 listener 实际启用，不能从裸 loop 继承保证。</p>
+<p>按源码顺序推演一次失败：claim 的队列移除早于异步 prompt assembly，也早于 <code>user/message</code> 追加；前者返回不证明后者发生。即便某段前缀已经 flush，也不能把“pending 中没有这条消息”解释成“模型一定处理成功”。仅凭这段顺序还不能判断外围插件是否会补偿；需要检验的条件是：<strong>如果产品要求已接纳输入最终被处理，验收必须覆盖 claim 后、模型消费前的中断。</strong></p>
+<h3 id="用事件序号算一次-projection-恢复">用事件序号算一次 projection 恢复</h3>
+<p>DSH 的 projection checkpoint 保存 <code>{ver, seq, val}</code>：<code>ver</code> 是投影状态格式版本，<code>seq</code> 是已经折叠进去的最后事件序号，<code>val</code> 是结果。它与 Session 的 <code>seq = log.length</code> 不同：后者表示下一个事件的位置。以下是依据 <code>restoreFloor/restore</code> 的手算，不是运行结果。</p>
+<p>假设仅有一个已注册投影，兼容的 checkpoint 覆盖到事件 41，存储实际还有 42、43、44：</p>
+<ol>
+<li><code>restoreFloor</code> 要求从 41 读取，而非直接从 42 读取；41 是证明存储尾部仍达到 checkpoint 的锚点。</li>
+<li>读取 <code>[41, 42, 43, 44]</code> 后，已包含在 checkpoint 的 41 不再 apply，只折叠 42–44。返回 <code>asOfSeq = 44</code>；完整 Session 的下一位置为 45。</li>
+<li>如果存储被修复截断到 40，从 41 读到空尾部，算出的末尾为 40。checkpoint 的 41 超过它，恢复拒绝这个尾读并要求从 0 重读，不能继续展示过新的缓存状态。</li>
+<li><code>ver</code> 不匹配也要回到完整日志重新折叠。格式版本检查与事件 cursor 检查分别防止“算法不兼容”和“覆盖范围不真实”。</li>
+</ol>
+<p>由此得到更精确的选型问题：需要恢复的是已消费历史、待处理意图，还是已经发生的外部效果？它们各自需要不同证据。数据库 WAL、业务事件、actor mailbox 和 outbox 分别在哪一层起作用，见<a href="../../../extended-reading.html#reference-16" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/runtime/agent-runtime-and-distributed-systems.md">Runtime 与分布式系统深研</a>；这里的两条 Agent 链不因此自动拥有这些外部机制。</p>
+<h2 id="3-分别决定谁拥有工作事实和资源">3. 分别决定谁拥有工作、事实和资源</h2>
+<p>Maka 的 Session/Turn/Run 提供了一种具体划分方式。设计自己的系统时可选择不同命名，但要分清三类身份：可持续的工作背景、一次用户要求，以及一次实际尝试。工具调用还需要自己的身份，以便把结果对应回来。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 3. 分别决定谁拥有工作、事实和资源"><table><caption>表 2 / Table 2 · 3. 分别决定谁拥有工作、事实和资源</caption><thead><tr><th scope="col">对象</th><th scope="col">负责者必须回答的事</th><th scope="col">常见混淆</th></tr></thead><tbody><tr><td>用户任务（Task）</td><td>当前目标和允许范围是什么；是否被修订或停止</td><td>把 UI loading 当作仍在执行</td></tr>
+<tr><td>执行尝试（Attempt）</td><td>谁能启动下一步；运行到哪里；如何结束</td><td>把重连当作重开一次任务</td></tr>
+<tr><td>文件/远端资源</td><td>谁提交改动；怎样判断当前版本</td><td>用模型记忆中的旧文件直接覆盖</td></tr>
+<tr><td>历史与请求</td><td>保存哪些事实；本次投影哪些内容</td><td>把压缩视图当作原始事实已删除</td></tr>
+<tr><td>验收（Acceptance）</td><td>哪些结果足以支持成功</td><td>用子任务文字或计划勾选替代测试</td></tr></tbody></table></div>
+<p>这张表有一个重要推论：一个对象可以有多个读者，但关键状态迁移应有明确的负责者。如果两个服务都能无条件把同一工作从 ready 改成 running，就必须补认领协议；不能只给它们相同的类型定义。</p>
+<h2 id="4-把异常加到真实时间线上">4. 把异常加到真实时间线上</h2>
+<p>现在让任务经过五个时点：读取文件 v7、模型生成编辑、用户写成 v8、执行器收到编辑、工具结果保存。正常情况下顺序一致，异常来自其中的间隔。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="把异常加到真实时间线上：可滚动示意图"><a href="../../../assets/diagrams/28-system-design-2.svg"><img src="../../../assets/diagrams/28-system-design-2.svg" alt="Agent 读到文件 v7 后用户写成 v8；带 v7 前提的编辑被资源负责者拒绝，Agent 重新读 v8 并保留用户段落后再计划。" width="818" height="827" loading="lazy" style="width:818px;min-width:696px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这里需要的是“检查前提与写入不能被同类受控写入穿插”的合同。进程内锁只能协调服从同一锁的参与者；普通文件系统上的外部编辑器不一定服从它。要么由统一资源服务提供原子条件写，要么缩窄保证，并使用安全补丁、检测和用户冲突处理。</p>
+<p>接着加入第二种异常：改动已经落盘，进程在记录结果前崩溃。重新执行编辑可能重复作用，直接报告失败也可能误导用户。此时需要先说明可观察状态和可查询能力，再选择幂等重试、对账、补偿或人工接管。失败处理由效果语义决定，不能统一写成 <code>catch → retry</code>。</p>
+<span class="heading-alias" id="5-写一份能推翻的设计记录" aria-hidden="true"></span><h2 id="5-条件编辑的完整设计记录">5. 条件编辑的完整设计记录</h2>
+<p>下面是一份已填写的参考设计记录，不是 Maka 或任何产品的真实 API：</p>
+<pre><code class="language-text">决策：使用绑定观察版本的条件编辑。
+解决的问题：模型思考期间用户也可能写文件。
+输入：文件身份、观察版本、编辑意图、当前允许范围。
+负责者：执行最终检查和提交的资源层。
+正常结果：返回新版本、实际修改范围和验证入口。
+失败结果：陈旧版本、冲突、明确未写入、结果未知。
+替代方案：统一写入服务；独立工作副本后人工合并。
+代价：冲突会增加回读和模型请求。
+推翻条件：并行编辑实验显示仍能静默覆盖用户内容。</code></pre>
+<p>记录要能区分“方案想保证什么”和“现在证明到了哪里”。例如用户段落仍被静默覆盖，就推翻了“该条件编辑保护并行修改”的保证；此时需要统一写入 owner，或收窄为可检测冲突而非完全防止竞争。</p>
+<h2 id="6-每一阶段只增加需要的复杂度">6. 每一阶段只增加需要的复杂度</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 6. 每一阶段只增加需要的复杂度"><table><caption>表 3 / Table 3 · 6. 每一阶段只增加需要的复杂度</caption><thead><tr><th scope="col">新压力</th><th scope="col">优先检查</th><th scope="col">满足什么条件才增加新机制</th></tr></thead><tbody><tr><td>输出越来越长</td><td>是否只取相关范围；结果能否回读</td><td>输入预算仍不足，再做压缩</td></tr>
+<tr><td>任务重复用同一偏好</td><td>写入和读取的范围是否明确</td><td>有跨任务复用收益，再加入长期记忆</td></tr>
+<tr><td>调查可分成多个独立模块</td><td>分工和结果合同是否清楚</td><td>节省关键路径且成本可控，再委派</td></tr>
+<tr><td>需要过一会继续</td><td>是否需要持久意图和任务身份</td><td>进程/连接会消失，再设计触发和恢复</td></tr>
+<tr><td>工具数大量增长</td><td>声明成本和发现遗漏</td><td>全量声明造成实际负担，再加入工具搜索</td></tr></tbody></table></div>
+<p>这些顺序是工程启发式，不是所有产品的演进历史。下面把同一种压力放进 Codex 与 Claude Code，检查不同实现在哪个层次做了选择。</p>
+<h2 id="7-把设计落到-codex-与-claude-code">7. 把设计落到 Codex 与 Claude Code</h2>
+<p>Codex 是 OpenAI 的编码 Agent 产品，Claude Code 是 Anthropic 的编码 Agent 产品，两者均有多种使用入口。本课对 Codex 主要追踪本地开源实现中的选定路径，对 Claude Code 按公开产品机制讨论；具体入口和适用条件在对应章节说明。</p>
+<p>现在把用户中途追加的“不改 README”放回生命周期图。关键问题是何时接纳、哪次请求开始看见它，以及已经发生的效果怎样结算。Codex 的 app-server 路径给出了接纳分类与输入队列；Claude Code 的公开材料说明可以中断或补充要求，但没有公开同一套内部状态类型。比较时应保留这个信息边界。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 7. 把设计落到 Codex 与 Claude Code"><table><caption>表 4 / Table 4 · 7. 把设计落到 Codex 与 Claude Code</caption><thead><tr><th scope="col">工程问题</th><th scope="col">Codex</th><th scope="col">Claude Code</th><th scope="col">本例参考选择</th></tr></thead><tbody><tr><td>输入交给了谁</td><td>Thread/Turn 标识工作；Started（新开工作）、Steered（加入在途工作）、NotSubmitted（未接纳）区分接纳结果</td><td>公开会话与交互入口；不公开与 Codex 对应的内部接纳类型</td><td>即时返回接纳状态，后续单独报告终态与测试结果</td></tr>
+<tr><td>新约束何时生效</td><td>已接纳 steering 在允许的步骤边界进入后续请求</td><td>可中断或补充指令；不能据此断言在途效果已撤销</td><td>保存最新范围修订，后续请求采用它，每个新效果准入再查；旧效果保留实际状态</td></tr>
+<tr><td>怎样继续旧工作</td><td>运行状态与历史重建各有责任</td><td>resume 恢复会话，仍需检查当前文件与执行配置</td><td>原工作仍 active 时接回观察；需要新尝试时先核对持久结果与当前文件</td></tr></tbody></table></div>
+<p><a href="29-codex-runtime-and-lifecycle.html">Codex 生命周期案例</a>和 <a href="30-claude-code-loop-and-context.html">Claude Code 循环案例</a>分别展开这些机制。本例借鉴统一接纳与步骤边界，适用于允许中途修订的任务；在途外部效果能否中止仍取决于具体执行入口，不能由输入排队推出。</p>
+<span class="heading-alias" id="8-自测与参考答案" aria-hidden="true"></span><h2 id="8-约束变化后的参考结论">8. 约束变化后的参考结论</h2>
+<p><strong>题一：用户只要求修 README，Agent 发现函数有错，应否一起改？</strong></p>
+<p>不能从发现错误推出获得写入授权。可以定位和说明问题，完成允许的文档修改，并把函数修复作为需要新范围的工作。任务合同决定成功条件，不能用“改得更多”替代它。</p>
+<p><strong>题二：已经有一份持久任务表，是否还需要工具调用身份？</strong></p>
+<p>需要能区分任务内部的不同调用和重试尝试。任务身份只证明归属，不能指出哪次写入发生、哪份结果迟到。具体是否独立建表取决于存储方案，身份与关联关系不能省略。</p>
+<p><strong>题三：让两个 Agent 同时修两处代码一定更快吗？</strong></p>
+<p>只有在可独立调查、写入冲突可控、合并和复测代价小于节省时才成立。计算总时长要包括启动、上下文分发、等待、采纳和整体验证，总成本也要累计所有子任务。</p>
+<p><strong>跨实现题：两种产品都支持中途补充要求，能否画成相同的“新消息立即替换当前输入”？</strong></p>
+<p>不能。Codex 的接纳与步骤边界之间存在间隔；Claude Code 的公开交互能力也不足以证明在途请求即时替换。接纳、生效与效果结算是三个不同边界，未公开的内部关系仍保留未知。</p>
+<p>本例得到两条失败结论：外部写入不服从同一锁时，进程内互斥不能保证不覆盖；效果后崩溃时，缺少结果不能保证安全重做。完整处理由资源合同和可查询能力决定，见<a href="31-tool-contracts.html">工具与执行</a>。</p>
+<p>同一设计还可以解释输入变化的影响：同一模型、同一任务，仅把完整历史改成遗漏“保留用户 README 段落”的摘要，行为为什么可能变化？因为策略接收的是被选择后的输入，不是全知的环境状态。换更大的模型也不能保证恢复这次被删去的具体约束；应先找信息在哪个选择或压缩环节丢失，再讨论模型能力。</p>
+<h3 id="把请求模型继续拆到协议与执行闸门">把“请求模型”继续拆到协议与执行闸门</h3>
+<p>“内部消息变成请求”和“响应返回循环”是不同阶段。以本课读取的 Pi OpenAI Responses 适配器为例：</p>
+<ol>
+<li><strong>Agent 层准备输入。</strong> 已运行的 <code>runLoop</code> 等待 <code>streamAssistantResponse</code>；后者依次经过可选的 <code>transformContext</code> 与 <code>convertToLlm</code>，把内部消息转换成 pi-ai 通用消息，并组成共享的 Context。</li>
+<li><strong>适配器编码请求。</strong> <code>convertResponsesMessages</code> 在内部调用 <code>transformMessages</code> 做消息兼容整理，再编码为 OpenAI Responses 的请求项。这与第1步的 Agent 通用消息转换属于不同层，也不代表所有 provider 都走这两个函数。</li>
+<li><strong>响应回到等待中的循环。</strong> <code>processResponsesStream</code> 按输出槽归并增量参数和响应状态；<code>streamAssistantResponse</code> 消费适配器的事件流，取得最终消息后返回。<code>runLoop</code> 再判断停止还是进入工具处理；它不是由响应解析器新调用起来的。</li>
+</ol>
+<p><a href="15-model-context.html#%E4%B8%A4%E4%B8%AA%E5%B7%A5%E5%85%B7%E4%BA%A4%E9%94%99%E5%88%B0%E8%BE%BE%E6%89%8B%E6%8E%A8%E5%85%AB%E4%B8%AA%E4%BA%8B%E4%BB%B6">第15章的八事件例</a>把“参数已可解析”与“响应已完整结束”分开；因此完整的参数对象也不能绕过终止政策直接执行。<a href="../../../extended-reading.html#reference-4" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/model-runtime/model-adapters-and-streaming.md">模型适配与流式执行</a>继续展开这些转换及其执行闸门。</p>
+<p>这些阶段可与编译器 IR、增量解析、队列背压和 vLLM 前缀缓存设计对照。跨模型时，签名思考可能是仅对原模型或协议有效的不透明状态，适配器不能把它当通用历史原样重放；合成缺失 toolResult 只补消息关系，没有执行文件回滚；sessionId 只是关联或提示信息，不能证明实际请求满足前缀复用条件，缓存命中仍需服务端观测。这些转换取决于模型协议，不能据一条 adapter 路径推广到所有模型。</p>
+<hr>
+<p><a href="27-task-continuity.html">上一章：第 27 章｜跨会话任务推进与工作交接</a> · <a href="29-codex-runtime-and-lifecycle.html">下一章：第 29 章｜Codex：运行时与任务生命周期</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="27-task-continuity.html"><span>← 上一章</span><strong>第 27 章｜跨会话任务推进与工作交接</strong></a><a href="29-codex-runtime-and-lifecycle.html"><span>下一章 →</span><strong>第 29 章｜Codex：运行时与任务生命周期</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E4%BB%8E%E4%BF%AE%E5%A4%8D%E7%9B%AE%E6%A0%87%E5%88%B0%E4%BB%BB%E5%8A%A1%E5%90%88%E5%90%8C">1. 从修复目标到任务合同</a></li><li class="toc-level-2"><a href="#2-%E7%94%A8%E6%9C%80%E5%B0%8F%E9%93%BE%E6%9D%A1%E6%A3%80%E6%9F%A5%E5%BF%85%E8%A6%81%E7%BB%84%E4%BB%B6">2. 用最小链条检查必要组件</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E5%8F%8D%E9%A6%88%E5%86%B3%E7%AD%96%E7%90%86%E8%AE%BA%E7%9C%8B%E5%93%AA%E4%BA%9B%E6%98%AF%E6%A8%A1%E5%9E%8B%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%93%AA%E4%BA%9B%E5%BF%85%E9%A1%BB%E7%94%B1%E7%A8%8B%E5%BA%8F%E5%AE%8C%E6%88%90">从反馈决策理论看：哪些是模型的工作，哪些必须由程序完成</a></li><li class="toc-level-3"><a href="#%E7%9C%8B%E4%B8%A4%E4%BB%BD%E7%9C%9F%E5%AE%9E%E5%BE%AA%E7%8E%AF%E7%90%86%E8%A7%A3%E6%A1%86%E6%9E%B6%E6%9B%B4%E5%A4%8D%E6%9D%82%E7%A9%B6%E7%AB%9F%E5%A2%9E%E5%8A%A0%E4%BA%86%E4%BB%80%E4%B9%88">看两份真实循环，理解“框架更复杂”究竟增加了什么</a></li><li class="toc-level-3"><a href="#%E5%86%8D%E8%BF%BD%E5%88%B0%E6%B6%88%E8%B4%B9%E8%80%85%E6%94%B6%E5%88%B0%E7%94%A8%E6%88%B7%E6%B6%88%E6%81%AF%E5%85%B7%E4%BD%93%E6%89%BF%E8%AF%BA%E4%BA%86%E4%BB%80%E4%B9%88">再追到消费者：“收到用户消息”具体承诺了什么</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E4%BA%8B%E4%BB%B6%E5%BA%8F%E5%8F%B7%E7%AE%97%E4%B8%80%E6%AC%A1-projection-%E6%81%A2%E5%A4%8D">用事件序号算一次 projection 恢复</a></li><li class="toc-level-2"><a href="#3-%E5%88%86%E5%88%AB%E5%86%B3%E5%AE%9A%E8%B0%81%E6%8B%A5%E6%9C%89%E5%B7%A5%E4%BD%9C%E4%BA%8B%E5%AE%9E%E5%92%8C%E8%B5%84%E6%BA%90">3. 分别决定谁拥有工作、事实和资源</a></li><li class="toc-level-2"><a href="#4-%E6%8A%8A%E5%BC%82%E5%B8%B8%E5%8A%A0%E5%88%B0%E7%9C%9F%E5%AE%9E%E6%97%B6%E9%97%B4%E7%BA%BF%E4%B8%8A">4. 把异常加到真实时间线上</a></li><li class="toc-level-2"><a href="#5-%E6%9D%A1%E4%BB%B6%E7%BC%96%E8%BE%91%E7%9A%84%E5%AE%8C%E6%95%B4%E8%AE%BE%E8%AE%A1%E8%AE%B0%E5%BD%95">5. 条件编辑的完整设计记录</a></li><li class="toc-level-2"><a href="#6-%E6%AF%8F%E4%B8%80%E9%98%B6%E6%AE%B5%E5%8F%AA%E5%A2%9E%E5%8A%A0%E9%9C%80%E8%A6%81%E7%9A%84%E5%A4%8D%E6%9D%82%E5%BA%A6">6. 每一阶段只增加需要的复杂度</a></li><li class="toc-level-2"><a href="#7-%E6%8A%8A%E8%AE%BE%E8%AE%A1%E8%90%BD%E5%88%B0-codex-%E4%B8%8E-claude-code">7. 把设计落到 Codex 与 Claude Code</a></li><li class="toc-level-2"><a href="#8-%E7%BA%A6%E6%9D%9F%E5%8F%98%E5%8C%96%E5%90%8E%E7%9A%84%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">8. 约束变化后的参考结论</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E8%AF%B7%E6%B1%82%E6%A8%A1%E5%9E%8B%E7%BB%A7%E7%BB%AD%E6%8B%86%E5%88%B0%E5%8D%8F%E8%AE%AE%E4%B8%8E%E6%89%A7%E8%A1%8C%E9%97%B8%E9%97%A8">把“请求模型”继续拆到协议与执行闸门</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

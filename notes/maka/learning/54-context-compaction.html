@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 54 章｜设计上下文压缩 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 54 / 62</div><article id="main-content"><span class="heading-alias" id="i06长任务怎样压缩压缩失败怎样继续" aria-hidden="true"></span><span class="heading-alias" id="i06设计上下文压缩" aria-hidden="true"></span><span class="heading-alias" id="第-51-章设计上下文压缩" aria-hidden="true"></span><span class="heading-alias" id="第-53-章设计上下文压缩" aria-hidden="true"></span><h1 id="第-54-章设计上下文压缩">第 54 章｜设计上下文压缩</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：历史接近窗口上限时，怎样应用摘要并保留失败后仍能继续判断的原始事实？</p>
+<p><strong>关键概念</strong>：Prefix（前缀）：选中整理的旧历史；Tail（尾部）：保留的完整近期单元；候选摘要：尚未被采用的表示；Checkpoint（检查点）：保存摘要及来源范围；有效历史：下一请求采用的表示；有界回读：按需取得原文细节。</p>
+<p><strong>关系主线</strong>：选取范围、生成候选、校验并保存后才能应用；巨型新结果另行控制表示，保存成功不保证摘要更忠实、更短或被模型服务接受。</p>
+</blockquote>
+<p>前置：<a href="19-context-compaction.html">第19章</a>、<a href="53-context-composition.html">第53章</a>。本题中摘要内容、阈值变量和接口均为教学设计。</p>
+<h2 id="1-原题与约束">1. 原题与约束</h2>
+<blockquote><p>Agent 已经进行了很多轮搜索和测试，Context 快满了。你会怎样压缩？</p>
+</blockquote>
+<p>窗口压力可能来自旧对话、当前巨型工具结果，或工具 schema 与固定指令。三者需要不同处理；原历史保留、重启恢复与 provider 切换要求进一步限定方案。</p>
+<p>本题要求保留原执行事实，允许生成可读摘要，压缩失败时不能伪造进展；当前任务只改 README，最近一次测试失败。若输入已经无法送给模型，要有明确停止或降级结果。</p>
+<span class="heading-alias" id="2-两分钟主答" aria-hidden="true"></span><h2 id="2-参考方案">2. 参考方案</h2>
+<blockquote><p>我会先分开持久历史和模型输入。压缩针对下一次请求的表示，原始工具结果和执行状态仍保留。触发依据结合窗口预算、输出预留和已知 usage；触发压缩并不保证压完一定能放下。选择范围时保留当前任务约束和近期完整协议单元，不切开调用与结果，也不把未完成流式内容当完整历史。然后让模型生成带任务状态、约束、已做、未做和证据引用的候选摘要，系统校验来源范围与重放结构，先保存 checkpoint，再应用到下一输入。摘要可能失真，所以后续关键动作仍要回查文件或测试证据。当前单次巨型日志则单独做有界投影和受控回读。保存失败保留此前有效表示；服务端仍报超窗时按有界策略处理，不能无限重复同一压缩。</p>
+</blockquote>
+<span class="heading-alias" id="3-白板图一压缩改变哪一部分" aria-hidden="true"></span><h2 id="3-压缩改变哪一部分">3. 压缩改变哪一部分</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="压缩改变哪一部分：可滚动示意图"><a href="../../../assets/diagrams/54-context-compaction-1.svg"><img src="../../../assets/diagrams/54-context-compaction-1.svg" alt="旧历史前缀生成带来源的摘要，近期完整尾部直接保留；摘要与尾部形成下一请求的有效历史，当前约束独立进入请求，持久原始执行历史继续保留。" width="1052" height="781" loading="lazy" style="width:1052px;min-width:895px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>摘要在下一请求中替代 prefix，tail 继续保留完整原文单元；数据库中的原事件不因这次替换而删除。当前约束独立保留，细节通过受控 ref 回查。</p>
+<span class="heading-alias" id="4-白板图二候选变为已应用的状态" aria-hidden="true"></span><h2 id="4-候选变为已应用的状态">4. 候选变为已应用的状态</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="候选变为已应用的状态：可滚动示意图"><a href="../../../assets/diagrams/54-context-compaction-2.svg"><img src="../../../assets/diagrams/54-context-compaction-2.svg" alt="预算压力触发安全切分并生成候选检查点；来源结构不合法或持久保存失败均保留旧表示，成功保存后应用检查点与尾部；provider 接受才继续，否则有界恢复或停止。" width="802" height="2131" loading="lazy" style="width:802px;min-width:682px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>三条关键边界是：生成不等于可用；保存成功后才应用；本地验证不等于 provider 接受。结构检查也不证明摘要中的每个语义判断正确。</p>
+<h2 id="5-最小数据与伪代码">5. 最小数据与伪代码</h2>
+<p>以下为教学类型，<code>coverage</code> 与 <code>effective_source</code> 表示两种核对对象，具体编码不等同 Maka checkpoint schema：</p>
+<pre><code class="language-python">checkpoint = {
+    &quot;coverage&quot;: covered_event_range,
+    &quot;effective_source&quot;: identity_of_input_actually_summarized,
+    &quot;representation&quot;: &quot;text_summary&quot;,
+    &quot;task_state&quot;: {
+        &quot;prior_goal&quot;: &quot;核对项目测试入口&quot;,
+        &quot;done&quot;: [&quot;从 package.json 读到 scripts.test 为 node --test&quot;],
+        &quot;known_fact&quot;: &quot;该项目声明的测试入口为 npm test&quot;,
+        &quot;not_established&quot;: [&quot;这一旧阶段没有运行测试，未确认功能正确&quot;],
+        &quot;evidence&quot;: [&quot;旧前缀中的配置读取调用与完整结果&quot;]
+    }
+}</code></pre>
+<p>本例明确只覆盖“已完成的测试入口调查”旧阶段。当前“只改 README、中文报告”来自单独保留的当前用户约束；最近 Edit 成功与 Bash 的 2 pass / 2 fail 留在原文 tail。<code>summarize(prefix)</code> 没看见这些近期内容，所以不能把它们写成旧摘要已经证明的事实。由摘要和 tail 一起组成下一输入，才得到完整的当前任务状态。</p>
+<p>先前如果已经裁剪工具结果，摘要必须知道自己实际看的是哪份有效内容。只核对原事件范围，无法说明摘要是否基于替换前还是替换后的正文。所以要分别记录原始覆盖范围与摘要实际接收的有效内容。</p>
+<pre><code class="language-python">def compact(view, attempt_budget):
+    prefix, tail = select_complete_safe_units(view)
+    if not prefix:
+        return CannotCompact(&quot;没有可安全替换的前缀&quot;)
+    if not attempt_budget.try_reserve_summary_call():
+        return CannotCompact(&quot;摘要调用预算耗尽&quot;)
+    candidate = summarize(prefix)
+    if not source_and_protocol_valid(candidate, prefix):
+        return KeepPreviousView(&quot;候选无效&quot;)
+    persist_checkpoint(candidate)      # 失败时不切换当前 view
+    next_view = apply(candidate, tail)
+    return ReadyForProvider(next_view, attempt_budget.remaining)</code></pre>
+<p><code>KeepPreviousView</code> 不表示超长请求可以继续无条件发送。如果之前已发生 overflow，保留原表示之后还需选择允许的缩减、回读或明确停止。</p>
+<h2 id="6-巨型工具日志是另一条处理链">6. 巨型工具日志是另一条处理链</h2>
+<blockquote><p>当前第一次测试就返回 20 万字符，旧历史还很短，压旧前缀没有帮助。</p>
+</blockquote>
+<p>教学方案是给模型退出码、相关报错、有界片段及受控 ref。读取器接受 ref 与行范围，并检查调用者权限、数据仍存在和请求大小。全文保存、模型表示、归档可读性是三项不同保证。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="巨型工具日志是另一条处理链：可滚动示意图"><a href="../../../assets/diagrams/54-context-compaction-3.svg"><img src="../../../assets/diagrams/54-context-compaction-3.svg" alt="本次工具结果形成有界表示，只有保存成功的正文提供受控引用；模型按引用和行范围请求读取，读取器检查权限、存在性和大小，实际片段或明确错误都作为新工具观察返回模型。" width="846" height="1816" loading="lazy" style="width:846px;min-width:720px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中虚线提供引用或读取材料；读取器接收 <code>ref + 行范围</code> 后，先检查权限、目标存在性和请求大小，再尝试读取；检查不通过或读取失败都会返回明确错误。实际片段和错误都成为新观察，进入后续模型输入；得到 ref 本身不等于已经读到全文或指定片段。</p>
+<p>这是一份教学方案，不宣称 Maka 为所有工具原始输出提供统一全文归档。Maka 的有效工具结果归档、图片读取结果的外置承载（Read image Offload）与原始字段覆盖不同。若引用目标没有保存成功，不能先返回一个看似可用的 ref。</p>
+<h2 id="7-正常与失败走读">7. 正常与失败走读</h2>
+<p>正常：旧阶段已经确定测试入口 → 近期 Edit 和失败 Bash 保留为原文单元 → 摘要只替代旧阶段 → 新请求仍看见只改 README 与当前失败 → 报告错误并保持写入范围。</p>
+<p>失败一：换到更晚的一次压缩，已经结束的 Edit 和失败 Bash 也被纳入旧前缀；摘要却把“编辑成功、测试失败”归为“修复成功”。这与上例将两者留在 tail 的范围不同。来源检查可能通过，语义仍错误。设计验证应加入关键事实检查和下游行为对照，不能声称 digest 证明语义正确。</p>
+<p>失败二：摘要生成成功，持久保存失败。继续使用先前表示，报告该步骤失败；不能在内存应用后把“稍后保存”当可恢复方案。</p>
+<p>失败三：已有投影记录不可读。不能当成从未发生裁剪而重新注入 raw body；根据能否定位目标屏蔽相关内容或报错。</p>
+<h2 id="8-递进追问">8. 递进追问</h2>
+<p><strong>按最后 N 条消息保留不行吗？</strong></p>
+<p>消息条数与协议单元、任务边界不同。可能拆开调用和结果，也可能删掉早期仍有效约束。先以完整单元为边界，再按任务与预算选取；N 只是策略参数。</p>
+<p><strong>每次都把旧摘要再摘要，是否更省？</strong></p>
+<p>可能降低输入，但误差会累积。保留来源与可回查证据，用长任务中后段的约束遵循、错误事实比例和任务成功率衡量。必要时从可用原始事实重建，不能假定递归摘要天然可靠。</p>
+<p><strong>压完还是超窗怎么办？</strong></p>
+<p>检查增长来自 tail、单个大结果还是固定输入；采用针对性的有界缩减，限制重复尝试。若没有安全方案，明确报告不能继续。Maka 没有可概括为“本地严格变短/fit 后才提交”的通用保证，不应在产品描述中编造该 gate。</p>
+<p><strong>原生 opaque state 和文本摘要怎么选？</strong></p>
+<p>文本便于审阅和跨路线设计，但生成有误差；原生状态可能提供特定 provider 连续性，但重放和可审阅性受限。必须根据实际合同检查 model/connection 兼容，不把 opaque state 交给任意模型。</p>
+<span class="heading-alias" id="9-取舍验证与自测" aria-hidden="true"></span><h2 id="9-取舍与失败处理结果">9. 取舍与失败处理结果</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 9. 取舍与失败处理结果"><table><caption>表 1 / Table 1 · 9. 取舍与失败处理结果</caption><thead><tr><th scope="col">方案</th><th scope="col">优点</th><th scope="col">最需要验证的失败</th></tr></thead><tbody><tr><td>完整近期窗口（Recent Window）</td><td>简单，近期细节精确</td><td>早期约束丢失、协议单元被切开</td></tr>
+<tr><td>摘要与原文尾部（Summary · Tail）</td><td>保留长任务状态</td><td>摘要误写完成、递归误差</td></tr>
+<tr><td>有界结果与受控回读（Bounded Read）</td><td>巨型结果可控</td><td>引用失效、找回关键证据的额外回合</td></tr></tbody></table></div>
+<p>固定任务、模型和权限，分别测总输入输出成本、压缩延迟、约束保留、关键错误可找回率、最后任务成功率。只比较摘要长度不能说明方案更好。</p>
+<p>三类失败的完整处理如下：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 9. 取舍与失败处理结果"><table><caption>表 2 / Table 2 · 9. 取舍与失败处理结果</caption><thead><tr><th scope="col">故障</th><th scope="col">保留的状态（State）</th><th scope="col">后续结果</th></tr></thead><tbody><tr><td>候选摘要已生成，保存失败</td><td>旧 checkpoint 与原始历史仍有效，新候选未应用</td><td>返回保存错误；若旧请求已超限，进入有界缩减或停止，不发送相同超长请求</td></tr>
+<tr><td>tail 自身超限</td><td>最近调用与结果身份保持关联</td><td>对巨大正文采用有界投影与可靠引用；不能靠反复压旧 prefix 解决 tail 的增长</td></tr>
+<tr><td>ref 无法读取</td><td>已知退出状态、关键差异与引用失败原因</td><td>只陈述已有事实；按权限重新观察，无法补证时明确报告缺口，不编造被截掉的内容</td></tr></tbody></table></div>
+<p>长期 Memory 更新、旧历史摘要与工具输出裁剪修改的是不同对象。完整切点演算见 <a href="19-context-compaction.html">第19章</a>，输入选择见 <a href="36-context-and-memory.html">第36章</a>。</p>
+<hr>
+<p><a href="53-context-composition.html">上一章：第 53 章｜设计模型输入</a> · <a href="55-memory.html">下一章：第 55 章｜设计记忆的写入与读取</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="53-context-composition.html"><span>← 上一章</span><strong>第 53 章｜设计模型输入</strong></a><a href="55-memory.html"><span>下一章 →</span><strong>第 55 章｜设计记忆的写入与读取</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E4%B8%8E%E7%BA%A6%E6%9D%9F">1. 原题与约束</a></li><li class="toc-level-2"><a href="#2-%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 参考方案</a></li><li class="toc-level-2"><a href="#3-%E5%8E%8B%E7%BC%A9%E6%94%B9%E5%8F%98%E5%93%AA%E4%B8%80%E9%83%A8%E5%88%86">3. 压缩改变哪一部分</a></li><li class="toc-level-2"><a href="#4-%E5%80%99%E9%80%89%E5%8F%98%E4%B8%BA%E5%B7%B2%E5%BA%94%E7%94%A8%E7%9A%84%E7%8A%B6%E6%80%81">4. 候选变为已应用的状态</a></li><li class="toc-level-2"><a href="#5-%E6%9C%80%E5%B0%8F%E6%95%B0%E6%8D%AE%E4%B8%8E%E4%BC%AA%E4%BB%A3%E7%A0%81">5. 最小数据与伪代码</a></li><li class="toc-level-2"><a href="#6-%E5%B7%A8%E5%9E%8B%E5%B7%A5%E5%85%B7%E6%97%A5%E5%BF%97%E6%98%AF%E5%8F%A6%E4%B8%80%E6%9D%A1%E5%A4%84%E7%90%86%E9%93%BE">6. 巨型工具日志是另一条处理链</a></li><li class="toc-level-2"><a href="#7-%E6%AD%A3%E5%B8%B8%E4%B8%8E%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB">7. 正常与失败走读</a></li><li class="toc-level-2"><a href="#8-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE">8. 递进追问</a></li><li class="toc-level-2"><a href="#9-%E5%8F%96%E8%88%8D%E4%B8%8E%E5%A4%B1%E8%B4%A5%E5%A4%84%E7%90%86%E7%BB%93%E6%9E%9C">9. 取舍与失败处理结果</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

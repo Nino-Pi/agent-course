@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 16 章｜工具调用与执行循环 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 16 / 62</div><article id="main-content"><span class="heading-alias" id="05工具与-agent-loop模型怎样从会说变成能做" aria-hidden="true"></span><span class="heading-alias" id="m05工具调用与执行循环" aria-hidden="true"></span><span class="heading-alias" id="第-15-章工具调用与执行循环" aria-hidden="true"></span><h1 id="第-16-章工具调用与执行循环">第 16 章｜工具调用与执行循环</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：工具返回参数错误、文本失配或测试失败后，Agent 应依据什么继续判断？</p>
+<p><strong>关键概念</strong>：Tool call（工具调用）提出结构化请求；schema（参数结构）规定合法形状；执行器接触真实资源；工具结果描述观察与失败；行动预算限制后续安排；循环依据观察选择下一步。</p>
+<p><strong>关系主线</strong>：工具先经历可用性、参数与执行边界检查，再执行并形成结果；后续输入选择这些结果。命令成功、文件已改与测试通过分别有依据，工具名称可见也不等于已经获准。</p>
+</blockquote>
+<p>本章先用 README 编辑失配说明怎样根据错误改变动作，再回到<a href="04-code-repair.html">第04章</a>的完整 <code>formatDuration</code> 修复。<code>S1 / T7 / R7</code> 沿用前文的会话、工作与执行身份。</p>
+<h2 id="核心阅读">核心阅读</h2>
+<span class="heading-alias" id="先判断edit-失败后下一条请求应改变什么" aria-hidden="true"></span><h3 id="edit-失败后下一条请求应改变什么">Edit 失败后，下一条请求应改变什么</h3>
+<p><a href="03-actions-and-messages.html#%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%9B%9E%E6%89%A7">第03章 的 observation</a>是执行返回的观察。模型依据它选择下一步，再把动作表示为结构化 <a href="glossary.html#tool%E5%B7%A5%E5%85%B7">Tool（工具）</a> 请求。</p>
+<p>先回到 <code>S1 / T7 / R7</code> 的 README 简化阶段：模型根据先前读到的内容提出 <code>Edit</code>，但文件已经变化，工具返回“目标文本未找到，未完成修改”。这时是重复同一 Edit、重新 Read，还是改跑测试？</p>
+<p>当前错误说的是编辑目标不匹配，并未给出测试入口或函数行为的新证据。下一步应先读回 README，确认现在的内容。这是原案例的教学失败分支，参数名用于说明动作，不是复制即可运行的调用，也不是另一份真实运行记录：</p>
+<pre><code class="language-text">Edit README(old_string=旧段落)
+  → 工具返回：目标文本未找到，未完成修改
+Read README
+  → 当前测试段落已经换了标题/上下文
+重新定位唯一目标，构造基于当前内容的 Edit
+  → 修改成功
+按 package.json 中的真实 scripts 运行测试
+  → 读取退出码和失败断言
+检查 git diff
+  → 只保留任务要求的修改，再总结</code></pre>
+<p>这里的 <strong>retarget（重新定位）</strong> 是改变“当前要修改哪个对象/哪一段内容、依据哪份观察”的判断，不是把相同参数再发三遍。这次错误已经推翻了“旧段落仍可定位”的假设；继续使用相同参数并没有补充新观察。第18章会进一步区分“执行前拒绝”与“实现已开始但没有完成修改”。</p>
+<h3 id="让不同观察导向不同下一步">让不同观察导向不同下一步</h3>
+<p>同样的判断方法也适用于课程的完整主任务。这里回到 <a href="04-code-repair.html">第04章</a> 的真实故障条件，不再假设功能测试原本已通过；仍使用同一个小 repo 的四份文件：<code>README.md</code>、<code>package.json</code>、<code>src/duration.js</code>、<code>test/duration.test.js</code>。<code>formatDuration</code> 对案例范围内的非负整数秒应返回 <code>minutes:ss</code>，余秒在 <code>0…59</code> 并显示两位；四个既有测试是检查要求的样例。下表按“观察 → 判断 → 动作”展开诊断；表中的推导与修改后文件的实际验证是两种依据。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 让不同观察导向不同下一步"><table><caption>表 1 / Table 1 · 让不同观察导向不同下一步</caption><thead><tr><th scope="col">新观察（Observation）</th><th scope="col">判断怎样改变</th><th scope="col">下一步</th></tr></thead><tbody><tr><td>README 写 <code>npm run check</code>，执行返回 missing script</td><td>文档给的测试入口错误，尚不能判断函数对错</td><td>读取 package 的 <code>test: node --test</code>，改用 <code>npm test</code></td></tr>
+<tr><td>测试 0 秒和 9 秒通过，60 秒和 125 秒分别得到 <code>1:60</code>、<code>2:25</code></td><td>已运行到功能断言；需要区分分钟、余秒、格式三个候选原因</td><td>沿测试的 import 读到实现，逐步手算这两个输入</td></tr>
+<tr><td>两个分钟前缀都正确；补零不能把 60、25 改成 0、5；<code>% 100</code> 恰好产生错误余秒</td><td>当前证据支持修正余秒周期，未支持改变分钟或补零逻辑</td><td>根据完整分钟之后的剩余秒数推导 <code>% 60</code>，同时修正 README</td></tr>
+<tr><td>四个用例通过</td><td>有原失败消失及已有正常样例的回归证据，尚非全部需求证明</td><td>审查一般计算与 diff；只对 60/125 特判仍会在 61 秒违反契约，不能接受</td></tr></tbody></table></div>
+<p>这张表展开的是教学推导，不要求真实模型固定遵循这一顺序：观察必须支持下一步修改，不能只因为看见 <code>% 100</code> 就套已知答案。<a href="04-code-repair.html#%E6%B5%8B%E8%AF%95%E5%85%A5%E5%8F%A3%E8%AE%A1%E7%AE%97%E8%BF%87%E7%A8%8B%E4%B8%8E%E4%BF%AE%E5%A4%8D%E7%BB%93%E6%9E%9C">第04章 的诊断答案</a>逐项排除候选，<a href="04-code-repair.html#%E6%80%8E%E6%A0%B7%E9%80%89%E6%8B%A9%E8%B6%B3%E5%A4%9F%E7%9A%84%E9%AA%8C%E8%AF%81">验证选择</a>说明怎样从契约选择故障、正常与边界检查。固定案例不改断言用于保持验收一致；真实项目可以增加独立需求支持的回归测试，不能删改期望来掩盖故障。</p>
+<p>案例保留第一次命令失败、第一次断言失败、修复后结果与 diff。它们用于区分调用错误、程序错误和修改结果；固定脚本的回放只能检查执行链，不能衡量模型自主定位能力。同一函数修改的 shell 与 Edit 请求在<a href="../../../extended-reading.html#reference-6" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../comparisons/code-work-methods.md#同一处修改请求相似失败语义不同">工具表达比较</a>中展示了不同匹配责任。</p>
+<h3 id="把判断写成工具请求">把判断写成工具请求</h3>
+<p>选出下一步以后，还要把它写成系统能检查的请求。模型按工具声明的参数格式表达意图，<a href="glossary.html#runtime%E8%BF%90%E8%A1%8C%E6%97%B6">Runtime（运行时）</a>再校验并安排执行。以下回到开篇的 Edit 失配分支，看看“先读回 README”怎样变成请求。</p>
+<h4 id="一次判断不等于整项工作完成">一次判断不等于整项工作完成</h4>
+<p>读回文件、重新构造编辑、运行测试和解释结果可以需要多个 <a href="glossary.html#model-step%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4">model step（模型步骤）</a>，它们仍属于同一 <a href="glossary.html#run--agentrun%E8%BF%90%E8%A1%8C--%E6%89%A7%E8%A1%8C%E5%B0%81%E5%A5%97">Run</a>。步骤多少取决于尚缺哪些观察；前章的顺利四步不是 Agent 的固定长度。</p>
+<h4 id="模型提出的是意图不是事实">模型提出的是意图，不是事实</h4>
+<p>模型生成：</p>
+<pre><code class="language-json">{
+  &quot;tool&quot;: &quot;Read&quot;,
+  &quot;arguments&quot;: { &quot;path&quot;: &quot;README.md&quot; }
+}</code></pre>
+<p>这只能证明“模型请求读取文件”，不能证明：</p>
+<ul>
+<li>参数格式有效；</li>
+<li>这个 Run 里真的存在名为 <code>Read</code> 的工具；</li>
+<li>当前步骤允许调用它；</li>
+<li>当前权限允许读这个路径；</li>
+<li>文件实际读取成功；</li>
+<li>结果已经可靠保存。</li>
+</ul>
+<p>这段 JSON 只是教学表示，未声称是可直接提交的实际协议。它说明：<strong>工具请求提出动作，执行结果报告发生了什么。</strong></p>
+<span class="heading-alias" id="从结果继续的四个检查" aria-hidden="true"></span><h3 id="工具契约怎样接回循环">工具契约怎样接回循环</h3>
+<p>工具要有名字、用途、参数格式（schema）和真正执行工作的代码。模型收到前三项说明，执行代码由运行系统调用。这把前面的“根据观察改变判断”接回了 <a href="glossary.html#agent-loop%E4%BB%A3%E7%90%86%E5%BE%AA%E7%8E%AF">Agent loop</a>：</p>
+<pre><code class="language-text">history = [用户请求]
+
+重复：
+  response = model(history, 当前可见的工具说明)
+
+  如果 response 请求调用工具：
+    校验工具名和参数
+    result = execute(tool, arguments)
+    把“调用意图 + 工具结果”加入 history
+    继续下一次模型步骤
+
+  否则：
+    根据当前产品的停止协议判断是否交还控制权
+    若已完成，返回最终回答并结束</code></pre>
+<p>这里是课程伪代码，不是 Maka 或 mini 源码。mini 的 Bash 协议还要求完成标记；“没有工具调用就结束”不能跨产品照搬。</p>
+<h4 id="为什么工具结果还要送回模型">为什么工具结果还要送回模型</h4>
+<p><code>Read</code> 的代码能读取文件，但它不会独自决定整个修复方案。模型有目标，需要读到真实内容才能构造下一步；如果返回的是“文件不存在”，下一步就应寻找正确路径，而不是编辑猜测的内容。工具结果因此既供人检查，也作为下一次模型步骤的输入。</p>
+<h4 id="一次步骤可以调用多个工具吗">一次步骤可以调用多个工具吗</h4>
+<p>可以，但“能并行”不等于“应该并行”。例如：</p>
+<pre><code class="language-text">Read package.json ─┐
+Read README.md    ─┴─ 两者互不依赖，可以并行
+
+Read README.md → Edit README.md → Bash tests
+                 上一步输出决定下一步输入，必须有顺序</code></pre>
+<p>如果模型在同一步同时要求 <code>Edit README.md</code> 和 <code>Bash tests</code>，测试可能在编辑完成前启动。一个成熟的工具系统需要知道哪些工具可以并行、哪些步骤必须独占，模型也需要通过前一步结果建立依赖顺序。</p>
+<span class="heading-alias" id="回看readme-简化阶段的四步参数" aria-hidden="true"></span><h3 id="readme-简化阶段的四步参数">README 简化阶段的四步参数</h3>
+<p>下面的成功分支展示参数和结果怎样配对；动作次序由依赖决定，工作不必固定经过四步。</p>
+<p><strong>四步成功示意：Read → Edit → 测试 → 总结</strong></p>
+<p>沿用前章的工作身份，具体展开 README 简化阶段的参数和结果。用户请求是：</p>
+<blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，更新 README 的测试步骤，运行测试。以后请记住，我希望你用中文解释结果。</p>
+</blockquote>
+<p>这段四步示意仍假设功能测试原本已通过，只修正说明里的入口；前面的<a href="#%E8%AE%A9%E4%B8%8D%E5%90%8C%E8%A7%82%E5%AF%9F%E5%AF%BC%E5%90%91%E4%B8%8D%E5%90%8C%E4%B8%8B%E4%B8%80%E6%AD%A5">完整代码修复判断</a>已经撤掉这个假设。本节只要求本轮用中文，是否形成跨 Turn 的长期记忆留到 第20章 判断。</p>
+<h4 id="step-1模型请求两个并行-read">Step 1：模型请求两个并行 Read</h4>
+<p>Runtime 给模型的上下文包括目标、当前历史和可见工具 schema。模型没有两份文件的内容，于是返回两个互不依赖的调用：</p>
+<pre><code class="language-json">[
+  { &quot;tool&quot;: &quot;Read&quot;, &quot;arguments&quot;: { &quot;path&quot;: &quot;package.json&quot; } },
+  { &quot;tool&quot;: &quot;Read&quot;, &quot;arguments&quot;: { &quot;path&quot;: &quot;README.md&quot; } }
+]</code></pre>
+<p>Runtime 分别校验并执行两个读取，把结果送回下一步模型输入。例如模型下一步可能看到：</p>
+<pre><code class="language-json">[
+  { &quot;path&quot;: &quot;package.json&quot;, &quot;name&quot;: &quot;demo-project&quot;, &quot;scripts&quot;: { &quot;test&quot;: &quot;node --test&quot; } },
+  { &quot;path&quot;: &quot;README.md&quot;, &quot;excerpt&quot;: &quot;## Testing\n\nRun `npm run check`.&quot; }
+]</code></pre>
+<p>这是缩短后的教学投影；RuntimeEvent 可以保存更完整的结果。</p>
+<h4 id="step-2模型请求-edit-readmemd">Step 2：模型请求 <code>Edit README.md</code></h4>
+<p>模型现在同时知道 <code>package.json</code> 中的真实测试命令与 README 当前文本，才能提出可定位旧字符串的具体编辑：</p>
+<pre><code class="language-json">{
+  &quot;tool&quot;: &quot;Edit&quot;,
+  &quot;arguments&quot;: {
+    &quot;path&quot;: &quot;README.md&quot;,
+    &quot;old_string&quot;: &quot;## Testing\n\nRun `npm run check`.&quot;,
+    &quot;new_string&quot;: &quot;## Testing\n\nRun `npm test` to execute the tests.&quot;
+  }
+}</code></pre>
+<p>Runtime 先检查参数，再让 Edit 根据当前文件定位可接受的唯一目标。实际结果返回后，模型才能依据它判断本次编辑报告了什么；结果也可能明确表示效果未知，而非简单的成功或失败。参数缺失与匹配流程最终拒绝会产生不同错误；两者都不能由模型自己的预期代替。</p>
+<h4 id="step-3模型请求-bash-tests">Step 3：模型请求 <code>Bash tests</code></h4>
+<p>编辑结果回到下一步后，模型请求：</p>
+<pre><code class="language-json">{
+  &quot;tool&quot;: &quot;Bash&quot;,
+  &quot;arguments&quot;: { &quot;command&quot;: &quot;npm test&quot; }
+}</code></pre>
+<p>沿这段成功示意，假设测试退出码为 <code>0</code>，工具结果可能包含：</p>
+<pre><code class="language-text">exitCode: 0
+summary: 4 tests passed</code></pre>
+<p>这里证明的是测试命令运行后这四例通过。README 是否真的写成这个入口，还要核对文件或 diff；成功的测试输出不能自动证明文档改对了。大日志怎样缩短留到 第19章。</p>
+<h4 id="step-4模型返回中文总结">Step 4：模型返回中文总结</h4>
+<p>这一次模型没有再请求工具，而是返回普通文本：</p>
+<pre><code class="language-text">已更新 README 的测试说明，并运行了 `npm test`；4 项测试全部通过。</code></pre>
+<p>Runtime 还需要把终态可靠记录下来，Run 才真正结束。UI 提前显示了一段流式文字，不等于 <code>R7</code> 已经形成唯一、持久的完成事实。</p>
+<h3 id="maka-edit-怎样定位旧片段">Maka Edit 怎样定位旧片段</h3>
+<p>在旧片段非空且新旧文本不同的前提下，普通 Maka Edit 先在当前文件中查找 <code>old_string</code> 的精确匹配。找到一处就替换；找到多处就直接拒绝，要求更明确的上下文。</p>
+<p><strong>精确零匹配仍可能继续定位。</strong> 旧片段足够长、文件没有被判为二进制且规模在限制内时，才依次尝试有限的行首尾空白、内部空白和转义容错。每一级候选仍须唯一且跨度合理；出现歧义或不安全跨度就拒绝，不会继续放宽条件猜一个位置。所有策略都找不到可用目标，也会在写入前拒绝。</p>
+<p>例如，下面只改变缩进，逻辑片段仍可唯一定位。这是依据匹配实现推演的输入与参考结果，没有在此运行 Edit：</p>
+<p>当前文件中，<code>return</code> 前有四个空格：</p>
+<pre><code class="language-js">function f() {
+    return 1;
+}</code></pre>
+<p>提交的 <code>old_string</code> 只有两个空格：</p>
+<pre><code class="language-js">function f() {
+  return 1;
+}</code></pre>
+<p>因此精确匹配为零，行空白容错仍可找到这一处。若提交下面的 <code>new_string</code>，替换后的函数也正是这段文本：</p>
+<pre><code class="language-js">function f() {
+    return 2;
+}</code></pre>
+<p><strong>新文本按原样写入，不会自动迁移旧缩进。</strong> 这类容错只处理有限文本差异，不会理解任意语义改写。</p>
+<p>因此，开篇“目标文本未找到”的失败分支，指匹配流程最终没有找到可接受目标。片段匹配成功也不表示上一次 Read 后整份文件未变；普通 Maka Edit 没有携带那次 Read 的内容版本，后面的<a href="18-effects-and-recovery.html#%E6%8A%8A%E5%90%8C%E4%B8%80%E6%AC%A1-edit-%E4%BB%8E%E5%87%86%E5%85%A5%E8%BF%BD%E5%88%B0%E5%90%8E%E7%BD%AE%E8%AF%81%E6%8D%AE">执行与恢复</a>会继续区分对象身份、写入效果与结果记录。</p>
+<h3 id="如果模型中途想查网络">如果模型中途想查网络</h3>
+<p>假设模型额外提出 <code>WebFetch</code> 查询测试工具文档。即使模型这一刻能看见该工具，也只说明“本 step 可以提出这个调用”。Runtime 仍要检查 <code>S1</code> 当前的网络边界。若网络未开放，应拒绝越界执行；只有相应工具与政策支持的分支才会给出可申请的扩权需求，不能把任何网络错误都当成扩权入口，更不能偷偷绕到 host 网络执行。</p>
+<h3 id="常见误区">常见误区</h3>
+<h4 id="误区一模型调用工具就是模型执行工具">误区一：模型调用工具，就是模型执行工具</h4>
+<p>不是。模型生成调用意图；Runtime 校验和调度；executor 或 adapter 执行。</p>
+<h4 id="误区二工具出现在提示词里就拥有权限">误区二：工具出现在提示词里，就拥有权限</h4>
+<p>不是。可见性回答“模型是否能提出调用”，权限回答“现实世界允许做到什么”。</p>
+<h4 id="误区三一个-turn-只调用一次模型">误区三：一个 Turn 只调用一次模型</h4>
+<p>不是。<code>T7 / R7</code> 可以包含多个模型 step 和多个工具调用。</p>
+<h4 id="误区四工具失败就应该自动重试">误区四：工具失败就应该自动重试</h4>
+<p>不一定。参数错误可以让模型修正；网络瞬断有时可重试；写文件后结果未知则可能重复副作用。重试策略必须考虑调用是否已经越过副作用边界。</p>
+<h3 id="两种真实走法都回到工具与反馈">两种真实走法，都回到工具与反馈</h3>
+<p><a href="22-agent-cases.html">第22章</a>记录了同一任务的两种路线：mini 先运行失败测试，再通过 Bash 修改；Maka 读到源码后直接请求两个 Edit，再跑测试。两者最后都检查了 diff。真实模型不一定遵循本文用于解释的固定顺序。</p>
+<p>Maka 的“两个 Edit 返回 → 下一次请求 → Bash 跑测试”区分了修改报告与行为检查。mini 的原测试 2 pass/2 fail 片段则保留了诊断修复前的失败观察。</p>
+<span class="heading-alias" id="基础完成条件" aria-hidden="true"></span><span class="heading-alias" id="基础自测能否根据结果推进工作" aria-hidden="true"></span><h4 id="工具结果与后续判断">工具结果与后续判断</h4>
+<p><strong>问题 1。</strong> 用户只发一条消息，为什么仍可能调用模型多次？</p>
+<p><strong>解释。</strong> 读、改、测、修正和总结依赖逐步得到的新事实，需要多次模型决策。</p>
+<p><strong>问题 2。</strong> 模型生成 Read 调用后，可以立刻说文件读取成功吗？</p>
+<p><strong>解释。</strong> 不可以；生成的是意图，还要校验、执行并接受结果。</p>
+<p><strong>问题 3。</strong> Edit 报目标文本未找到，下一步为什么应读回文件，而不是重复同一调用？</p>
+<p><strong>解释。</strong> 参数依赖的旧观察可能失效；新 Read 才能帮助定位当前唯一目标。</p>
+<p><strong>问题 4。</strong> missing script 与 <code>formatDuration(60)</code> 期望 <code>1:00</code> 却实际得到 <code>1:60</code> 的断言失败，分别说明什么？</p>
+<p><strong>解释。</strong> 前者是调用了不存在的脚本，尚未运行目标测试；后者是测试已运行并发现行为不符合断言。</p>
+<p><strong>问题 5。</strong> 四项测试通过后，为什么还要看 diff？若补丁只特判 60、125 呢？</p>
+<p><strong>解释。</strong> 测试只检查覆盖到的行为；diff 还要确认改动符合目标，没有额外修改或篡改测试。仅特判 60、125 仍可通过四例，却不能处理 61 秒；需依据一般契约审查修复，并选择相关边界检查。</p>
+<p><strong>问题 6。</strong> WebFetch 对模型可见，是否意味着网络已经开放？</p>
+<p><strong>解释。</strong> 不意味着；可见性与实际权限分别判断。</p>
+<h2 id="实现深化">实现深化</h2>
+<h3 id="用一个类型连接说明与执行">用一个类型连接说明与执行</h3>
+<p>下面的 TypeScript 类型是教学简化，展示工具的两侧怎样连接；<code>unknown</code> 表示输入仍需校验，<code>Promise</code> 表示异步结果，可能成功、失败，也可能一直处于等待中：</p>
+<pre><code class="language-ts">type Tool = {
+  name: string
+  description: string
+  inputSchema: unknown
+  execute: (args: unknown) =&gt; Promise&lt;unknown&gt;
+}</code></pre>
+<p><code>name</code>、<code>description</code> 和 <code>inputSchema</code> 供模型理解名字、用途和参数格式；<code>execute</code> 是真正工作的代码。Maka 把已绑定的实现组成可用工具集合，再为模型选择本步可见的说明。</p>
+<h3 id="失败一个十几行的循环为什么不够生产使用">失败：一个十几行的循环为什么不够生产使用</h3>
+<p>最小循环适合教学，但真实工作会迅速遇到下面这些失败。</p>
+<h4 id="参数看起来合理实际不合法">参数看起来合理，实际不合法</h4>
+<p>模型可能生成：</p>
+<pre><code class="language-json">{ &quot;tool&quot;: &quot;Read&quot;, &quot;arguments&quot;: { &quot;file&quot;: 42 } }</code></pre>
+<p>而工具要求的是：</p>
+<pre><code class="language-json">{ &quot;path&quot;: &quot;package.json&quot; }</code></pre>
+<p>Runtime 应在执行前校验，并把结构化错误送回模型。否则错误会在工具内部以难以理解的方式爆炸，甚至让不合法参数越过安全边界。</p>
+<p>ToolRuntime 先校验 schema、availability 等 preflight（执行前检查）条件；越过 T1 后，Edit 实现再按前面的精确匹配与有限容错流程定位目标，并尝试编辑。若缺少必填 <code>old_string</code> 的原调用未经改写到达 ToolRuntime，并在其参数校验处被拒绝，会在 T1 前形成 synthetic error response（程序生成的错误反馈）；参数结构合法，但匹配流程最终未找到可接受目标并在写入前拒绝，则属于已 dispatch 的实现错误；错误结果成功保存时形成 error T2。</p>
+<p>另有一条前置分支：SDK repair 可能先把坏参数调用改为内部 <code>invalid</code> 工具，随后记录的是该错误反馈工具自己的 T1/error T2，原 Edit 仍未执行。要先看实际到达 ToolRuntime 的是哪份调用，再判断持久边界；详见 <a href="15-model-context.html#%E5%9D%8F%E5%8F%82%E6%95%B0%E6%9C%80%E5%90%8E%E4%BA%A4%E7%BB%99%E8%B0%81%E5%A4%84%E7%90%86">第15章 坏参数分叉</a>。T1/T2 的提交含义在 第18章 展开。</p>
+<h4 id="模型调用了一个本步不可用的工具">模型调用了一个本步不可用的工具</h4>
+<p>模型可能从旧对话里记得某个工具名，却在当前 step 没有看到它。若 Runtime 仍按名字从全局字典执行，模型就能绕过本步冻结的工具面。正确做法是拒绝这次调用，并明确告诉模型“当前步骤未激活该工具”。</p>
+<h4 id="工具失败后模型陷入重复循环">工具失败后，模型陷入重复循环</h4>
+<p>例如模型反复请求 <code>Bash</code>，用相同参数运行同一条失败命令。Maka 普通失败闸门的处理是：</p>
+<pre><code class="language-text">第 1 次 npm test → 工具返回错误，连续失败数为 1
+第 2 次相同调用 → 工具返回错误，连续失败数为 2
+第 3 次相同调用 → 在真实实现开始前拒绝，不再运行这条命令</code></pre>
+<p>闸门比较“调用来源、工具名、规范化参数”组成的签名，不比较错误文字是否相同。它只保存最近失败签名的一份连续计数：任意签名的成功结果清空计数，另一签名失败则从那份新签名的第 1 次开始。这限定普通工具路径；Computer Use 等另有专门边界。</p>
+<p><code>Read → Edit → Bash</code> 的正常反馈过程不会因为调用次数多就被这个闸门拒绝。但改一个无关参数也可能改变签名，不能据此证明有进展。闸门负责限制重复失败，后面还要判断下一行动能否补充有效观察。</p>
+<h4 id="工具输出太大">工具输出太大</h4>
+<p>测试可能输出几十万行日志。若每次后续模型步骤都携带完整日志，Context 很快被塞满。一个实用的 Runtime 会：</p>
+<ul>
+<li>保存可追踪的结果；</li>
+<li>给模型一个有界投影，例如末尾错误摘要；</li>
+<li>必要时把大结果归档；</li>
+<li>给模型一个受限的回读工具，让它按片段检查原内容。</li>
+</ul>
+<p>“缩短模型看到的结果”和“删除真实执行事实”是两件事。第19章会继续解释。</p>
+<h4 id="工具报告成功但现实没有改变">工具报告“成功”，但现实没有改变</h4>
+<p>如果 <code>Edit</code> 的实现只返回 <code>{&quot;ok&quot;: true}</code>，却没有真正验证写入，模型可能沿错误报告继续工作。Runtime 接受并规范化 Tool result，只能确认收到并处理了该结果，不能替有缺陷的执行器证明文件改变。文件现态、diff 与行为检查仍承担各自的验证责任，模型预期和 UI 文案都不能代替它们。</p>
+<h4 id="网络工具引入了另一个世界">网络工具引入了另一个世界</h4>
+<p>假设模型看到 <code>WebFetch</code>，它可能认为可以直接查询 npm 文档。但网络调用会把请求发送到进程外，可能泄露路径、代码或凭据，也可能产生计费和远端副作用。</p>
+<p>因此以下三句话必须分开：</p>
+<pre><code class="language-text">模型看到了 WebFetch
+当前边界允许访问网络
+这次网络请求已经执行并取得结果</code></pre>
+<p><a href="17-permissions-and-sandbox.html">第17章</a>解释网络边界怎样在实际执行位置限制调用。</p>
+<h3 id="循环深化用观察与预算选择下一行动">循环深化：用观察与预算选择下一行动</h3>
+<p>Runtime 允许继续，模型仍须决定下一步值得做什么。沿用前面“观察 → 判断 → 动作”的修复过程，这次同时记录尚未查清的效果和剩余资源，比较几种行动安排。</p>
+<p>用一个<strong>教学状态</strong>记录决策，字段不是 Maka 的 API，也不要求模型公开内部思考：</p>
+<pre><code class="language-text">D = (待解释的问题, 候选解释, 已有观察, 尚未查清的效果, 剩余行动预算)</code></pre>
+<p>“候选解释”可以写进诊断笔记供核验；没有观测支持就保持候选，不能因为描述很流畅而升级为事实。仍用 第04章 的 <code>formatDuration</code>。此处起点是已有一次测试失败报告，但还未读取详细失败值与函数。暂列三个可能方向：显示格式、分钟计算、余秒计算；这不是穷尽所有 bug，更不假定它们永远互斥。</p>
+<p>本题给 <strong>4 个行动成本单位</strong>：读取完整失败片段、读取相关实现、一次修改、一次回归检查各花 1。单位是为了手算的课堂约定，不是 Maka <code>maxSteps</code>，也没有包含模型回答、provider retry 或真实 token 账单。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 循环深化：用观察与预算选择下一行动"><table><caption>表 2 / Table 2 · 循环深化：用观察与预算选择下一行动</caption><thead><tr><th scope="col">决策前</th><th scope="col">本次行动与得到的观察</th><th scope="col">怎样更新判断与预算</th></tr></thead><tbody><tr><td>三个方向待查，余额 4</td><td>读详细断言：60 秒得到 <code>1:60</code>，125 秒得到 <code>2:25</code>，契约要求 <code>1:00</code>、<code>2:05</code></td><td>两例分钟前缀已符合；单纯补零不能把 60 变成 00。把余秒计算列为优先核查，余额 3；尚不证明其他输入的分钟计算都正确</td></tr>
+<tr><td>余秒方向优先，余额 3</td><td>读实现：余秒用 <code>% 100</code>，分钟用向下取整除 60</td><td>两个错误值都能由 <code>% 100</code> 推出；形成修改该表达式的可检验方案，余额 2</td></tr>
+<tr><td>有支持的修改方案，余额 2</td><td>Edit 改为 <code>% 60</code>，收到已结算修改结果</td><td>只更新“已改文件”，仍缺行为证据，余额 1</td></tr>
+<tr><td>文件已改，余额 1</td><td>执行按契约选定的回归检查并查看结果及差异</td><td>记录通过/失败和覆盖范围，余额 0；用这些证据决定交付结论，不把四例通过冒充一般行为证明</td></tr></tbody></table></div>
+<p>候选计划也能这样比较。计划 A 是上表的“补足观察 → 定位 → 改 → 验”；计划 B 是反复运行同一测试；计划 C 是未读实现先改格式。若当前环境未变，B 的同一结果通常不能区分余秒与显示代码；C 缺少解释失败值的依据，可能花掉预算又增加回退工作。A 在题设下保留了验证成本，因而更合适；这是依据给定证据的选择，不是已经算出了全局最优策略。若日志来自不稳定外部服务，重复观测可能有价值，不能把“重复”本身判为错误。</p>
+<p>现在改变条件。若第一次读取只返回截断头部，不能仍把候选集合按原表缩小；下一步要取回缺失断言，并重算余额。若 Edit 丢失回执，先把效果记为未知，后续动作转为查询当前文件和执行记录；不能在“还剩 1”时盲目重复编辑。预算不足以查清时，应交付已知状态与缺口。停止规则必须同时看证据、未明效果和资源限制，而不是只问还有没有工具可以调用。</p>
+<p>验证是否充分由任务的输入输出契约决定。若题设指定某项必要回归且没有等效替代依据，就必须保留其完整成本；不能为了凑预算改用更便宜的检查。预算不足也可以在编辑前交付诊断和缺口，并约定下一阶段，并非只能先修改再留下未验证文件。</p>
+<p><strong>另一种真实选择：把检查固定在编辑后。</strong> 另一种 Code Agent 实现 Aider 的官方说明指出，它默认对被编辑文件做静态检查（lint）；自动测试需要配置 <code>--test-cmd</code> 与 <code>--auto-test</code>。于是同一次修复的验证触发可由宿主预设，减少模型漏选检查；检查失败仍需结合输出定位原因，错误测试命令也不会因此变正确。这是 Aider 公开说明的功能行为；Maka 当前案例则由模型通过工具选择检查。两种安排分别把“何时检查”的责任放在宿主规则和模型决策中。</p>
+<p>ReAct 提出的推理与行动交错，也关注怎样用新观察修正下一步。这里的显式决策表用于解释可核验的判断依据，不是模型内部状态的还原，也不要求保存模型私有推理。</p>
+<p><strong>不同失败需要不同控制。</strong> 如果失败在遗漏项目检查，可先定义固定的验收入口；如果失败在反复无信息行动，应补候选、证据和预算的可观察记录；如果失败在无法判断写入是否发生，应补恢复合同。仅增加“请认真规划”的提示或放宽循环上限，不分别解决这些问题。结构化 Plan、跨 Turn Goal 负责更长期的控制安排，按需接 第24章；它们也不自动验证诊断正确性。</p>
+<h4 id="条件变化后的参考判断">条件变化后的参考判断</h4>
+<p><strong>问题 1。</strong> 测试每次耗 5 单位，读日志/源码各 1、修改 1，总预算 8。如何保留验证机会？已有第一次失败不应重复收取本题预算。若后来还要取回被截断的一段日志，又怎样处理？</p>
+<p><strong>解释。</strong> 1+1+1+5=8，按原题先补观察、定位、改、验刚好够；新缺失片段再花 1 后，完整方案要 9，不能仍沿用预算 8 的成功叙述。可在尚未改动时报告已有诊断、申请或约定下一阶段预算，或选择经任务要求证明足够的更低成本检查；不能为了合预算删掉必要验证后称完成。</p>
+<p><strong>问题 2。</strong> 连续两次相同工具及参数返回错误，第三次被 Maka 普通失败 gate 挡住。把无关参数换一下是否证明有进展？如果中间先读到新的有效诊断材料，又怎样判断重试？</p>
+<p><strong>解释。</strong> 不证明。gate 比较调用签名及连续失败次数，不比较错误文本，也不做语义进展判定。新材料若改变了错误原因、目标或环境，重建请求再试可以有依据；如果材料无关，就不能把“签名不同”当收益。成功调用/不同失败签名对计数的影响与策略价值分别判断。</p>
+<p><strong>问题 3。</strong> 固定 auto-test 没有报错，但它只跑格式检查。能否据此宣布 <code>formatDuration</code> 已修复？</p>
+<p><strong>解释。</strong> 不能。触发稳定性与检查覆盖是两件事；要根据输入输出契约取得行为证据，并报告未覆盖范围。</p>
+<h3 id="maka把工具调用拆成可检查的管线">Maka：把“工具调用”拆成可检查的管线</h3>
+<p>Maka 的普通 Runtime-executed 工具在 Host 已接入持久结果存储时经过下面的管线。图中只画提交成功的后续路径；参数、可用性等前置拒绝没有本次 T1，T1/T2 自己提交失败则不能沿图继续到下一模型输入：</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Maka：把“工具调用”拆成可检查的管线：可滚动示意图"><a href="../../../assets/diagrams/16-tools-and-execution-1.svg"><img src="../../../assets/diagrams/16-tools-and-execution-1.svg" alt="普通持久工具管线从 Run 工具全集和本步快照开始；请求通过 preflight 后先提交 T1，再读取 live 权限边界、执行与规范化，T2 成功后结果才进入后续模型输入。前置拒绝无 T1，提交失败不能继续普通路径。" width="720" height="1975" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这里的 <a href="glossary.html#durable%E6%8C%81%E4%B9%85%E5%B4%A9%E6%BA%83%E5%90%8E%E4%BB%8D%E5%8F%AF%E8%AF%BB">durable（持久）</a> 是指：进程崩溃或重启后仍能从存储中读到。T1 保存“实现可能开始”的边界，T2 保存结算结果；<a href="18-effects-and-recovery.html">第18章</a>用崩溃窗口区分这两条记录。</p>
+<p>把最后两条箭头再落到同一个 Edit：正常文件工具可将完整 diff 保存为结果，而模型收到的是有界编辑摘要；要核对正文仍须读取。若 worker 可能已写文件但回包丢失，错误结果也可以被持久保存，并带“效果未知、不可安全自动重试”的含义。下一步应先取得文件现态和相关执行证据，而不是把“结果已保存”读成“写入已成功”。这两种消费者与故障变化见 <a href="18-effects-and-recovery.html#%E6%8A%8A%E5%90%8C%E4%B8%80%E6%AC%A1-edit-%E4%BB%8E%E5%87%86%E5%85%A5%E8%BF%BD%E5%88%B0%E5%90%8E%E7%BD%AE%E8%AF%81%E6%8D%AE">第18章 普通 Edit 连续推演</a>；比较三个模块如何共同决定下一步，进入 <a href="31-tool-contracts.html#%E8%90%BD%E5%9B%9E%E6%99%AE%E9%80%9A-maka-edit%E4%B8%89%E7%A7%8D%E7%8A%B6%E6%80%81%E8%A6%81%E5%90%8C%E6%97%B6%E4%BF%9D%E5%AD%98">第31章</a>。</p>
+<h4 id="最终工具面由真实-binding-组成">最终工具面由真实 binding 组成</h4>
+<p>Maka 不是拿一张静态名单告诉模型“这些工具大概存在”。Runtime Host 会从实际绑定的内置工具、Host 能力、MCP 服务、Computer Use、Client capability、Skill 与子任务等来源组成当前 Run 的工具上限，再按工作模式、配置与当前就绪状态过滤。</p>
+<p>这里的 MCP 是连接外部工具服务的协议，Computer Use 是操作浏览器或桌面的能力，Client capability 是由客户端设备执行的能力。它们在本节后面的 Adapter 小节中继续比较；第23章再展开 Skill 与子任务。</p>
+<p>这意味着：</p>
+<ul>
+<li>工具说明和实际 dispatcher 应来自同一组成结果；</li>
+<li>当前 Run 没绑定的工具，不能仅凭模型说出名字就执行；</li>
+<li>child、root 或特定 profile 可以拥有不同的最终工具面；</li>
+<li>工具面会作为本次执行组成的一部分被冻结和记录。</li>
+</ul>
+<h4 id="工具存在还不等于本步可见">工具“存在”还不等于本步“可见”</h4>
+<p>假设 Host 一共装了 500 个工具。把 500 份工具说明每次都发给模型会占用大量上下文，也会增加选错工具的概率。因此可以分两层：</p>
+<pre><code class="language-text">完整工具集合：这个 Run 最多可能使用什么
+本步可见集合：这次模型请求实际看到了什么 schema</code></pre>
+<p>有些工具可以先通过 <code>tool_search</code> 找到，再从下一次模型步骤开始变得可见。这称为 <a href="glossary.html#availability%E5%BD%93%E5%89%8D%E5%8F%AF%E8%A7%81--%E5%8F%AF%E8%B0%83%E7%94%A8%E6%80%A7">deferred availability（延迟可用）</a>。它解决的是上下文成本，不是权限问题。</p>
+<h4 id="providertools-与-activetools"><code>providerTools</code> 与 <code>activeTools</code></h4>
+<p>这两个集合承担不同职责：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · `providerTools` 与 `activeTools`"><table><caption>表 3 / Table 3 · `providerTools` 与 `activeTools`</caption><thead><tr><th scope="col">集合</th><th scope="col">通俗含义</th><th scope="col">能否据此判断权限（Permissions）</th></tr></thead><tbody><tr><td><code>providerTools</code></td><td>本 Run 完整的调用分派注册表（dispatch registry）</td><td>不能</td></tr>
+<tr><td><code>activeTools</code></td><td>当前模型 step 可见、可调用的 schema 快照</td><td>不能</td></tr></tbody></table></div>
+<p>当模型用 <code>tool_search</code> 激活一个延迟工具时，新工具从<strong>下一次</strong> provider projection 才可见。同一步先搜索、又并行调用刚搜到的工具会被拒绝，因为当前 step 的快照已经冻结。</p>
+<h4 id="toolruntime-是执行与结算入口">ToolRuntime 是执行与结算入口</h4>
+<p>对普通 Maka 工具，<code>ToolRuntime</code> 会在真正执行前检查：</p>
+<ul>
+<li>工具名和 schema；</li>
+<li>当前 step 是否激活；</li>
+<li>嵌套调用是否允许；</li>
+<li>是否与同一步其他工具冲突；</li>
+<li>是否触发重复失败闸门；</li>
+<li>Client capability 是否满足最低边界；</li>
+<li>subagent 数量等资源上限。</li>
+</ul>
+<p>执行前拒绝也会形成一个正常的 call/result 对，让模型知道为什么失败；但它不会伪装成“工具实现已经启动”。</p>
+<h4 id="同一步独占与嵌套许可是两个维度">同一步独占与嵌套许可是两个维度</h4>
+<p>Code Mode 是用一段受控代码组合多个工具调用的方式；Maka 用外层 <code>exec</code> 承接这段代码。工具声明分别规定“能否与同一步的其他调用共存”和“能否出现在组合代码内部”：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 同一步独占与嵌套许可是两个维度"><table><caption>表 4 / Table 4 · 同一步独占与嵌套许可是两个维度</caption><thead><tr><th scope="col">声明</th><th scope="col">回答的问题</th><th scope="col">实际含义</th></tr></thead><tbody><tr><td><code>executionSemantics: parallel / exclusive_step</code></td><td>同一 assistant step 能否容纳其他调用</td><td><code>exclusive_step</code> 与其他调用冲突时，冲突调用被拒绝，需在后续 step 重提；<code>parallel</code> 或普通缺省值只是没有声明此类独占</td></tr>
+<tr><td><code>nesting: nestable / direct_only</code></td><td>能否在 <code>exec</code> 内部调用</td><td><code>direct_only</code> 不进入可嵌套工具表，Runtime 也会拒绝此类嵌套调用；普通工具默认可嵌套，仍须当前 active，并通过参数、权限与执行边界检查</td></tr></tbody></table></div>
+<p>第一行是带 step 身份的准入约束，不是资源锁，也不会自动推断 <code>Edit → 测试</code> 的依赖。同为 <code>parallel</code> 的两个工具若竞争同一资源，仍需要相应资源协调；被拒绝的调用也不会自动排队到下一步。</p>
+<p>Maka 的外层 <code>exec</code> 声明为 <code>exclusive_step</code> 和 <code>direct_only</code>：它不能与同一 assistant step 的其他外层调用混用，也不能嵌套另一个 <code>exec</code>。这不妨碍其中获准的独立子调用并发执行，每个子调用仍单独经过 ToolRuntime。<code>nestable</code> 也不是唯一准入条件，例如 provider 原生工具不会因此自动进入代码组合。</p>
+<p>这里的 <code>direct_only</code> 表示只能直接调用，与工具发现时“默认直接可见”的名单是两回事。发现决定当前展示哪些工具，嵌套声明决定组合代码能使用哪些入口。</p>
+<h4 id="adapter-不是第二套-agent-loop">Adapter 不是第二套 Agent loop</h4>
+<p>MCP、Computer Use 和 Client capability 看起来很不同：一个调用远程服务，一个操作桌面，一个回到 Client 执行。但在普通路径中，它们被适配成 Maka tool，共享 ToolRuntime 的外层调用身份、权限检查与结果结算生命周期。</p>
+<p>这样做的价值是：新增一种外部能力时，不必再发明一套 Session、Run 和工具生命周期。</p>
+<p>共享外层生命周期不代表共享相同的外部副作用保证。Client Capability 区分客户端同意接收（accept）与实际准入执行（admitted）两个阶段；第25章将展开。Computer Use/helper 与远端 MCP 的 effect provenance、幂等和 reconcile 也各由 adapter contract 决定。普通 T1/T2 只能说明 Maka 记录了 dispatch 与 settlement，不能单独升级成“外部效果恰好发生一次（exactly-once）”。</p>
+<h4 id="一个明确绕过-toolruntime-的例外provider-executed-工具">一个明确绕过 ToolRuntime 的例外：provider-executed 工具</h4>
+<p>有些模型提供商会在一次模型请求内部执行原生工具。只有返回事件明确标记 <code>providerExecuted=true</code> 时，Maka 才把它视为 <a href="glossary.html#provider-executed-tool%E7%94%B1%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E4%BB%A3%E6%89%A7%E8%A1%8C%E7%9A%84%E5%B7%A5%E5%85%B7">provider-executed（由提供商执行）</a> 子通道。</p>
+<p>这类调用：</p>
+<ul>
+<li>由 provider 执行，不进入普通 ToolRuntime；</li>
+<li>Maka 保存它观察到的调用和结果时间线；</li>
+<li>不拥有普通本地工具的持久效果前后边界；</li>
+<li>在<strong>同一个在线 provider request</strong> 的 retry 判断中，一旦观察到工具活动，失败后就不能安全地整次重发该模型请求。</li>
+</ul>
+<p>“provider-native 声明”本身不等于 provider 已执行；真正的分流依据是运行事件里的 <code>providerExecuted</code> 事实。</p>
+<p>这个在线 retry guard 不等于跨进程恢复已经闭合。若进程恰在 provider 外部效果附近崩溃，当前 generic crash resolver 没有一条完整的 provider-executed 专用 taxonomy，甚至可能把某些情况误归为 <code>definitely_not_dispatched</code>。因此这里能下的强结论只是“同一在线请求不会在观察到工具活动后被整次安全重发”，不是“所有崩溃窗口都已获得 exactly-once”。</p>
+<h4 id="工具也可能暂停向用户补充结构化输入">工具也可能暂停，向用户补充结构化输入</h4>
+<p>Maka 的 <code>requestUserForm</code> 让一个已绑定身份的工具调用等待表单答案；答案先由 Host 持久结算，再恢复该调用。它与授权交互的用途不同。Desktop/TUI 的现代 MCP form 路径在答案提交后，由 manager 以同一调用参数及协议 state 继续。接上这条桥仍不意味着任意 server 都支持它：协议版本、form 模式和绑定是否仍有效，都决定能否继续。</p>
+<h3 id="更深一层的常见误区">更深一层的常见误区</h3>
+<h4 id="误区五把全部工具-schema-每步都发给模型最可靠">误区五：把全部工具 schema 每步都发给模型最可靠</h4>
+<p>工具少时可行，工具多时会浪费上下文并增加选择噪声。Maka 把完整 registry 和本步 active snapshot 分开。</p>
+<h4 id="误区六工具结果越完整越好">误区六：工具结果越完整越好</h4>
+<p>模型需要的是足够完成下一步的有效投影。无限制日志会挤占上下文；原始证据可以保存在可回读的归档中。</p>
+<h4 id="误区七mcp-或-computer-use-有自己的-agent-生命周期">误区七：MCP 或 Computer Use 有自己的 Agent 生命周期</h4>
+<p>在 Maka 的普通路径里，它们是能力 adapter，不拥有另一套 Session、Turn 或 Run。</p>
+<span class="heading-alias" id="深化自测解释-maka-的分层" aria-hidden="true"></span><h4 id="maka-工具分层问答">Maka 工具分层问答</h4>
+<p><strong>问题 1。</strong> <code>providerTools</code> 和 <code>activeTools</code> 有什么区别？</p>
+<p><strong>解释。</strong> 前者保留完整 dispatch registry，后者是本步冻结的可见 schema；它们还都受最终 bound surface 上限约束。</p>
+<p><strong>问题 2。</strong> 同批次先搜索再调用刚找到的 deferred tool，为什么仍会被拒绝？</p>
+<p><strong>解释。</strong> 搜索只更新以后 step 的 activation，不能改变当前已冻结的快照。</p>
+<p><strong>问题 3。</strong> 大工具结果的有界投影与可回读归档各解决什么问题？</p>
+<p><strong>解释。</strong> 投影控制反复进入模型的观察成本；归档让删减后仍能按需取得证据。两者都不应伪造成功或丢失关键失败信息。</p>
+<p><strong>问题 4。</strong> 普通 MCP adapter 是否绕过 ToolRuntime？什么事实才把调用分到 provider-owned lane？</p>
+<p><strong>解释。</strong> 普通 MCP 仍经 ToolRuntime；返回事件明确标记 <code>providerExecuted=true</code> 才进入另一个执行 lane，native declaration 本身不够。</p>
+<p><strong>问题 5。</strong> 表单 callback 已存在，能否推断所有 Desktop MCP server 都可发起表单？</p>
+<p><strong>解释。</strong> 不能；要逐段检查 callback 是否传递到具体 server。当前现代协议的 form 桥已接通；其他模式、版本与实际 server 仍须分别确认。</p>
+<p><a href="../../../extended-reading.html#reference-7" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../comparisons/tool-methods.md">工具调用方法</a>比较了 typed call、shell 与代码组合怎样表达同一个动作。</p>
+<span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
+<ul>
+<li>相关章节：<a href="15-model-context.html">第15章｜模型输入与上下文组成</a></li>
+<li>相关章节：<a href="17-permissions-and-sandbox.html">第17章｜权限控制与沙箱隔离</a></li>
+<li>总导航：<a href="README.html">从零学习 Maka Agent</a></li>
+</ul>
+<h2 id="延伸阅读">延伸阅读</h2>
+<p><a href="../../../extended-reading.html#reference-8" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/tool-system.md">Tool 系统说明</a>按工具组成、实时可用性、执行和结果消费展开完整实现。</p>
+<hr>
+<p><a href="15-model-context.html">上一章：第 15 章｜模型输入与上下文组成</a> · <a href="17-permissions-and-sandbox.html">下一章：第 17 章｜权限控制与沙箱隔离</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="15-model-context.html"><span>← 上一章</span><strong>第 15 章｜模型输入与上下文组成</strong></a><a href="17-permissions-and-sandbox.html"><span>下一章 →</span><strong>第 17 章｜权限控制与沙箱隔离</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">核心阅读</a></li><li class="toc-level-3"><a href="#edit-%E5%A4%B1%E8%B4%A5%E5%90%8E%E4%B8%8B%E4%B8%80%E6%9D%A1%E8%AF%B7%E6%B1%82%E5%BA%94%E6%94%B9%E5%8F%98%E4%BB%80%E4%B9%88">Edit 失败后，下一条请求应改变什么</a></li><li class="toc-level-3"><a href="#%E8%AE%A9%E4%B8%8D%E5%90%8C%E8%A7%82%E5%AF%9F%E5%AF%BC%E5%90%91%E4%B8%8D%E5%90%8C%E4%B8%8B%E4%B8%80%E6%AD%A5">让不同观察导向不同下一步</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E5%88%A4%E6%96%AD%E5%86%99%E6%88%90%E5%B7%A5%E5%85%B7%E8%AF%B7%E6%B1%82">把判断写成工具请求</a></li><li class="toc-level-3"><a href="#%E5%B7%A5%E5%85%B7%E5%A5%91%E7%BA%A6%E6%80%8E%E6%A0%B7%E6%8E%A5%E5%9B%9E%E5%BE%AA%E7%8E%AF">工具契约怎样接回循环</a></li><li class="toc-level-3"><a href="#readme-%E7%AE%80%E5%8C%96%E9%98%B6%E6%AE%B5%E7%9A%84%E5%9B%9B%E6%AD%A5%E5%8F%82%E6%95%B0">README 简化阶段的四步参数</a></li><li class="toc-level-3"><a href="#maka-edit-%E6%80%8E%E6%A0%B7%E5%AE%9A%E4%BD%8D%E6%97%A7%E7%89%87%E6%AE%B5">Maka Edit 怎样定位旧片段</a></li><li class="toc-level-3"><a href="#%E5%A6%82%E6%9E%9C%E6%A8%A1%E5%9E%8B%E4%B8%AD%E9%80%94%E6%83%B3%E6%9F%A5%E7%BD%91%E7%BB%9C">如果模型中途想查网络</a></li><li class="toc-level-3"><a href="#%E5%B8%B8%E8%A7%81%E8%AF%AF%E5%8C%BA">常见误区</a></li><li class="toc-level-3"><a href="#%E4%B8%A4%E7%A7%8D%E7%9C%9F%E5%AE%9E%E8%B5%B0%E6%B3%95%E9%83%BD%E5%9B%9E%E5%88%B0%E5%B7%A5%E5%85%B7%E4%B8%8E%E5%8F%8D%E9%A6%88">两种真实走法，都回到工具与反馈</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E4%B8%80%E4%B8%AA%E7%B1%BB%E5%9E%8B%E8%BF%9E%E6%8E%A5%E8%AF%B4%E6%98%8E%E4%B8%8E%E6%89%A7%E8%A1%8C">用一个类型连接说明与执行</a></li><li class="toc-level-3"><a href="#%E5%A4%B1%E8%B4%A5%E4%B8%80%E4%B8%AA%E5%8D%81%E5%87%A0%E8%A1%8C%E7%9A%84%E5%BE%AA%E7%8E%AF%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E5%A4%9F%E7%94%9F%E4%BA%A7%E4%BD%BF%E7%94%A8">失败：一个十几行的循环为什么不够生产使用</a></li><li class="toc-level-3"><a href="#%E5%BE%AA%E7%8E%AF%E6%B7%B1%E5%8C%96%E7%94%A8%E8%A7%82%E5%AF%9F%E4%B8%8E%E9%A2%84%E7%AE%97%E9%80%89%E6%8B%A9%E4%B8%8B%E4%B8%80%E8%A1%8C%E5%8A%A8">循环深化：用观察与预算选择下一行动</a></li><li class="toc-level-3"><a href="#maka%E6%8A%8A%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8%E6%8B%86%E6%88%90%E5%8F%AF%E6%A3%80%E6%9F%A5%E7%9A%84%E7%AE%A1%E7%BA%BF">Maka：把“工具调用”拆成可检查的管线</a></li><li class="toc-level-3"><a href="#%E6%9B%B4%E6%B7%B1%E4%B8%80%E5%B1%82%E7%9A%84%E5%B8%B8%E8%A7%81%E8%AF%AF%E5%8C%BA">更深一层的常见误区</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-2"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

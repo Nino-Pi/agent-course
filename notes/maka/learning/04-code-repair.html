@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 04 章｜代码修复与测试 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 04 / 62</div><article id="main-content"><span class="heading-alias" id="l00第一次代码修复从错误日志走到可信-diff" aria-hidden="true"></span><span class="heading-alias" id="l00代码修复与测试" aria-hidden="true"></span><h1 id="第-04-章代码修复与测试">第 04 章｜代码修复与测试</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：测试命令不存在与测试断言失败，为什么需要两条不同的诊断路径？</p>
+<p><strong>关键概念</strong>：任务契约规定正确行为；断言比较实际值与期望值；退出码描述命令结束状态；diff（差异）说明文件改动；确定性模型返回预写动作。</p>
+<p><strong>关系主线</strong>：案例先定位测试入口，解释向下取整、取余与差异比较基准，再由失败输入推导修复，以复测和范围检查验收。预写响应驱动真实 mini 循环，全程未调用真实模型。</p>
+</blockquote>
+<p>本章把前面的“只修 README”扩展成“同时修正文档与函数”。示例项目由四份文件组成：<code>README.md</code> 说明使用方法，<code>package.json</code> 配置测试入口，<code>src/duration.js</code> 实现时间格式化，<code>test/duration.test.js</code> 检查结果。这样的固定示例项目也称为 fixture。后文的诊断根据源码和已有执行输出展开。</p>
+<p><strong>任务要求。</strong> 本案例约定 <code>formatDuration(seconds)</code> 接受非负整数秒，返回 <code>minutes:ss</code>：分钟是完整分钟数，余秒在 <code>0…59</code> 之间并显示为两位。以下输入都在 JavaScript 安全整数范围内：<code>Number</code> 数值类型能精确表示并可靠区分这些整数，非负上限为2的53次方减1，即9,007,199,254,740,991；超过安全范围时，相邻整数可能无法区分。负数、小数、非法输入和超大数的处理不属于本案例。README 则应告诉读者怎样运行项目实际提供的测试。这里的契约是教学任务的要求，既有测试用 0、9、60、125 秒四个输入检查它，不能反过来把需求缩成“只让这四个输入通过”。</p>
+<span class="heading-alias" id="第一遍先由你完成修复" aria-hidden="true"></span><span class="heading-alias" id="练习一独立诊断与修复" aria-hidden="true"></span><h2 id="从失败输出定位两处问题">从失败输出定位两处问题</h2>
+<p><strong>基线是修改之前可用于比较的项目状态与检查结果。</strong> 本例先读取四个文件，再确认真正的测试入口：错误命令没有启动测试；正确入口得到的 2 pass / 2 fail，才描述了修复前的函数表现。保留基线，才能区分原有失败与补丁引入的问题。</p>
+<p>诊断沿着“测试入口 → 失败断言 → 被测实现 → 修复范围”展开：</p>
+<p>函数由取整、取余与字符串拼接组成。<code>node:test</code> 只负责运行断言，测试所表达的输入和期望输出是本次定位的依据。Shell 中紧随命令的 <code>echo $?</code> 可读到上一条命令的退出码；0 表示该命令成功退出，非 0 要结合日志判断原因。</p>
+<p>先把算术和代码记号对应起来：在本例限定的非负整数范围，<code>Math.floor(x)</code> 表示向下取整，取不大于 x 的最大整数；<code>a % b</code> 表示 a 除以正整数 b 的余数。125 除以 60 是 2 余 5，因此 <code>Math.floor(125 / 60) = 2</code>、<code>125 % 60 = 5</code>，结果应写成 <code>2:05</code>。向下取整与四舍五入不同：59 秒还不满一分钟，<code>Math.floor(59 / 60) = 0</code>，而四舍五入会得到 1。这个 59 秒对照只是说明运算含义的教学计算，不是新增运行测试。</p>
+<p><strong>Git</strong> 是记录文件版本的工具。工作区是眼前的文件；暂存区（index）保存准备提交的文件状态。默认 <code>git diff</code> 比较工作区与暂存区，<code>git status --short</code> 用简短标记列出暂存、未暂存和未跟踪等状态。该 fixture 已将四份原始文件记录成初始提交；后续固定动作没有再次暂存或提交，所以暂存区保持初始基线。<code>git diff -- README.md src/duration.js</code> 中 <code>--</code> 后面的路径限定了比较范围，只看这两份文件的差异还不足以证明测试未变，仍要核对全仓变化范围与状态。</p>
+<p>下表把原固定运行中已执行的动作、对结果的教学推导和补充建议分开。“已执行”指该案例留下的运行记录；这里的讲解没有重新运行命令。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 从失败输出定位两处问题"><table><caption>表 1 / Table 1 · 从失败输出定位两处问题</caption><thead><tr><th scope="col">关键动作（Action）</th><th scope="col">本案例执行状态</th><th scope="col">已有观察与定位</th><th scope="col">接下来的判断与边界</th></tr></thead><tbody><tr><td><code>cat README.md package.json</code></td><td>已执行，第 1 步</td><td><code>command-trace.json</code> 第 1 项：README 写 <code>npm run check</code>，scripts 实际声明 <code>test</code></td><td>测试入口不一致</td></tr>
+<tr><td><code>npm run check</code></td><td>已执行，第 2 步</td><td>第 2 项：退出码 1，<code>Missing script: &quot;check&quot;</code></td><td>测试尚未启动，先修正入口判断</td></tr>
+<tr><td><code>cat src/duration.js test/duration.test.js</code></td><td>已执行，第 3 步；诊断是教学推导</td><td>第 3 项：返回函数和测试；函数余秒为 <code>% 100</code></td><td>沿 import 确认被测实现，再分别排查分钟、余秒、补零</td></tr>
+<tr><td><code>npm test</code></td><td>已执行，第 4 步</td><td>第 4 项：测试启动，60/125 秒断言失败，2 pass / 2 fail</td><td>问题进入函数行为，不能继续归咎命令名</td></tr>
+<tr><td>修改 README 和取余基数，再执行 <code>npm test</code></td><td>已执行，第 5–6 步</td><td>第 5 项编辑退出码 0；第 6 项为 4 pass / 0 fail</td><td>四个既有断言通过，编辑退出码本身不能证明修复正确</td></tr>
+<tr><td><code>git diff -- README.md src/duration.js</code></td><td>已执行，第 7 步</td><td>第 7 项与 <code>diff.patch</code>：两份目标文件各一处替换</td><td>仅展示这两份文件的差异，单独不能排除其他文件改动</td></tr>
+<tr><td><code>git diff --name-only</code></td><td>已执行，由脚本在循环结束后验收</td><td><code>verification.json</code> 的 <code>changed_files</code> 仅列 README 与函数文件；不属于八步 tool observation</td><td>结合初始提交及无后续暂存/提交，支持本例原有测试文件未变；不列出未跟踪文件</td></tr>
+<tr><td><code>git status --short</code></td><td>建议补充；本案例未对 fixture 执行</td><td>没有对应 fixture 输出，不能补写成已观察结果</td><td>执行后可补充暂存、未暂存及未跟踪状态；不能反向成为这次运行的证据</td></tr></tbody></table></div>
+<p>其中 <code>command-trace.json</code> 记录动作与普通回执，<code>verification.json</code> 保存脚本的最终验收结果；两者的产物含义见<a href="#%E8%BF%90%E8%A1%8C%E4%BA%A7%E7%89%A9%E5%88%86%E5%88%AB%E8%AF%B4%E6%98%8E%E4%BB%80%E4%B9%88">运行产物分别说明什么</a>。本例对“测试未变”的判断依赖已知准备过程、固定动作与全仓已跟踪文件的差异检查，不依赖未执行的 <code>git status --short</code>。</p>
+<p>正确入口只解决命令选择问题；测试仍可能暴露函数缺陷。</p>
+<span class="heading-alias" id="手工练习答案与验收" aria-hidden="true"></span><h3 id="测试入口计算过程与修复结果">测试入口、计算过程与修复结果</h3>
+<p>下面把观察与源码计算逐项对应。</p>
+<p><code>package.json</code> 的真实声明是：</p>
+<pre><code class="language-json">{&quot;scripts&quot;: {&quot;test&quot;: &quot;node --test&quot;}}</code></pre>
+<p>调用 npm 的入口是 <code>npm test</code>；<code>scripts.test</code> 的值是它真正启动的 <code>node --test</code>。不要把 test 字段写成 <code>&quot;test&quot;: &quot;npm test&quot;</code>，那会再次调用自身。</p>
+<p>初始 <code>npm run check</code> 的退出码为 1，关键输出为 <code>Missing script: &quot;check&quot;</code>。这时尚未启动测试，不能说“函数有两个测试失败”。</p>
+<p>改用 <code>npm test</code> 后，有 2 个通过、2 个失败：60 秒被写成 <code>1:60</code>，125 秒被写成 <code>2:25</code>，正确值分别是 <code>1:00</code>、<code>2:05</code>。下面是根据这些观察和当前源码作出的教学推导，不是确定性模型的思考日志：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 测试入口、计算过程与修复结果"><table><caption>表 2 / Table 2 · 测试入口、计算过程与修复结果</caption><thead><tr><th scope="col">候选解释（Hypothesis）</th><th scope="col">用现有证据检查</th><th scope="col">当前判断</th></tr></thead><tbody><tr><td>分钟的取整或除数错了</td><td>两个实际值的分钟前缀都是正确的 <code>1</code>、<code>2</code>；源码是 <code>Math.floor(seconds / 60)</code></td><td>不支持用修改分钟来解释这两项失败；这还不等于已测遍所有输入</td></tr>
+<tr><td>只是忘记给余秒补零</td><td><code>60</code>、<code>25</code> 本来就有两位；单纯补零无法把数值变成 <code>0</code>、<code>5</code>。源码对 9 秒已产生 <code>09</code></td><td>不能仅修改字符串格式解决当前失败</td></tr>
+<tr><td>余秒使用了错误的周期</td><td><code>60 % 100 = 60</code>，<code>125 % 100 = 25</code>，恰好重现错误；余秒却应在减去完整分钟后剩下</td><td>当前源码与失败现象一致支持修改余秒计算</td></tr></tbody></table></div>
+<p><code>test/duration.test.js</code> 的 <code>import { formatDuration } from &#39;../src/duration.js&#39;</code> 把断言连到真实实现，而不是靠文件名猜测。对非负整数秒，令 <code>minutes = Math.floor(seconds / 60)</code>，余秒应为 <code>seconds - 60 * minutes</code>，即 <code>seconds % 60</code>。这解释了为什么一个运算符参数的修复能够覆盖一般情况。README 里的 <code>npm run check</code> 另改为 <code>npm test</code>。</p>
+<p>修正后的完整函数保留原来的导出、分钟计算和补零方式，只改变取余基数：</p>
+<pre><code class="language-js">export function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, &#39;0&#39;)}`;
+}</code></pre>
+<p>README 中的测试命令相应成为：</p>
+<pre><code class="language-sh">npm test</code></pre>
+<p>下文固定运行的结果为 4 个通过、0 个失败，退出码 0；diff 仅包含 README 的命令替换与 <code>src/duration.js</code> 的 <code>% 100</code> → <code>% 60</code>，测试文件未变。这是该案例的结果，不保证任意修改或环境都得到相同输出。</p>
+<h3 id="怎样选择足够的验证">怎样选择足够的验证</h3>
+<p>验证要能反驳一个看起来合理的错误修复。先把检查与任务要求对应起来：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 怎样选择足够的验证"><table><caption>表 3 / Table 3 · 怎样选择足够的验证</caption><thead><tr><th scope="col">要确认什么</th><th scope="col">本例怎样检查</th><th scope="col">证据边界</th></tr></thead><tbody><tr><td>测试入口确实可用</td><td>根据 scripts 运行 <code>npm test</code>，读到测试名称与结果</td><td>命令存在不证明函数正确</td></tr>
+<tr><td>缺陷消失且已有正常行为保留</td><td>60、125 是原失败样例；0、9 保留零值与不足一分钟时的格式检查</td><td>四例通过只证明这四例，不是整个输入域证明</td></tr>
+<tr><td>修复遵守分钟与余秒的关系</td><td>阅读 diff 中的一般计算，检查 <code>seconds = 60 * minutes + remainder</code>、<code>0 ≤ remainder &lt; 60</code> 及两位显示</td><td>这是源码推理；仍不能代替实际执行</td></tr></tbody></table></div>
+<p><strong>反例：只针对测试输入打补丁。</strong> 如果一个补丁只给 60、125 写特判，保留其余 <code>% 100</code> 逻辑，它也能让现有四例通过。按契约，59 秒应为 <code>0:59</code>，61 秒应为 <code>1:01</code>；该特判补丁却会把 61 秒算成 <code>1:61</code>。这是根据代码的纸面计算，fixture 的四个测试没有包含这两个边界样例，不能把此推导写成新增运行结果。一般规律、边界样例和 diff 审查互相补充，不能把多跑几个数说成穷尽证明。</p>
+<p>本固定案例保持测试不变，是为了让验收可比较；它不是“真实项目禁止改测试”的规则。真实修复可以增加符合独立需求的回归测试，先确认它在旧实现暴露故障、在修复后通过，并保留相关既有检查。若怀疑原断言有误，先依据需求说明理由，不能仅为变绿而删除断言或改期望。</p>
+<p><a href="05-exit-and-trajectory.html#localenvironment_check_finished-%E6%A3%80%E6%9F%A5%E4%BB%80%E4%B9%88">第05章 的退出检查</a>只决定循环怎样停下，不能代替修复验收。<a href="26-evaluation-and-design.html#%E8%AF%84%E4%BB%B7%E6%9C%80%E5%B0%8F%E6%A8%A1%E5%9E%8B">第26章</a>讨论多次任务委托的评价；本实验的固定回放次数不能生成模型成功率。</p>
+<span class="heading-alias" id="第二遍让真实-mini-循环推进同一组动作" aria-hidden="true"></span><span class="heading-alias" id="练习二固定响应驱动真实循环" aria-hidden="true"></span><h2 id="固定响应怎样驱动真实循环">固定响应怎样驱动真实循环</h2>
+<p>本节使用已有固定响应运行，起点是同一套未修复的四文件项目。每个动作、返回结果与最终差异都已给出，可以直接沿表格理解循环如何推进。</p>
+<p><a href="../../../attachments/mini-code-lab.py.html">教学脚本</a>把准备与运行分成两个阶段。<strong>准备阶段</strong>，<code>run_repair()</code> 给出八步命令计划；<code>make_agent()</code> 把每条命令包装成原始 tool call，先调用真实的 <code>parse_toolcall_actions</code> 解析出 actions，再用 <code>make_toolcall_output</code> 装好响应。<strong>运行阶段</strong>，<code>DeterministicToolcallModel</code> 依次返回这些已经装好的响应，<code>DefaultAgent</code> 接着调用真实 <code>LocalEnvironment</code> 执行命令、取得结果并继续循环。</p>
+<p>因此，解析预写命令发生在运行之前；运行时不会再请求真实模型生成动作，也不会因观察变化自动改动八步顺序。这与第03章“真实模型响应到达后再解析”的在线路径不同，但命令执行与结果回传仍是真实代码路径。</p>
+<p>表中的 <code>cat README.md package.json</code> 按所列顺序读取两份文件，把内容拼接到输出中；它本身不核对哪条测试命令正确，判断仍要依据返回的内容。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 固定响应怎样驱动真实循环"><table><caption>表 4 / Table 4 · 固定响应怎样驱动真实循环</caption><thead><tr><th scope="col">步骤（Step）</th><th scope="col">发出的命令或动作</th><th scope="col">案例中的结果</th><th scope="col">这条证据说明什么</th></tr></thead><tbody><tr><td>1</td><td><code>cat README.md package.json</code></td><td>README 与 scripts 不一致</td><td>需要核对测试入口</td></tr>
+<tr><td>2</td><td><code>npm run check</code></td><td>returncode 1，Missing script</td><td>没有找到该 npm 脚本</td></tr>
+<tr><td>3</td><td>读函数与测试</td><td>60 与 125 的断言、<code>% 100</code></td><td>找到可检查的代码位置</td></tr>
+<tr><td>4</td><td><code>npm test</code></td><td>returncode 1，2 pass / 2 fail</td><td>测试已运行，暴露函数缺陷</td></tr>
+<tr><td>5</td><td>替换 README 和取余基数</td><td>returncode 0</td><td>编辑命令完成；此时还没证明测试通过</td></tr>
+<tr><td>6</td><td><code>npm test</code></td><td>returncode 0，4 pass / 0 fail</td><td>这四个断言在本次执行通过</td></tr>
+<tr><td>7</td><td><code>git diff</code></td><td>仅两个目标文件的最小修改</td><td>可审查交付范围</td></tr>
+<tr><td>8</td><td>输出完成标记与中文总结</td><td><code>Submitted</code> exit</td><td>循环按完成协议停止</td></tr></tbody></table></div>
+<p>第 5 步的脚本使用 Python <code>str.replace</code>，没有检查目标出现次数：零匹配仍可能正常退出，多匹配会全部替换。这里的固定初始文件使预定替换可用；迁移到未知仓库时必须重新检查目标与差异，不能从此脚本推导“退出 0 就一定改对一处”。</p>
+<p>为什么有 8 次 Model.query，却只有 7 条 tool observation？最后一次 action 的命令已经执行，<code>LocalEnvironment._check_finished()</code> 检出完成标记后抛出 <code>Submitted</code>，<code>DefaultAgent.run()</code> 加入 exit。该完成 action 不像普通命令一样返回 output 并生成 tool observation。这个差异是实际控制流，不要补造第 8 条成功 observation。</p>
+<span class="heading-alias" id="怎样核对产物" aria-hidden="true"></span><h2 id="运行产物分别说明什么">运行产物分别说明什么</h2>
+<p>案例保存了以下产物，它们分别回答不同问题：</p>
+<ul>
+<li><code>repo/</code>：真实修改后的四文件 Git 仓库。</li>
+<li><code>command-trace.json</code>：八步的命令及前七步真实 output/returncode。最后一步的 observation 为 <code>null</code>，终态看 trajectory。</li>
+<li><code>trajectory.json</code>：mini 原生序列化结果。按 <code>messages[].tool_call_id</code> 配对 assistant tool call 与 tool observation。</li>
+<li><code>diff.patch</code>：最终 diff。</li>
+<li><code>verification.json</code>：脚本对返回码、测试结果、修改范围和 exit 的验收。</li>
+<li><code>versions.json</code>：实际 Python、Node、npm 与 mini 源码入口。</li>
+</ul>
+<p>已有固定运行的关键输出为：</p>
+<pre><code class="language-text">model_calls: 8
+tool_observations: 7
+observed_returncodes: [0, 1, 0, 1, 0, 0, 0]
+tests_before: pass 2, fail 2
+tests_after: pass 4, fail 0
+changed_files: [README.md, src/duration.js]
+exit_status: Submitted
+acceptance: PASS</code></pre>
+<span class="heading-alias" id="第三遍可选看看真实模型怎么走" aria-hidden="true"></span><h2 id="真实模型生成的修复路线">真实模型生成的修复路线</h2>
+<p><a href="22-agent-cases.html#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">第22章 的真实 mini 修复</a>沿用四份原始文件，由真实 K3 生成动作。它读取文件、选择测试时点并修改代码，动作顺序由模型响应决定，可与这里预写的八步对比。</p>
+<span class="heading-alias" id="自测先解释再看答案" aria-hidden="true"></span><span class="heading-alias" id="练习判断失败与修复证据" aria-hidden="true"></span><h2 id="失败与修复结果问答">失败与修复结果问答</h2>
+<p><strong>问题 1。</strong> 第 2 步与第 4 步都是 returncode 1，为什么不能按同一种故障修复？</p>
+<p><strong>解释。</strong> 第 2 步失败在 npm 的入口选择，测试尚未运行；第 4 步运行到了测试断言，需核对函数逻辑与测试需求。必须阅读 observation 的内容，不能只看返回码。</p>
+<p><strong>问题 2。</strong> 第 5 步 returncode 0，能否直接向用户说“修复已验证”？</p>
+<p><strong>解释。</strong> 不能。那只说明编辑命令成功退出；第 6 步才运行了验证，第 7 步检查修改范围。</p>
+<p><strong>问题 3。</strong> 什么证据可以排除“修改测试让它通过”？</p>
+<p><strong>解释。</strong> 本例从已提交的原始文件开始，固定动作没有再次暂存或提交；循环结束后，脚本用不限定路径的 <code>git diff --name-only</code> 列出全仓已跟踪文件的未暂存变更，<code>changed_files</code> 只有 README 与函数文件。结合初始提交、已知动作和两文件 diff，才支持原有测试文件未变。按两条路径筛选的 diff 单独不能排除其他改动；<code>git diff --name-only</code> 也不列出未跟踪文件。<code>git status --short</code> 是可补充的状态检查，本案例没有对 fixture 执行它。</p>
+<p><strong>问题 4。</strong> 把 fixture 的 bug 换掉，确定性模型还会自己找到正确修复吗？</p>
+<p><strong>解释。</strong> 不会。响应脚本已经知道具体替换字符串；这验证的是控制流与本地执行，不是模型的定位或规划能力。</p>
+<p><strong>问题 5。</strong> 一个只特判 60、125 的补丁也让四例通过，为什么仍不满足任务？</p>
+<p><strong>解释。</strong> 任务要求一般的分钟/余秒格式，四例只是样例。该补丁在 61 秒仍错误；应结合契约、边界检查设计和源码差异判断，不能把样例通过当成需求本身。</p>
+<p>相关章节：<a href="05-exit-and-trajectory.html#%E4%BA%A4%E4%BA%92%E9%80%80%E5%87%BA%E4%B8%8E%E8%BD%A8%E8%BF%B9">第05章 交互与退出</a>；<a href="06-crash-window.html">第06章 写入与记录缺口</a>。</p>
+<hr>
+<p><a href="03-actions-and-messages.html">上一章：第 03 章｜动作、观察与消息协议</a> · <a href="05-exit-and-trajectory.html">下一章：第 05 章｜交互、退出、预算与执行轨迹</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="03-actions-and-messages.html"><span>← 上一章</span><strong>第 03 章｜动作、观察与消息协议</strong></a><a href="05-exit-and-trajectory.html"><span>下一章 →</span><strong>第 05 章｜交互、退出、预算与执行轨迹</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E4%BB%8E%E5%A4%B1%E8%B4%A5%E8%BE%93%E5%87%BA%E5%AE%9A%E4%BD%8D%E4%B8%A4%E5%A4%84%E9%97%AE%E9%A2%98">从失败输出定位两处问题</a></li><li class="toc-level-3"><a href="#%E6%B5%8B%E8%AF%95%E5%85%A5%E5%8F%A3%E8%AE%A1%E7%AE%97%E8%BF%87%E7%A8%8B%E4%B8%8E%E4%BF%AE%E5%A4%8D%E7%BB%93%E6%9E%9C">测试入口、计算过程与修复结果</a></li><li class="toc-level-3"><a href="#%E6%80%8E%E6%A0%B7%E9%80%89%E6%8B%A9%E8%B6%B3%E5%A4%9F%E7%9A%84%E9%AA%8C%E8%AF%81">怎样选择足够的验证</a></li><li class="toc-level-2"><a href="#%E5%9B%BA%E5%AE%9A%E5%93%8D%E5%BA%94%E6%80%8E%E6%A0%B7%E9%A9%B1%E5%8A%A8%E7%9C%9F%E5%AE%9E%E5%BE%AA%E7%8E%AF">固定响应怎样驱动真实循环</a></li><li class="toc-level-2"><a href="#%E8%BF%90%E8%A1%8C%E4%BA%A7%E7%89%A9%E5%88%86%E5%88%AB%E8%AF%B4%E6%98%8E%E4%BB%80%E4%B9%88">运行产物分别说明什么</a></li><li class="toc-level-2"><a href="#%E7%9C%9F%E5%AE%9E%E6%A8%A1%E5%9E%8B%E7%94%9F%E6%88%90%E7%9A%84%E4%BF%AE%E5%A4%8D%E8%B7%AF%E7%BA%BF">真实模型生成的修复路线</a></li><li class="toc-level-2"><a href="#%E5%A4%B1%E8%B4%A5%E4%B8%8E%E4%BF%AE%E5%A4%8D%E7%BB%93%E6%9E%9C%E9%97%AE%E7%AD%94">失败与修复结果问答</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

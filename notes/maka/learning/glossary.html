@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>Agent 术语表 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">查阅入口</div><article id="main-content"><span class="heading-alias" id="agent-初学者共享术语表" aria-hidden="true"></span><h1 id="agent-术语表">Agent 术语表</h1>
+<p>本表解释课程中的概念、职责与适用范围。同名术语在不同项目中可能对应不同对象；Maka 专用词按本课程所分析的实现定义。</p>
+<span class="heading-alias" id="怎样使用这份术语表" aria-hidden="true"></span><h2 id="按正在解决的问题查词">按正在解决的问题查词</h2>
+<p>下表按机制问题归组，右栏链接到具体实例。</p>
+<p>图中采用中文名称配英文关键词。Permission 与其复数 Permissions 都译为“权限”；Permission Policy 译为“权限策略”，不能因为共享 Permission 一词就合并含义。具体代码/API 标识仍按原名保留，例如 <code>permissionMode</code> 是权限模式字段，<code>permissions</code> 也可能是参数或配置键；字段的实际含义要看所属项目，不能仅凭名字判断它是否完成授权或隔离。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 按正在解决的问题查词"><table><caption>表 1 / Table 1 · 按正在解决的问题查词</caption><thead><tr><th scope="col">机制问题</th><th scope="col">相关术语</th><th scope="col">实例</th></tr></thead><tbody><tr><td>系统、模型和运行支撑怎样配合？</td><td><a href="#agent%E6%99%BA%E8%83%BD%E4%BB%A3%E7%90%86">Agent</a>、<a href="#model--llm%E6%A8%A1%E5%9E%8B--%E5%A4%A7%E8%AF%AD%E8%A8%80%E6%A8%A1%E5%9E%8B">Model</a>、<a href="#harness%E8%BF%90%E8%A1%8C%E6%94%AF%E6%92%91">Harness</a>、<a href="#environment%E6%89%A7%E8%A1%8C%E7%8E%AF%E5%A2%83">Environment</a></td><td><a href="01-agent-components.html#agent%E6%A8%A1%E5%9E%8B%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%94%AF%E6%92%91">第01章</a></td></tr>
+<tr><td>请求、返回和保存分别是什么？</td><td><a href="#action%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82">Action</a>、<a href="#observation%E8%A7%82%E5%AF%9F%E7%BB%93%E6%9E%9C">Observation</a>、<a href="#message%E6%B6%88%E6%81%AF">Message</a>、<a href="#trajectory%E6%89%A7%E8%A1%8C%E8%BD%A8%E8%BF%B9">Trajectory</a></td><td><a href="03-actions-and-messages.html#%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%9B%9E%E6%89%A7">第03章</a></td></tr>
+<tr><td>配置和命令怎样启动程序？</td><td><a href="#json%E5%AD%97%E6%AE%B5%E4%B8%8E%E5%80%BC">JSON</a>、<a href="#npm-%E4%B8%8E-nodejs%E9%A1%B9%E7%9B%AE%E5%B7%A5%E5%85%B7">npm 与 Node.js</a>、<a href="#shell--bash%E5%91%BD%E4%BB%A4%E8%A7%A3%E9%87%8A%E5%99%A8%E4%B8%8E%E5%B7%A5%E5%85%B7%E5%90%8D">Shell / Bash</a></td><td><a href="01-agent-components.html#%E5%85%88%E8%AF%BB%E6%87%82%E6%96%87%E4%BB%B6%E7%A8%8B%E5%BA%8F%E5%92%8C%E5%91%BD%E4%BB%A4">第01章</a>、<a href="02-agent-loop.html#runtask%E5%88%9D%E5%A7%8B%E5%8C%96%E6%B6%88%E6%81%AF%E5%B9%B6%E6%8B%A5%E6%9C%89%E5%A4%96%E5%B1%82%E5%BE%AA%E7%8E%AF">第02章</a></td></tr>
+<tr><td>一项工作为什么有多次模型调用？</td><td><a href="#session%E4%BC%9A%E8%AF%9D">Session</a>、<a href="#turn%E8%BD%AE%E6%AC%A1--%E7%94%A8%E6%88%B7%E5%8F%AF%E8%A7%82%E5%AF%9F%E5%B7%A5%E4%BD%9C%E8%BE%B9%E7%95%8C">Turn</a>、<a href="#run--agentrun%E8%BF%90%E8%A1%8C--%E6%89%A7%E8%A1%8C%E5%B0%81%E5%A5%97">Run</a>、<a href="#model-step%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4">Model Step</a></td><td><a href="13-session-turn-run.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第13章</a></td></tr>
+<tr><td>已发生的事为什么与屏幕不同？</td><td><a href="#fact%E4%BA%8B%E5%AE%9E">Fact</a>、<a href="#event%E4%BA%8B%E4%BB%B6">Event</a>、<a href="#projection--read-model%E6%8A%95%E5%BD%B1--%E8%AF%BB%E5%8F%96%E8%A7%86%E5%9B%BE">Projection</a>、<a href="#canonical-fact%E8%A7%84%E8%8C%83%E4%BA%8B%E5%AE%9E--%E6%9D%83%E5%A8%81%E4%BA%8B%E5%AE%9E">Canonical Fact</a></td><td><a href="14-events-and-projections.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第14章</a></td></tr>
+<tr><td>同样叫快照，究竟固定了什么？</td><td><a href="#snapshot%E5%BF%AB%E7%85%A7">Snapshot</a>、<a href="#composition-snapshot--promptcomposition%E7%BB%84%E6%88%90%E5%BF%AB%E7%85%A7--%E8%AF%B7%E6%B1%82%E7%BB%84%E6%88%90%E8%AF%8A%E6%96%AD">Composition Snapshot</a></td><td><a href="23-skills-and-subagents.html">第23章</a>、<a href="25-host-and-client.html">第25章</a>、<a href="41-codex-memory-and-collaboration.html">第41章</a></td></tr>
+<tr><td>文件存着，为什么未进入本次输入？</td><td><a href="#history%E5%8E%86%E5%8F%B2">History</a>、<a href="#context%E4%B8%8A%E4%B8%8B%E6%96%87">Context</a>、<a href="#memory%E8%AE%B0%E5%BF%86">Memory</a>、<a href="#recall%E5%8F%AC%E5%9B%9E">Recall</a></td><td><a href="15-model-context.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E5%BE%84%E8%B7%9F%E7%9D%80%E4%B8%80%E6%AC%A1%E4%BF%AE%E5%A4%8D%E7%9C%8B%E6%A8%A1%E5%9E%8B%E8%A7%86%E9%87%8E">第15章</a>、<a href="20-memory.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB%E4%B8%80%E6%9D%A1%E5%81%8F%E5%A5%BD%E5%9B%9B%E4%B8%AA%E4%B8%8D%E5%90%8C%E7%9A%84%E5%8A%A8%E4%BD%9C">第20章</a></td></tr>
+<tr><td>工具出现了，为什么还不能执行？</td><td><a href="#availability%E5%BD%93%E5%89%8D%E5%8F%AF%E8%A7%81--%E5%8F%AF%E8%B0%83%E7%94%A8%E6%80%A7">Availability</a>、<a href="#permission%E6%9D%83%E9%99%90">Permission</a>、<a href="#permission-policy%E6%9D%83%E9%99%90%E7%AD%96%E7%95%A5">Permission Policy</a>、<a href="#isolation%E9%9A%94%E7%A6%BB">Isolation</a>、<a href="#sandbox%E6%B2%99%E7%AE%B1">Sandbox</a></td><td><a href="17-permissions-and-sandbox.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第17章</a></td></tr>
+<tr><td>改动发生了，结果记录在哪里？</td><td><a href="#side-effect%E5%A4%96%E9%83%A8%E5%89%AF%E4%BD%9C%E7%94%A8">Effect</a>、<a href="#durable%E6%8C%81%E4%B9%85%E5%B4%A9%E6%BA%83%E5%90%8E%E4%BB%8D%E5%8F%AF%E8%AF%BB">Durable</a>、<a href="#t1--t2%E5%B7%A5%E5%85%B7%E5%89%AF%E4%BD%9C%E7%94%A8%E5%89%8D%E5%90%8E%E6%A0%87%E8%AE%B0">T1 / T2</a>、<a href="#indeterminate--outcome-unknown%E7%BB%93%E6%9E%9C%E4%B8%8D%E7%A1%AE%E5%AE%9A">Outcome Unknown</a></td><td><a href="06-crash-window.html">第06章</a>、<a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章</a></td></tr>
+<tr><td>长对话缩短后，哪些内容还在？</td><td><a href="#compaction%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9">Compaction</a>、<a href="#checkpoint%E6%A3%80%E6%9F%A5%E7%82%B9">Checkpoint</a>、<a href="#archive--offload%E5%BD%92%E6%A1%A3--%E5%A4%96%E7%BD%AE">Offload</a></td><td><a href="19-context-compaction.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E5%BE%84%E7%BB%99%E6%9C%89%E9%99%90%E5%B7%A5%E4%BD%9C%E5%8F%B0%E6%95%B4%E7%90%86%E6%9D%90%E6%96%99">第19章</a></td></tr>
+<tr><td>谁负责继续或停止？</td><td><a href="#owner%E6%89%80%E6%9C%89%E8%80%85">Owner</a>、<a href="#authority%E8%A3%81%E5%86%B3%E6%9D%83--%E6%9D%83%E5%A8%81%E8%BE%B9%E7%95%8C">Authority</a>、<a href="#admission%E5%87%86%E5%85%A5">Admission</a>、<a href="#continuation%E7%BB%A7%E7%BB%AD%E6%89%A7%E8%A1%8C">Continuation</a></td><td><a href="24-continuation-and-orchestration.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第24章</a></td></tr>
+<tr><td>界面断开，是否代表执行停止？</td><td><a href="#client%E5%AE%A2%E6%88%B7%E7%AB%AF">Client</a>、<a href="#runtime-host%E8%BF%90%E8%A1%8C%E6%97%B6%E5%AE%BF%E4%B8%BB">Runtime Host</a>、<a href="#terminal-state--terminal-fact%E7%BB%88%E6%80%81--%E7%BB%88%E6%80%81%E4%BA%8B%E5%AE%9E">Terminal</a>、<a href="#settled%E8%B5%84%E6%BA%90%E7%BB%93%E7%AE%97%E5%AE%8C%E6%AF%95">Settled</a></td><td><a href="25-host-and-client.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第25章</a></td></tr>
+<tr><td>看过代码能说到多确定？</td><td><a href="#source-fact%E6%BA%90%E7%A0%81%E4%BA%8B%E5%AE%9E">Source Fact</a>、<a href="#design-intent%E8%AE%BE%E8%AE%A1%E6%84%8F%E5%9B%BE">Design Intent</a>、<a href="#mechanism%E6%9C%BA%E5%88%B6">Mechanism</a></td><td><a href="26-evaluation-and-design.html#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">第26章</a></td></tr></tbody></table></div>
+<h2 id="最基础的-agent-概念">最基础的 Agent 概念</h2>
+<h3 id="agent智能代理">Agent（智能代理）</h3>
+<p>围绕目标，通过观察、决策、行动与反馈推进工作的系统。本课程讨论由语言模型参与决策的 Agent：模型生成文字和动作请求，运行支撑将请求接到工具与环境，并把观察用于后续判断。任务还需按目标与约束验收。</p>
+<p>Agent 指整个工作系统；某个项目中名为 Agent 的类可能只承担控制职责。持久恢复、长期记忆、子任务和定时工作是按需求增加的能力，不是每个最小 Agent 的必备清单。</p>
+<h3 id="code-agent代码代理">Code Agent（代码代理）</h3>
+<p>以软件任务为对象的 Agent，例如理解仓库、读取和修改代码、运行检查、解释结果。它需要面对真实文件与执行环境；生成一段代码建议和将修改执行、验证、交付是不同阶段。</p>
+<h3 id="harness运行支撑">Harness（运行支撑）</h3>
+<p>让模型参与实际工作的支撑机制，包括输入组织、模型与工具循环、状态与恢复、权限与隔离、任务推进与协作、观察与评价。这六组是本课程的教学划分，不是统一的组件数量；简单实现可以只提供其中的基础能力，复杂实现可能将一项责任分给多个组件。</p>
+<p>项目规则、测试入口和服务提供工作环境的配置、材料与接口；Harness 通过相应读取、执行和控制路径使用它们。规则写在文件里不等于本次已加载，也不等于硬权限。Memory 的存取与输入选择、Skill 的方法装载与执行工具会跨越上述分组，见<a href="01-agent-components.html#harness-%E7%9A%84%E5%85%AD%E7%BB%84%E8%B4%A3%E4%BB%BB">第01章责任图与例子</a>。</p>
+<h3 id="agent-loop代理循环">Agent Loop（代理循环）</h3>
+<p>Agent 反复执行“组成 Context → 请求模型 → 解释输出 → 必要时调用工具 → 把结果加入下一次 Context”的控制循环。循环何时开始、何时停止以及崩溃后怎样恢复，由 Runtime 和更外层控制面决定，不由模型单独拥有。</p>
+<h3 id="model--llm模型--大语言模型">Model / LLM（模型 / 大语言模型）</h3>
+<p>接收一组输入并生成下一段输出的推理组件。输出可能是回答文字、推理内容，或“调用某个工具并传入这些参数”的结构化请求。模型服务会把这些内容包装为自己的响应或流式事件，再交给 Agent 处理；本地文件修改由执行工具的程序完成。</p>
+<p><strong>一次 Model 调用 ≠ 一次完整 Agent 工作</strong>。一个 Run 中可以有多次模型请求。</p>
+<h3 id="task任务">Task（任务）</h3>
+<p>交给 Agent 的目标与约束，例如“只修 README 的测试命令，运行相关检查，并报告失败”。它是工作输入，不是会主动运行的部件。在 mini-SWE-agent 中，<code>agent.run(task)</code> 将字符串渲染进初始用户消息；其他系统可以为任务另外保存结构化状态。</p>
+<p>任务文字本身不提供跨项目统一的持久身份。进入 Maka 后，Session、Turn 和 Run 分别标识会话、用户工作与执行。</p>
+<h3 id="message消息">Message（消息）</h3>
+<p>带有角色或用途的一条记录，例如 system、user、assistant、tool。mini-SWE-agent 的 <code>messages</code> 是线性列表，还可记录用于退出处理的 <code>exit</code>；不能把这个项目内部角色当成所有模型服务都接受的消息角色。普通响应和 observation 会追加进列表，退出与异常的具体路径见 <a href="05-exit-and-trajectory.html#%E4%BA%A4%E4%BA%92%E9%80%80%E5%87%BA%E4%B8%8E%E8%BD%A8%E8%BF%B9">第05章</a>。</p>
+<p><strong>Messages ≠ 系统全部事实</strong>。生产系统还可能保存权限、准入、恢复和控制状态；模型也不一定看到全部已保存事实。</p>
+<h3 id="action行动请求">Action（行动请求）</h3>
+<p>模型输出中被 Agent 解释为“希望执行什么”的结构化内容。mini-SWE-agent v2.4.6 的默认 CLI 组合把它解析为带 <code>command</code> 的 Bash action；text-based 变体则从特定代码块提取命令。</p>
+<p><strong>Action ≠ Effect</strong>。Action 是意图；只有执行器真正运行以后，外部世界才可能改变。</p>
+<h3 id="environment执行环境">Environment（执行环境）</h3>
+<p>Agent 进行观察与行动所面对的对象和运行条件，例如仓库文件、进程、测试与相关服务。项目规则说明工作约定，配置和工具接口决定怎样接触这些对象；实际访问还受权限和隔离机制约束。</p>
+<p>在 mini-SWE-agent 源码中，同名 <code>Environment</code> 是执行接口：接收 action，在工作目录与环境变量下运行命令并返回结果。<code>LocalEnvironment</code> 直接启动本机 shell 子进程；接口可替换不代表每种实现都有相同的确认、权限或 sandbox 能力。通用环境与这个具体接口须按上下文区分。</p>
+<h3 id="observation观察结果">Observation（观察结果）</h3>
+<p>执行 action 后反馈给 Agent、并用于下一次模型判断的信息，例如 stdout、return code 或 timeout 错误。它把“模型想做什么”连接到“执行后看见了什么”。</p>
+<p><strong>缺少 Observation ≠ 副作用没有发生</strong>。进程可能在真实 effect 已发生、结果尚未来得及记录时崩溃。</p>
+<h3 id="trajectory执行轨迹">Trajectory（执行轨迹）</h3>
+<p>一条 Agent 运行中保存下来的消息、模型统计、配置和退出信息，用于复盘、调试或训练数据处理。mini-SWE-agent 的 <code>save()</code> 可以把完整序列化结果写成 JSON 文件。</p>
+<p><strong>保存轨迹不等于保存了每一步的可靠结果</strong>。例如文件已经修改，进程却在保存本轮轨迹前退出，磁盘上的轨迹就可能落后于实际文件。保存时机和恢复方式见 <a href="06-crash-window.html">第06章</a>。</p>
+<h3 id="provider模型服务提供方">Provider（模型服务提供方）</h3>
+<p>真正接收模型请求并返回结果的服务或适配目标，例如某个云模型 API。Provider 有自己的消息格式、工具协议、重试行为和原生状态；Runtime 需要通过 adapter 将内部表达转换成 provider 能理解的格式。</p>
+<h3 id="json字段与值">JSON（字段与值）</h3>
+<p>一种记录结构化数据的文本格式。对象用花括号包住字段，冒号连接字段名与值；值可以是文本、数字、另一对象或列表等。例如 <code>{&quot;scripts&quot;:{&quot;test&quot;:&quot;node --test&quot;}}</code> 中，scripts 的值是内层对象，test 的值是命令文本。数据能解析不等于字段已满足业务要求，也不表示文本中的命令已经执行。<a href="01-agent-components.html#%E5%85%88%E8%AF%BB%E6%87%82%E6%96%87%E4%BB%B6%E7%A8%8B%E5%BA%8F%E5%92%8C%E5%91%BD%E4%BB%A4">第01章完整读法</a>、<a href="03-actions-and-messages.html#%E4%B8%80%E6%AC%A1%E5%91%BD%E4%BB%A4%E7%9A%84%E5%9B%9B%E4%BB%BD%E6%95%B0%E6%8D%AE">第03章请求转换</a>。</p>
+<h3 id="npm-与-nodejs项目工具">npm 与 Node.js（项目工具）</h3>
+<p>Node.js 运行 JavaScript 程序；npm 可以按项目配置启动脚本等工作。本课配置将 test 脚本写为 <code>node --test</code>，所以工具提交 <code>npm test</code> 后，npm 读取 <code>package.json</code> 中的 <code>scripts.test</code>，再启动 Node.js 的测试运行模式。这些是案例项目使用的工具，不是所有 Agent 必须具备的部件；测试是否通过仍要看实际输出。<a href="01-agent-components.html#%E5%85%88%E8%AF%BB%E6%87%82%E6%96%87%E4%BB%B6%E7%A8%8B%E5%BA%8F%E5%92%8C%E5%91%BD%E4%BB%A4">配置与结果的完整关系</a>。</p>
+<h3 id="shell--bash命令解释器与工具名">Shell / Bash（命令解释器与工具名）</h3>
+<p>shell 是解释并运行文本命令的程序，Bash 是常见的一种 shell。课程中名为 <code>bash</code> 的模型工具接收命令参数，但工具协议名不保证执行器实际启动 <code>/bin/bash</code>；不同执行环境可以采用不同 shell。Maka 的 Read、Edit 等原生工具也不能全部归为 Bash 命令。<a href="02-agent-loop.html#runtask%E5%88%9D%E5%A7%8B%E5%8C%96%E6%B6%88%E6%81%AF%E5%B9%B6%E6%8B%A5%E6%9C%89%E5%A4%96%E5%B1%82%E5%BE%AA%E7%8E%AF">第02章首例</a>、<a href="03-actions-and-messages.html#shelltrue-%E8%A1%A8%E7%A4%BA%E5%91%BD%E4%BB%A4%E7%94%B1-shell-%E8%A7%A3%E9%87%8A">第03章实际执行方式</a>。</p>
+<h3 id="agent-backend执行后端">Agent Backend（执行后端）</h3>
+<p>Runtime 用来承载一次 Run 的具体执行实现。当前 Maka Host 默认注册 <code>ai-sdk</code>，由 AiSdkBackend/AiSdkTurn 组织模型与工具循环，见<a href="../../../extended-reading.html#reference-2" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/plain-turn.md">普通 Turn 主链</a>。Backend 是执行实现，Provider 是模型服务目标；更换模型服务不一定要更换 backend。</p>
+<h3 id="model-adapter模型协议适配器">Model Adapter（模型协议适配器）</h3>
+<p>负责把内部消息、工具声明和调用选项转换成某个模型服务接受的格式，并解释其返回值。它解决“怎样表达和传输这次请求”，不能仅凭它支持某种格式就推断整个 Agent 的权限、恢复或工具效果已经闭合。provider-native 消息也不自动代表换了一个 Agent Backend，具体边界见<a href="../../../extended-reading.html#reference-21" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/core-systems.md#prompt--model-composition-是独立责任">模型输入组成</a>。</p>
+<h3 id="provider-executed-tool由模型服务代执行的工具">Provider-Executed Tool（由模型服务代执行的工具）</h3>
+<p>工具效果发生在 provider 正在处理的模型请求内部，而不是由 Maka 的普通 ToolRuntime 调用本地实现。Maka 可以保存它观察到的 call/result 时间线，但普通工具的 T1/T2 不能直接证明这条子通道的外部效果。“provider 支持原生工具”也不等于本次调用已由 provider 执行；需要运行事件明确标记 <code>providerExecuted=true</code>。</p>
+<h3 id="prompt提示词">Prompt（提示词）</h3>
+<p>广义上指交给模型的一整组指令与输入，不只是 system prompt 的一段文字。在 Maka 中，一次请求通常还会包含当前用户输入、历史投影、Memory、workspace instructions、Skill 内容和工具 schema。</p>
+<p><strong>Prompt ≠ History</strong>，也不等于数据库中所有可用信息。</p>
+<h3 id="context上下文">Context（上下文）</h3>
+<p>系统为某一次模型请求提供的输入集合。“模型看见”表示内容已进入该次输入；这不保证模型注意到或正确使用了每一项。输入受上下文窗口限制，因此完整历史、长期 Memory 和当前 Context 不能视为同一个东西。</p>
+<h3 id="working-context工作上下文">Working Context（工作上下文）</h3>
+<p>为了当前模型请求，从事实历史、指令、Memory、Skill 和工具定义中选择、整理出来的可用输入。它是一个视图，可以在下一次 step 重新构造。</p>
+<h3 id="composition-snapshot--promptcomposition组成快照--请求组成诊断">Composition Snapshot / promptComposition（组成快照 / 请求组成诊断）</h3>
+<p>这组记录帮助解释：一次 Run 的配置来自哪里，以及其中某次模型请求的输入由哪些部分组成。两者的记录范围不同。</p>
+<p><code>RunCompositionSnapshot</code> 记录一次执行选择了哪些规则、工具和组成来源；<code>promptComposition</code> 记录某次模型请求的组成统计，例如工具定义与消息各占多少序列化字节；<code>ModelCallAttempt</code> 关联这次调用的状态、使用量和成本。前者帮助查配置，后两者帮助查单次请求。组成统计不保存完整请求正文，不能凭它逐字还原模型输入，详见 <a href="15-model-context.html">第15章</a>。</p>
+<h3 id="snapshot快照">Snapshot（快照）</h3>
+<p>某次选定状态的表示。读到“快照”时，先问它记录了什么、何时采集、由谁读取，再看保存和刷新合同；这个名字本身不保证已经持久化、资源永远不变，或能够恢复整个执行。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · Snapshot（快照）"><table><caption>表 2 / Table 2 · Snapshot（快照）</caption><thead><tr><th scope="col">快照对象（Snapshot Object）</th><th scope="col">实际消费者（Consumer）</th><th scope="col">不能由“快照”名称推出的保证</th></tr></thead><tbody><tr><td>mini trajectory：某时点的消息、配置与运行信息</td><td>复盘者或另有装载入口的程序</td><td>不保证文件效果与快照同时保存；第二轮 action 也可能尚未保存，见<a href="06-crash-window.html">第06章</a></td></tr>
+<tr><td>请求组成：执行配置来源或某次请求的组成统计</td><td>组成检查与调用诊断</td><td>统计不等于完整请求正文，见<a href="15-model-context.html">第15章</a></td></tr>
+<tr><td>本步工具快照：当前步骤可见、可调用的工具声明</td><td>模型请求组装与调用校验</td><td>不固定未来步骤，也不冻结已撤回的执行权限，见<a href="16-tools-and-execution.html">第16章</a>、<a href="56-tool-scheduling.html">第56章</a></td></tr>
+<tr><td>Maka Skill inventory：本 Turn 采用的方法目录与已扫描正文</td><td>prompt 目录、SkillSearch 与 Skill</td><td>不包括正文引用的所有脚本或外部资源，也不自动保证任意重启后继续可读，见<a href="23-skills-and-subagents.html">第23章</a></td></tr>
+<tr><td>Host 状态快照：当前权威状态的展示表示及观察起点</td><td>Client 查询、重连与后续增量处理</td><td>恢复观察不等于重新执行业务，也不能使用不匹配的旧订阅游标，见<a href="25-host-and-client.html">第25章</a></td></tr>
+<tr><td>分页快照：同一次有界读取所采用的内容</td><td>持相应 cursor 继续读取的调用者</td><td>保持续页一致不等于每页都最新；缓存与重新读取各有条件，见<a href="41-codex-memory-and-collaboration.html">第41章</a></td></tr>
+<tr><td>工作区 checkpoint：该实现实际捕获的文件状态</td><td>文件恢复与后续核查</td><td>不自动覆盖所有文件，更不能撤销远端业务效果，见<a href="44-checkpoints-and-replay.html">第44章</a></td></tr></tbody></table></div>
+<h3 id="history历史">History（历史）</h3>
+<p>过去发生过的用户输入、模型输出、工具调用、工具结果和终态等事实。History 可能很长；模型这一次看到的 Context 通常只是它的安全投影或压缩形式。</p>
+<h3 id="memory记忆">Memory（记忆）</h3>
+<p>用于跨轮次或跨会话复用信息的机制。它不是一个固定技术名称。聊天历史、Context、摘要、<code>MEMORY.md</code>、结构化 LTM 和 workspace instructions 各自解决不同问题，不能因为都与“过去的信息”有关就叫成同一个 Memory。</p>
+<h2 id="产品运行时与身份">产品、运行时与身份</h2>
+<h3 id="client客户端">Client（客户端）</h3>
+<p>用户操作和观察 Agent 的产品界面，例如 Desktop、TUI 或 CLI。Client 提交意图、显示投影，也可能反向提供 Computer Use 或 MCP 能力；它不因此成为 canonical Run owner。</p>
+<h3 id="runtime-host运行时宿主">Runtime Host（运行时宿主）</h3>
+<p>承担长期控制责任的组件：接收请求、决定是否开始、管理连接与恢复，再把工作交给 Runtime 执行。这里的“长期”描述责任与状态的连续性，不保证同一个进程一直常驻；具体驻留和释放条件由 <a href="../../../extended-reading.html#reference-13" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/runtime-host-system.md#3-当前-maka-的-host-驻留合同">Runtime Host 系统</a>维护。</p>
+<h3 id="state-root--single-writer状态根--单写者">State Root / Single Writer（状态根 / 单写者）</h3>
+<p>State Root 是 Host 用来组织长期控制状态的根；single writer 表示同一时刻只有获得有效 authority 或 lease 的写者可以修改它。目的不是让整个 Agent 串行，而是避免两个 Host 对同一份关键控制状态同时拍板。</p>
+<h3 id="broker能力中介">Broker（能力中介）</h3>
+<p>夹在能力提供方与调用方之间，负责发现、转发、接受和结算请求的组件。例如 Client Capability broker 把 Desktop 提供的能力接给 Runtime。Broker 能协调协议，不因此自动拥有外部副作用的真实结果或 Session 的最终 authority。</p>
+<h3 id="state状态">State（状态）</h3>
+<p>某个对象在一个时点的情况，例如会话选择了什么配置、工具效果是否已确认、任务还剩哪些步骤。读图时要先找状态所属对象与负责更新的组件。运行状态、文件状态、记忆内容和界面显示可能不同步，不能用同一个“已完成”标签代替。见<a href="13-session-turn-run.html">第13章</a>与<a href="14-events-and-projections.html">第14章</a>。</p>
+<h3 id="lifecycle生命周期">Lifecycle（生命周期）</h3>
+<p>一个对象从创建、接纳、运行到结束和清理的过程。不同对象有不同生命周期：连接断开、任务执行结束、资源释放并不是同一事件。图中的时序或状态节点需要指明在描述哪种对象。见<a href="25-host-and-client.html">第25章</a>。</p>
+<h3 id="runtime运行时">Runtime（运行时）</h3>
+<p>真正运行模型—工具循环的执行系统。Maka 的 Runtime 包含 SessionManager、RuntimeKernel、AgentRun、backend、context 和 tool loop；它和负责长期接入及控制的 Runtime Host 不是同一个层次。</p>
+<h3 id="session会话">Session（会话）</h3>
+<p>长期存在的工作房间，保存会话身份、workspace context、配置和历史投影。一个 Session 可以经历很多 Turn 和 Run。</p>
+<p><strong>Session ≠ 一次执行</strong>。</p>
+<h3 id="turn轮次--用户可观察工作边界">Turn（轮次 / 用户可观察工作边界）</h3>
+<p>Session 中一项用户可观察的顶层工作，例如一条用户消息触发的工作。它用 <code>turnId</code> 标识。一个 Turn 内可以经历多个模型 step 和工具调用。</p>
+<h3 id="run--agentrun运行--执行封套">Run / AgentRun（运行 / 执行封套）</h3>
+<p>一次真正的 durable Agent 执行尝试，用 <code>runId</code> 标识。它拥有执行状态、组成证据和终态。普通情况下，一个 Run 里会多次调用模型并穿插工具执行。</p>
+<p><strong>Run ≠ 一次 Provider 请求</strong>。</p>
+<h3 id="root-execution顶层执行">Root Execution（顶层执行）</h3>
+<p>直接占用一个 Session 顶层工作位置的执行，例如用户 Turn、Goal continuation 或 Schedule 唤醒后进入的 Run。它与 child Session 内的执行相对；Host 会对同一 Session 的 root admission 做冲突控制。</p>
+<h3 id="model-step模型步骤">Model Step（模型步骤）</h3>
+<p>Agent loop 中的一轮模型判断。模型可能在一个 step 返回工具调用，在得到工具结果后进入下一个 step，最终某个 step 返回面向用户的答案。</p>
+<h3 id="tool-call工具调用">Tool Call（工具调用）</h3>
+<p>模型提出的结构化行动请求，例如 <code>Read(package.json)</code>。它只是意图；在通过 availability、schema、权限与执行边界检查之前，不代表工具已经执行。</p>
+<h3 id="invocationid执行事实关联坐标"><code>invocationId</code>（执行事实关联坐标）</h3>
+<p>将一次执行的 opening、事件、工具 operation 与 terminal 关联起来。RuntimeInvocationRecord 从这些事件重建，不再依赖 mutable live Run header。普通 Run 的 invocationId 可默认等于 runId；它有明确的事实数据结构，但不引入另一套独立调度器。</p>
+<h2 id="决策权准入与并发控制">决策权、准入与并发控制</h2>
+<h3 id="owner所有者">Owner（所有者）</h3>
+<p>对某类状态和业务决定负最终责任的组件。例如负责 Goal 的协调组件决定 Goal 是否继续；SQLite store 可以保存状态，但不会自行决定下一轮应不应该开始。这里的“所有者”指职责归属，不是文件所有者或用户账号。</p>
+<h3 id="authority裁决权--权威边界">Authority（裁决权 / 权威边界）</h3>
+<p>“谁有资格拍板”的规则或主体。它强调决策权，而不只是“谁执行了一段代码”。Owner 常拥有某类 authority，但两个词关注点不同：owner 偏责任归属，authority 偏有效裁决权。</p>
+<h3 id="admission准入">Admission（准入）</h3>
+<p>工作真正开始前的受控入口。系统检查身份、冲突、权限和当前状态，并先留下足够的 durable 事实，再允许执行继续。Client 提交请求不等于准入已经完成。</p>
+<h3 id="claim认领">Claim（认领）</h3>
+<p>某个 worker 或 coordinator 用持久状态声明“这项工作由我处理”的动作。它用于避免两个执行者同时处理同一工作，但具体保证取决于 claim 的存储、过期和恢复协议。</p>
+<h3 id="lease租约">Lease（租约）</h3>
+<p>带有有效期或持有条件的临时所有权。租约可以避免永久锁死，但系统必须定义过期、续租、接管和旧持有者迟到写入的处理方式。</p>
+<h3 id="cascompare-and-swap--比较后写入">CAS（Compare-And-Swap / 比较后写入）</h3>
+<p>写入时原子地检查“当前值或版本，是否仍等于我读取时的预期”。例如 A、B 都读到版本 7：A 以“仍为 7”为条件提交并推进到 8；B 再以版本 7 提交就应被拒绝。B 需要重读并处理冲突，而不是照原内容盲写。检查与写入必须处在同一个不可被其他写者插入的操作中，先查一次再普通写入不具备这项保证。</p>
+<h2 id="事实事件和展示">事实、事件和展示</h2>
+<h3 id="fact事实">Fact（事实）</h3>
+<p>系统已经接受并能够据此做出后续判断的记录，例如某个 Run 已被准入、某个工具结果已经结算、某个 terminal 已经写入。日志文本不一定都是业务事实。</p>
+<h3 id="canonical-fact规范事实--权威事实">Canonical Fact（规范事实 / 权威事实）</h3>
+<p>当不同界面、缓存或重试产生冲突时，系统指定用来裁决的事实。例如 UI 显示“完成”不能覆盖 canonical terminal fact。</p>
+<h3 id="event事件">Event（事件）</h3>
+<p>描述“发生了什么”的结构化记录。事件可以是临时流式事件，也可以被接受并持久化为 durable 事实；必须看具体类型和写入边界，不能只凭名字判断。</p>
+<h3 id="runtimeeventmaka-运行时语义事件">RuntimeEvent（Maka 运行时语义事件）</h3>
+<p>Maka 用于记录用户、模型、工具和 terminal 等执行语义的 canonical ledger 条目。它是 execution/model replay 的重要事实源，但不是整个产品唯一账本；admission、approval、Goal 等有各自的 durable owner。</p>
+<h3 id="partial--streaming-event未完成的流式片段">Partial / Streaming Event（未完成的流式片段）</h3>
+<p>模型响应尚在生成时到达的一段增量，例如“已”随后扩展成“已更新 README”。它适合实时展示，但不能把每个增量都当成一条完整回答重复放进下一次模型 Context。</p>
+<h3 id="visibility--origin可见性--来源">Visibility / Origin（可见性 / 来源）</h3>
+<p>事件元数据：visibility 约束它是否进入某类消费者的投影，origin 记录它来自用户、模型、工具、Host 或其他通道。它们帮助构造 UI 与模型 history，但具体安全保证仍取决于保存和投影规则。</p>
+<h3 id="ledger账本">Ledger（账本）</h3>
+<p>按规则记录事实的持久结构。账本强调“哪些记录可以用来证明什么”。Maka 使用多个专用 ledger，而不是把所有业务状态都塞进一张万能事件表。</p>
+<h3 id="durable持久崩溃后仍可读">Durable（持久、崩溃后仍可读）</h3>
+<p>数据在进程崩溃或重启后仍能从持久存储中恢复。写入内存、发出 UI stream 或打印日志通常不能单独称为 durable。</p>
+<h3 id="projection--read-model投影--读取视图">Projection / Read Model（投影 / 读取视图）</h3>
+<p>从一组事实计算出的面向特定消费者的视图，例如 UI transcript 或下一次模型的 history。Projection 可以重建、过滤或压缩，因此它不必等于 canonical facts 的原始形态。</p>
+<h3 id="projection-transition--effective-fold投影变换--有效折叠">Projection Transition / Effective Fold（投影变换 / 有效折叠）</h3>
+<p>Projection transition 是一条持久规则，说明某段 canonical 内容在后续模型视图中应怎样被摘要、裁剪或替换成归档引用，而不删除原始事实。Effective fold 是按顺序应用这些变换，得到模型此刻真正使用的 effective history。Compaction、预算和 replay 必须读取同一折叠结果，才能避免已裁剪的大结果被重新“复活”。</p>
+<h3 id="head-anchor当前工作起点">Head Anchor（当前工作起点）</h3>
+<p>在本课程的 compaction 场景中，用来定位当前用户工作起点的锚。它帮助划定哪些旧历史可以覆盖，哪些当前任务内容必须保留；不是把最新一句话随意指定为切点。见 <a href="19-context-compaction.html#h1h5%E5%8E%9F%E5%A7%8B%E5%8E%86%E5%8F%B2%E6%B2%A1%E5%8F%98%E6%97%A7%E6%91%98%E8%A6%81%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BB%8D%E4%BC%9A%E5%A4%B1%E6%95%88">第19章 的 H1–H5 推演</a>。</p>
+<h3 id="request-shaping请求整形">Request Shaping（请求整形）</h3>
+<p>在发送模型请求前，根据当前有效历史、保护边界和预算等规则选择或调整本次输入表示，例如用合规 checkpoint 替换旧前缀。它不等于改写原始事件，也不保证整个请求一定装得下。首步整形指本 Turn 第一次调用前的这项准备；真实 overflow 是 provider 拒绝后的另一条处理路径。见 <a href="19-context-compaction.html#%E4%B8%BB%E5%8A%A8-shaping-%E4%B8%8E%E7%9C%9F%E5%AE%9E-overflow-%E5%88%86%E5%BC%80">第19章</a>。</p>
+<h3 id="terminal-state--terminal-fact终态--终态事实">Terminal State / Terminal Fact（终态 / 终态事实）</h3>
+<p>说明一次 Run 已经 <code>completed</code>、<code>failed</code> 或 <code>cancelled</code> 的最终执行状态。Maka 要求终态由 durable ledger 证明，而不是由 Client loading 状态或连接关闭来猜测。执行结束后，仍需按任务目标核对交付结果。</p>
+<h3 id="settled资源结算完毕">Settled（资源结算完毕）</h3>
+<p>表示 iterator、临时资源或后台清理也已经结束。它可能晚于用户已经能够看到的 terminal completion，所以 <strong>terminal ≠ settled</strong>。</p>
+<h2 id="tool权限与副作用">Tool、权限与副作用</h2>
+<h3 id="tool工具">Tool（工具）</h3>
+<p>Agent 与外部世界交互的受控能力，例如读文件、改文件、运行命令、访问网络或操作 GUI。模型生成 tool call，Runtime/adapter/executor 才可能实施行动。</p>
+<h3 id="tool-surface工具表面">Tool Surface（工具表面）</h3>
+<p>某一轮向模型提供的“工具目录”：包含工具名称、用途和参数格式。它决定本次请求声明了哪些能力，不直接决定某次调用是否获得权限。</p>
+<h3 id="schema结构与字段约束">Schema（结构与字段约束）</h3>
+<p>用来描述数据应有哪些字段、字段类型和限制的规则。例如工具要求 <code>path</code> 是字符串，传入数字就不符合 schema。通过结构检查只说明参数形状合法；文件是否存在、是否允许访问、修改是否符合任务，还要继续判断。</p>
+<h3 id="binding工具绑定">Binding（工具绑定）</h3>
+<p>把工具名称和 schema 连接到真实实现的关系。系统知道一个工具名字，不代表当前 Session 已绑定实现；绑定了实现，也不代表本 step 一定向模型展示。</p>
+<h3 id="availability当前可见--可调用性">Availability（当前可见 / 可调用性）</h3>
+<p>在冻结的模型 step 中，某个已绑定工具是否出现在 active schema 中。Deferred tool 可以先被搜索、再在下一 step 激活。Availability 解决 Context 和能力暴露问题，不等于授权。</p>
+<span class="heading-alias" id="permission权限策略" aria-hidden="true"></span><h3 id="permission权限">Permission（权限）</h3>
+<p>某个主体在给定条件下获准执行的操作及其范围。Permissions 是复数形式，例如一组文件读取、写入和网络访问权限。权限表达“允许做什么”；Prompt 中写“请只读”不能单独证明实际访问已经受限，执行时还需可信的边界检查与隔离机制。</p>
+<h3 id="permission-policy权限策略">Permission Policy（权限策略）</h3>
+<p>用于判断操作是否允许、拒绝或需要批准，以及允许扩张到何种范围的规则。Policy（策略）强调判断依据，Permission（权限）强调在给定条件下被允许的操作范围。策略文本与当前生效权限不是同一份事实，还要核对规则由谁解释、当前授权状态和具体执行边界。</p>
+<h3 id="confirmation确认">Confirmation（确认）</h3>
+<p>向人展示明确事项、询问是否继续并接收决定的交互。第05章的 mini 确认模式让用户决定一组候选动作是否继续；它不会自动建立沙箱。确认被什么授权流程接纳，决定它对执行的影响；填写任务参数也不能自动视为批准新增权限。</p>
+<h3 id="approval批准">Approval（批准）</h3>
+<p>由有权主体针对明确请求作出的同意决定。它可以确认已有授权，也可通过可信流程改变允许范围；不必每次工具调用都重新发生。Approval 不等于动作已执行，不等于 OS 已阻止越界，也不代替 Authority（裁决权）对决定资格的要求。</p>
+<h3 id="authorization授权">Authorization（授权）</h3>
+<p>依据身份、策略和当前状态，判断某次操作是否被允许的过程及其结果。它可以依据已有授权完成，不一定每次都询问用户；需要明确同意时，Approval 是其中的一次批准决定，Authority 则说明谁有权作出有效决定。工具可见性（Tool Visibility）只描述模型能看到哪些工具与请求格式，不能证明本次授权已经通过。</p>
+<h3 id="isolation隔离">Isolation（隔离）</h3>
+<p>通过运行边界限制状态共享和资源访问，使一个执行单元不能任意读写另一个单元或宿主的资源。隔离要说明具体对象：上下文隔离、文件工作区隔离、进程隔离和网络隔离各有范围；分出子会话并不自动隔离文件。Sandbox（沙箱）是落实某些执行资源限制的机制。图中的“权限与隔离 Permissions &amp; Isolation”同时关心是否允许行动，以及执行层怎样约束它。见<a href="17-permissions-and-sandbox.html">第17章</a>与<a href="23-skills-and-subagents.html">第23章</a>。</p>
+<h3 id="executionboundary执行边界">ExecutionBoundary（执行边界）</h3>
+<p>Maka 为当前 Session 保存的文件、网络和宿主能力访问边界，并用修订号区分边界的不同状态。工具接近实际执行时读取当前边界，避免继续使用模型提出调用时的旧权限。超界请求只有符合申请条件时才进入显式批准流程；被提出并不意味着一定可以扩权。</p>
+<h3 id="sandbox沙箱">Sandbox（沙箱）</h3>
+<p>在操作系统或执行器层实际限制进程能访问什么的机制。Permission（权限）表示允许范围，Permission Policy（权限策略）提供判定规则，Sandbox 通过具体后端落实资源访问限制。能否强制阻止越界，要看该后端与配置的真实能力，不能从一条策略声明或批准记录直接推导。</p>
+<h3 id="side-effect外部副作用">Side Effect（外部副作用）</h3>
+<p>会改变模型自身之外世界的操作，例如写文件、发送消息、启动进程或提交网络请求。副作用可能已经发生，但对应结果尚未来得及持久化，这是恢复系统最困难的窗口之一。</p>
+<h3 id="t1--t2工具副作用前后标记">T1 / T2（工具副作用前后标记）</h3>
+<p>在已接入持久化边界的普通 Runtime 工具路径中，T1 是调用工具实现前的持久记录，T2 是结果的持久结算。T2 可以记下成功，也可以记下失败；它不是“任务成功”的同义词。两者帮助划分恢复窗口，不自动提供 exactly-once，也不能套用到所有 provider、远端或 Client 执行路径。具体前提见 <a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章</a>。</p>
+<h3 id="settlement结算">Settlement（结算）</h3>
+<p>把执行结果变成 durable 事实的过程。真实操作返回成功和 T2 成功写入之间仍可能存在 crash window，因此“工具实现返回了”与“结果已结算”不是同一时刻。</p>
+<h2 id="失败与恢复">失败与恢复</h2>
+<h3 id="recovery恢复">Recovery（恢复）</h3>
+<p>系统重启后，根据 durable facts 判断哪些工作已完成、哪些肯定没开始、哪些结果不确定，以及哪些控制状态需要继续协调。Recovery 不是简单地把所有 <code>running</code> 项重跑一次。</p>
+<h3 id="reconcile对账--收敛">Reconcile（对账 / 收敛）</h3>
+<p>把多个事实源或外部系统的当前状态重新比对，收敛出可证明结论。例如向外部服务查询一个请求是否已成功，从而解决本地记录缺失的问题。</p>
+<h3 id="indeterminate--outcome-unknown结果不确定">Indeterminate / Outcome Unknown（结果不确定）</h3>
+<p>系统有证据表明操作可能开始，但没有足够证据证明成功或失败。正确处理通常是保留现场、人工确认或外部 reconcile，而不是默认重做。</p>
+<h3 id="parked暂停等待裁决">Parked（暂停等待裁决）</h3>
+<p>系统主动不再自动推进某项结果不确定的工作，把它停在可检查状态，等待 reconcile、人工处理或更强证据。</p>
+<h3 id="fail-closed无法证明安全时停止">Fail Closed（无法证明安全时停止）</h3>
+<p>当权限、身份或副作用状态不能被可靠证明时，系统选择拒绝或暂停。它优先保护正确性和安全性，代价是有时需要用户介入。</p>
+<h3 id="fail-open依赖判断失败时仍继续">Fail Open（依赖判断失败时仍继续）</h3>
+<p>某个检查、评估或优化步骤失败时，系统选择一条默认的“继续”路径，而不是停止。这个词只描述行为，本身不代表该选择安全。例如新摘要生成失败后保留原始 Context，通常是保守降级。</p>
+<p>当前 Goal evaluator 在 timeout、调用错误或不可解析时返回 <code>evaluatorFailed: true</code> 的中性结果：尚未形成关于目标是否达成的可靠判断，也不把本次评估当作取得进展或停滞的证据。是否继续仍由当前目标、状态、预算和准入条件决定，见<a href="24-continuation-and-orchestration.html">第24章 的继续条件</a>。这仍可能浪费预算或掩盖判断失败。权限、安全边界或未知副作用不能仅因为产品希望继续就随意 fail open。</p>
+<h3 id="liveness-guard--circuit活性保护--熔断">Liveness Guard / Circuit（活性保护 / 熔断）</h3>
+<p>防止系统对同一失败输入无限重复工作的有界机制。它可以用稳定 fingerprint 识别“相同来源、相同配置、相同失败”，达到阈值后暂时停止该自动路径或保留原始表示。它保护系统最终能退出循环，不代表原问题已经解决。</p>
+<h3 id="poison--drain标记权威不再安全--排空">Poison / Drain（标记权威不再安全 / 排空）</h3>
+<p>当一次关键写入的结果变得不确定时，poison 表示当前 writer authority 不能再安全接受新决定；drain 表示停止接纳新工作，并让已有工作结算或转入恢复。它们是在证据不足时保护单写者状态，不是“清空数据”或“忽略错误”。</p>
+<h3 id="idempotency幂等性">Idempotency（幂等性）</h3>
+<p>在约定范围内，同一操作重复执行与执行一次产生相同的目标效果。例如把字段设为 5，重复设置后仍为 5；把字段加 1，重复执行则继续增加。外部服务也可以用固定请求 key 识别重复，但保证取决于 key 的作用域、保存期限以及去重记录与实际操作怎样一起提交。只给请求加一个 key，不会自动获得幂等性。</p>
+<h3 id="exactly-once恰好执行一次">Exactly Once（恰好执行一次）</h3>
+<p>强到要求操作既不丢失也不重复。跨本地账本和外部世界通常很难实现。Maka 的 T1/T2 提供可审计的失败分类，但不能因此笼统宣称所有工具 exactly-once。</p>
+<h2 id="长-context-与-memory">长 Context 与 Memory</h2>
+<h3 id="context-window上下文窗口">Context Window（上下文窗口）</h3>
+<p>模型一次调用可处理的上下文容量，通常以 token 计量。若接口让输入与输出共享总窗口，就要先为输出留出空间；有独立输入或输出限制时，也须同时满足。不能把标称总窗口全部分给历史消息。参见 <a href="36-context-and-memory.html#2-%E5%85%88%E7%AE%A1%E7%90%86%E8%BE%93%E5%85%A5%E6%9D%A5%E6%BA%90%E5%86%8D%E9%80%89%E6%8B%A9%E5%8E%8B%E7%BC%A9%E6%96%B9%E6%B3%95">第36章 的预算算例</a>。</p>
+<h3 id="token模型处理的序列单位">Token（模型处理的序列单位）</h3>
+<p>模型使用的分词器把文本编码成 token 序列。一个 token 不固定等于一个汉字、单词或字符；相同文字在不同分词器下的数量也可能不同。课程中人为给定的 token 数用于手算预算，真实请求应按对应模型与接口的计量方式估算。</p>
+<h3 id="compaction上下文压缩">Compaction（上下文压缩）</h3>
+<p>尝试把一段旧的模型可见历史整理成更紧凑的表示，为后续请求腾出空间。摘要是否真的更短、整次请求是否装得下，还要分别检查。Maka 的 compaction 改变模型输入投影，不应改写原始 RuntimeEvents。</p>
+<h3 id="checkpoint检查点">Checkpoint（检查点）</h3>
+<p>在本课程的压缩场景中，Checkpoint 把摘要与它所覆盖的历史范围、来源等信息一起保存，供后续请求恢复较短的上下文。应用前还要验证它是否对应当前历史；“检查点已经写入”不保证摘要保留了每一条重要约束，也不是所有文件、工具或进程的完整快照。见 <a href="19-context-compaction.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E5%BE%84%E7%BB%99%E6%9C%89%E9%99%90%E5%B7%A5%E4%BD%9C%E5%8F%B0%E6%95%B4%E7%90%86%E6%9D%90%E6%96%99">第19章</a>。</p>
+<h3 id="archive--offload归档--外置">Archive / Offload（归档 / 外置）</h3>
+<p>把过大的内容保留在 Context 之外，并用有界引用让 Agent 在需要时读取。它减少当前 Prompt 体积，但不等于自动召回，也不一定和 Memory 共用同一存储。</p>
+<h3 id="memorymd透明文件记忆"><code>MEMORY.md</code>（透明文件记忆）</h3>
+<p>用户可以看到、编辑和控制的长期信息文件。Maka 的 Agent 读取开关启用后，还要检查内容能否解析、条目是否有效且适用当前范围，再把选中的内容加入模型输入。文件存在或开关开启，都不能单独说明本次已读到某条偏好。</p>
+<h3 id="atomic-ltm原子长期记忆">Atomic LTM（原子长期记忆）</h3>
+<p>Maka 把符合来源要求的结构化记忆写入独立 <code>memory.sqlite</code> 的机制。“原子”关注一次存储提交内的记录是否一起成立，不代表后续检索和使用都会成功。当前已有提取、持久化和存储查询接口，但尚未把这套查询接到 Agent 的自动召回和输入组装，见 <a href="20-memory.html">第20章</a>。</p>
+<h3 id="workspace-instructions工作区指令">Workspace Instructions（工作区指令）</h3>
+<p>项目为 Agent 提供的规则与背景，例如 <code>AGENTS.md</code>。它们通过相应 Host 的发现、读取和组成路径进入输入，实际范围与加载时点取决于实现和配置。它们属于显式指令，不是通过对话自动学习出的 Memory；规则文字也不代替执行层权限。</p>
+<h3 id="recall召回">Recall（召回）</h3>
+<p>按当前问题，从已保存的信息中找出候选。在搜索推荐中，召回通常强调先找出候选集合，再交给过滤、排序等后续步骤；Agent Memory 也需要区分这些阶段。</p>
+<p>例如查询返回“项目 A 使用英文”，但当前任务属于项目 B，这条候选就可能被过滤；即使保留下来，还要加入本次输入，才可能影响模型。<strong>存得下、召回到、装入输入、正确使用</strong>是四个不同的判断。</p>
+<h2 id="skill子代理与继续工作">Skill、子代理与继续工作</h2>
+<h3 id="trigger触发条件">Trigger（触发条件）</h3>
+<p>允许某个控制域创建或推进下一项工作的事实，例如用户批准 Plan，或时钟到点并取得 Schedule claim。Graph 依赖满足时首先得到的是可重算的 <a href="#readiness%E5%B0%B1%E7%BB%AA%E6%80%A7">Readiness</a>，还要经过 claim / admission 才能触发执行。Trigger 只证明“现在可以尝试下一步”，通常不证明后续 AgentRun 已经成功。</p>
+<h3 id="evaluator完成评估器">Evaluator（完成评估器）</h3>
+<p>根据目标、当前结果和证据判断“是否已经满足 Goal”的组件。它提供判断材料，但 timeout、解析失败和含糊输出怎样处理取决于控制策略；不能把 evaluator 的一句自然语言直接当成无条件终态。</p>
+<h3 id="orchestration编排">Orchestration（编排）</h3>
+<p>根据步骤、依赖、资源和当前状态安排工作由谁推进、何时开始以及结果怎样交回。它协调执行单元，本身不能代替工具的实际执行或任务验收。“任务推进与协作”这组教学职责包含此类安排，也涉及触发、委派和采纳。见<a href="24-continuation-and-orchestration.html">第24章</a>与<a href="39-orchestration-and-continuation.html">第39章</a>。</p>
+<h3 id="coordination-state协同状态">Coordination State（协同状态）</h3>
+<p>记录多个执行单元如何协作的状态，例如谁依赖谁、什么已经就绪、下一步由谁推进。官方设计文章用“协同状态在 <a href="#agent-graph%E4%BB%A3%E7%90%86%E5%9B%BE">Graph</a> 中，还是分散在 <a href="#mailbox%E7%A7%81%E6%9C%89%E4%BF%A1%E7%AE%B1">Mailbox</a> 对话中”来比较两种多 Agent 路径；这是一种架构观察角度，不是新的 Run 状态，也不能替代 AgentRun / RuntimeEvent 的执行事实。</p>
+<h3 id="dag--edge有向无环图--边">DAG / Edge（有向无环图 / 边）</h3>
+<p>DAG 用节点和有方向、无环的边表示先后依赖：后继节点等待必要输入就绪，没有依赖关系的节点从这个角度具备并发条件。实际并发还要检查共享资源、权限和预算；两节点即使没有依赖边，同时写同一文件仍可能冲突。在 Agent Graph 中，节点可承载 <a href="#operator%E7%AE%97%E5%AD%90">Operator</a>，Edge 表达依赖或记录路由；Edge 本身不复制完整上游内容、不授予跨 Session 权限，也不执行模型。</p>
+<h3 id="topology图结构">Topology（图结构）</h3>
+<p>Agent Graph 中有哪些节点、节点之间有哪些依赖边，以及结果应流向哪里。Topology 描述工作结构，不执行模型—工具循环。</p>
+<h3 id="readiness就绪性">Readiness（就绪性）</h3>
+<p>Agent Graph 根据当前 topology、输入记录与策略反复推导出的“前置条件是否满足”视图。它应当可以无副作用地重算；同一意图再次显示为 ready，不代表可以再启动一次。真正把它绑定到具体 Session / Turn / Run，要继续经过 <a href="#claim%E8%AE%A4%E9%A2%86">Claim</a> 与 <a href="#admission%E5%87%86%E5%85%A5">Admission</a>。</p>
+<h3 id="quiescence静止点">Quiescence（静止点）</h3>
+<p>图中当前没有可运行节点、没有在途 child，并且没有待处理唤醒的状态。它有助于判断 Graph 是否需要结束或等待，但“没有活动”不自动等于“所有业务目标都成功”。</p>
+<h3 id="skill技能说明包">Skill（技能说明包）</h3>
+<p>为 Agent 提供特定工作方法、知识、脚本或资源的可复用内容。Skill 主要增强输入和工作流程；它不会因为被加载就自动扩大 ExecutionBoundary 或创建一项新 Run。</p>
+<h3 id="subagent--linked-child-session子代理--关联子会话">Subagent / Linked Child Session（子代理 / 关联子会话）</h3>
+<p>由父任务委托、具有独立 Session 和 Run 的执行单元。它有 lineage 和受限能力，不是把同一个 Prompt 函数递归调用一下，也不应默认继承父会话全部历史和权限。</p>
+<h3 id="operator算子">Operator（算子）</h3>
+<p>把 Subagent 当作一项边界封闭、可按依赖调度的工作单元时使用的角色名称。Maka Agent Graph 以 linked child Session 作为稳定的 Operator 容器，以普通 child AgentRun 作为一次 activation；它接收显式 instruction 与已提交输入的有界交接，不因此获得修改全局 <a href="#schedule-revision%E8%B0%83%E5%BA%A6%E4%BF%AE%E8%AE%A2">Schedule Revision</a> 的 authority。</p>
+<h3 id="participant协作参与者">Participant（协作参与者）</h3>
+<p>把 Agent 当作可寻址、可持续收发消息并动态磋商的协作者时使用的设计角色。它常与 <a href="#mailbox%E7%A7%81%E6%9C%89%E4%BF%A1%E7%AE%B1">Mailbox</a> 配套，工作流随对话交织演进。Participant 是官方文章用于对照 Operator 的概念，不是 Maka 当前源码中的另一种 Session 类型，也不能把所有 Subagent 都自动归入这一类。</p>
+<h3 id="mailbox私有信箱">Mailbox（私有信箱）</h3>
+<p>面向某个可寻址 Agent 的异步入站消息队列；在某些 Mailbox 设计中，消息可以只排队，也可以附带“唤醒一个新轮次”的调度意图。队列内容、唤醒信号、会话历史是否持久必须分别核对。Inter-agent Mailbox 是 Agent 之间的协同原语，不是 Client 与 Runtime Host 之间用于重连、snapshot 和 subscription 的网络连接。</p>
+<h3 id="plan计划">Plan（计划）</h3>
+<p>由用户查看、批准和推进的 durable workflow。Plan 管理步骤和用户控制状态，不等于自主循环，也不拥有另一套通用 Agent Runtime。</p>
+<h3 id="goal目标">Goal（目标）</h3>
+<p>能够根据 evaluator 判断“尚未完成”而触发下一轮工作的 continuation domain。Goal 拥有自己的 durable control state，真正执行时仍进入普通 Hosted AgentRun。</p>
+<h3 id="scheduledtask--schedule定时任务">ScheduledTask / Schedule（定时任务）</h3>
+<p>由 durable clock 和 <a href="24-continuation-and-orchestration.html#%E5%88%B0%E7%82%B9%E4%B8%8E%E6%89%A7%E8%A1%8C%E6%88%90%E5%8A%9F%E4%B9%8B%E9%97%B4%E8%BF%98%E6%9C%89%E5%BE%88%E5%A4%9A%E6%AD%A5%E9%AA%A4">fire claim</a> 在指定时间触发的工作。到点只是取得触发资格，不等于 Agent 工作已经完成。</p>
+<h3 id="schedule-revision调度修订">Schedule Revision（调度修订）</h3>
+<p>Root supervisor 对 Agent Graph 追加的一次 durable control decision，例如增加 work、停止或替换旧分支、选择结果并 finish。Revision 按顺序持久化且不就地改写过去；提交它只改变调度意图，仍要由 <a href="#reconcile%E5%AF%B9%E8%B4%A6--%E6%94%B6%E6%95%9B">Reconcile</a> 重建视图，并经过 <a href="#readiness%E5%B0%B1%E7%BB%AA%E6%80%A7">Readiness</a>、<a href="#claim%E8%AE%A4%E9%A2%86">Claim</a> 与 <a href="#admission%E5%87%86%E5%85%A5">Admission</a> 才能启动普通 Run。</p>
+<h3 id="agent-graph代理图">Agent Graph（代理图）</h3>
+<p>持久化 <a href="#schedule-revision%E8%B0%83%E5%BA%A6%E4%BF%AE%E8%AE%A2">Schedule Revision</a>、<a href="#topology%E5%9B%BE%E7%BB%93%E6%9E%84">Topology</a>、依赖、claim 和 supervisor wake 的控制平面。它组织谁何时执行，不重新实现模型—工具循环，也不是 Agent 之间的共享 <a href="#mailbox%E7%A7%81%E6%9C%89%E4%BF%A1%E7%AE%B1">Mailbox</a>。</p>
+<h3 id="continuation继续执行">Continuation（继续执行）</h3>
+<p>让未来的新工作在某个业务条件满足时开始。Plan resume、Goal continuation、Schedule fire、Graph wake 和 Client reconnect 都可能被口头称为“继续”，但 owner、状态和语义完全不同。</p>
+<h2 id="实现状态与机制">实现状态与机制</h2>
+<h3 id="production-path当前生产主路径">Production Path（当前生产主路径）</h3>
+<p>产品默认或真实接线正在使用的执行路径。存在类型、Store 或测试基础，不足以证明一项机制已进入 production path。</p>
+<h3 id="foundation实现基础">Foundation（实现基础）</h3>
+<p>已经有 contract、数据结构、Store、adapter 或测试入口，但缺少产品主路径 consumer 或完整闭环的能力。它比“只有想法”更强，但不能宣传成用户已经得到的完整能力。</p>
+<h3 id="experimental实验性">Experimental（实验性）</h3>
+<p>实现存在，但接口、行为、部署或安全保证尚不稳定，通常需要显式开启或不能承担 production 承诺。</p>
+<h3 id="compatibility--legacy兼容路径--历史路径">Compatibility / Legacy（兼容路径 / 历史路径）</h3>
+<p>为了读取旧数据、旧协议或旧调用方式而保留的路径。它不一定代表当前新建数据或默认执行方式。</p>
+<h3 id="source-fact源码事实">Source Fact（源码事实）</h3>
+<p>通过阅读实际调用链、状态变化，以及相关测试的设置与断言得到的实现判断。只找到类名或测试文件还不足以支持行为结论；读懂代码也不等于它已在自己的环境运行成功。</p>
+<h3 id="design-intent设计意图">Design Intent（设计意图）</h3>
+<p>官方架构文档、注释或 proposal 描述的目标。它可以帮助寻找实现，但不能单独证明当前 production 接线已经兑现目标。</p>
+<h3 id="mechanism机制">Mechanism（机制）</h3>
+<p>一项能力实际怎样由 owner、状态、调用链、持久化边界和失败处理共同实现。比较 Agent 时应比较 mechanism，而不是只比较名称或 UI 功能入口。</p>
+<h3 id="contract--invariant行为约定--不变量">Contract / Invariant（行为约定 / 不变量）</h3>
+<p>Contract 说明输入满足什么条件时，组件应产生什么输出或失败；例如 Edit 要求旧文本匹配，否则返回冲突。Invariant 是整个过程中始终需要成立的约束，例如未获允许的文件不能因重试而变得可写。接口类型只表达其中一部分，执行过程也必须遵守这些规则。</p>
+<h3 id="producer--consumer产生者--使用者">Producer / Consumer（产生者 / 使用者）</h3>
+<p>Producer 创建某份数据，Consumer 读取它并据此行动。例如记忆提取器产生候选，输入组装器选择记忆作为背景。只有消费者将数据用于后续输入或动作，数据才能影响任务。</p>
+<h3 id="fixture测试用的受控设置">Fixture（测试用的受控设置）</h3>
+<p>为一个测试准备的输入、对象和环境，例如临时数据库、指定事件序列或预写模型响应。Fixture 可以替代部分组件，同时调用真实存储或运行时；阅读测试时要分清哪些是真的执行，哪些由测试预先设定。第04章 的预写模型响应与真实命令执行就是这样的组合。</p>
+<h2 id="方法比较常用词">方法比较常用词</h2>
+<h3 id="主动读取与检索">主动读取与检索</h3>
+<p>检索按当前问题从候选库选择内容；主动读取强调 Agent 依据已有线索决定下一步去哪里读、读哪部分。二者可以组合；“内容在存储中”不表示本次已进入模型 Context。</p>
+<h3 id="consolidation记忆整理">Consolidation（记忆整理）</h3>
+<p>把新经验和已有记忆合并、修订、建立联系或淘汰。整理可能降低重复与冲突，也可能把误判传播到长期状态，因此需要来源、作用域与更新/删除规则。它不等于无损保存全部历史。</p>
+<h3 id="opaque-state不可直接解释的状态">Opaque State（不可直接解释的状态）</h3>
+<p>provider 返回供后续调用使用、通常不能直接读懂的结构或加密内容。能被相应 provider 消费不等于可跨 provider 迁移、可人工审计或保证不丢语义。</p>
+<h3 id="sota-与代表方法">SOTA 与代表方法</h3>
+<p>SOTA 是给定任务、指标、预算、日期和可比基线下的最好已知结果。代表方法说明一种机制怎样实现；前沿论文说明一个新假设或报告结果。两者都不能自动成为“SOTA”，更不能由知名 Host 名称推出。</p>
+</article></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%8C%89%E6%AD%A3%E5%9C%A8%E8%A7%A3%E5%86%B3%E7%9A%84%E9%97%AE%E9%A2%98%E6%9F%A5%E8%AF%8D">按正在解决的问题查词</a></li><li class="toc-level-2"><a href="#%E6%9C%80%E5%9F%BA%E7%A1%80%E7%9A%84-agent-%E6%A6%82%E5%BF%B5">最基础的 Agent 概念</a></li><li class="toc-level-3"><a href="#agent%E6%99%BA%E8%83%BD%E4%BB%A3%E7%90%86">Agent（智能代理）</a></li><li class="toc-level-3"><a href="#code-agent%E4%BB%A3%E7%A0%81%E4%BB%A3%E7%90%86">Code Agent（代码代理）</a></li><li class="toc-level-3"><a href="#harness%E8%BF%90%E8%A1%8C%E6%94%AF%E6%92%91">Harness（运行支撑）</a></li><li class="toc-level-3"><a href="#agent-loop%E4%BB%A3%E7%90%86%E5%BE%AA%E7%8E%AF">Agent Loop（代理循环）</a></li><li class="toc-level-3"><a href="#model--llm%E6%A8%A1%E5%9E%8B--%E5%A4%A7%E8%AF%AD%E8%A8%80%E6%A8%A1%E5%9E%8B">Model / LLM（模型 / 大语言模型）</a></li><li class="toc-level-3"><a href="#task%E4%BB%BB%E5%8A%A1">Task（任务）</a></li><li class="toc-level-3"><a href="#message%E6%B6%88%E6%81%AF">Message（消息）</a></li><li class="toc-level-3"><a href="#action%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82">Action（行动请求）</a></li><li class="toc-level-3"><a href="#environment%E6%89%A7%E8%A1%8C%E7%8E%AF%E5%A2%83">Environment（执行环境）</a></li><li class="toc-level-3"><a href="#observation%E8%A7%82%E5%AF%9F%E7%BB%93%E6%9E%9C">Observation（观察结果）</a></li><li class="toc-level-3"><a href="#trajectory%E6%89%A7%E8%A1%8C%E8%BD%A8%E8%BF%B9">Trajectory（执行轨迹）</a></li><li class="toc-level-3"><a href="#provider%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E6%8F%90%E4%BE%9B%E6%96%B9">Provider（模型服务提供方）</a></li><li class="toc-level-3"><a href="#json%E5%AD%97%E6%AE%B5%E4%B8%8E%E5%80%BC">JSON（字段与值）</a></li><li class="toc-level-3"><a href="#npm-%E4%B8%8E-nodejs%E9%A1%B9%E7%9B%AE%E5%B7%A5%E5%85%B7">npm 与 Node.js（项目工具）</a></li><li class="toc-level-3"><a href="#shell--bash%E5%91%BD%E4%BB%A4%E8%A7%A3%E9%87%8A%E5%99%A8%E4%B8%8E%E5%B7%A5%E5%85%B7%E5%90%8D">Shell / Bash（命令解释器与工具名）</a></li><li class="toc-level-3"><a href="#agent-backend%E6%89%A7%E8%A1%8C%E5%90%8E%E7%AB%AF">Agent Backend（执行后端）</a></li><li class="toc-level-3"><a href="#model-adapter%E6%A8%A1%E5%9E%8B%E5%8D%8F%E8%AE%AE%E9%80%82%E9%85%8D%E5%99%A8">Model Adapter（模型协议适配器）</a></li><li class="toc-level-3"><a href="#provider-executed-tool%E7%94%B1%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E4%BB%A3%E6%89%A7%E8%A1%8C%E7%9A%84%E5%B7%A5%E5%85%B7">Provider-Executed Tool（由模型服务代执行的工具）</a></li><li class="toc-level-3"><a href="#prompt%E6%8F%90%E7%A4%BA%E8%AF%8D">Prompt（提示词）</a></li><li class="toc-level-3"><a href="#context%E4%B8%8A%E4%B8%8B%E6%96%87">Context（上下文）</a></li><li class="toc-level-3"><a href="#working-context%E5%B7%A5%E4%BD%9C%E4%B8%8A%E4%B8%8B%E6%96%87">Working Context（工作上下文）</a></li><li class="toc-level-3"><a href="#composition-snapshot--promptcomposition%E7%BB%84%E6%88%90%E5%BF%AB%E7%85%A7--%E8%AF%B7%E6%B1%82%E7%BB%84%E6%88%90%E8%AF%8A%E6%96%AD">Composition Snapshot / promptComposition（组成快照 / 请求组成诊断）</a></li><li class="toc-level-3"><a href="#snapshot%E5%BF%AB%E7%85%A7">Snapshot（快照）</a></li><li class="toc-level-3"><a href="#history%E5%8E%86%E5%8F%B2">History（历史）</a></li><li class="toc-level-3"><a href="#memory%E8%AE%B0%E5%BF%86">Memory（记忆）</a></li><li class="toc-level-2"><a href="#%E4%BA%A7%E5%93%81%E8%BF%90%E8%A1%8C%E6%97%B6%E4%B8%8E%E8%BA%AB%E4%BB%BD">产品、运行时与身份</a></li><li class="toc-level-3"><a href="#client%E5%AE%A2%E6%88%B7%E7%AB%AF">Client（客户端）</a></li><li class="toc-level-3"><a href="#runtime-host%E8%BF%90%E8%A1%8C%E6%97%B6%E5%AE%BF%E4%B8%BB">Runtime Host（运行时宿主）</a></li><li class="toc-level-3"><a href="#state-root--single-writer%E7%8A%B6%E6%80%81%E6%A0%B9--%E5%8D%95%E5%86%99%E8%80%85">State Root / Single Writer（状态根 / 单写者）</a></li><li class="toc-level-3"><a href="#broker%E8%83%BD%E5%8A%9B%E4%B8%AD%E4%BB%8B">Broker（能力中介）</a></li><li class="toc-level-3"><a href="#state%E7%8A%B6%E6%80%81">State（状态）</a></li><li class="toc-level-3"><a href="#lifecycle%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F">Lifecycle（生命周期）</a></li><li class="toc-level-3"><a href="#runtime%E8%BF%90%E8%A1%8C%E6%97%B6">Runtime（运行时）</a></li><li class="toc-level-3"><a href="#session%E4%BC%9A%E8%AF%9D">Session（会话）</a></li><li class="toc-level-3"><a href="#turn%E8%BD%AE%E6%AC%A1--%E7%94%A8%E6%88%B7%E5%8F%AF%E8%A7%82%E5%AF%9F%E5%B7%A5%E4%BD%9C%E8%BE%B9%E7%95%8C">Turn（轮次 / 用户可观察工作边界）</a></li><li class="toc-level-3"><a href="#run--agentrun%E8%BF%90%E8%A1%8C--%E6%89%A7%E8%A1%8C%E5%B0%81%E5%A5%97">Run / AgentRun（运行 / 执行封套）</a></li><li class="toc-level-3"><a href="#root-execution%E9%A1%B6%E5%B1%82%E6%89%A7%E8%A1%8C">Root Execution（顶层执行）</a></li><li class="toc-level-3"><a href="#model-step%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4">Model Step（模型步骤）</a></li><li class="toc-level-3"><a href="#tool-call%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8">Tool Call（工具调用）</a></li><li class="toc-level-3"><a href="#invocationid%E6%89%A7%E8%A1%8C%E4%BA%8B%E5%AE%9E%E5%85%B3%E8%81%94%E5%9D%90%E6%A0%87">invocationId（执行事实关联坐标）</a></li><li class="toc-level-2"><a href="#%E5%86%B3%E7%AD%96%E6%9D%83%E5%87%86%E5%85%A5%E4%B8%8E%E5%B9%B6%E5%8F%91%E6%8E%A7%E5%88%B6">决策权、准入与并发控制</a></li><li class="toc-level-3"><a href="#owner%E6%89%80%E6%9C%89%E8%80%85">Owner（所有者）</a></li><li class="toc-level-3"><a href="#authority%E8%A3%81%E5%86%B3%E6%9D%83--%E6%9D%83%E5%A8%81%E8%BE%B9%E7%95%8C">Authority（裁决权 / 权威边界）</a></li><li class="toc-level-3"><a href="#admission%E5%87%86%E5%85%A5">Admission（准入）</a></li><li class="toc-level-3"><a href="#claim%E8%AE%A4%E9%A2%86">Claim（认领）</a></li><li class="toc-level-3"><a href="#lease%E7%A7%9F%E7%BA%A6">Lease（租约）</a></li><li class="toc-level-3"><a href="#cascompare-and-swap--%E6%AF%94%E8%BE%83%E5%90%8E%E5%86%99%E5%85%A5">CAS（Compare-And-Swap / 比较后写入）</a></li><li class="toc-level-2"><a href="#%E4%BA%8B%E5%AE%9E%E4%BA%8B%E4%BB%B6%E5%92%8C%E5%B1%95%E7%A4%BA">事实、事件和展示</a></li><li class="toc-level-3"><a href="#fact%E4%BA%8B%E5%AE%9E">Fact（事实）</a></li><li class="toc-level-3"><a href="#canonical-fact%E8%A7%84%E8%8C%83%E4%BA%8B%E5%AE%9E--%E6%9D%83%E5%A8%81%E4%BA%8B%E5%AE%9E">Canonical Fact（规范事实 / 权威事实）</a></li><li class="toc-level-3"><a href="#event%E4%BA%8B%E4%BB%B6">Event（事件）</a></li><li class="toc-level-3"><a href="#runtimeeventmaka-%E8%BF%90%E8%A1%8C%E6%97%B6%E8%AF%AD%E4%B9%89%E4%BA%8B%E4%BB%B6">RuntimeEvent（Maka 运行时语义事件）</a></li><li class="toc-level-3"><a href="#partial--streaming-event%E6%9C%AA%E5%AE%8C%E6%88%90%E7%9A%84%E6%B5%81%E5%BC%8F%E7%89%87%E6%AE%B5">Partial / Streaming Event（未完成的流式片段）</a></li><li class="toc-level-3"><a href="#visibility--origin%E5%8F%AF%E8%A7%81%E6%80%A7--%E6%9D%A5%E6%BA%90">Visibility / Origin（可见性 / 来源）</a></li><li class="toc-level-3"><a href="#ledger%E8%B4%A6%E6%9C%AC">Ledger（账本）</a></li><li class="toc-level-3"><a href="#durable%E6%8C%81%E4%B9%85%E5%B4%A9%E6%BA%83%E5%90%8E%E4%BB%8D%E5%8F%AF%E8%AF%BB">Durable（持久、崩溃后仍可读）</a></li><li class="toc-level-3"><a href="#projection--read-model%E6%8A%95%E5%BD%B1--%E8%AF%BB%E5%8F%96%E8%A7%86%E5%9B%BE">Projection / Read Model（投影 / 读取视图）</a></li><li class="toc-level-3"><a href="#projection-transition--effective-fold%E6%8A%95%E5%BD%B1%E5%8F%98%E6%8D%A2--%E6%9C%89%E6%95%88%E6%8A%98%E5%8F%A0">Projection Transition / Effective Fold（投影变换 / 有效折叠）</a></li><li class="toc-level-3"><a href="#head-anchor%E5%BD%93%E5%89%8D%E5%B7%A5%E4%BD%9C%E8%B5%B7%E7%82%B9">Head Anchor（当前工作起点）</a></li><li class="toc-level-3"><a href="#request-shaping%E8%AF%B7%E6%B1%82%E6%95%B4%E5%BD%A2">Request Shaping（请求整形）</a></li><li class="toc-level-3"><a href="#terminal-state--terminal-fact%E7%BB%88%E6%80%81--%E7%BB%88%E6%80%81%E4%BA%8B%E5%AE%9E">Terminal State / Terminal Fact（终态 / 终态事实）</a></li><li class="toc-level-3"><a href="#settled%E8%B5%84%E6%BA%90%E7%BB%93%E7%AE%97%E5%AE%8C%E6%AF%95">Settled（资源结算完毕）</a></li><li class="toc-level-2"><a href="#tool%E6%9D%83%E9%99%90%E4%B8%8E%E5%89%AF%E4%BD%9C%E7%94%A8">Tool、权限与副作用</a></li><li class="toc-level-3"><a href="#tool%E5%B7%A5%E5%85%B7">Tool（工具）</a></li><li class="toc-level-3"><a href="#tool-surface%E5%B7%A5%E5%85%B7%E8%A1%A8%E9%9D%A2">Tool Surface（工具表面）</a></li><li class="toc-level-3"><a href="#schema%E7%BB%93%E6%9E%84%E4%B8%8E%E5%AD%97%E6%AE%B5%E7%BA%A6%E6%9D%9F">Schema（结构与字段约束）</a></li><li class="toc-level-3"><a href="#binding%E5%B7%A5%E5%85%B7%E7%BB%91%E5%AE%9A">Binding（工具绑定）</a></li><li class="toc-level-3"><a href="#availability%E5%BD%93%E5%89%8D%E5%8F%AF%E8%A7%81--%E5%8F%AF%E8%B0%83%E7%94%A8%E6%80%A7">Availability（当前可见 / 可调用性）</a></li><li class="toc-level-3"><a href="#permission%E6%9D%83%E9%99%90">Permission（权限）</a></li><li class="toc-level-3"><a href="#permission-policy%E6%9D%83%E9%99%90%E7%AD%96%E7%95%A5">Permission Policy（权限策略）</a></li><li class="toc-level-3"><a href="#confirmation%E7%A1%AE%E8%AE%A4">Confirmation（确认）</a></li><li class="toc-level-3"><a href="#approval%E6%89%B9%E5%87%86">Approval（批准）</a></li><li class="toc-level-3"><a href="#authorization%E6%8E%88%E6%9D%83">Authorization（授权）</a></li><li class="toc-level-3"><a href="#isolation%E9%9A%94%E7%A6%BB">Isolation（隔离）</a></li><li class="toc-level-3"><a href="#executionboundary%E6%89%A7%E8%A1%8C%E8%BE%B9%E7%95%8C">ExecutionBoundary（执行边界）</a></li><li class="toc-level-3"><a href="#sandbox%E6%B2%99%E7%AE%B1">Sandbox（沙箱）</a></li><li class="toc-level-3"><a href="#side-effect%E5%A4%96%E9%83%A8%E5%89%AF%E4%BD%9C%E7%94%A8">Side Effect（外部副作用）</a></li><li class="toc-level-3"><a href="#t1--t2%E5%B7%A5%E5%85%B7%E5%89%AF%E4%BD%9C%E7%94%A8%E5%89%8D%E5%90%8E%E6%A0%87%E8%AE%B0">T1 / T2（工具副作用前后标记）</a></li><li class="toc-level-3"><a href="#settlement%E7%BB%93%E7%AE%97">Settlement（结算）</a></li><li class="toc-level-2"><a href="#%E5%A4%B1%E8%B4%A5%E4%B8%8E%E6%81%A2%E5%A4%8D">失败与恢复</a></li><li class="toc-level-3"><a href="#recovery%E6%81%A2%E5%A4%8D">Recovery（恢复）</a></li><li class="toc-level-3"><a href="#reconcile%E5%AF%B9%E8%B4%A6--%E6%94%B6%E6%95%9B">Reconcile（对账 / 收敛）</a></li><li class="toc-level-3"><a href="#indeterminate--outcome-unknown%E7%BB%93%E6%9E%9C%E4%B8%8D%E7%A1%AE%E5%AE%9A">Indeterminate / Outcome Unknown（结果不确定）</a></li><li class="toc-level-3"><a href="#parked%E6%9A%82%E5%81%9C%E7%AD%89%E5%BE%85%E8%A3%81%E5%86%B3">Parked（暂停等待裁决）</a></li><li class="toc-level-3"><a href="#fail-closed%E6%97%A0%E6%B3%95%E8%AF%81%E6%98%8E%E5%AE%89%E5%85%A8%E6%97%B6%E5%81%9C%E6%AD%A2">Fail Closed（无法证明安全时停止）</a></li><li class="toc-level-3"><a href="#fail-open%E4%BE%9D%E8%B5%96%E5%88%A4%E6%96%AD%E5%A4%B1%E8%B4%A5%E6%97%B6%E4%BB%8D%E7%BB%A7%E7%BB%AD">Fail Open（依赖判断失败时仍继续）</a></li><li class="toc-level-3"><a href="#liveness-guard--circuit%E6%B4%BB%E6%80%A7%E4%BF%9D%E6%8A%A4--%E7%86%94%E6%96%AD">Liveness Guard / Circuit（活性保护 / 熔断）</a></li><li class="toc-level-3"><a href="#poison--drain%E6%A0%87%E8%AE%B0%E6%9D%83%E5%A8%81%E4%B8%8D%E5%86%8D%E5%AE%89%E5%85%A8--%E6%8E%92%E7%A9%BA">Poison / Drain（标记权威不再安全 / 排空）</a></li><li class="toc-level-3"><a href="#idempotency%E5%B9%82%E7%AD%89%E6%80%A7">Idempotency（幂等性）</a></li><li class="toc-level-3"><a href="#exactly-once%E6%81%B0%E5%A5%BD%E6%89%A7%E8%A1%8C%E4%B8%80%E6%AC%A1">Exactly Once（恰好执行一次）</a></li><li class="toc-level-2"><a href="#%E9%95%BF-context-%E4%B8%8E-memory">长 Context 与 Memory</a></li><li class="toc-level-3"><a href="#context-window%E4%B8%8A%E4%B8%8B%E6%96%87%E7%AA%97%E5%8F%A3">Context Window（上下文窗口）</a></li><li class="toc-level-3"><a href="#token%E6%A8%A1%E5%9E%8B%E5%A4%84%E7%90%86%E7%9A%84%E5%BA%8F%E5%88%97%E5%8D%95%E4%BD%8D">Token（模型处理的序列单位）</a></li><li class="toc-level-3"><a href="#compaction%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9">Compaction（上下文压缩）</a></li><li class="toc-level-3"><a href="#checkpoint%E6%A3%80%E6%9F%A5%E7%82%B9">Checkpoint（检查点）</a></li><li class="toc-level-3"><a href="#archive--offload%E5%BD%92%E6%A1%A3--%E5%A4%96%E7%BD%AE">Archive / Offload（归档 / 外置）</a></li><li class="toc-level-3"><a href="#memorymd%E9%80%8F%E6%98%8E%E6%96%87%E4%BB%B6%E8%AE%B0%E5%BF%86">MEMORY.md（透明文件记忆）</a></li><li class="toc-level-3"><a href="#atomic-ltm%E5%8E%9F%E5%AD%90%E9%95%BF%E6%9C%9F%E8%AE%B0%E5%BF%86">Atomic LTM（原子长期记忆）</a></li><li class="toc-level-3"><a href="#workspace-instructions%E5%B7%A5%E4%BD%9C%E5%8C%BA%E6%8C%87%E4%BB%A4">Workspace Instructions（工作区指令）</a></li><li class="toc-level-3"><a href="#recall%E5%8F%AC%E5%9B%9E">Recall（召回）</a></li><li class="toc-level-2"><a href="#skill%E5%AD%90%E4%BB%A3%E7%90%86%E4%B8%8E%E7%BB%A7%E7%BB%AD%E5%B7%A5%E4%BD%9C">Skill、子代理与继续工作</a></li><li class="toc-level-3"><a href="#trigger%E8%A7%A6%E5%8F%91%E6%9D%A1%E4%BB%B6">Trigger（触发条件）</a></li><li class="toc-level-3"><a href="#evaluator%E5%AE%8C%E6%88%90%E8%AF%84%E4%BC%B0%E5%99%A8">Evaluator（完成评估器）</a></li><li class="toc-level-3"><a href="#orchestration%E7%BC%96%E6%8E%92">Orchestration（编排）</a></li><li class="toc-level-3"><a href="#coordination-state%E5%8D%8F%E5%90%8C%E7%8A%B6%E6%80%81">Coordination State（协同状态）</a></li><li class="toc-level-3"><a href="#dag--edge%E6%9C%89%E5%90%91%E6%97%A0%E7%8E%AF%E5%9B%BE--%E8%BE%B9">DAG / Edge（有向无环图 / 边）</a></li><li class="toc-level-3"><a href="#topology%E5%9B%BE%E7%BB%93%E6%9E%84">Topology（图结构）</a></li><li class="toc-level-3"><a href="#readiness%E5%B0%B1%E7%BB%AA%E6%80%A7">Readiness（就绪性）</a></li><li class="toc-level-3"><a href="#quiescence%E9%9D%99%E6%AD%A2%E7%82%B9">Quiescence（静止点）</a></li><li class="toc-level-3"><a href="#skill%E6%8A%80%E8%83%BD%E8%AF%B4%E6%98%8E%E5%8C%85">Skill（技能说明包）</a></li><li class="toc-level-3"><a href="#subagent--linked-child-session%E5%AD%90%E4%BB%A3%E7%90%86--%E5%85%B3%E8%81%94%E5%AD%90%E4%BC%9A%E8%AF%9D">Subagent / Linked Child Session（子代理 / 关联子会话）</a></li><li class="toc-level-3"><a href="#operator%E7%AE%97%E5%AD%90">Operator（算子）</a></li><li class="toc-level-3"><a href="#participant%E5%8D%8F%E4%BD%9C%E5%8F%82%E4%B8%8E%E8%80%85">Participant（协作参与者）</a></li><li class="toc-level-3"><a href="#mailbox%E7%A7%81%E6%9C%89%E4%BF%A1%E7%AE%B1">Mailbox（私有信箱）</a></li><li class="toc-level-3"><a href="#plan%E8%AE%A1%E5%88%92">Plan（计划）</a></li><li class="toc-level-3"><a href="#goal%E7%9B%AE%E6%A0%87">Goal（目标）</a></li><li class="toc-level-3"><a href="#scheduledtask--schedule%E5%AE%9A%E6%97%B6%E4%BB%BB%E5%8A%A1">ScheduledTask / Schedule（定时任务）</a></li><li class="toc-level-3"><a href="#schedule-revision%E8%B0%83%E5%BA%A6%E4%BF%AE%E8%AE%A2">Schedule Revision（调度修订）</a></li><li class="toc-level-3"><a href="#agent-graph%E4%BB%A3%E7%90%86%E5%9B%BE">Agent Graph（代理图）</a></li><li class="toc-level-3"><a href="#continuation%E7%BB%A7%E7%BB%AD%E6%89%A7%E8%A1%8C">Continuation（继续执行）</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E7%8A%B6%E6%80%81%E4%B8%8E%E6%9C%BA%E5%88%B6">实现状态与机制</a></li><li class="toc-level-3"><a href="#production-path%E5%BD%93%E5%89%8D%E7%94%9F%E4%BA%A7%E4%B8%BB%E8%B7%AF%E5%BE%84">Production Path（当前生产主路径）</a></li><li class="toc-level-3"><a href="#foundation%E5%AE%9E%E7%8E%B0%E5%9F%BA%E7%A1%80">Foundation（实现基础）</a></li><li class="toc-level-3"><a href="#experimental%E5%AE%9E%E9%AA%8C%E6%80%A7">Experimental（实验性）</a></li><li class="toc-level-3"><a href="#compatibility--legacy%E5%85%BC%E5%AE%B9%E8%B7%AF%E5%BE%84--%E5%8E%86%E5%8F%B2%E8%B7%AF%E5%BE%84">Compatibility / Legacy（兼容路径 / 历史路径）</a></li><li class="toc-level-3"><a href="#source-fact%E6%BA%90%E7%A0%81%E4%BA%8B%E5%AE%9E">Source Fact（源码事实）</a></li><li class="toc-level-3"><a href="#design-intent%E8%AE%BE%E8%AE%A1%E6%84%8F%E5%9B%BE">Design Intent（设计意图）</a></li><li class="toc-level-3"><a href="#mechanism%E6%9C%BA%E5%88%B6">Mechanism（机制）</a></li><li class="toc-level-3"><a href="#contract--invariant%E8%A1%8C%E4%B8%BA%E7%BA%A6%E5%AE%9A--%E4%B8%8D%E5%8F%98%E9%87%8F">Contract / Invariant（行为约定 / 不变量）</a></li><li class="toc-level-3"><a href="#producer--consumer%E4%BA%A7%E7%94%9F%E8%80%85--%E4%BD%BF%E7%94%A8%E8%80%85">Producer / Consumer（产生者 / 使用者）</a></li><li class="toc-level-3"><a href="#fixture%E6%B5%8B%E8%AF%95%E7%94%A8%E7%9A%84%E5%8F%97%E6%8E%A7%E8%AE%BE%E7%BD%AE">Fixture（测试用的受控设置）</a></li><li class="toc-level-2"><a href="#%E6%96%B9%E6%B3%95%E6%AF%94%E8%BE%83%E5%B8%B8%E7%94%A8%E8%AF%8D">方法比较常用词</a></li><li class="toc-level-3"><a href="#%E4%B8%BB%E5%8A%A8%E8%AF%BB%E5%8F%96%E4%B8%8E%E6%A3%80%E7%B4%A2">主动读取与检索</a></li><li class="toc-level-3"><a href="#consolidation%E8%AE%B0%E5%BF%86%E6%95%B4%E7%90%86">Consolidation（记忆整理）</a></li><li class="toc-level-3"><a href="#opaque-state%E4%B8%8D%E5%8F%AF%E7%9B%B4%E6%8E%A5%E8%A7%A3%E9%87%8A%E7%9A%84%E7%8A%B6%E6%80%81">Opaque State（不可直接解释的状态）</a></li><li class="toc-level-3"><a href="#sota-%E4%B8%8E%E4%BB%A3%E8%A1%A8%E6%96%B9%E6%B3%95">SOTA 与代表方法</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 23 章｜Skills、插件与子 Agent · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 23 / 62</div><article id="main-content"><span class="heading-alias" id="10skill-与-subagent说明书和新执行者不是一回事" aria-hidden="true"></span><span class="heading-alias" id="m10skills插件与子-agent" aria-hidden="true"></span><span class="heading-alias" id="第-22-章skills插件与子-agent" aria-hidden="true"></span><h1 id="第-23-章skills插件与子-agent">第 23 章｜Skills、插件与子 Agent</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：复用一套方法、增加工具实现与委派独立工作，分别改变系统的哪一层？</p>
+<p><strong>关键概念</strong>：Skill（技能说明包）：可加载的方法正文；Plugin（插件）：提供工具绑定的可信实现；代际：一次加载的实现身份；Subagent（子代理）：独立的关联子会话；Artifact（产物）：可供父任务检查的输出。</p>
+<p><strong>关系主线</strong>：方法经加载进入输入，插件经发布和激活提供能力，子任务交回状态与产物；权限、在途调用和父任务验收分别处理。</p>
+</blockquote>
+<p>前置：<a href="13-session-turn-run.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">执行身份</a>、<a href="16-tools-and-execution.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">工具</a>与<a href="17-permissions-and-sandbox.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">执行边界</a>。</p>
+<h2 id="核心路线">核心路线</h2>
+<span class="heading-alias" id="本章只回答什么问题" aria-hidden="true"></span><h3 id="方法复用与独立委托">方法复用与独立委托</h3>
+<p>Skill 和 Subagent 改变系统的方式不同：</p>
+<ul>
+<li><a href="glossary.html#skill%E6%8A%80%E8%83%BD%E8%AF%B4%E6%98%8E%E5%8C%85">Skill</a> 主要提供 Agent <strong>可采用的方法说明</strong>；</li>
+<li><a href="glossary.html#subagent--linked-child-session%E5%AD%90%E4%BB%A3%E7%90%86--%E5%85%B3%E8%81%94%E5%AD%90%E4%BC%9A%E8%AF%9D">Subagent</a> 创建一个新的受控执行者，让另一条 Session/Run 去 <strong>独立做一部分工作</strong>。</li>
+</ul>
+<p>子任务之间还有依赖时，<a href="24-continuation-and-orchestration.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第24章 的调度机制</a>决定它们何时开始。</p>
+<span class="heading-alias" id="先看贯穿案例" aria-hidden="true"></span><h3 id="文档规范与独立检查">文档规范与独立检查</h3>
+<p>文档任务是：</p>
+<blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，把 README 的测试步骤更新正确，运行测试；以后请用中文解释结果。</p>
+</blockquote>
+<p>现在增加两个需求：</p>
+<ol>
+<li>项目要求 README 必须遵循一套固定文档规范；</li>
+<li>修改前，希望有另一个 Agent 独立检查 <code>package.json</code> 与 README 是否一致。</li>
+</ol>
+<p>第一项适合 Skill，第二项可能适合 Subagent。</p>
+<p>图中的 Skill 分支增加父任务的方法输入；child 分支另有执行身份，检查结果再交回父任务。两项分支不表示谁必须先完成。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="文档规范与独立检查：可滚动示意图"><a href="../../../assets/diagrams/23-skills-and-subagents-1.svg"><img src="../../../assets/diagrams/23-skills-and-subagents-1.svg" alt="父任务加载 Skill 后得到方法输入；另一条分支创建有独立身份的子会话，只读检查后交回结果。方法加载和独立执行分别作用于不同对象。" width="893" height="922" loading="lazy" style="width:893px;min-width:760px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><span class="heading-alias" id="最简单的实现会怎样做" aria-hidden="true"></span><span class="heading-alias" id="误区二subagent-就是把同一个模型调用两次" aria-hidden="true"></span><h3 id="为什么模拟专家不等于创建子任务">为什么模拟专家不等于创建子任务</h3>
+<p>一个非常简单的 Agent 系统可能把两者都实现为“往 Prompt 里塞一段文字”：</p>
+<pre><code class="language-text">Skill:
+  system prompt += 文档规范
+
+Subagent:
+  system prompt += 请模拟另一个专家再检查一遍</code></pre>
+<p>第一种做法可以勉强表达 Skill。第二种做法却没有创建新的执行者：</p>
+<ul>
+<li>没有新的 Session 或 Run identity；</li>
+<li>没有独立 Context；</li>
+<li>没有独立工具和权限边界；</li>
+<li>无法单独停止、观察或恢复“子任务”；</li>
+<li>所谓“另一个专家”仍然只是同一次模型生成中的角色扮演。</li>
+</ul>
+<p>因此，真正的 Subagent 需要一个可识别、可约束、可观察的执行生命周期。</p>
+<h3 id="skill给-agent-一份可复用说明书">Skill：给 Agent 一份可复用说明书</h3>
+<h4 id="skill-解决什么问题">Skill 解决什么问题</h4>
+<p>许多任务不是缺少工具，而是缺少稳定的方法。例如文档评审可能要求：</p>
+<ul>
+<li>先核对测试命令的真实来源；</li>
+<li>不把未运行的测试写成已通过；</li>
+<li>更新正文后检查相对链接；</li>
+<li>最后按固定模板报告变更和证据。</li>
+</ul>
+<p>如果每次都让用户重新写这些要求，容易遗漏，也会让 Prompt 变长。Skill 把方法、检查清单、脚本说明或模板组织成可重复加载的内容。</p>
+<h4 id="skill-改变了什么">Skill 改变了什么</h4>
+<p>在教学案例中，加载文档 Skill 后，R7 可以知道：</p>
+<pre><code class="language-text">先读项目规则
+→ 从 package.json 核对测试命令
+→ 修改 README
+→ 检查链接
+→ 只报告实际运行过的验证</code></pre>
+<p>它改变的是 R7 的工作方法和可用上下文。</p>
+<h4 id="看见名字加载正文采用方法是三步">看见名字、加载正文、采用方法是三步</h4>
+<p>假设 <code>documentation-review</code> 的描述是“核对项目测试说明”，正文包含：</p>
+<pre><code class="language-text">先从 package.json 找到真实测试入口。
+修改 README 后运行该入口；失败时保留失败输出。
+报告修改、实际验证和仍未证明的内容。</code></pre>
+<p>这是教学用的短正文。模型只看到名字和描述时，本次输入还没有这三条正文要求，不能声称已经读过这份方法。正文可以由用户显式调用时预先加载，也可以由模型在后续步骤按需加载；两者都要确保正文实际进入输入。按需路线经过以下步骤：</p>
+<p>按需路线如下；箭头只到工具选择，实际调用仍要经过权限（Permissions）与执行边界（Execution boundary）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="看见名字、加载正文、采用方法是三步：可滚动示意图"><a href="../../../assets/diagrams/23-skills-and-subagents-2.svg"><img src="../../../assets/diagrams/23-skills-and-subagents-2.svg" alt="按需 Skill 路径从目录与候选发现进入正文加载，再让后续模型请求读到方法并选择工具；工具选择仍须另行满足权限与执行条件。" width="720" height="907" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p><code>SkillSearch</code> 只找候选，<code>Skill</code> 才取得正文。加载成功仍不证明模型已经遵循方法，更不证明附带脚本已经执行或测试通过；后面这些结果需要各自的工具观察。两种入口都为本次普通 Turn 提供方法，不创建独立执行者。两种入口的消费链见<a href="#%E6%AD%A3%E6%96%87%E8%BF%9B%E5%85%A5%E8%BE%93%E5%85%A5%E7%9A%84%E4%B8%A4%E6%9D%A1%E6%8E%A5%E7%BA%BF">正文加载</a>。</p>
+<h4 id="skill-没有改变什么">Skill 没有改变什么</h4>
+<p>Skill 本身不会自动：</p>
+<ul>
+<li>创建新的 Run；</li>
+<li>获得本来没有的 <code>Write</code> 或 <code>Bash</code> 工具；</li>
+<li>扩大 <a href="glossary.html#executionboundary%E6%89%A7%E8%A1%8C%E8%BE%B9%E7%95%8C">ExecutionBoundary</a>；</li>
+<li>绕过用户批准；</li>
+<li>证明附带脚本可信；</li>
+<li>让 Agent 在未来自动更新这份 Skill。</li>
+</ul>
+<p>它的作用范围是：</p>
+<pre><code class="language-text">Skill = 方法与上下文增强
+Skill ≠ 新执行者
+Skill ≠ 新权限</code></pre>
+<h3 id="subagent创建一个受控的关联子会话">Subagent：创建一个受控的关联子会话</h3>
+<h4 id="subagent-解决什么问题">Subagent 解决什么问题</h4>
+<p>当一部分工作需要独立 Context、可以并行、应有单独结果或不应污染父任务主线时，可以委托给 Subagent。</p>
+<p>在这个案例中，child 只检查配置和说明是否一致，父任务负责采纳结论并修改。父任务可以先整理文档规范，待这次检查返回再编辑 README，避免把 child 观察到的旧内容误当成修改后的状态。委托要明确目标、输入、允许做什么和结果格式；自然语言中的“只读”还要由实际工具与执行边界落实。</p>
+<h4 id="maka-的当前主路径">Maka 的当前主路径</h4>
+<p>Maka 的 production Subagent 主路径是 durable linked child Session。通俗地说：</p>
+<ol>
+<li>父 Run 提出创建 child 的请求；</li>
+<li>Host 检查 lineage（父子关联）、深度、数量和能力边界；</li>
+<li>创建一个与父任务有关联、但身份独立的 child Session；</li>
+<li>child 在自己的 Session 中运行普通 AgentRun；</li>
+<li>child 的 terminal 结果被父任务读取或接收；</li>
+<li>父 Run 根据这个结果继续自己的 model step。</li>
+</ol>
+<p>它没有另造一套“Subagent Runtime”。child 最终仍走普通 Hosted Execution 主干。</p>
+<h3 id="用同一个案例逐步重放">用同一个案例逐步重放</h3>
+<h4 id="第一步父-run-决定是否需要委托">第一步：父 Run 决定是否需要委托</h4>
+<p>R7 先判断任务是否真的值得创建 child。如果检查只需读两行配置，直接调用 <code>Read</code> 可能更简单。Subagent 会增加：</p>
+<ul>
+<li>新的身份和 Context；</li>
+<li>调度与等待成本；</li>
+<li>结果整合成本；</li>
+<li>取消和失败处理。</li>
+</ul>
+<h4 id="第二步冻结最小子任务">第二步：冻结最小子任务</h4>
+<p>父任务不应只说“帮我看看项目”。先通过系统配置把 child 的可执行能力限定为只读检查，再给出自足的任务文字：</p>
+<pre><code class="language-text">比较 package.json 中的测试命令与 README 当前测试说明。
+只读，不修改文件。
+返回：每个不一致项、观察到的原文与文件位置、推荐修改。</code></pre>
+<p>目标、输入、能力上限和输出形状越明确，父任务越容易判断结果是否可用。任务中的“只读”表达意图，冻结后的 tool ceiling（可用工具集合的上限）与 ExecutionBoundary 负责强制执行。</p>
+<h4 id="第三步child-独立运行">第三步：child 独立运行</h4>
+<p>C1/CT1/CR1 在自己的 Context 中读取两个文件并形成结论。它可能调用多次模型和工具，但这些都属于 child 的执行事实，不与 R7 的事件混成同一个 Run。</p>
+<span class="heading-alias" id="误区五child-完成就代表父任务完成" aria-hidden="true"></span><h4 id="第四步父任务消费结果">第四步：父任务消费结果</h4>
+<p>CR1 完成不等于 R7 自动完成。父任务还要：</p>
+<ol>
+<li>判断 child 的观察和结论是否充分，文件是否已被其他操作改变；</li>
+<li>在用户已有授权内执行 README 修改，需要扩边时再走授权链；</li>
+<li>运行测试；</li>
+<li>生成最终回答。</li>
+</ol>
+<h4 id="第五步处理-child-失败或取消">第五步：处理 child 失败或取消</h4>
+<p>如果 child 失败，父任务至少需要知道：</p>
+<ul>
+<li>child 是未开始、运行失败、被取消，还是结果不确定；</li>
+<li>是否可以改由父任务直接处理；</li>
+<li>已返回的部分结果能否安全使用；</li>
+<li>父任务取消时是否应该级联取消 child。</li>
+</ul>
+<p>这也是为什么真实 Subagent 需要独立生命周期，而不仅是 Prompt 中的一个角色。</p>
+<span class="heading-alias" id="常见误区" aria-hidden="true"></span><h3 id="skill-与-subagent-对照">Skill 与 Subagent 对照</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · Skill 与 Subagent 对照"><table><caption>表 1 / Table 1 · Skill 与 Subagent 对照</caption><thead><tr><th scope="col">问题</th><th scope="col">技能说明包（Skill）</th><th scope="col">子代理（Subagent）</th></tr></thead><tbody><tr><td>核心作用</td><td>注入方法、知识或资源说明</td><td>创建独立、受控的执行单元</td></tr>
+<tr><td>是否产生新 Session/Run</td><td>否</td><td>是，当前主路径为 linked child Session</td></tr>
+<tr><td>是否自动获得新工具</td><td>否</td><td>否，按 child policy/委托决定</td></tr>
+<tr><td>是否自动扩大权限</td><td>否</td><td>否</td></tr>
+<tr><td>是否有独立 terminal</td><td>否</td><td>是</td></tr>
+<tr><td>适合场景</td><td>固定流程、规范、领域知识</td><td>独立检查、并行研究、隔离 Context</td></tr>
+<tr><td>主要风险</td><td>供应链、错误指令、Context 污染</td><td>资源失控、权限继承、失败与取消传播</td></tr></tbody></table></div>
+<p>有时两者会一起使用：父任务给 child 加载一个只读审计 Skill，但仍要分别处理 Skill 来源和 child 权限。</p>
+<span class="heading-alias" id="核心出口自测与答案" aria-hidden="true"></span><h3 id="核心问题解析">核心问题解析</h3>
+<p><strong>问题 1。</strong> 项目给出一份文档 Skill，为什么不会因此获得新的文件或网络权限？</p>
+<p><strong>解释。</strong> Skill 增加方法与上下文；实际工具绑定、权限和隔离由执行系统决定。说明书不能自行改变这些边界。</p>
+<p><strong>问题 2。</strong> child 已完成只读检查，为什么父 Run 仍不能直接算完成？</p>
+<p><strong>解释。</strong> child 的结果只是父任务的输入。父任务仍需检查结论，执行目标修改、运行验证并形成自己的终态。</p>
+<p><strong>问题 3。</strong> 只需读取两行配置时，怎样判断是否值得创建 child？</p>
+<p><strong>解释。</strong> 先比较独立上下文或并行检查的收益与交接、等待、结果整合成本；直接 Read 已能解决时无需增加一份执行。</p>
+<p><strong>问题 4。</strong> 模型在 SkillSearch 中找到 documentation-review，能否直接声称已经读过正文、执行了检查？</p>
+<p><strong>解释。</strong> 不能。搜索返回候选信息，按需路线还需要 Skill 返回正文，再由模型选择工具并取得检查结果。若用户显式调用已将正文注入本轮，则无需重复加载，但执行结果仍需独立证据。</p>
+<p><strong>问题 5。</strong> child 返回 README 某行仍是旧命令，父任务刚刚编辑了那一行，应直接按 child 建议再改一次吗？</p>
+<p><strong>解释。</strong> 不应。child 的结果反映它读取时的内容；父任务应核对当前文件及差异，判断建议是否仍适用。独立执行者和共享文件的当前状态需要分别确认。</p>
+<h2 id="实现深化">实现深化</h2>
+<p>正文加载、实现绑定与独立执行有不同生命周期。worktree（同仓库的独立 Git 工作副本，后文展开）中的修改还受到 <a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章 的效果恢复条件</a>约束；有依赖的子任务由 <a href="24-continuation-and-orchestration.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第24章 的 Graph</a>协调。</p>
+<h3 id="正文进入输入的两条接线">正文进入输入的两条接线</h3>
+<p>把前面的 <code>documentation-review</code> 接回 Maka，目前有两条入口：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 正文进入输入的两条接线"><table><caption>表 2 / Table 2 · 正文进入输入的两条接线</caption><thead><tr><th scope="col">入口</th><th scope="col">正文什么时候进入模型输入</th><th scope="col">本例会发生什么</th></tr></thead><tbody><tr><td>用户显式选择或调用 Skill</td><td>Host 在 provider 调用前解析，把已加载正文放入本轮用户内容</td><td>T7 已带上三条要求，模型无需再调用同一 Skill</td></tr>
+<tr><td>模型按需加载</td><td>模型先看到有界目录，调用 <code>Skill</code> 后，正文通过工具结果进入后续 step</td><td>R7 先请求 <code>Skill({name: &quot;documentation-review&quot;})</code>，下一步才依据正文检查文件</td></tr></tbody></table></div>
+<p>这两条入口的扫描和冻结时点不同，不能从“都加载同一个文件”推出它们处于同一个原子快照。冻结范围取决于每条入口的读取与缓存时点。</p>
+<h3 id="一个-turn-冻结了什么不只是目录名字">一个 Turn 冻结了什么：不只是目录名字</h3>
+<p>当前默认 Interactive composer 按 <code>sessionId + turnId</code> 缓存同一份 canonical inventory（本轮采用的方法目录与正文快照），供 prompt 目录、<code>SkillSearch</code> 和 <code>Skill</code> 共用。扫描结果包含去掉文件开头元数据块（frontmatter）的 <code>content</code> 与原文件的 <code>contentSha256</code>；repository 冻结这些扫描记录。<code>Skill</code> 直接读取记录中的 <code>content</code>，清洗并按长度截断后返回 <code>instructions</code>，不会在这一步重新打开磁盘上的 <code>SKILL.md</code>。</p>
+<p>所以，在下面这个单 Turn 例子里，正文与名字一起保持一致：</p>
+<pre><code class="language-text">S1/T7 首次组成输入：快照里是 old / OLD_DESCRIPTION / OLD_BODY
+目录更新：现在可发现 new / NEW_DESCRIPTION / NEW_BODY
+T7 调用 Skill(old)：仍返回 OLD_BODY
+S1/T8 首次组成输入：重新取得目录，可看到 NEW_DESCRIPTION</code></pre>
+<p>这里演示的是 inventory 被替换后的读取选择，不能由此推导整个文件系统在并发更新时也保持同一快照。</p>
+<p>冻结也有明确范围。正文提到的其他文档、脚本或网络资源没有因此一起快照化，之后读取或执行仍是新的工具动作。上述 resolver 是有界的进程内缓存，不能据此推导任意重启后的永久正文快照保证。显式 invocation 则先通过独立的 inventory 读取生成已加载用户内容，再随准入保存；不要把这次读取与稍后的 composer inventory 读取说成同一个原子操作。</p>
+<span class="heading-alias" id="误区一skill-名字里写了管理员它就有管理员权限" aria-hidden="true"></span><h3 id="工具声明加载资格与执行许可">工具声明、加载资格与执行许可</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 工具声明、加载资格与执行许可"><table><caption>表 3 / Table 3 · 工具声明、加载资格与执行许可</caption><thead><tr><th scope="col">Skill 中的信息</th><th scope="col">当前用途</th><th scope="col">不能证明什么</th></tr></thead><tbody><tr><td><code>allowed-tools</code> / <code>declaredTools</code></td><td>说明该方法希望使用哪些工具</td><td>不会注册工具或扩大权限</td></tr>
+<tr><td><code>required-tools</code> / <code>requiredCapabilities</code></td><td>检查当前 Host 是否满足展示、加载资格</td><td>满足资格不等于某次具体调用已获准</td></tr>
+<tr><td>正文中的“运行测试”</td><td>告诉模型应该做什么</td><td>不会绕过 ToolRuntime、Permission 或 ExecutionBoundary</td></tr></tbody></table></div>
+<p>例如只有 Read 的执行环境不会因为正文写了“用 Bash 测试”就获得 Bash。若 Skill 将 Bash 列为 required tool，当前资格检查会隐藏或拒绝加载它；若只是 declared tool，则那只是说明信息。加载失败也必须被观察：显式请求的 Skill 全部失败时会在 provider 前阻断；部分成功可以继续并返回失败明细；按需 <code>Skill</code> 失败则返回失败结果，不能假装已读过正文。</p>
+<h3 id="skill-来源与依赖的边界">Skill 来源与依赖的边界</h3>
+<h4 id="为什么-skill-仍然需要安全审查">为什么 Skill 仍然需要安全审查</h4>
+<p>“只是文字”不代表没有风险。Skill 可能引导 Agent：</p>
+<ul>
+<li>读取不必要的敏感文件；</li>
+<li>运行来源不明的脚本；</li>
+<li>把数据发送到外部服务；</li>
+<li>把一次临时做法写成长期规则。</li>
+</ul>
+<p>强制边界仍由工具、Permission 和 Sandbox 承担，但 Skill 的来源、内容和依赖也属于供应链治理问题。这类似于：<strong>说明书不能打开上锁的门，但坏说明书仍可能诱导拿着合法钥匙的人走错房间。</strong></p>
+<h3 id="方法正文没变执行工具却换了一代">方法正文没变，执行工具却换了一代</h3>
+<p>Skill 解决“如何做”的复用，Plugin 可以提供实际可调用的实现。这里讲已经安装、受信任的 Host 插件；扫描到一份 <code>SKILL.md</code> 不会因此执行插件代码。</p>
+<p>热更新首先要区分同名工具的不同实现。<code>generation</code> 是这次加载的<strong>绑定代次</strong>，<code>retired</code> 表示这代绑定不再接受新调用，<code>activeCalls</code> 是已经进入这代实现、尚未退出的调用数。下面用一个教学对象表示它们，不是调用 API：</p>
+<pre><code class="language-text">绑定 B = (作用域, entry, extension, generation, name, schema)
+运行状态 = (是否 retired, 已进入的 activeCalls 数)</code></pre>
+<p><code>entry/extension</code> 标识插件入口与扩展，<code>name/schema</code> 是工具名称与参数结构。同名、同参数结构的工具，也可能绑定到不同代次的代码。正常调用依次经过四步：</p>
+<ol>
+<li><strong>加载一代代码。</strong> <code>TrustedPluginPackageLoader.loadInstalled</code> 从已安装包加载独立代码代次。加载出来只说明代码可供组成，还没有向模型发布工具。</li>
+<li><strong>发布工具绑定。</strong> <code>MakaCompositionLoader</code> 先暂存贡献的工具，再提交发布。交互运行的组成者通过 <code>PluginToolService</code> 取得当前 Session 的有效绑定。</li>
+<li><strong>冻结本步工具表。</strong> 每个逻辑 step 重新取得可用工具快照。<code>ToolAvailabilityRuntime.prepare</code> 比较 Turn 保存的激活身份；如果实现换代，旧的搜索激活资格会被清除。</li>
+<li><strong>调用这份实现。</strong> 模型依据本步声明返回请求，<code>ToolRuntime</code> 再检查调用条件并进入相应工具。包已加载、绑定已发布、本步已激活、实现已进入，是不同状态。</li>
+</ol>
+<p>卸载旧代也有顺序：先标记 <code>retired</code>、拒绝新进入，再等已进入调用的 <code>finally</code> 将 <code>activeCalls</code> 减到零。退役负责等待和清理，不会强制杀死正在运行的插件，也不撤回它已经产生的效果。</p>
+<p>假设可信插件提供一个需要搜索激活的 <code>check_docs</code> 工具，g17/g18 分别代表第17、18代绑定：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 方法正文没变，执行工具却换了一代"><table><caption>表 4 / Table 4 · 方法正文没变，执行工具却换了一代</caption><thead><tr><th scope="col">时点</th><th scope="col">登记与调用</th><th scope="col">下一步为何如此</th></tr></thead><tbody><tr><td>g17 已被本 Turn 搜索激活</td><td>A 已进入 impl，activeCalls=1</td><td>A 持有这代实现的调用资格</td></tr>
+<tr><td>重载先发布 g18，再退役 g17</td><td>g17 retired=true，A 仍在运行</td><td>等 A 返回或抛错并减到0；退役不是撤回其已经发生的效果</td></tr>
+<tr><td>B 还拿着 g17 wrapper，尚未进入</td><td>入口检查 retired，拒绝 B</td><td>旧请求中的声明不能让已退役 wrapper 继续接受新调用</td></tr>
+<tr><td>下一逻辑 step 重新取工具集合</td><td>同名工具的 activation key 从 g17 变 g18</td><td>原来的搜索激活被清除；这个 searchable 工具需要重新搜索激活</td></tr>
+<tr><td>g17 disposer 清理旧注册</td><td>token 不再匹配 g18 的登记</td><td>不能顺手把新代工具删掉</td></tr></tbody></table></div>
+<p>模型上一份请求的 schema 不会被热更新追溯改写；新的 step 才取新的绑定集合。仅名字和 schema 相同也不代表实现身份相同。基础 Host wrapper 的形状身份有其独立规则，不能把所有工具重建都说成一定清掉激活。插件代码在 Host 内执行，贡献发布事务也不会回滚任意顶层文件或远端副作用；这里不是不可信代码隔离保证。</p>
+<h4 id="skill-的发现与读取快照">Skill 的发现与读取快照</h4>
+<p>假设目录已展示，正文随后从“运行命令A”改成“运行命令B”。Maka 本 Turn inventory 缓存有效时，lazy <code>Skill</code> 读扫描所得 content，仍可返回A；Codex 的普通 Host Skill 按关联 filesystem 读取选定正文，如果该来源可变，此时可能返回B或读取失败。后者的 snapshot 主要保存发现结果与来源关联。来自不可变 plugin generation 的文件、executor/orchestrator 的分页缓存另有规则，不能由这一例推断所有 Codex Skill 都立即刷新。</p>
+<p>这里比较的是“发现目录后、实际加载正文前”的变化。<a href="41-codex-memory-and-collaboration.html#%E5%88%86%E9%A1%B5%E5%BF%AB%E7%85%A7%E4%BF%9D%E6%8C%81%E5%93%AA%E4%B8%80%E6%AC%A1%E8%AF%BB%E5%8F%96%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7">第41章的分页快照</a>则追踪本地 executor-backed 路径同一次读取的后续页：继续页命中缓存时会延续那份正文。发现时记录了什么，与一次分页读取保持哪份内容一致，时间范围不同。</p>
+<p>因此选型取决于复用对象：复用方法文字用 Skill；增加可信执行实现及热替换用 Plugin 的绑定与清理合同；另起有独立任务/历史的执行者用 child。如果产品要求“审核过的确切正文及脚本在重启后继续使用”，应把内容和资源版本纳入持久合同，仅靠任一 <code>snapshot</code> 名称都不够。</p>
+<p><strong>变式一：Skill 已载入，但 <code>check_docs</code> 被卸载。模型还能因为方法正文要求它，就继续调用旧工具吗？</strong></p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不能。已加载文字是输入历史，不是当前可执行 binding。新 step 可能已经没有该工具；旧 wrapper 如果 retired 也拒绝新进入。已经进入 impl 的 A 仍需收束，不能从卸载推导它没有产生效果。</p>
+<p><strong>变式二：产品要求同名、同 schema 的 g18 自动继承 g17 激活，只按名字缓存是否足够？</strong></p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>这会改变当前合同：旧代实现的搜索激活将自动延续到新实现；这是可用性资格，执行权限仍独立核对。要这样设计，必须另行定义等价性、审核与失效策略；不能只删掉 generation 就说仍保留原保证。若需求反而是审核内容在恢复后不漂移，则还要持久保存确切正文与资源，代际内存对象本身也不能完成跨重启合同。</p>
+<h3 id="只读-child-的实际约束">只读 child 的实际约束</h3>
+<p>在案例中，父任务要修改 README；子任务只负责只读检查：</p>
+<pre><code class="language-text">definition/profile：选择 `local_read` preset
+输入：package.json、README.md、检查问题
+输出：不一致项和证据
+任务文字：只读，不修改文件，不运行有副作用命令</code></pre>
+<p>这里必须区分“告诉 child 不要做什么”和“系统真的不让它做什么”。任务文字表达委托意图；真正的 enforcement 来自 <code>local_read</code> definition/profile 冻结的 <code>explore</code> mode、只包含 <code>Read</code> / <code>Glob</code> / <code>Grep</code> 的 tool ceiling，以及最终的 ExecutionBoundary。只在 Prompt 里写“禁止修改”并不能构成安全边界。</p>
+<h3 id="如果把代码修改也委托出去改的是哪一份文件">如果把代码修改也委托出去，改的是哪一份文件</h3>
+<p>上面的只读 child 有独立对话，文件仍从父任务的工作目录读取。<strong>Context 独立、工具受限、文件工作副本分离是三种不同机制。</strong> Maka 的 <code>implementation</code> profile 才会要求 Host 建立独立 Git worktree，也就是同一个 Git 仓库的一份单独工作副本；它可以运行本地修改与 shell 工具，最后交回 patch。worktree 自身不等于 OS sandbox，实际访问许可仍由执行边界决定。</p>
+<p>理解起点时，先分开 Git 的<strong>已提交版本</strong>和<strong>工作目录当前文件</strong>。提交记录某一版文件；<code>HEAD</code> 通常指向当前分支，由此确定当前检出的提交，也可能直接指向某个提交。工作目录中的未提交编辑不会自动进入该提交。本节的 <code>dirty</code>（有改动）表示 Git 状态检查发现尚未提交的变化；没有这些变化时称为干净。</p>
+<p>例如，HEAD 中的 README 仍写 <code>npm run check</code>，父工作目录却已将它改为 <code>npm test</code>、尚未提交；直接从 HEAD 建立的副本不会包含这次编辑。本节所查的 Maka fresh worktree 路径会拒绝这样的 dirty 起点，避免静默漏掉父目录改动。这是该创建路径的约束，不是 Git 一概禁止从有改动的目录创建 worktree。</p>
+<p>下面重新以父工作区干净、已提交 README 仍含错误测试命令为初态，沿用“修改 README 测试步骤”的子任务。这是依据源码设计的状态轨迹，没有实际创建 child：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 如果把代码修改也委托出去，改的是哪一份文件"><table><caption>表 5 / Table 5 · 如果把代码修改也委托出去，改的是哪一份文件</caption><thead><tr><th scope="col">时点</th><th scope="col">child 工作副本</th><th scope="col">父工作副本与可得结论</th></tr></thead><tbody><tr><td>创建前</td><td>尚不存在</td><td>父 Git 工作区干净；Host 从其 HEAD 建立 child 的起点</td></tr>
+<tr><td>child Edit 并测试</td><td>README 已修改，child 保存自己的观察</td><td>父 README 仍未因此改变；child 测试只说明它测试的那份状态</td></tr>
+<tr><td>child Run 到达终态</td><td>文件 delta 仍在 worktree；Host 还须确认没有活动运行资源</td><td><code>completed</code> 本身不证明补丁已经发布</td></tr>
+<tr><td>Host 发布结果</td><td>保存相对起点的 <code>workspace.patch</code> Artifact</td><td>父收到 child 状态、摘要和产物 ID；仍不是自动合并</td></tr>
+<tr><td>父任务采纳</td><td>child 原产物可供追溯</td><td>父检查 patch、决定如何应用或重做修改，再验证最终工作副本</td></tr></tbody></table></div>
+<p>这解释了“结果交回”和“父任务验收”的差别。child 说测试通过时，父任务仍要检查测试范围、补丁内容和自己的当前文件是否已变化，不能只转述成功文字。若父目录后来已有另一份 README 修改，是否还能采用该 patch 需要新的判断；创建 child 时的干净起点并不保证未来合并无冲突。</p>
+<p>两个失败窗口尤其值得辨认：</p>
+<ul>
+<li><strong>父目录本来就有未提交修改</strong>：当前 fresh worktree 路径会拒绝创建，而不是默默从 HEAD 出发漏掉这些修改；父任务必须重新选择和确认工作起点，不能假定 child 已看到 dirty state。</li>
+<li><strong>child 已结束，但发布前失败</strong>：恢复逻辑可以在最新 child Run 已 terminal 时，从仍保留的 worktree 补发它的 patch；已发布的产物会复用。它不能任意重建所有历史 Turn 的旧补丁。child 失败或被取消也可能留下修改，产物存在不代表修改可采纳。</li>
+</ul>
+<span class="heading-alias" id="误区三child-应该继承父任务的全部-context" aria-hidden="true"></span><h3 id="父子之间的上下文与能力继承">父子之间的上下文与能力继承</h3>
+<h4 id="父子关系中哪些东西不会自动相等">父子关系中哪些东西不会自动相等</h4>
+<p>父 Session S1 与 child Session C1 具有 lineage，但不应该因此假设：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 父子关系中哪些东西不会自动相等"><table><caption>表 6 / Table 6 · 父子关系中哪些东西不会自动相等</caption><thead><tr><th scope="col">项目</th><th scope="col" style="text-align:right">是否自动完全继承</th><th scope="col">为什么</th></tr></thead><tbody><tr><td>父会话全部聊天历史</td><td style="text-align:right">否</td><td>child 只应获得完成任务所需的上下文</td></tr>
+<tr><td>父 Run identity</td><td style="text-align:right">否</td><td>child 有自己的 Session、Turn、Run</td></tr>
+<tr><td>父工具集合</td><td style="text-align:right">否</td><td>child capability 应按委托和 policy 计算</td></tr>
+<tr><td>父执行边界（ExecutionBoundary）</td><td style="text-align:right">否</td><td>能力扩张必须显式受控</td></tr>
+<tr><td>父记忆（Memory）</td><td style="text-align:right">否</td><td>跨 Session 记忆需要明确读取和治理</td></tr>
+<tr><td>父任务目标</td><td style="text-align:right">部分</td><td>child 获得的是边界明确的子目标</td></tr>
+<tr><td>结果与状态（Result / State）</td><td style="text-align:right">否</td><td>child 有独立 terminal，父任务再消费结果</td></tr></tbody></table></div>
+<p>父子关联只建立 lineage；哪些内容会跨过去，取决于对应的组合、委托和授权合同。</p>
+<h3 id="上下文分叉的实现边界">上下文分叉的实现边界</h3>
+<h4 id="上下文分叉不是操作系统-copy-on-write">上下文分叉不是操作系统 Copy-on-Write</h4>
+<p>“从父任务分出 child”容易让人联想到操作系统 <code>fork()</code> 的 Copy-on-Write（CoW）：先共享内存页，写入时再复制。这个类比只能帮助理解“分叉后各自演进”，不能当成 Maka 的上下文实现说明。</p>
+<p>LLM Context 不是平坦、只读、由 MMU 管理的内存页。它可能包含用户消息、模型输出、工具结果、权限事件和已经过时的试错路径；把父历史全部交给 child 会同时带来噪声、隐私与 token 成本。Maka 的直接 child 默认获得独立历史，由冻结的角色配置、工具边界和显式 task 构造初始工作集，而不是自动引用父会话前缀后再做“写时复制”。</p>
+<span class="heading-alias" id="误区六能-spawn-child就已经拥有-graph-或-mailbox-协商" aria-hidden="true"></span><h3 id="从一次委托到多-agent-协调">从一次委托到多 Agent 协调</h3>
+<h4 id="operator-与-participant先问-child-扮演什么角色">Operator 与 Participant：先问 child 扮演什么角色</h4>
+<p>Maka 的官方设计文章把协作角色分为下面两类。这个区分用于理解设计取向，并不说明产品已经提供了表中所有通信能力。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · Operator 与 Participant：先问 child 扮演什么角色"><table><caption>表 7 / Table 7 · Operator 与 Participant：先问 child 扮演什么角色</caption><thead><tr><th scope="col">角色视角</th><th scope="col">怎样协作</th><th scope="col">主要协调状态放在哪里</th></tr></thead><tbody><tr><td>Operator（算子）</td><td>接受边界封闭的任务，在受限 Runtime 中工作，终态交回结果或 artifact ref</td><td>显式任务、Graph 拓扑与调度状态</td></tr>
+<tr><td>Participant（参与者）</td><td>有可寻址身份和私有 Mailbox，可在多轮消息中补充、追问或横向协商</td><td>多个 Agent 的会话与消息流</td></tr></tbody></table></div>
+<p>Maka 的直接 <code>agent_spawn</code> 更接近前者：parent 交付自足的 task，child 在独立 Session/Run 中完成，然后做一次有界结果回传。当前这条直接父子路径没有让 parent 与 child 共享 Mailbox，也没有给 sibling child 暴露持续横向协商通道；前端能看到 child 的执行事件属于可观察性，不等于 Agent 间通信。</p>
+<p>这个区分还能防止把两个层次混在一起：</p>
+<pre><code class="language-text">direct agent_spawn = 创建一个边界明确的 child Operator
+Agent Graph         = 用拓扑、revision、claim 与 wake 编排多个 Operator</code></pre>
+<p>因此，调用一次 <code>agent_spawn</code> <strong>不等于</strong> 已经进入 Agent Graph 路径。Graph 还要有独立持久化的 topology、Schedule Revision、claim 与 supervisor-wake 控制机制；一张刚创建的图未必已经抵达 checkpoint，所以不能用“当前是否已经产生 wake”判断图是否存在。其推进过程见 <a href="24-continuation-and-orchestration.html#graph-%E4%BB%8E%E4%BE%9D%E8%B5%96%E5%9B%BE%E5%88%B0%E6%8C%81%E4%B9%85%E8%B0%83%E5%BA%A6">第24章</a>。</p>
+<h3 id="压缩后的子任务结果是否足够让父任务决策">压缩后的子任务结果，是否足够让父任务决策</h3>
+<p>继续让只读 child 检查 README 与配置。普通 <code>agent_spawn</code> 的 task 被送入独立 child Session；返回时，Maka 组合 invocation status、有界 summary 和 Artifact IDs。当前 summary 在最后一次完整文本非空时优先取它，否则用流式尾部或错误文字，不会回溯较早完整事件，最多4,000个 JavaScript 字符；它不是自动生成的一份完整证据报告。父模型通过普通工具结果的有效投影读到它，再决定要不要补读原文。</p>
+<p>为这类委托设计两个教学对象：</p>
+<pre><code class="language-text">委托输入 I = (明确子问题, 可用背景, 能力边界, 输出要求)
+交回证据 E = (child身份与状态, 观察范围, 结论, 证据位置, 未知项)</code></pre>
+<p>I/E 表示任务文字与结果应覆盖的语义，不是 Maka 已强制验证的完整 schema。例如 I 明确“仅检查脚本和说明，返回原文位置，不推断测试通过”；E 应报告“package.json有npm test，README写npm run check；未运行测试”。如果 E 只剩“应改为npm test，一切完成”，父任务就丢失了决定是否已验收的关键信息。保留结论却删掉观察范围，可能比少传一点背景更危险；子任务输出压缩和 第19章 的上下文压缩都要说明哪些决策前提必须保留。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 压缩后的子任务结果，是否足够让父任务决策"><table><caption>表 8 / Table 8 · 压缩后的子任务结果，是否足够让父任务决策</caption><thead><tr><th scope="col">父任务收到的东西</th><th scope="col">已证明什么</th><th scope="col">本例中还要做什么</th></tr></thead><tbody><tr><td>child status=completed</td><td>这次子执行有其完成状态</td><td>核对它实际检查了什么，不等于主任务通过</td></tr>
+<tr><td>summary 给出两处不一致</td><td>子模型报告了观察和建议</td><td>必要时回读当前正文，检查是否已被修改</td></tr>
+<tr><td>implementation child 的 patch Artifact</td><td>可定位交回的工作副本差异</td><td>检查状态/差异，再决定采纳；不会自动合并到父目录</td></tr>
+<tr><td>父侧修改并获得验收证据</td><td>有了针对最终状态的检查</td><td>才能按 第26章 的任务要求报告完成</td></tr></tbody></table></div>
+<p><strong>同题的另一种实现是持续通信。</strong> Codex 的可寻址消息协作路径（实现中称 Multi-Agent V2）把发消息和触发新工作分开：普通消息先入队，活跃 Turn 在允许消费输入的 step 边界接收；follow-up 请求还能在目标空闲、容量等条件满足时开新普通 Turn。这适合发现新线索后继续协商，而 Maka 本例的 foreground child 更适合输入明确、返回有界结果的一次委托。这条路径有个细节：queue-only 表示仅投递消息，通常不单独启动普通空闲任务；但目标没有活跃 Turn、仍保留 durable sleep（持久等待）记录时，也可触发新的普通 Turn 处理等待中的工作。它不重开旧 Turn，也不恢复旧调用栈；第41章会展开该接收分支。消息已提交不证明目标读过或完成任务，也不能由正常投递流程推导崩溃后邮箱必然完整恢复。</p>
+<p>选择持续通信，需要额外定义谁可以发什么、接收时点、旧消息的相关性、重复与取消，以及谁最终提交结论。若几个只读检查相互独立，先用普通委托或 DAG 即可；若结果不断改变对方的任务，再考虑通信模式。目录共享、工具授权与结果合并仍分别设计，多一套消息 API 不会自动解决它们。</p>
+<span class="heading-alias" id="误区四创建更多-subagent-一定更快" aria-hidden="true"></span><span class="heading-alias" id="手算并行收益再改变约束" aria-hidden="true"></span><h3 id="并行收益与约束变化">并行收益与约束变化</h3>
+<p>时间推演的条件是：两个独立只读检查 A/B 分别需8秒和12秒；设置与派发总计3秒，整合5秒，最终检查7秒。假定资源足够、没有排队与失败，并保持其他开销相同：</p>
+<pre><code class="language-text">顺序安排：3 + 8 + 12 + 5 + 7 = 35 秒
+并行安排：3 + max(8,12) + 5 + 7 = 27 秒</code></pre>
+<p>并行省下的是重叠执行的8秒，最终整合和验证仍在关键路径上。这里比较同一分工的两种安排，没有证明它比单 Agent 直接处理更快；token 总量还要累加父子输入、输出、重试，不能只按27秒计成本。并发上限、累计 child-run 上限和失败收敛也可能改变这个理想时间。</p>
+<p><strong>变式一：总预算30秒，但父任务在 child 回来前改了配置，必须再用6秒核对原观察。还能照原推演说按时完成吗？</strong></p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不能沿用27秒。若新增核对不能与剩余步骤重叠，理想时间成为33秒，已超预算。应调整计划、缩小有授权的交付或如实说明未完成验证；不能用 child completed 或旧观察省略最终状态检查。新增共享写冲突也会破坏原来的独立前提。</p>
+<p><strong>变式二：child 的摘要说“已修好”，状态却是 failed，且返回 patch。父任务能直接合并并宣布主任务完成吗？如果改用消息协作，send 成功能代替验收吗？</strong></p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不能。失败也可能留下有用甚至部分正确的 patch；父任务需核对失败原因、完整差异、当前工作副本和检查结果，在已有授权内决定是否采纳。summary、status、artifact 和主任务验收是不同证据。消息协作的 send 成功也只说明提交被接受，不证明对方已经阅读、做完或结论正确；它不能替代结果和验收链。</p>
+<span class="heading-alias" id="深化自测" aria-hidden="true"></span><h3 id="机制问题解析">机制问题解析</h3>
+<p><strong>问题 1。</strong> child 的任务文字说“只读”，具体什么机制才限制修改？</p>
+<p><strong>解释。</strong> 本例由 local_read definition/profile 固定 explore mode、Read/Glob/Grep ceiling，并结合 ExecutionBoundary 执行；提示词表达意图，不能代替强制约束。</p>
+<p><strong>问题 2。</strong> 为什么分出 child 不能理解为自动共享父历史的 OS Copy-on-Write？</p>
+<p><strong>解释。</strong> 当前直接 child 有独立历史，使用冻结配置与显式 task 组成工作集；不能借 OS 内存页语义解释 LLM Context。</p>
+<p><strong>问题 3。</strong> 为什么直接 agent_spawn 不能证明已拥有 Graph 或 Mailbox？</p>
+<p><strong>解释。</strong> spawn 是一次有界委派；Graph 还需要拓扑、revision、claim/wake，Mailbox 还需要独立消息投递与唤醒契约。</p>
+<p><strong>问题 4。</strong> 在上面的 T7 快照例子中，目录更新后加载 old 会得到什么？正文引用的脚本是否也被冻结？</p>
+<p><strong>解释。</strong> T7 的按需加载返回快照中的 OLD_BODY；T8 首次组成输入才重新读取 inventory。附带脚本没有被这一正文快照冻结，不能推导其内容或运行结果。</p>
+<p><strong>问题 5。</strong> 一个 Skill 的 required-tools 包含 Bash，但当前 Host 没有 Bash；把它改成 allowed-tools 是否就能运行命令？</p>
+<p><strong>解释。</strong> required-tools 不满足会阻止资格；改成 allowed-tools 只改变声明，不会产生 Bash 工具或执行许可。既不能把加载成功当成授权，也不能把授权当成实际执行。</p>
+<p><strong>问题 6。</strong> implementation child 返回 completed 和 patch ID，父 README 是否已经改变？如果父目录在创建前已有未提交修改，会发生什么？</p>
+<p><strong>解释。</strong> 不一定；这条 write-back 链发布产物，没有自动合并到父目录。父任务仍须检查、采纳并验证。fresh worktree 在父目录 dirty 时拒绝创建，不能假定 child 复制了未提交修改。</p>
+<p><strong>问题 7。</strong> child Run 已 terminal，但 Host 在发布 patch 前退出；能否仅凭这个终态认定产物已交回？恢复可以补什么？</p>
+<p><strong>解释。</strong> 不能，Run terminal 与 Artifact 发布是两个事实。在绑定仍有效且工作区无活动运行资源的条件下，恢复可在最新 child Run 已 terminal 时补发它尚未发布的 patch；它不是任意历史 Turn 的快照恢复。</p>
+<h3 id="继续阅读">继续阅读</h3>
+<ul>
+<li>相关机制：<a href="24-continuation-and-orchestration.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第24章｜计划、目标与持续执行</a>；<a href="25-host-and-client.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第25章｜Host、Client 与连接连续性</a></li>
+<li>结果判断：<a href="26-evaluation-and-design.html#%E4%B8%80%E6%AC%A1%E5%AE%8C%E6%95%B4%E4%BF%AE%E5%A4%8D%E7%9A%84%E4%BA%94%E9%A1%B9%E5%88%A4%E6%96%AD">第26章｜任务评价与综合设计</a> 或 <a href="26-evaluation-and-design.html#%E7%BB%BC%E5%90%88%E8%AE%BE%E8%AE%A1%E8%A7%A3%E9%87%8A%E6%AF%94%E8%BE%83%E4%B8%8E%E9%99%90%E5%AE%9A%E7%BB%93%E8%AE%BA">综合设计</a></li>
+<li>相关机制：<a href="20-memory.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB%E4%B8%80%E6%9D%A1%E5%81%8F%E5%A5%BD%E5%9B%9B%E4%B8%AA%E4%B8%8D%E5%90%8C%E7%9A%84%E5%8A%A8%E4%BD%9C">第20章｜记忆的写入、读取与更新</a>，区分背景读取与子任务显式输入</li>
+<li>总导航：<a href="README.html">从零学习 Maka Agent</a></li>
+</ul>
+<h3 id="延伸阅读">延伸阅读</h3>
+<p><a href="../../../extended-reading.html#reference-12" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/orchestration-system.md">编排系统分析</a>提供 Skill、child 与协作机制的完整实现及源码入口。</p>
+<hr>
+<p><a href="22-agent-cases.html">上一章：第 22 章｜mini 与 Maka 的任务执行案例</a> · <a href="24-continuation-and-orchestration.html">下一章：第 24 章｜计划、目标与持续执行</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="22-agent-cases.html"><span>← 上一章</span><strong>第 22 章｜mini 与 Maka 的任务执行案例</strong></a><a href="24-continuation-and-orchestration.html"><span>下一章 →</span><strong>第 24 章｜计划、目标与持续执行</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E6%96%B9%E6%B3%95%E5%A4%8D%E7%94%A8%E4%B8%8E%E7%8B%AC%E7%AB%8B%E5%A7%94%E6%89%98">方法复用与独立委托</a></li><li class="toc-level-3"><a href="#%E6%96%87%E6%A1%A3%E8%A7%84%E8%8C%83%E4%B8%8E%E7%8B%AC%E7%AB%8B%E6%A3%80%E6%9F%A5">文档规范与独立检查</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%A8%A1%E6%8B%9F%E4%B8%93%E5%AE%B6%E4%B8%8D%E7%AD%89%E4%BA%8E%E5%88%9B%E5%BB%BA%E5%AD%90%E4%BB%BB%E5%8A%A1">为什么模拟专家不等于创建子任务</a></li><li class="toc-level-3"><a href="#skill%E7%BB%99-agent-%E4%B8%80%E4%BB%BD%E5%8F%AF%E5%A4%8D%E7%94%A8%E8%AF%B4%E6%98%8E%E4%B9%A6">Skill：给 Agent 一份可复用说明书</a></li><li class="toc-level-3"><a href="#subagent%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E5%8F%97%E6%8E%A7%E7%9A%84%E5%85%B3%E8%81%94%E5%AD%90%E4%BC%9A%E8%AF%9D">Subagent：创建一个受控的关联子会话</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E5%90%8C%E4%B8%80%E4%B8%AA%E6%A1%88%E4%BE%8B%E9%80%90%E6%AD%A5%E9%87%8D%E6%94%BE">用同一个案例逐步重放</a></li><li class="toc-level-3"><a href="#skill-%E4%B8%8E-subagent-%E5%AF%B9%E7%85%A7">Skill 与 Subagent 对照</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E6%96%87%E8%BF%9B%E5%85%A5%E8%BE%93%E5%85%A5%E7%9A%84%E4%B8%A4%E6%9D%A1%E6%8E%A5%E7%BA%BF">正文进入输入的两条接线</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E4%B8%AA-turn-%E5%86%BB%E7%BB%93%E4%BA%86%E4%BB%80%E4%B9%88%E4%B8%8D%E5%8F%AA%E6%98%AF%E7%9B%AE%E5%BD%95%E5%90%8D%E5%AD%97">一个 Turn 冻结了什么：不只是目录名字</a></li><li class="toc-level-3"><a href="#%E5%B7%A5%E5%85%B7%E5%A3%B0%E6%98%8E%E5%8A%A0%E8%BD%BD%E8%B5%84%E6%A0%BC%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%AE%B8%E5%8F%AF">工具声明、加载资格与执行许可</a></li><li class="toc-level-3"><a href="#skill-%E6%9D%A5%E6%BA%90%E4%B8%8E%E4%BE%9D%E8%B5%96%E7%9A%84%E8%BE%B9%E7%95%8C">Skill 来源与依赖的边界</a></li><li class="toc-level-3"><a href="#%E6%96%B9%E6%B3%95%E6%AD%A3%E6%96%87%E6%B2%A1%E5%8F%98%E6%89%A7%E8%A1%8C%E5%B7%A5%E5%85%B7%E5%8D%B4%E6%8D%A2%E4%BA%86%E4%B8%80%E4%BB%A3">方法正文没变，执行工具却换了一代</a></li><li class="toc-level-3"><a href="#%E5%8F%AA%E8%AF%BB-child-%E7%9A%84%E5%AE%9E%E9%99%85%E7%BA%A6%E6%9D%9F">只读 child 的实际约束</a></li><li class="toc-level-3"><a href="#%E5%A6%82%E6%9E%9C%E6%8A%8A%E4%BB%A3%E7%A0%81%E4%BF%AE%E6%94%B9%E4%B9%9F%E5%A7%94%E6%89%98%E5%87%BA%E5%8E%BB%E6%94%B9%E7%9A%84%E6%98%AF%E5%93%AA%E4%B8%80%E4%BB%BD%E6%96%87%E4%BB%B6">如果把代码修改也委托出去，改的是哪一份文件</a></li><li class="toc-level-3"><a href="#%E7%88%B6%E5%AD%90%E4%B9%8B%E9%97%B4%E7%9A%84%E4%B8%8A%E4%B8%8B%E6%96%87%E4%B8%8E%E8%83%BD%E5%8A%9B%E7%BB%A7%E6%89%BF">父子之间的上下文与能力继承</a></li><li class="toc-level-3"><a href="#%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%86%E5%8F%89%E7%9A%84%E5%AE%9E%E7%8E%B0%E8%BE%B9%E7%95%8C">上下文分叉的实现边界</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E4%B8%80%E6%AC%A1%E5%A7%94%E6%89%98%E5%88%B0%E5%A4%9A-agent-%E5%8D%8F%E8%B0%83">从一次委托到多 Agent 协调</a></li><li class="toc-level-3"><a href="#%E5%8E%8B%E7%BC%A9%E5%90%8E%E7%9A%84%E5%AD%90%E4%BB%BB%E5%8A%A1%E7%BB%93%E6%9E%9C%E6%98%AF%E5%90%A6%E8%B6%B3%E5%A4%9F%E8%AE%A9%E7%88%B6%E4%BB%BB%E5%8A%A1%E5%86%B3%E7%AD%96">压缩后的子任务结果，是否足够让父任务决策</a></li><li class="toc-level-3"><a href="#%E5%B9%B6%E8%A1%8C%E6%94%B6%E7%9B%8A%E4%B8%8E%E7%BA%A6%E6%9D%9F%E5%8F%98%E5%8C%96">并行收益与约束变化</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E7%BB%A7%E7%BB%AD%E9%98%85%E8%AF%BB">继续阅读</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

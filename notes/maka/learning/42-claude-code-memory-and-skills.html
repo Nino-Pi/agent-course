@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 42 章｜Claude Code：记忆、规则与 Skills · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 42 / 62</div><article id="main-content"><span class="heading-alias" id="claude-code-深度课三memory-与-skills把知识放到合适的位置" aria-hidden="true"></span><span class="heading-alias" id="cc03claude-code记忆规则与-skills" aria-hidden="true"></span><span class="heading-alias" id="第-39-章claude-code记忆规则与-skills" aria-hidden="true"></span><span class="heading-alias" id="第-41-章claude-code记忆规则与-skills" aria-hidden="true"></span><h1 id="第-42-章claude-code记忆规则与-skills">第 42 章｜Claude Code：记忆、规则与 Skills</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：默认偏好、当前例外与可复用方法，怎样在 Claude Code 中保存并用于恰当任务？</p>
+<p><strong>关键概念</strong>：CLAUDE.md：人工持续指令；auto memory（自动记忆）：后续任务可用的记录；索引：常驻的主题线索；作用域：规则适用对象；Skill（技能说明包）：按需方法；Skill 独立上下文：以正文和参数驱动子任务。</p>
+<p><strong>关系主线</strong>：持续规则与记忆提供背景，索引引导读取细节，当前要求决定本次例外；方法装载、独立执行与工具预批准各有不同寿命和边界。</p>
+</blockquote>
+<p>所属主题：第 1–5 节对应 <a href="36-context-and-memory.html">第36章 Memory</a>，第 6 节起对应 Skills 与 <a href="39-orchestration-and-continuation.html">第39章 协作</a>。</p>
+<p>前置：<a href="20-memory.html">第20章 Memory</a>、<a href="23-skills-and-subagents.html">第23章 Skills 与 Subagents</a>、<a href="33-claude-code-tools-and-safety.html">第33章的权限边界</a>。</p>
+<h2 id="1-从记住了拆出四个问题">1. 从“记住了”拆出四个问题</h2>
+<p>延续扫描器任务。用户先说：“这个仓库的报告用中文。”后来又说：“这次给外部协作者的报告用英文，代码注释规则不变。”一次会话里两句话都在，模型仍可能套错；换会话后，还多了是否保存和是否读入的问题。</p>
+<p>跨会话使用涉及信息范围、持久化决定、读取入口与冲突处理。一个 <code>MEMORY.md</code> 文件的存在，只能证明存储载体存在。</p>
+<p>Claude Code 官方把人工维护的 <code>CLAUDE.md</code> 与 auto memory 分开。前者表达持续指令，后者保存有助后续任务的记录；两者作为模型背景使用，不构成硬权限。auto memory 用自己的 <code>MEMORY.md</code> 索引和主题文件组织；与 Maka 的文件同名，但各自管理文件与读取规则。Claude Code 的 auto memory 当前默认仓库范围内共享，机器之间不自动共享；启动读索引前 200 行或 25KB，以先到者为限，主题文件按需读。</p>
+<p>这些文件规则没有公开向量库、语义去重或原子写入协议，不能据此补出对应实现。</p>
+<h2 id="2-四种经常被叫作记忆的东西">2. 四种经常被叫作“记忆”的东西</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 2. 四种经常被叫作“记忆”的东西"><table><caption>表 1 / Table 1 · 2. 四种经常被叫作“记忆”的东西</caption><thead><tr><th scope="col">对象</th><th scope="col">服务哪个时间尺度</th><th scope="col">主要内容</th><th scope="col">变化后影响什么</th></tr></thead><tbody><tr><td>人工项目指令（Project Instructions）</td><td>多次任务</td><td>持续规则、默认约定</td><td>后续任务的背景与行为倾向</td></tr>
+<tr><td>自动记忆（Auto Memory）</td><td>后续会话</td><td>有价值的偏好、修正与项目背景</td><td>后续任务可能取回的材料</td></tr>
+<tr><td>压缩材料（Compaction）</td><td>当前长任务</td><td>已做、待做、约束、关键观察</td><td>下一次请求怎样继续</td></tr>
+<tr><td>文件检查点（Checkpoint）</td><td>某次编辑前后</td><td>可追踪文件状态</td><td>哪些代码变化可以恢复</td></tr></tbody></table></div>
+<p>表里最后一项不是用来教模型用户偏好的，前三项也不是文件回滚器。后续恢复案例沿不同对象解释这个差别。</p>
+<p>对于扫描器题目，可以这样分配材料：</p>
+<ul>
+<li>“项目测试入口是文档规定的检查流程”可作为简短项目规则，但命令是否仍有效要查当前项目。</li>
+<li>“本仓库报告默认中文”是有作用域的表达习惯；本次英文要求是当前例外，不能悄悄升级成所有未来报告都英文。</li>
+<li>“链接检查报告的固定步骤”适合按需装载的 Skill。</li>
+<li>“已修实现，空格路径用例尚未复测”属于当前任务连续性。</li>
+<li>“编辑前的 <code>scan.py</code> 内容”属于文件恢复数据。</li>
+</ul>
+<p>把材料归位的收益不只是省 token。它让修改责任变清晰：改默认规则、纠正一条记忆、替换一个方法和恢复一段代码，是不同操作。</p>
+<h2 id="3-第一张图写入和使用有两条闭环">3. 第一张图：写入和使用有两条闭环</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第一张图：写入和使用有两条闭环：可滚动示意图"><a href="../../../assets/diagrams/42-claude-code-memory-and-skills-1.svg"><img src="../../../assets/diagrams/42-claude-code-memory-and-skills-1.svg" alt="用户偏好先判断范围；需要长期保存的内容进入记忆条目和索引，新会话装载索引后按需读取。当前要求直接参与本次判断，实际结果反馈纠正过时记忆。" width="1035" height="1581" loading="lazy" style="width:1035px;min-width:880px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>其中“判断范围与未来用途”以及“当前请求与相关记忆一起解释”是课程概括的职责，图不意味着宿主对每次语义冲突都有确定性求解器。当前明确要求直接参与当前任务，不必先完成持久化。公开文件机制提供可审查的载体，是否选中正确条目和是否正确应用仍需要检查。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 3. 第一张图：写入和使用有两条闭环"><table><caption>表 2 / Table 2 · 3. 第一张图：写入和使用有两条闭环</caption><thead><tr><th scope="col">步骤</th><th scope="col">本题输入（Input）</th><th scope="col">状态变化（State）</th><th scope="col">可观察输出（Output）</th></tr></thead><tbody><tr><td>收到默认偏好</td><td>本仓库报告用中文</td><td>形成仓库级候选</td><td>一条带范围的内容</td></tr>
+<tr><td>保存</td><td>候选与现有记录</td><td>索引和条目可能更新</td><td>文件实际内容</td></tr>
+<tr><td>新任务开始</td><td>新请求与索引</td><td>当前模型获得发现线索</td><td>索引装载情况</td></tr>
+<tr><td>按需读取</td><td>任务涉及报告语言</td><td>获得详细默认与例外</td><td>具体读取内容</td></tr>
+<tr><td>应用</td><td>本次明确要求英文</td><td>本次输出使用局部要求</td><td>英文报告，默认未被误改</td></tr></tbody></table></div>
+<p>每一行都可能独立失败。保存成功不等于下次索引可见；索引可见不等于读了详细文件；读过也不等于推理时选择正确。</p>
+<h2 id="4-正常案例三次会话怎样避免扩大偏好">4. 正常案例：三次会话怎样避免扩大偏好</h2>
+<p><strong>会话 A：建立默认。</strong> 用户说本仓库报告使用中文。教学上先明确它的对象是“报告”，范围是“当前仓库”，有效期是持续默认。它不涉及测试数据、代码注释，也不自动适用于所有仓库。</p>
+<p><strong>会话 B：出现局部例外。</strong> 用户要向外部协作者交付本次英文报告。模型应按当前请求输出英文，但后续记忆整理应避免把这次例外写成全局偏好。如果有必要保存项目背景，可以保留“本次交付对象和语言”的有限事实，并明确后续应重新确认。</p>
+<p><strong>会话 C：没有重述语言。</strong> 用户只说“生成最新检查报告”。此时才需要检验默认是否真正发挥作用。若当前会话没有其他语言线索，读取相关偏好后采用中文，才构成一条完整的使用轨迹。</p>
+<p>但“输出中文”仍不能单独证明来自 Memory。系统指令、界面语言、用户本次中文输入都可能解释这个结果。因此验证应控制其他来源，检查读入材料，并加入移除该条目的对照。Memory 的评价对象不是某次输出看起来合理，而是在需要旧背景时是否正确使用、在不适用时是否克制。</p>
+<h2 id="5-容量与冲突写进文件仍可能丢在入口之外">5. 容量与冲突：写进文件仍可能丢在入口之外</h2>
+<p>索引的作用是把少量线索常驻，让详细材料按需出现。同一文件机制下，两种失误会产生不同后果。</p>
+<p><strong>失误一：索引写成了一本手册。</strong> 前面全是详细步骤，关键例外放在很后面。即使文件完整保存，启动装载边界也可能使后半部分不进入模型。参考处理是每条索引只表达主题、适用条件和条目位置；长过程移到 Skill 或详细文件。</p>
+<p><strong>失误二：两个条目同时自称默认。</strong> 旧条目说报告中文，新条目说报告英文，却都没有范围和条件。即使全部读进来，模型也缺少正确选择的依据。改法不是增加更多形容词，而是纠正对象、作用域和例外条件，移除已经无效的冲突内容。</p>
+<p>下面是<strong>课程自拟的完整记忆内容</strong>，不是 Claude Code 强制 schema：</p>
+<pre><code class="language-yaml">subject: 扫描器报告的语言
+scope: 当前仓库的日常检查报告
+default: 中文
+exception: 当前用户明确指定其他语言时按本次要求
+does_not_apply_to:
+  - 代码注释
+  - 测试 fixture 中的原始字符串
+review_when: 团队报告规范发生变化</code></pre>
+<p><code>does_not_apply_to</code> 用反例限制过度泛化，<code>review_when</code> 表达失效条件。简单偏好可以使用更少字段，只要仍能区分适用范围与失效条件。</p>
+<h2 id="6-skill-解决的是方法复用">6. Skill 解决的是方法复用</h2>
+<p>项目规则“提交前运行检查”还没有告诉模型如何检查链接、怎样理解失败、如何组织报告。Skill 可以装载一套相关方法。官方扩展概览把常驻指令、按需方法、外部能力和独立任务分成不同功能；组合时仍应围绕实际任务需求。</p>
+<p>一个好 Skill 的首要产物是可完成的任务，而非工具名清单。对于扫描器，步骤可以是确定输入目录，找到验证入口，执行相关检查，分类无效链接和不可访问对象，给出带范围的报告。若用户只问一个函数含义，整套检查流程可能无需调用。</p>
+<p>当模型可见许多 Skill 时，名称和描述承担发现作用；正文承担执行方法。描述太泛会误触发，描述漏掉常用说法会漏触发。可以用几条正反例评估：修坏链接应命中，解释 Python 列表不应命中，用户明确调用时应有清晰任务输入。</p>
+<h2 id="7-第二张图装载方法与分出上下文是两个选择">7. 第二张图：装载方法与分出上下文是两个选择</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第二张图：装载方法与分出上下文是两个选择：可滚动示意图"><a href="../../../assets/diagrams/42-claude-code-memory-and-skills-2.svg"><img src="../../../assets/diagrams/42-claude-code-memory-and-skills-2.svg" alt="当前任务按需装载 Skill，分别选择主会话或独立 Skill 上下文执行；两条路径都受实际工具权限约束，并在检查产物处汇合。" width="747" height="1384" loading="lazy" style="width:747px;min-width:635px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>Skill 的 <code>context: fork</code> 在独立子上下文执行，不能按“复制完整父对话”的 conversation fork 理解。当前 Skills 文档还明确：<code>allowed-tools</code> 是调用 turn 的预批准，下一条用户消息后结束，不是工具白名单；Skill 内容与这份临时许可的寿命不同。</p>
+<p>这带来一个具体的陷阱：一份 Skill 写“只读审查”，同时配置了广泛的 <code>allowed-tools</code>。自然语言方法不能自动限制实际工具，预批准也不能证明仅允许只读。方法内容、可调用工具集合和权限规则必须分别审查。</p>
+<span class="heading-alias" id="8-写一份有明确交付的教学-skill" aria-hidden="true"></span><h2 id="8-只读调查-skill-的完整参考定义">8. 只读调查 Skill 的完整参考定义</h2>
+<p>下面是<strong>采用公开字段的教学示例</strong>。它用于只读调查；<code>agent: Explore</code> 的工具能力由产品定义，正文仍显式重述本题必须到达子任务的限制。</p>
+<pre><code class="language-markdown">---
+name: inspect-link-checker
+description: 调查指定目录的 Markdown 链接检查流程，返回检查入口和潜在失败原因
+disable-model-invocation: true
+context: fork
+agent: Explore
+---
+
+调查 $ARGUMENTS。
+
+任务限制：只读取文件，不修改，不上传项目内容。
+1. 找到扫描器入口和测试配置。
+2. 确认含空格目录如何穿过参数边界。
+3. 区分已读代码事实与需要实际运行才能确认的假设。
+4. 返回：入口、参数流、可疑位置、建议检查、未完成项。
+若找不到目标目录，明确返回缺失信息。</code></pre>
+<p>任务参数提供调查对象；正文说明产物；失败分支允许返回缺失；必要限制写在子任务实际收到的正文里。仅写“遵守上面讨论的要求”会依赖它未必拥有的父对话。</p>
+<p><code>disable-model-invocation: true</code> 使本例偏向用户明确调用的方法。若改为自动发现，描述就要足够区分相邻任务，并增加误触发评估。是否后台执行、怎样控制完成顺序，则属于下一课的委派设计。</p>
+<h2 id="9-三个工程反例">9. 三个工程反例</h2>
+<p><strong>反例一：压缩后记得偏好，却忘了测试失败细节。</strong> 不矛盾。持久背景和当前任务摘要走不同链，能读到前者不证明后者完整。应重取关键错误，不能用正确语言风格掩盖功能状态未知。</p>
+<p><strong>反例二：主任务用了一个 Skill，子任务却不知道那套规则。</strong> 独立子任务的初始化不等于主任务当前输入。必须检查它依据的是单独提供的任务说明（brief）、父对话分叉（conversation fork），还是 Skill 自己驱动的上下文，并传入必要方法。已装载过不等于所有后代都继承；这几种初始化方式在下一章展开。</p>
+<p><strong>反例三：两个 worktree 同时修改相同记忆主题。</strong> 文件工作区隔离不保证长期背景也隔离。公开的文件式记忆接口本身不说明并发冲突如何解决。参考方案让同一主题由一个写入 owner 提交，以旧版本作为更新前提；发生冲突时保留两方意图并重新核对适用范围。这是额外设计，不能声称某个 worktree 的代码隔离或公开文件接口已经实现了它。</p>
+<p>这些条件的参考结果可以逐项区分：换到不适用仓库后，旧偏好不应作为有效默认；删除条目后，后续索引即使仍有线索，也不能把读取失败当成正文；当前明确改用英文时，本次输出采用英文而不自动改长期默认；压缩丢失失败细节时，需要回读任务记录；委派时遗漏规则，则应补到子任务实际收到的输入中。这些是设计判定，尚未形成该产品的新增运行轨迹。</p>
+<h2 id="10-取舍何时放常驻何时按需">10. 取舍：何时放常驻，何时按需</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 10. 取舍：何时放常驻，何时按需"><table><caption>表 3 / Table 3 · 10. 取舍：何时放常驻，何时按需</caption><thead><tr><th scope="col">内容选择</th><th scope="col">收益</th><th scope="col">代价</th><th scope="col">判断问题</th></tr></thead><tbody><tr><td>常驻项目规则（Project Rules）</td><td>每次任务容易获得关键约定</td><td>长文件争夺注意力和预算</td><td>它是否几乎每次都需要？</td></tr>
+<tr><td>索引与详细记忆（Index · Memory）</td><td>可审查，低成本暴露线索</td><td>选条目和读条目可能失败</td><td>描述是否足以发现正确例外？</td></tr>
+<tr><td>技能按需装载（Skill Loading）</td><td>方法可复用，可独立迭代</td><td>发现与触发需要评价</td><td>它是否定义了清楚任务与产物？</td></tr>
+<tr><td>独立上下文执行技能（Skill Context）</td><td>调查噪声留在子任务</td><td>缺失父背景、结果需整合</td><td>能否写出自足 brief？</td></tr></tbody></table></div>
+<p>Maka 与 Claude Code 都需要在常驻成本和按需漏读之间取舍，但使用 Markdown 并不意味着两者具有相同的 scope、读取顺序或权限语义。</p>
+<span class="heading-alias" id="11-自测与完整参考答案" aria-hidden="true"></span><h2 id="11-常见场景与完整参考结论">11. 常见场景与完整参考结论</h2>
+<p><strong>题一：CLAUDE.md、auto memory、compaction、checkpoint 分别回答什么？</strong></p>
+<p>参考答案：CLAUDE.md 提供人工持续指导；auto memory 提供后续任务可能用到的记录；compaction 组织当前长任务的输入；checkpoint 追踪特定文件恢复状态。它们有不同对象与生命周期，不能通过一条“保存”箭头互相替代。</p>
+<p><strong>题二：索引写入成功，为什么新会话仍没用到条目？</strong></p>
+<p>参考答案：依次检查内容是否在启动读取范围、索引描述是否相关、详细条目是否被读取、当前任务是否覆盖旧偏好、最终推理是否正确。不要只重复写入；先定位哪一环断了。</p>
+<p><strong>题三：把手册拆成许多被 CLAUDE.md 导入的文件，就能省上下文吗？</strong></p>
+<p>参考答案：文件组织和装载策略是两件事。若仍在启动时展开所有内容，拆文件主要改善维护。要减少常驻成本，应选择按任务或路径装载，并验证需要时能被找到。不能只按磁盘文件数判断请求大小。</p>
+<p><strong>题四：Skill 的 allowed-tools 为何不是安全白名单？</strong></p>
+<p>参考答案：该字段表达临时预批准，未列出的工具仍受其正常权限规则控制，而非因此不存在。需要限制能力时，应使用真正的工具限制与权限机制；方法正文只是另外一层指导。</p>
+<p><strong>题五：独立 Skill 只写“按前文分析”，会怎样？</strong></p>
+<p>参考答案：它可能没有前文，只收到含糊任务。应提供明确对象、必要背景、限制和交付标准；若确实依赖完整历史，评估其他上下文模式，不要误读 <code>context: fork</code> 的含义。</p>
+<p><strong>用户要把报告默认从中文改为英文，怎样区别于本次例外？</strong></p>
+<p>参考答案：当前措辞明确要求改变默认，因此先定位旧默认范围，再更新或撤销旧条目，避免两条并存。后续新会话没有重述语言时，参考输入应包含英文默认，参考输出为英文报告；只有实际读取与输出记录才能证明这一链发生过。已有历史报告无需无关改写。</p>
+<p>按产品连续复盘时可读：<a href="43-claude-code-subagents-and-recovery.html">子任务、回收与恢复</a>。记忆与方法的更多场景见 <a href="55-memory.html">第55章</a>与 <a href="57-skills-and-subagents.html">第57章</a>。</p>
+<hr>
+<p><a href="41-codex-memory-and-collaboration.html">上一章：第 41 章｜Codex：记忆、Skills 与协作</a> · <a href="43-claude-code-subagents-and-recovery.html">下一章：第 43 章｜Claude Code：子任务、隔离与恢复</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="41-codex-memory-and-collaboration.html"><span>← 上一章</span><strong>第 41 章｜Codex：记忆、Skills 与协作</strong></a><a href="43-claude-code-subagents-and-recovery.html"><span>下一章 →</span><strong>第 43 章｜Claude Code：子任务、隔离与恢复</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E4%BB%8E%E8%AE%B0%E4%BD%8F%E4%BA%86%E6%8B%86%E5%87%BA%E5%9B%9B%E4%B8%AA%E9%97%AE%E9%A2%98">1. 从“记住了”拆出四个问题</a></li><li class="toc-level-2"><a href="#2-%E5%9B%9B%E7%A7%8D%E7%BB%8F%E5%B8%B8%E8%A2%AB%E5%8F%AB%E4%BD%9C%E8%AE%B0%E5%BF%86%E7%9A%84%E4%B8%9C%E8%A5%BF">2. 四种经常被叫作“记忆”的东西</a></li><li class="toc-level-2"><a href="#3-%E7%AC%AC%E4%B8%80%E5%BC%A0%E5%9B%BE%E5%86%99%E5%85%A5%E5%92%8C%E4%BD%BF%E7%94%A8%E6%9C%89%E4%B8%A4%E6%9D%A1%E9%97%AD%E7%8E%AF">3. 第一张图：写入和使用有两条闭环</a></li><li class="toc-level-2"><a href="#4-%E6%AD%A3%E5%B8%B8%E6%A1%88%E4%BE%8B%E4%B8%89%E6%AC%A1%E4%BC%9A%E8%AF%9D%E6%80%8E%E6%A0%B7%E9%81%BF%E5%85%8D%E6%89%A9%E5%A4%A7%E5%81%8F%E5%A5%BD">4. 正常案例：三次会话怎样避免扩大偏好</a></li><li class="toc-level-2"><a href="#5-%E5%AE%B9%E9%87%8F%E4%B8%8E%E5%86%B2%E7%AA%81%E5%86%99%E8%BF%9B%E6%96%87%E4%BB%B6%E4%BB%8D%E5%8F%AF%E8%83%BD%E4%B8%A2%E5%9C%A8%E5%85%A5%E5%8F%A3%E4%B9%8B%E5%A4%96">5. 容量与冲突：写进文件仍可能丢在入口之外</a></li><li class="toc-level-2"><a href="#6-skill-%E8%A7%A3%E5%86%B3%E7%9A%84%E6%98%AF%E6%96%B9%E6%B3%95%E5%A4%8D%E7%94%A8">6. Skill 解决的是方法复用</a></li><li class="toc-level-2"><a href="#7-%E7%AC%AC%E4%BA%8C%E5%BC%A0%E5%9B%BE%E8%A3%85%E8%BD%BD%E6%96%B9%E6%B3%95%E4%B8%8E%E5%88%86%E5%87%BA%E4%B8%8A%E4%B8%8B%E6%96%87%E6%98%AF%E4%B8%A4%E4%B8%AA%E9%80%89%E6%8B%A9">7. 第二张图：装载方法与分出上下文是两个选择</a></li><li class="toc-level-2"><a href="#8-%E5%8F%AA%E8%AF%BB%E8%B0%83%E6%9F%A5-skill-%E7%9A%84%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E5%AE%9A%E4%B9%89">8. 只读调查 Skill 的完整参考定义</a></li><li class="toc-level-2"><a href="#9-%E4%B8%89%E4%B8%AA%E5%B7%A5%E7%A8%8B%E5%8F%8D%E4%BE%8B">9. 三个工程反例</a></li><li class="toc-level-2"><a href="#10-%E5%8F%96%E8%88%8D%E4%BD%95%E6%97%B6%E6%94%BE%E5%B8%B8%E9%A9%BB%E4%BD%95%E6%97%B6%E6%8C%89%E9%9C%80">10. 取舍：何时放常驻，何时按需</a></li><li class="toc-level-2"><a href="#11-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">11. 常见场景与完整参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

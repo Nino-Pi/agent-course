@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 01 章｜什么是 Agent 与 Agent Harness · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 01 / 62</div><article id="main-content"><span class="heading-alias" id="a00为什么聊天模型还不是-agent从一份输入和三个部件开始" aria-hidden="true"></span><span class="heading-alias" id="a00任务模型执行环境与-agent" aria-hidden="true"></span><span class="heading-alias" id="第-01-章任务模型执行环境与-agent" aria-hidden="true"></span><h1 id="第-01-章什么是-agent-与-agent-harness">第 01 章｜什么是 Agent 与 Agent Harness</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：Agent 怎样围绕目标行动，Model 与 Harness 负责什么？</p>
+<p><strong>关键概念</strong>：Agent（智能代理）：目标驱动系统；Task（任务）：目标与约束；Model（模型）：生成文字与动作请求；Harness（运行支撑）：组织输入、调用工具并控制流程；项目环境：文件、测试与服务。</p>
+<p><strong>关系主线</strong>：模型参与决策，Harness 连接环境并收集反馈，Agent 据此继续或结束。完整案例先解释文件、命令与配置字段怎样相连，再根据修改与测试结果验收任务。</p>
+</blockquote>
+<span class="heading-alias" id="核心阅读" aria-hidden="true"></span><span class="heading-alias" id="从一个看起来只要问一句的任务开始" aria-hidden="true"></span><span class="heading-alias" id="四个名字是怎样从这个过程里出现的" aria-hidden="true"></span><span class="heading-alias" id="task系统要解决的具体问题" aria-hidden="true"></span><span class="heading-alias" id="task-是输入不是一个会行动的对象" aria-hidden="true"></span><span class="heading-alias" id="model根据当前消息生成下一步请求" aria-hidden="true"></span><span class="heading-alias" id="model-读到的不是整个电脑" aria-hidden="true"></span><span class="heading-alias" id="model-返回的是请求不是现实结果" aria-hidden="true"></span><span class="heading-alias" id="environment真正执行-action-的边界" aria-hidden="true"></span><span class="heading-alias" id="environment-连接了语言和现实" aria-hidden="true"></span><span class="heading-alias" id="environment-不负责决定下一步应该做什么" aria-hidden="true"></span><span class="heading-alias" id="localenvironment-并不天然安全" aria-hidden="true"></span><span class="heading-alias" id="误区二模型会-bash所以它执行了-bash" aria-hidden="true"></span><span class="heading-alias" id="误区三environment-就等于-sandbox" aria-hidden="true"></span><span class="heading-alias" id="误区五task-没有类所以它不重要" aria-hidden="true"></span><span class="heading-alias" id="为什么这里没有单独的-task-类" aria-hidden="true"></span><span class="heading-alias" id="task-与三个运行部件" aria-hidden="true"></span><span class="heading-alias" id="model生成请求" aria-hidden="true"></span><span class="heading-alias" id="environment执行并报告观察" aria-hidden="true"></span><h2 id="agent模型与运行支撑">Agent、模型与运行支撑</h2>
+<p><strong>Agent 是围绕目标，通过观察、决策、行动和反馈推进工作的系统。</strong> 例如，修复代码时先了解当前文件与失败现象，选择修改，再检查结果；测试暴露新问题，后续行动也随之调整。Code Agent 是这类系统在软件任务中的应用，工作可能包含理解仓库、读改代码、运行检查和交付说明。</p>
+<p>本课程讨论以语言模型参与决策的 Agent。<strong>Model 是其中的决策部件；Harness 是让模型参与实际工作的运行支撑。</strong> 先用一个小任务说明它们的关系。</p>
+<p><strong>案例背景。</strong> 一个 Node.js 项目的 <code>README.md</code>（使用说明）把测试命令写成了 <code>npm run check</code>，而 <code>package.json</code>（脚本配置）实际提供的入口是 <code>npm test</code>。这里 Node.js 负责运行项目程序，npm 负责按配置启动测试；它们是本例的项目工具。用户要求 Agent 核对这两份文件，只修正文档中的命令，运行测试，再用中文报告。本例假设项目代码和原有测试正常；本章后面的“一个完整的 README 修复例子”会解释配置的读法，并给出文件片段与处理结果。</p>
+<p>下表中的“README 修复”都指这项任务：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · Agent、模型与运行支撑"><table><caption>表 1 / Table 1 · Agent、模型与运行支撑</caption><thead><tr><th scope="col">概念</th><th scope="col">回答什么问题</th><th scope="col">README 修复中的例子</th></tr></thead><tbody><tr><td>智能代理（Agent）</td><td>整个系统怎样围绕目标推进？</td><td>发现测试命令不一致，修改文档，核对结果并交付</td></tr>
+<tr><td>任务输入（Task）</td><td>要完成什么，受什么约束？</td><td>只修 README，运行测试，用中文报告</td></tr>
+<tr><td>模型（Model）</td><td>根据当前材料，下一步可能做什么？</td><td>提出读取、修改或测试请求，解释已有结果</td></tr>
+<tr><td>运行支撑（Harness）</td><td>怎样准备输入、执行请求、记录和控制过程？</td><td>将文件结果交给模型，调用工具，处理失败、预算与结束</td></tr>
+<tr><td>项目环境（Environment）</td><td>工作操作哪些对象，从哪里取得反馈？</td><td>仓库文件、配置、测试、命令行与相关服务</td></tr></tbody></table></div>
+<p>任务提供目标与约束，模型、工具和控制程序共同参与执行。项目规则说明工作约定，测试和服务提供可调用接口与反馈；文件能否读取、动作能否执行，仍由实际能力和权限边界落实。例如，提示里写“本次只读”是在指导模型选择动作；若模型仍提出写入请求，要保证文件不被修改，还需执行层拒绝这次写入。</p>
+<p>后文采用 mini-SWE-agent 这个结构简洁的代码 Agent 实例；其中，Harness 把当前消息列表传给 <code>model.query(messages)</code>。读文件的结果加入列表后，下一次请求才会带上这份当前内容；文件仅仅位于仓库中，还没有完成这条输入链。这里说的是 mini 的接线，其他系统可以采用不同的输入与状态接续方式。</p>
+<span class="heading-alias" id="agent让-model-和-environment-形成循环" aria-hidden="true"></span><span class="heading-alias" id="agent-不是-model-的别名" aria-hidden="true"></span><span class="heading-alias" id="agent-最核心的责任是继续闭环" aria-hidden="true"></span><span class="heading-alias" id="误区一model-就是-agent" aria-hidden="true"></span><span class="heading-alias" id="误区四一个-task-只调用一次-model" aria-hidden="true"></span><span class="heading-alias" id="agent连接请求与观察" aria-hidden="true"></span><h2 id="一个目标怎样变成行动与反馈">一个目标怎样变成行动与反馈</h2>
+<p>下图展示 Agent 收到任务后的处理过程，把 Harness 的输入和执行职责展开，让模型处于它支持的循环中。项目环境中的文件和服务是被操作、被观察的对象。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="一个目标怎样变成行动与反馈：可滚动示意图"><a href="../../../assets/diagrams/01-agent-components-1.svg"><img src="../../../assets/diagrams/01-agent-components-1.svg" alt="Agent 接收目标与约束，Harness 组织输入让模型提出请求，经执行控制操作项目环境，观察与反馈再进入输入；交付或停止仍须依据结果与结束规则判断，停止不等于任务完成。" width="743" height="1267" loading="lazy" style="width:743px;min-width:632px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>沿正常路径，模型提出请求，执行程序操作环境，取得的观察进入后续输入。读取也属于行动，它未必修改文件，却能改变下一步判断的依据。环境可能返回失败、重复信息或不完整结果，系统据此选择补充观察、调整方案或停止。</p>
+<p>图中的“交付或停止”是控制出口：预算耗尽可以导致停止，任务仍可能未完成；模型给出完成文字，也要经过系统的结束规则。任务正确与否由需求、实际产物和检查结果共同判断。这个图表达责任关系，不声称每个工具调用都经过同一套内部实现。</p>
+<h2 id="harness-的六组责任">Harness 的六组责任</h2>
+<p>为了阅读后面的工程实现，本课程把运行支撑分成六组责任。它们可以由同一小程序承担，也可以分散在多个组件中；这是一种教学分组，并非唯一标准。</p>
+<p>下图把六组责任并列放在同一个 Harness 范围内。框的并列表示责任分工，没有从第一组依次走到第六组的执行顺序；下表再用代码任务逐项解释。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Harness 的六组责任：可滚动示意图"><a href="../../../assets/diagrams/01-agent-components-2.svg"><img src="../../../assets/diagrams/01-agent-components-2.svg" alt="同一 Harness 范围中的六组并列教学职责：输入组织、模型与工具循环、状态与恢复、权限与隔离、任务推进与协作、观察与评价；卡片位置不表示执行顺序。" width="1104" height="557" loading="lazy" style="width:1104px;min-width:939px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · Harness 的六组责任"><table><caption>表 2 / Table 2 · Harness 的六组责任</caption><thead><tr><th scope="col">责任组</th><th scope="col">解决的问题</th><th scope="col">在代码任务中的表现</th></tr></thead><tbody><tr><td>输入组织（Input Composition）</td><td>本次模型需要哪些指令和材料？</td><td>选入当前要求、相关文件、工具说明和必要历史</td></tr>
+<tr><td>模型与工具循环（Model / Tool Loop）</td><td>请求怎样执行，结果怎样回到下一步？</td><td>调模型、解释动作、调用工具、处理返回并继续或退出</td></tr>
+<tr><td>状态与恢复（State / Recovery）</td><td>工作到了哪里，中断后能依据什么继续？</td><td>保存消息或运行事实，区分已知结果与未确认效果</td></tr>
+<tr><td>权限与隔离（Permissions / Isolation）</td><td>当前允许做什么，实际怎样限制访问？</td><td>检查修改范围、处理批准、限制文件和网络访问</td></tr>
+<tr><td>任务推进与协作（Task Progress / Collaboration）</td><td>多步或多次工作怎样组织？</td><td>管理待办、触发后续工作、委派子任务并采纳结果</td></tr>
+<tr><td>观察与评价（Observation / Evaluation）</td><td>看到了什么，怎样判断进展与完成？</td><td>取得测试/文件状态，核对任务条件、成本与未完成项</td></tr></tbody></table></div>
+<p>最小循环可以只有内存消息、命令执行和简单预算；持久恢复、子任务、定时运行与自动长期记忆按需求增加。具有某个接口名称，也还要看它实际完成了哪些责任。</p>
+<p>这些责任会连接起来。**Memory（长期记忆）**的保存与更新属于状态管理，检索和注入又影响输入组织；**Skill（可复用方法包）**为模型提供工作方法，附带脚本是否执行仍经过工具链。观察把结果带回来，评价再回答它是否满足目标。分组是为了找到责任和缺口，不是把系统切成互不相干的盒子。</p>
+<span class="heading-alias" id="为什么一次回答不够" aria-hidden="true"></span><span class="heading-alias" id="把它们接成一张最小全景图" aria-hidden="true"></span><span class="heading-alias" id="四个位置各自不负责什么" aria-hidden="true"></span><span class="heading-alias" id="常见误区" aria-hidden="true"></span><span class="heading-alias" id="误区六类越少系统能力就一定越弱" aria-hidden="true"></span><span class="heading-alias" id="本章小结" aria-hidden="true"></span><span class="heading-alias" id="在真实案例里认出四个角色" aria-hidden="true"></span><span class="heading-alias" id="从动作请求到执行观察" aria-hidden="true"></span><span class="heading-alias" id="三个不能合并的判断" aria-hidden="true"></span><h2 id="一个完整的-readme-修复例子">一个完整的 README 修复例子</h2>
+<p>任务输入是：</p>
+<blockquote><p>检查 <code>package.json</code> 和 <code>README.md</code>，把 README 中的测试命令改正确，运行测试，然后用中文总结结果。</p>
+</blockquote>
+<p>这里限定只改 README。下面的文件片段、动作顺序和结果是<strong>完整的教学示意</strong>：假设项目已经可以运行，函数及原有测试正常。后面的第04章将增加“函数本身也有错误”的条件，并展示真实执行结果；它与本章的简化示意是两种场景。</p>
+<h3 id="先读懂文件程序和命令">先读懂文件、程序和命令</h3>
+<p><strong>文件</strong>是在电脑上按名称保存的内容；项目用不同文件放说明、配置、程序和测试。<strong>程序</strong>是一组可执行的指令，只有被运行，才会读取输入并产生结果。README 里写着一条命令，只是在告诉人怎样操作，不会自动执行它。</p>
+<p>本例的程序用 JavaScript 语言编写，由 Node.js 运行。<strong>命令</strong>是告诉程序做什么的一行文本；<strong>命令行</strong>让人或执行工具提交这样的文本并取得输出。<code>npm test</code> 就是一条命令：启动 npm，让它查找项目配置里名为 test 的脚本。这里的脚本指预先写好、可以按名字启动的一段命令。本例所用文件与程序的关系如下：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 先读懂文件、程序和命令"><table><caption>表 3 / Table 3 · 先读懂文件、程序和命令</caption><thead><tr><th scope="col">对象</th><th scope="col">本例中是什么</th><th scope="col">谁使用它</th></tr></thead><tbody><tr><td><code>README.md</code></td><td>给人阅读的项目说明</td><td>人和 Agent 读取测试步骤</td></tr>
+<tr><td><code>package.json</code></td><td>保存项目设置的配置文件</td><td>npm 读取其中的脚本配置</td></tr>
+<tr><td>npm</td><td>按项目配置启动脚本等工作的命令行工具</td><td>执行工具用 <code>npm test</code> 请求它启动测试</td></tr>
+<tr><td>Node.js</td><td>运行 JavaScript 程序的工具</td><td>本例用它启动测试程序</td></tr>
+<tr><td>测试程序</td><td>比较实际结果与预期结果的程序</td><td>运行后返回检查结果，供 Agent 判断</td></tr></tbody></table></div>
+<p>下面是本例已知的配置。它用 <strong>JSON</strong> 这种数据格式记录“字段名与值”：冒号左边是字段名，右边是值；花括号包住一组字段。值既可以是引号中的文本，也可以是另一组字段，所以能一层套一层：</p>
+<pre><code class="language-json">{
+  &quot;scripts&quot;: {
+    &quot;test&quot;: &quot;node --test&quot;
+  }
+}</code></pre>
+<p>这份配置已经完整填写。最外层有一个 <code>scripts</code> 字段，它的值是内层对象；内层的 <code>test</code> 字段，值为文本 <code>node --test</code>。后文写 <code>scripts.test</code>，就是“先找 scripts，再找其中的 test”的路径简写。引号和花括号用于表示数据，JSON 文件本身不负责启动测试。</p>
+<p>当执行工具提交 <code>npm test</code>，npm 读取这份配置，找到 <code>scripts.test</code>，再运行其中的 <code>node --test</code>；<code>node</code> 启动 Node.js，<code>--test</code> 要求它进入测试运行模式。测试程序随后给出结果，执行工具把输出交回 Agent：</p>
+<pre><code class="language-text">工具执行 npm test
+  → npm 读取 package.json 中的 scripts.test
+  → 启动配置值 node --test
+  → Node.js 运行测试并给出输出
+  → Agent 根据实际输出判断测试状态</code></pre>
+<p>程序结束时还可以返回一个数字，称为<strong>退出码</strong>；0 通常表示命令正常退出，其他值要结合输出判断原因。它描述的是这次命令，不能单独证明测试确实发现了用例或整项任务已经完成。</p>
+<p>本章给定的教学观察是：项目原有测试正常，实际发现的用例均通过。若输出是错误，则应按错误内容继续判断；配置里写了测试入口，不能代替测试结果。这里不需要安装工具或运行命令，后面的表格已给出本例完整过程。第04章再展示固定响应驱动真实命令时的已有输出。</p>
+<h3 id="对照两份文件再修改和核查">对照两份文件，再修改和核查</h3>
+<p>待修的 README 是：</p>
+<pre><code class="language-markdown">## 测试
+
+测试命令：npm run check</code></pre>
+<p>这份配置没有名为 <code>check</code> 的脚本，所以 README 中的 <code>npm run check</code> 指向了不存在的入口；应改为能找到 test 脚本的 <code>npm test</code>。Agent 最初只收到任务，读取以后才取得这两份当前内容。以下过程给出请求、观察与决策之间的关系：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 对照两份文件，再修改和核查"><table><caption>表 4 / Table 4 · 对照两份文件，再修改和核查</caption><thead><tr><th scope="col">阶段</th><th scope="col">模型提出的行动或判断</th><th scope="col">Harness 与环境提供的结果</th><th scope="col">下一步依据</th></tr></thead><tbody><tr><td>读取（Read）</td><td>读取配置和 README</td><td>返回 scripts 与文档正文</td><td>配置提供 test，文档却指向不存在的 check</td></tr>
+<tr><td>修改（Edit）</td><td>只把 README 的命令改成 <code>npm test</code></td><td>执行修改，并取得修改结果</td><td>已有修改结果；测试状态仍待检查</td></tr>
+<tr><td>核查（Verification）</td><td>运行 <code>npm test</code>，查看 README 差异</td><td>本例给定观察为测试已发现并通过；diff 只有命令替换</td><td>文档入口和当前受测行为得到检查，修改范围符合任务</td></tr>
+<tr><td>交付（Delivery）</td><td>用中文说明改动与检查范围</td><td>系统依据结束规则收束本次工作</td><td>报告本次完成项，保留未覆盖范围</td></tr></tbody></table></div>
+<p>修复后的 README 是：</p>
+<pre><code class="language-markdown">## 测试
+
+测试命令：npm test</code></pre>
+<p>参考交付说明是：“README 的测试命令已改为 <code>npm test</code>。测试运行完成，已发现的用例均通过，差异仅包含这处文档修改；未修改源码或测试文件，其他环境和未覆盖行为尚未验证。”这段话是在上述给定观察下的示例答案，不是本章新增的真实运行报告。</p>
+<p><strong>如果测试返回失败，会怎样？</strong> 读取具体输出后，先区分入口无法运行与断言暴露源码问题。在本题 README-only 范围内，可以修正文档并报告源码测试失败；发现函数 bug 并不增加修改函数的许可。第04章将另给明确授权，完整演示函数修复。</p>
+<p><strong>如果修改命令返回正常，README 却没变，会怎样？</strong> 例如替换目标没有匹配，进程仍可能正常退出。回读文件或核对 diff 能发现缺口；这时应重新定位，不报告修复完成。命令退出、目标文件已改变、整项任务满足要求，是三个不同判断。</p>
+<p><strong>为什么需要循环？</strong> 下一动作取决于观察：没有脚本要找入口，断言失败要定位行为，修改没生效要核对目标。如果步骤和所有分支都已确定，普通脚本通常更直接；模型参与的价值在于结合新材料选择后续调查与行动，而非保证每轮都取得进展。</p>
+<span class="heading-alias" id="实现深化" aria-hidden="true"></span><span class="heading-alias" id="默认-tool-call-路径中的实际消息形状" aria-hidden="true"></span><span class="heading-alias" id="model-接口最少需要什么" aria-hidden="true"></span><span class="heading-alias" id="environment-的请求与原始结果示意" aria-hidden="true"></span><span class="heading-alias" id="工具名称与实际-shell-的区别" aria-hidden="true"></span><span class="heading-alias" id="命令行入口怎样组装三个部件" aria-hidden="true"></span><span class="heading-alias" id="runminipy-是组装入口" aria-hidden="true"></span><span class="heading-alias" id="hello_worldpy-可用于看组装运行前还要核对协议" aria-hidden="true"></span><span class="heading-alias" id="继续读源码" aria-hidden="true"></span><span class="heading-alias" id="消息接口与数据转换" aria-hidden="true"></span><span class="heading-alias" id="默认工具调用消息" aria-hidden="true"></span><span class="heading-alias" id="model-接口" aria-hidden="true"></span><span class="heading-alias" id="environment-的输入与结果" aria-hidden="true"></span><span class="heading-alias" id="工具名不决定实际-shell" aria-hidden="true"></span><span class="heading-alias" id="命令行如何组装部件" aria-hidden="true"></span><span class="heading-alias" id="cli-的默认构造" aria-hidden="true"></span><span class="heading-alias" id="hello_worldpy-的构造与协议条件" aria-hidden="true"></span><h2 id="把概念映射到-mini-swe-agent">把概念映射到 mini-SWE-agent</h2>
+<p>mini-SWE-agent 把这条循环做成容易观察的实现。通用概念中的 Agent 是整个工作系统；源码中名为 <code>DefaultAgent</code> 的类主要承担控制职责，它与模型、执行环境共同形成这个最小实例。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 把概念映射到 mini-SWE-agent"><table><caption>表 5 / Table 5 · 把概念映射到 mini-SWE-agent</caption><thead><tr><th scope="col">概念责任</th><th scope="col">mini 中的对应位置</th><th scope="col">作用</th></tr></thead><tbody><tr><td>任务输入（Task Input）</td><td><code>run(task)</code> 与初始消息模板</td><td>把目标和约束放入消息；没有单独的 Task 运行对象</td></tr>
+<tr><td>当前输入与控制（Context / Control）</td><td><code>DefaultAgent</code> 的 <code>messages</code>、配置和循环</td><td>保存本轮材料，协调调用、结果与退出</td></tr>
+<tr><td>模型调用（Model Query）</td><td><code>model.query(messages)</code></td><td>将明确准备的消息交给模型，取得文字或动作请求</td></tr>
+<tr><td>工具执行（Tool Execution）</td><td><code>env.execute(action)</code>；本机实现为 <code>LocalEnvironment</code></td><td>运行命令并返回输出、返回码或异常信息</td></tr>
+<tr><td>结果反馈（Result Feedback）</td><td>模型适配器整理观察，Agent 加入消息</td><td>后续请求才能依据这份结果继续判断</td></tr></tbody></table></div>
+<p><code>LocalEnvironment</code> 直接在本机启动命令，执行接口本身不提供完整安全隔离；默认交互入口还会在 <code>DefaultAgent</code> 的基础上增加人工确认等控制。消息可以保存为 trajectory（执行轨迹），但文件效果与轨迹快照之间仍可能存在记录缺口，后续章节会展开这些边界。</p>
+<p><a href="02-agent-loop.html">第02章</a>追踪循环与预算，<a href="03-actions-and-messages.html">第03章</a>解释动作参数、shell 执行和观察消息的转换，<a href="05-exit-and-trajectory.html">第05章</a>说明交互、退出与轨迹。它们解释上述责任怎样在代码中接通，接口声明本身还不负责校验所有运行数据。</p>
+<span class="heading-alias" id="基础完成条件与下一步" aria-hidden="true"></span><span class="heading-alias" id="基础自测区分输入判断与执行" aria-hidden="true"></span><span class="heading-alias" id="深化自测核对真实组装" aria-hidden="true"></span><span class="heading-alias" id="练习判断意图执行与接口" aria-hidden="true"></span><h2 id="意图执行与接口问答">意图、执行与接口问答</h2>
+<p><strong>问题 1。</strong> 一个模型给出了正确命令，是否已经构成完成任务的 Agent？</p>
+<p><strong>解释。</strong> 还需要系统接纳并执行行动、取得结果、继续判断和验收。Model 是决策部件，Harness 把它接入工作循环；任务完成则取决于实际结果。</p>
+<p><strong>问题 2。</strong> Harness 与项目里的 README、测试有什么关系？</p>
+<p><strong>解释。</strong> Harness 提供读取、输入组织、执行和控制；README 说明项目约定，测试提供可调用的检查。材料经实际读取和执行才能影响本次工作，规则文字与执行权限分别落实。</p>
+<p><strong>问题 3。</strong> 一个小 Agent 没有子任务和长期 Memory，还算 Agent 吗？</p>
+<p><strong>解释。</strong> 可以。只要它围绕目标，根据观察选择行动并利用反馈继续工作，就具备这里讨论的基本闭环。子任务、长期记忆和跨会话恢复解决进一步的需求。</p>
+<p><strong>问题 4。</strong> mini 的 <code>DefaultAgent</code> 类是否就是 Agent 的通用定义？</p>
+<p><strong>解释。</strong> 该类是一个实现中的控制部件。理解整个实例还要看 Model、Environment、配置和任务；其他系统可能把这些责任分给不同组件。</p>
+<span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
+<ul>
+<li><a href="02-agent-loop.html">第02章｜Agent Loop 的执行过程</a>：循环、状态与预算。</li>
+<li><a href="03-actions-and-messages.html">第03章｜动作、观察与消息协议</a>：请求与观察的表示。</li>
+<li><a href="04-code-repair.html">第04章｜代码修复与测试</a>：完整函数修复及已有执行结果。</li>
+</ul>
+<hr>
+<p><a href="02-agent-loop.html">下一章：第 02 章｜Agent Loop 的执行过程</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="../../../index.html"><span>课程目录</span><strong>查看完整阅读路线</strong></a><a href="02-agent-loop.html"><span>下一章 →</span><strong>第 02 章｜Agent Loop 的执行过程</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#agent%E6%A8%A1%E5%9E%8B%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%94%AF%E6%92%91">Agent、模型与运行支撑</a></li><li class="toc-level-2"><a href="#%E4%B8%80%E4%B8%AA%E7%9B%AE%E6%A0%87%E6%80%8E%E6%A0%B7%E5%8F%98%E6%88%90%E8%A1%8C%E5%8A%A8%E4%B8%8E%E5%8F%8D%E9%A6%88">一个目标怎样变成行动与反馈</a></li><li class="toc-level-2"><a href="#harness-%E7%9A%84%E5%85%AD%E7%BB%84%E8%B4%A3%E4%BB%BB">Harness 的六组责任</a></li><li class="toc-level-2"><a href="#%E4%B8%80%E4%B8%AA%E5%AE%8C%E6%95%B4%E7%9A%84-readme-%E4%BF%AE%E5%A4%8D%E4%BE%8B%E5%AD%90">一个完整的 README 修复例子</a></li><li class="toc-level-3"><a href="#%E5%85%88%E8%AF%BB%E6%87%82%E6%96%87%E4%BB%B6%E7%A8%8B%E5%BA%8F%E5%92%8C%E5%91%BD%E4%BB%A4">先读懂文件、程序和命令</a></li><li class="toc-level-3"><a href="#%E5%AF%B9%E7%85%A7%E4%B8%A4%E4%BB%BD%E6%96%87%E4%BB%B6%E5%86%8D%E4%BF%AE%E6%94%B9%E5%92%8C%E6%A0%B8%E6%9F%A5">对照两份文件，再修改和核查</a></li><li class="toc-level-2"><a href="#%E6%8A%8A%E6%A6%82%E5%BF%B5%E6%98%A0%E5%B0%84%E5%88%B0-mini-swe-agent">把概念映射到 mini-SWE-agent</a></li><li class="toc-level-2"><a href="#%E6%84%8F%E5%9B%BE%E6%89%A7%E8%A1%8C%E4%B8%8E%E6%8E%A5%E5%8F%A3%E9%97%AE%E7%AD%94">意图、执行与接口问答</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

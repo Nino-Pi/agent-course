@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>memory-write-read-lab.py · Agent 工程课程</title><link rel="stylesheet" href="../assets/site.css"><link rel="stylesheet" href="../assets/course-visual-style.css"><script defer src="../assets/site.js"></script></head><body data-course-root="../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../index.html">全部章节</a><a href="../notes/maka/learning/README.html">学习路线</a><a href="../notes/maka/learning/glossary.html">术语表</a><a class="back-link" data-course-back href="../index.html">← 返回</a></nav></header><main class="reading-layout attachment-layout"><div class="reading-column"><div class="page-kicker">教学附件</div><p class="attachment-note">用于查看课程引用的原始输入或脚本。此页面只展示文件内容；运行条件和已有结果以对应章节的说明为准。</p><article id="main-content"><h1>memory-write-read-lab.py</h1><pre><code>#!/usr/bin/env python3
+&quot;&quot;&quot;Offline teaching lab: persisted preferences, fresh readers, scoped projection.
+
+This is a small teaching design, not Maka code. No LLM is called and no answer
+language is generated. Sequential JSON writes provide no crash/transaction
+guarantee. All parent-controlled output lives below .workspace/learning-labs.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[5]
+LAB_ROOT = (ROOT / &#39;.workspace/learning-labs&#39;).resolve()
+REQUEST = &#39;解释 formatDuration 的测试结果。&#39;
+
+
+def checked_path(raw: str) -&gt; Path:
+    path = Path(raw).resolve()
+    if path == LAB_ROOT or LAB_ROOT not in path.parents:
+        raise ValueError(&#39;Output must be a child of .workspace/learning-labs&#39;)
+    return path
+
+
+def worker(action: str, store: Path, workspace: str, read_enabled: bool) -&gt; dict:
+    if action == &#39;save-global&#39;:
+        data = {&#39;global&#39;: &#39;zh&#39;, &#39;workspaces&#39;: {}}
+        store.write_text(json.dumps(data, ensure_ascii=False, indent=2) + &#39;\n&#39;)
+        return {&#39;pid&#39;: os.getpid(), &#39;action&#39;: action, &#39;saved&#39;: data}
+    if action == &#39;save-override&#39;:
+        data = json.loads(store.read_text())
+        data[&#39;workspaces&#39;][workspace] = &#39;en&#39;
+        store.write_text(json.dumps(data, ensure_ascii=False, indent=2) + &#39;\n&#39;)
+        return {&#39;pid&#39;: os.getpid(), &#39;action&#39;: action, &#39;saved&#39;: data}
+    if not read_enabled:
+        # No store read is needed for this branch. The file still exists.
+        return {&#39;pid&#39;: os.getpid(), &#39;action&#39;: action, &#39;workspace&#39;: workspace,
+                &#39;current_request&#39;: REQUEST, &#39;background&#39;: [], &#39;store_read&#39;: False}
+    data = json.loads(store.read_text())
+    # The deliberately broken variant ignores the workspace exception.
+    language = (data[&#39;global&#39;] if action == &#39;read-global-only&#39;
+                else data[&#39;workspaces&#39;].get(workspace, data[&#39;global&#39;]))
+    return {&#39;pid&#39;: os.getpid(), &#39;action&#39;: action, &#39;workspace&#39;: workspace,
+            &#39;current_request&#39;: REQUEST, &#39;store_read&#39;: True,
+            &#39;background&#39;: [{&#39;kind&#39;: &#39;explanation-language&#39;, &#39;value&#39;: language,
+                            &#39;source&#39;: &#39;saved-preference&#39;, &#39;authority&#39;: &#39;background&#39;}]}
+
+
+def child(action: str, store: Path, workspace: str = &#39;A&#39;, enabled: bool = True) -&gt; dict:
+    command = [sys.executable, str(Path(__file__).resolve()), &#39;--worker&#39;, action,
+               &#39;--store&#39;, str(store), &#39;--workspace&#39;, workspace]
+    if not enabled:
+        command.append(&#39;--read-disabled&#39;)
+    completed = subprocess.run(command, check=True, capture_output=True, text=True, timeout=15)
+    return json.loads(completed.stdout)
+
+
+def run(output: Path) -&gt; dict:
+    # Refuse old runs so generated evidence cannot silently replace earlier data.
+    output.mkdir(parents=True, exist_ok=False)
+    store = output / &#39;preferences.json&#39;
+    saved = child(&#39;save-global&#39;, store)
+    first = child(&#39;read&#39;, store)
+    updated = child(&#39;save-override&#39;, store)
+    project_a = child(&#39;read&#39;, store, &#39;A&#39;)
+    project_b = child(&#39;read&#39;, store, &#39;B&#39;)
+    before_disabled = hashlib.sha256(store.read_bytes()).hexdigest()
+    disabled = child(&#39;read&#39;, store, &#39;A&#39;, enabled=False)
+    after_disabled = hashlib.sha256(store.read_bytes()).hexdigest()
+    broken = child(&#39;read-global-only&#39;, store, &#39;A&#39;)
+
+    checks = {
+        &#39;fresh_reader_recovers_global_preference&#39;: first[&#39;background&#39;][0][&#39;value&#39;] == &#39;zh&#39;,
+        &#39;workspace_a_selects_override&#39;: project_a[&#39;background&#39;][0][&#39;value&#39;] == &#39;en&#39;,
+        &#39;workspace_b_keeps_global_preference&#39;: project_b[&#39;background&#39;][0][&#39;value&#39;] == &#39;zh&#39;,
+        &#39;disabled_read_has_no_background&#39;: disabled[&#39;background&#39;] == [] and not disabled[&#39;store_read&#39;],
+        &#39;disabled_read_preserves_store&#39;: before_disabled == after_disabled,
+        &#39;new_request_does_not_repeat_preference&#39;: all(
+            row[&#39;current_request&#39;] == REQUEST and &#39;中文&#39; not in row[&#39;current_request&#39;]
+            and &#39;英文&#39; not in row[&#39;current_request&#39;]
+            for row in [first, project_a, project_b, disabled, broken]
+        ),
+        &#39;negative_control_exposes_wrong_scope&#39;: broken[&#39;background&#39;][0][&#39;value&#39;] == &#39;zh&#39;
+            and broken[&#39;background&#39;] != project_a[&#39;background&#39;],
+    }
+    report = {
+        &#39;result&#39;: &#39;PASS&#39; if all(checks.values()) else &#39;FAIL&#39;,
+        &#39;design&#39;: &#39;teaching-only; sequential JSON writes; each action in a fresh subprocess&#39;,
+        &#39;model_called&#39;: False,
+        &#39;maka_called&#39;: False,
+        &#39;proves&#39;: &#39;cross-process file retention and deterministic scoped background selection&#39;,
+        &#39;does_not_prove&#39;: [&#39;model compliance&#39;, &#39;Maka wiring&#39;, &#39;crash durability&#39;, &#39;concurrent writes&#39;],
+        &#39;checks&#39;: checks,
+        &#39;trace&#39;: [saved, first, updated, project_a, project_b, disabled, broken],
+    }
+    (output / &#39;verification.json&#39;).write_text(json.dumps(report, ensure_ascii=False, indent=2) + &#39;\n&#39;)
+    if not all(checks.values()):
+        raise AssertionError(json.dumps(checks, ensure_ascii=False))
+    return report
+
+
+def main() -&gt; None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(&#39;--output&#39;)
+    parser.add_argument(&#39;--worker&#39;, choices=[&#39;save-global&#39;, &#39;save-override&#39;, &#39;read&#39;, &#39;read-global-only&#39;])
+    parser.add_argument(&#39;--store&#39;)
+    parser.add_argument(&#39;--workspace&#39;, default=&#39;A&#39;)
+    parser.add_argument(&#39;--read-disabled&#39;, action=&#39;store_true&#39;)
+    args = parser.parse_args()
+    if args.worker:
+        if not args.store:
+            parser.error(&#39;--worker requires --store&#39;)
+        result = worker(args.worker, checked_path(args.store), args.workspace, not args.read_disabled)
+    else:
+        if not args.output:
+            parser.error(&#39;--output is required; choose a new directory for every run&#39;)
+        result = run(checked_path(args.output))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+if __name__ == &#39;__main__&#39;:
+    main()
+</code></pre></article></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../index.html">返回课程目录</a><a href="../extended-reading.html">扩展资料说明</a></footer></body></html>

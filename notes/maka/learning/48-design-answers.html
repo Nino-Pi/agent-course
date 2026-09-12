@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 48 章｜设计问题与参考方案 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 48 / 62</div><article id="main-content"><span class="heading-alias" id="i00把学过的机制变成自己的设计回答" aria-hidden="true"></span><span class="heading-alias" id="i00设计回答与白板表达" aria-hidden="true"></span><span class="heading-alias" id="第-45-章设计回答与白板表达" aria-hidden="true"></span><span class="heading-alias" id="第-45-章设计问题与参考方案" aria-hidden="true"></span><span class="heading-alias" id="第-47-章设计问题与参考方案" aria-hidden="true"></span><h1 id="第-48-章设计问题与参考方案">第 48 章｜设计问题与参考方案</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：一份代码修复 Agent 方案怎样把需求、组件、失败处理和验收条件讲成完整设计？</p>
+<p><strong>关键概念</strong>：任务合同：成功条件与允许范围；组件职责：谁组装输入、决定或执行；数据流：观察怎样进入下一请求；状态机：工作能否继续或结束；验收：以测试、差异和用户要求检查结果。</p>
+<p><strong>关系主线</strong>：从固定需求选最小组件，沿一次修复连接输入、动作和观察，再加入失败与并发条件解释取舍；模型的完成声明不能替代实际验收。</p>
+</blockquote>
+<span class="heading-alias" id="1-面试原题与真正要交付的东西" aria-hidden="true"></span><h2 id="1-问题与已确定的条件">1. 问题与已确定的条件</h2>
+<blockquote><p>一个 Agent 怎样读取代码、修复问题并验证结果？</p>
+</blockquote>
+<p>采用单用户、本地仓库、一次一个顶层任务的条件。用户允许修改目标函数与 README，要求保留已有改动，不允许修改测试来掩盖错误。成功意味着问题的复现消失、相关测试通过、diff 符合授权范围；模型说“已修复”不是独立完成证据。</p>
+<p>这些条件决定最小组件。任务较短时用顺序循环和有界输出；需要跨进程恢复时才增加对应的持久执行合同。多 Agent、向量索引或分布式调度都不是这个起点的必需条件。</p>
+<span class="heading-alias" id="2-两分钟主答的组织方法" aria-hidden="true"></span><h2 id="2-完整参考方案">2. 完整参考方案</h2>
+<p>任务入口固定用户目标与授权范围，运行控制器保存工作身份和预算。Context 组装器选择当前规则、任务、已获得的文件与测试结果；模型根据这些输入提出动作。工具执行器校验参数和当前权限，在受控环境中执行，并把结果交回下一次模型输入。</p>
+<p>对 <code>125 → 2:25</code> 的错误，循环先读取配置、实现与断言，确定测试入口；执行测试获得实际差异，再根据一般的分钟/余秒契约修改。编辑成功之后仍需复测并检查 diff。模型负责解释结果，程序负责执行、记录和停止条件。</p>
+<p>若任务变长，Context 压缩改变后续输入表示，原始事实继续保留。若要未来沿用语言偏好，则需要独立 Memory 写入、读取和注入。若要求崩溃恢复，可能产生效果的操作在执行前后保存身份与结果；结果未知时先向资源 owner 核对，不能直接重做。</p>
+<span class="heading-alias" id="3-五分钟白板按问题选择图" aria-hidden="true"></span><h2 id="3-从问题到设计对象">3. 从问题到设计对象</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 3. 从问题到设计对象"><table><caption>表 1 / Table 1 · 3. 从问题到设计对象</caption><thead><tr><th scope="col">设计问题</th><th scope="col">对应表示</th><th scope="col">本例的具体对象</th></tr></thead><tbody><tr><td>谁负责什么</td><td>组件图（Component Diagram）</td><td>入口、运行控制、输入组装、模型、工具、结果记录</td></tr>
+<tr><td>信息怎样进入下一请求</td><td>数据流（Data Flow）</td><td>文件与测试结果 → 完整观察单元 → Context → 模型</td></tr>
+<tr><td>哪一步可能改变现实</td><td>时序图（Sequence Diagram）</td><td>工具接纳、文件写入、结果保存三个位置</td></tr>
+<tr><td>什么条件能继续或结束</td><td>状态机（State Machine）</td><td>等待模型、等待工具、已知失败、效果未知、终态</td></tr>
+<tr><td>哪些工作可以并行</td><td>依赖图（Dependency Graph）</td><td>独立读取可并行，编辑依赖观察，复测依赖修改</td></tr></tbody></table></div>
+<p>下面展示设计推导顺序，不是某个产品的 Runtime：</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从问题到设计对象：可滚动示意图"><a href="../../../assets/diagrams/48-design-answers-1.svg"><img src="../../../assets/diagrams/48-design-answers-1.svg" alt="设计从需求和成功条件出发，确定边界与最小组件，走正常数据流，标明状态与决定者，再加入失败或并发条件，解释取舍与验证。" width="720" height="1176" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>箭头需要表达具体操作。例如“工具结果 → Context”包含关联调用身份、保存完整结果、选择有界表示；它不是把任意日志直接拼进下一请求。数据库、模型输入和外部文件也属于不同状态，不能用一个双向箭头隐藏读写和权限协议。</p>
+<span class="heading-alias" id="4-从图进入接口" aria-hidden="true"></span><h2 id="4-一份已填写的设计记录">4. 一份已填写的设计记录</h2>
+<p>以下是教学方案的配置记录，用来说明字段各自约束什么；不是 Agent SDK 或可直接启动的配置。</p>
+<pre><code class="language-python">design = {
+    &quot;scope&quot;: {&quot;user_count&quot;: 1, &quot;workspace&quot;: &quot;local&quot;, &quot;top_level_tasks&quot;: 1},
+    &quot;allowed_writes&quot;: [&quot;README.md&quot;, &quot;src/duration.js&quot;],
+    &quot;acceptance&quot;: [&quot;一般分钟/余秒契约成立&quot;, &quot;相关测试通过&quot;, &quot;保留用户改动&quot;],
+    &quot;owners&quot;: {
+        &quot;task_and_budget&quot;: &quot;run_controller&quot;,
+        &quot;file_commit&quot;: &quot;workspace_executor&quot;,
+        &quot;accepted_results&quot;: &quot;result_store&quot;
+    },
+    &quot;normal_path&quot;: [&quot;读取&quot;, &quot;复现&quot;, &quot;诊断&quot;, &quot;条件编辑&quot;, &quot;复测&quot;, &quot;检查差异&quot;],
+    &quot;failure_policy&quot;: {
+        &quot;stale_file&quot;: &quot;重新读取，保留并发修改，再决定补丁&quot;,
+        &quot;effect_unknown&quot;: &quot;查询或对账，不直接重做&quot;,
+        &quot;budget_exhausted&quot;: &quot;停止新调用，结算已开始操作并报告未完成范围&quot;
+    }
+}</code></pre>
+<p><code>allowed_writes</code> 表达政策，真实执行器仍需落实路径和资源边界。<code>file_commit</code> 的条件提交要由资源 owner 实现，不能只靠配置字段获得。<code>accepted_results</code> 保存运行程序接纳的结果；它不能替代外部文件或服务的状态。</p>
+<span class="heading-alias" id="5-正常走读与约束变化" aria-hidden="true"></span><h2 id="5-正常结果与条件变化">5. 正常结果与条件变化</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 5. 正常结果与条件变化"><table><caption>表 2 / Table 2 · 5. 正常结果与条件变化</caption><thead><tr><th scope="col">条件</th><th scope="col">状态变化（State）</th><th scope="col">参考处理</th></tr></thead><tbody><tr><td>正常修复</td><td>实际失败 → 接受修改 → 测试通过且 diff 合规</td><td>报告修改、验证与覆盖范围</td></tr>
+<tr><td>用户在 Read 后编辑文件</td><td>当前内容已不同于模型的观察版本</td><td>拒绝陈旧条件提交，重读并保留用户内容</td></tr>
+<tr><td>测试连接中断</td><td>执行可能继续，退出状态尚不清楚</td><td>查询原进程/任务，不用断线推断失败或从未执行</td></tr>
+<tr><td>已写文件但结果未保存</td><td>文件效果与本地记录不一致</td><td>核对当前状态，保留无法归因的部分，不自动重写</td></tr>
+<tr><td>用户要求以后中文</td><td>出现跨任务信息需求</td><td>独立保存偏好；后续读取和实际遵循分别判断</td></tr></tbody></table></div>
+<p>例如文件已经变成期望内容而操作回执丢失，只能确认“当前内容符合目标”；没有可靠回执时不能断言一定由原调用完成。这不妨碍继续有权限的验证，但阻止无依据的重复写入。</p>
+<span class="heading-alias" id="6-三种常见追问" aria-hidden="true"></span><h2 id="6-常见设计问题与完整回答">6. 常见设计问题与完整回答</h2>
+<p><strong>为什么不直接用多 Agent？</strong> 两个短文件的读取可以通过并行工具完成。子 Agent 适合独立多步探索或需要隔离的大量上下文；新增身份、输入、等待和交付都有成本。只有可独立验收的子任务，才提供有意义的委派边界。</p>
+<p><strong>必须用事件溯源吗？</strong> 不必。恢复、审计与 UI 重建各需要某些事实，可以由状态表、追加记录或组合满足。选择依据是哪些状态要原子更新、哪些过程要重放、哪些记录要跨重启保留，而不是先选择架构名称。</p>
+<p><strong>类型定义了 <code>safe=true</code> 就安全了吗？</strong> 类型约束数据形状，真实效果还要经过可信授权与执行限制。版本条件必须在提交时成立；取消也必须由执行入口处理。字段存在不证明这些行为已接线。</p>
+<p><strong>方案和运行结果是什么关系？</strong> 本章给出可实现的责任与合同，尚未报告运行结果。实际测试只能支持所覆盖的输入、环境和故障窗口；一次正常修复不能证明所有工具都能安全恢复。产品比较也分别保留源码事实、公开设计与自拟方案的边界。</p>
+<span class="heading-alias" id="7-评分与独立练习" aria-hidden="true"></span><span class="heading-alias" id="8-下一步练习" aria-hidden="true"></span><h2 id="7-验收条件及预期结果">7. 验收条件及预期结果</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 7. 验收条件及预期结果"><table><caption>表 3 / Table 3 · 7. 验收条件及预期结果</caption><thead><tr><th scope="col">验收输入（Acceptance Input）</th><th scope="col">本方案应产生的结果</th><th scope="col">不能接受的结果</th></tr></thead><tbody><tr><td>不存在的测试脚本</td><td>入口失败与具体诊断；没有运行断言</td><td>报告函数回归已失败或已通过</td></tr>
+<tr><td>陈旧文件版本</td><td>本次不写入，要求新观察</td><td>静默覆盖用户修改</td></tr>
+<tr><td>超出允许路径的 Edit</td><td>效果前拒绝</td><td>因模型自称安全而执行</td></tr>
+<tr><td>写入后回执丢失</td><td>保存未知并查询真实状态</td><td>把没有回执等同于没有效果</td></tr>
+<tr><td>测试通过但有无关 diff</td><td>不满足完整任务合同</td><td>仅凭 exit 0 宣布全部完成</td></tr></tbody></table></div>
+<p>相关章节：<a href="49-agent-architecture.html">第49章 代码修复架构</a>、<a href="26-evaluation-and-design.html">第26章 评价与设计</a>、<a href="62-complete-design-cases.html">第62章 完整设计案例</a>。</p>
+<hr>
+<p><a href="47-integrated-design.html">上一章：第 47 章｜跨模块综合设计</a> · <a href="49-agent-architecture.html">下一章：第 49 章｜设计代码修复 Agent</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="47-integrated-design.html"><span>← 上一章</span><strong>第 47 章｜跨模块综合设计</strong></a><a href="49-agent-architecture.html"><span>下一章 →</span><strong>第 49 章｜设计代码修复 Agent</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E9%97%AE%E9%A2%98%E4%B8%8E%E5%B7%B2%E7%A1%AE%E5%AE%9A%E7%9A%84%E6%9D%A1%E4%BB%B6">1. 问题与已确定的条件</a></li><li class="toc-level-2"><a href="#2-%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 完整参考方案</a></li><li class="toc-level-2"><a href="#3-%E4%BB%8E%E9%97%AE%E9%A2%98%E5%88%B0%E8%AE%BE%E8%AE%A1%E5%AF%B9%E8%B1%A1">3. 从问题到设计对象</a></li><li class="toc-level-2"><a href="#4-%E4%B8%80%E4%BB%BD%E5%B7%B2%E5%A1%AB%E5%86%99%E7%9A%84%E8%AE%BE%E8%AE%A1%E8%AE%B0%E5%BD%95">4. 一份已填写的设计记录</a></li><li class="toc-level-2"><a href="#5-%E6%AD%A3%E5%B8%B8%E7%BB%93%E6%9E%9C%E4%B8%8E%E6%9D%A1%E4%BB%B6%E5%8F%98%E5%8C%96">5. 正常结果与条件变化</a></li><li class="toc-level-2"><a href="#6-%E5%B8%B8%E8%A7%81%E8%AE%BE%E8%AE%A1%E9%97%AE%E9%A2%98%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%9B%9E%E7%AD%94">6. 常见设计问题与完整回答</a></li><li class="toc-level-2"><a href="#7-%E9%AA%8C%E6%94%B6%E6%9D%A1%E4%BB%B6%E5%8F%8A%E9%A2%84%E6%9C%9F%E7%BB%93%E6%9E%9C">7. 验收条件及预期结果</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

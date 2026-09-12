@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 55 章｜设计记忆的写入与读取 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 55 / 62</div><article id="main-content"><span class="heading-alias" id="i07memory-怎样写更新找回并真正用上" aria-hidden="true"></span><span class="heading-alias" id="i07设计记忆的写入与读取" aria-hidden="true"></span><span class="heading-alias" id="第-52-章设计记忆的写入与读取" aria-hidden="true"></span><span class="heading-alias" id="第-54-章设计记忆的写入与读取" aria-hidden="true"></span><h1 id="第-55-章设计记忆的写入与读取">第 55 章｜设计记忆的写入与读取</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：跨会话偏好和经验怎样保存、更新与撤回，才能在适用的新任务中正确使用？</p>
+<p><strong>关键概念</strong>：来源：信息由谁声明或观察；Scope（范围）：条目适用的用户或项目；有效性：规则是否过时或撤回；候选检索：找出待筛选条目；注入：把选中内容加入请求；采用：模型实际据此回答或行动。</p>
+<p><strong>关系主线</strong>：写链决定条目怎样提交和更新，读链依次检索、筛选、注入并观察使用；查不到、读取失败和未获准读取不同，撤回也不能改写已经发出的请求。</p>
+</blockquote>
+<p>前置：<a href="20-memory.html">第20章</a>、<a href="53-context-composition.html">第53章</a>。本题完整读写链是教学方案。Maka Local Memory 与 Atomic LTM 是不同系统；Atomic 的查询能力不等于默认 Agent recall 已接通。</p>
+<h2 id="1-原题与约束">1. 原题与约束</h2>
+<blockquote><p>用户希望 Agent 跨会话记住偏好和项目经验。你怎么设计 Memory？信息过时、冲突或越来越多时怎么办？</p>
+</blockquote>
+<p>用户明确偏好、可观测项目事实与失败经验具有不同的可信来源和更新方式。scope、查看与撤回权限、有效时间共同决定写读合同。</p>
+<p>最小场景从显式语言偏好开始：T7 用户说全局使用中文；T20 指定工作区 A 使用英文，其他仍中文；T22 撤回 A 的例外。A、B 表示同一用户的两个不同工作区，B 没有单独的例外规则。任务要求新会话能正确读取，而且不把未保存或读取失败说成“没有偏好”。</p>
+<span class="heading-alias" id="2-两分钟主答" aria-hidden="true"></span><h2 id="2-参考方案">2. 参考方案</h2>
+<blockquote><p>我先把当前会话历史和长期 Memory 分开。小规模偏好可以用透明的文件或条目保存，关键是写入、范围、读取和注入闭环。写入时保留原话来源、适用范围和有效状态；更新前找相关旧信息，区分新增例外、替代旧规则和冲突。读取时根据当前用户、工作区、权限和任务选择候选，过滤已撤回或不适用项，再按预算进入本次请求。检索排序不能代替范围判断，向量数据库也不是第一版必需。信息变多以后再根据实际漏检问题选择关键词、语义或混合检索。最后分别验证存得对、找得到、注入正确，以及模型实际用了；经验记忆还需要验证适用条件，防止把一次失败的猜测传播到所有任务。</p>
+</blockquote>
+<span class="heading-alias" id="3-白板图写链与读链分开" aria-hidden="true"></span><h2 id="3-memory-的写链与读链">3. Memory 的写链与读链</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Memory 的写链与读链：可滚动示意图"><a href="../../../assets/diagrams/55-memory-1.svg"><img src="../../../assets/diagrams/55-memory-1.svg" alt="写链从允许的信息提取候选、核对来源与旧条目，决定新增、更新、撤回或保留冲突并提交；新任务读链再检索、权限与有效性筛选、预算选择和带来源注入，最后观察实际行为。" width="720" height="1908" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>Store 两侧分别是写入和读取；“检索到了”和“用对了”之间还有筛选、注入与模型行为。</p>
+<p>不变量：未获准的信息不能跨 scope 读取；撤回后的新读取不再将该内容纳入有效集合；写入失败不能确认已保存；来自模型的推测不能默认为用户声明。撤回不能追溯修改已捕获的输入或已经发出的请求，后者需要另行取消或重建。</p>
+<h2 id="4-最小条目与读取契约">4. 最小条目与读取契约</h2>
+<p>下面是教学数据结构和接口，不是 Maka Atomic Item schema：</p>
+<pre><code class="language-python">MemoryItem = {
+    &quot;id&quot;: &quot;M2&quot;,
+    &quot;kind&quot;: &quot;explicit_preference&quot;,
+    &quot;key&quot;: &quot;explanation_language&quot;,
+    &quot;value&quot;: &quot;en&quot;,
+    &quot;scope&quot;: {&quot;user&quot;: &quot;U&quot;, &quot;workspace&quot;: &quot;A&quot;},
+    &quot;source&quot;: {&quot;turn&quot;: &quot;T20&quot;, &quot;text&quot;: &quot;A 用英文，其他项目仍中文&quot;},
+    &quot;status&quot;: &quot;active&quot;,
+    &quot;version&quot;: 1
+}
+
+def retrieve(task, scope, permissions, budget):
+    candidates = store.search(task, allowed_scope=scope)
+    allowed = filter_authorized_active(candidates, permissions)
+    resolved = resolve_applicability_and_conflicts(allowed, scope)
+    return select_with_provenance(resolved, budget)</code></pre>
+<p><code>version</code> 在需要防并发覆盖时参与条件更新。若系统采用串行单写者文件，也可以使用更简单的确定规则。</p>
+<p>这段骨架中的 Store 异常向外抛出，由接口层归类为 <code>unavailable</code>，不能捕获后改成空列表。冲突处理若无法决定适用规则，应保留冲突状态；有适用候选却因预算无法注入，也应报告预算缺口。只有确实没有适用项时才是 <code>no_match</code>，正常选出条目时是 <code>found</code>。Store 不可用是基础设施失败；把它转成空列表会让模型误判用户从未提供信息。写入请求重发需要可辨认的操作或 receipt；提交成功与响应丢失也要有明确查询方式。</p>
+<h2 id="5-正常走读新增例外再撤回">5. 正常走读：新增例外，再撤回</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 5. 正常走读：新增例外，再撤回"><table><caption>表 1 / Table 1 · 5. 正常走读：新增例外，再撤回</caption><thead><tr><th scope="col">时点</th><th scope="col">需要理解的用户语义</th><th scope="col">写后状态（State）</th><th scope="col">新任务在 A / B 的背景</th></tr></thead><tbody><tr><td>T7</td><td>全局中文</td><td>M1：global=zh</td><td>zh / zh</td></tr>
+<tr><td>T20</td><td>A 英文，其他不变</td><td>保留 M1；新增 M2：A=en</td><td>en / zh</td></tr>
+<tr><td>T22</td><td>A 跟随全局</td><td>M2 变为 inactive；保留撤回来源</td><td>zh / zh</td></tr>
+<tr><td>T23</td><td>全局改日文</td><td>M1 的有效规则更新为 ja</td><td>ja / ja</td></tr></tbody></table></div>
+<p>本题约定明确工作区例外优先于全局规则；它是教学读取政策，不代表所有系统都有相同优先级。</p>
+<p>T22 若把 M2 改为“A 固定中文”，当时的回答也可能正确，却没表达“跟随全局”。到 T23 才暴露错误。这是为什么 Memory 更新要用多步状态轨迹评估，不能只检查一次最终回答。</p>
+<h2 id="6-失败走读与恢复边界">6. 失败走读与恢复边界</h2>
+<p><strong>提取错误。</strong> 把“同事喜欢英文”记成用户偏好。需要原文主体与来源检查；无法确定时保留为候选或不写入，不应依靠检索排名修正错误写入。</p>
+<p><strong>检索遗漏。</strong> 只找到 M1，没有找到 A 的例外 M2。模型忠实使用 M1 仍然会答错。记录候选和过滤结果，才能把召回失败与模型不遵循分开。</p>
+<p><strong>并发覆盖。</strong> 两个更新器都基于版本 1 写入，后者覆盖前者。若场景允许多写者，使用条件版本提交或串行 owner；版本冲突应回读重判，不能把旧提取决定无条件再提交。</p>
+<p><strong>模型没用。</strong> 输入已注入 en，最终仍输出中文。写链和读链可能都正确；错误发生在行为阶段，应看实际请求与输出，不能把保存成功作为证据替代。</p>
+<h2 id="7-递进追问">7. 递进追问</h2>
+<p><strong>为什么不用聊天历史充当 Memory？</strong></p>
+<p>历史保留发生过什么，Memory 为未来任务选择适用信息。完整历史有大量无关内容，也包含已过时规则。两者可以互相引用，但需要不同的读取与生命周期策略。</p>
+<p><strong>必须使用向量数据库吗？</strong></p>
+<p>几条语言偏好按 key 和 scope 读取就足够。信息多且用户措辞变化导致漏检时，比较语义/混合检索；引入向量索引之后仍要处理权限、时间、冲突和有效状态。相关性不能替代有效性。</p>
+<p><strong>Memory 很大，怎样“压缩”？</strong></p>
+<p>先区分去重、语义合并、过期归档和本次请求的有界选择。整理长期信息必须保留例外、来源和可撤回性；只把全部条目总结成一段话可能丢掉更新依据。请求预算问题则先通过选择/回读处理，旧任务上下文压缩见 <a href="54-context-compaction.html">第54章</a>。</p>
+<p><strong>可以自动从工具失败里学经验吗？</strong></p>
+<p>可设计另一条经验 admission：记录环境、实际失败、行动、验证和适用条件，把归纳当可撤回建议。Maka Atomic 的既有 user-authored evidence 边界不能直接推广到所有工具结果；扩展属于新设计，不能写成已经接线。</p>
+<p><strong>用户删除 Memory 后，旧备份和摘要怎么办？</strong></p>
+<p>先确认删除承诺涉及哪些派生数据。逻辑撤回、搜索过滤、缓存失效、备份保留和物理删除是不同范围。若产品承诺删除，必须追踪相关副本；只从 UI 隐藏一个条目不足以证明全部删除。</p>
+<h2 id="8-方案取舍与评估">8. 方案取舍与评估</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 8. 方案取舍与评估"><table><caption>表 2 / Table 2 · 8. 方案取舍与评估</caption><thead><tr><th scope="col">方案</th><th scope="col">起点与收益</th><th scope="col">风险 / 成本</th></tr></thead><tbody><tr><td>显式文件或条目与作用域读取（Scope）</td><td>少量可审阅偏好，简单可解释</td><td>人工维护、固定背景增长</td></tr>
+<tr><td>主动搜索与读取（Search · Read）</td><td>大库少量相关信息</td><td>不发起查询、漏读、额外回合</td></tr>
+<tr><td>候选与旧条目联合更新（Memory Update）</td><td>经常新增例外或纠正规则</td><td>更新判断错误、并发维护</td></tr>
+<tr><td>经验提取与整理（Experience Extraction）</td><td>有可验证重复问题</td><td>错误归因、过度泛化、撤回成本</td></tr></tbody></table></div>
+<p>比较其他记忆方案时，仍固定同一组新增、例外与撤回操作，不用论文排名代替本场景验证。</p>
+<p>最小验证集与中间证据：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 8. 方案取舍与评估"><table><caption>表 3 / Table 3 · 8. 方案取舍与评估</caption><thead><tr><th scope="col">要检查什么</th><th scope="col">必须记录</th><th scope="col">成功条件</th></tr></thead><tbody><tr><td>新会话使用旧偏好</td><td>Store 条目、本次注入、实际回答</td><td>没有再次提示仍按适用偏好输出</td></tr>
+<tr><td>A/B 例外</td><td>候选与作用域筛选（Scope）</td><td>A=en，B=zh</td></tr>
+<tr><td>撤回后改全局</td><td>更新决定、有效状态</td><td>T23 A/B 都跟随 ja</td></tr>
+<tr><td>未声明信息</td><td>来源与拒绝写入理由</td><td>不制造用户偏好</td></tr>
+<tr><td>Store 失败</td><td>错误类型与反馈</td><td>不假报已保存或不存在</td></tr></tbody></table></div>
+<span class="heading-alias" id="9-自测与回读" aria-hidden="true"></span><h2 id="9-固定注入与主动检索的完整对照">9. 固定注入与主动检索的完整对照</h2>
+<p>沿用 T20 后的状态：M1 是 global=zh，M2 是 A=en，新会话的当前工作区为 A，用户没有重述语言偏好。</p>
+<p><strong>固定注入：</strong> Host 在新请求组装时读取有效条目，先按用户与工作区过滤，再按“明确工作区例外优先”选择 M2，将带来源的 en 背景加入请求。若错把 B 的条目注入，错误在 scope 选择；若正确注入 en 却输出中文，错误在行为阶段。固定注入减少了模型主动搜索的必要，但增加常驻输入。</p>
+<p><strong>主动检索：</strong> 初始请求只提供 Memory 查找入口，模型判断本任务需要历史偏好后查询 <code>explanation_language</code>，读取 M1/M2，按同一适用性政策选 M2，再形成回答。模型不发查询会导致漏用；返回候选仍需筛选，不能将 top-1 排名当优先级。</p>
+<p>到 T22，M2 已撤回，两个方案的新读取都应排除它并采用 M1。到 T23，global 改为 ja，两者都应得到 ja。若读取服务不可用，则返回 unavailable；不能把基础设施错误解释为用户没有偏好。已经捕获 en 的旧请求不会被 Store 修改追溯改写。</p>
+<p>相关机制：<a href="20-memory.html">第20章 Memory</a>、<a href="21-memory-lifecycle.html">第21章 写入与读取案例</a>。</p>
+<hr>
+<p><a href="54-context-compaction.html">上一章：第 54 章｜设计上下文压缩</a> · <a href="56-tool-scheduling.html">下一章：第 56 章｜设计工具发现与调度</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="54-context-compaction.html"><span>← 上一章</span><strong>第 54 章｜设计上下文压缩</strong></a><a href="56-tool-scheduling.html"><span>下一章 →</span><strong>第 56 章｜设计工具发现与调度</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E4%B8%8E%E7%BA%A6%E6%9D%9F">1. 原题与约束</a></li><li class="toc-level-2"><a href="#2-%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 参考方案</a></li><li class="toc-level-2"><a href="#3-memory-%E7%9A%84%E5%86%99%E9%93%BE%E4%B8%8E%E8%AF%BB%E9%93%BE">3. Memory 的写链与读链</a></li><li class="toc-level-2"><a href="#4-%E6%9C%80%E5%B0%8F%E6%9D%A1%E7%9B%AE%E4%B8%8E%E8%AF%BB%E5%8F%96%E5%A5%91%E7%BA%A6">4. 最小条目与读取契约</a></li><li class="toc-level-2"><a href="#5-%E6%AD%A3%E5%B8%B8%E8%B5%B0%E8%AF%BB%E6%96%B0%E5%A2%9E%E4%BE%8B%E5%A4%96%E5%86%8D%E6%92%A4%E5%9B%9E">5. 正常走读：新增例外，再撤回</a></li><li class="toc-level-2"><a href="#6-%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB%E4%B8%8E%E6%81%A2%E5%A4%8D%E8%BE%B9%E7%95%8C">6. 失败走读与恢复边界</a></li><li class="toc-level-2"><a href="#7-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE">7. 递进追问</a></li><li class="toc-level-2"><a href="#8-%E6%96%B9%E6%A1%88%E5%8F%96%E8%88%8D%E4%B8%8E%E8%AF%84%E4%BC%B0">8. 方案取舍与评估</a></li><li class="toc-level-2"><a href="#9-%E5%9B%BA%E5%AE%9A%E6%B3%A8%E5%85%A5%E4%B8%8E%E4%B8%BB%E5%8A%A8%E6%A3%80%E7%B4%A2%E7%9A%84%E5%AE%8C%E6%95%B4%E5%AF%B9%E7%85%A7">9. 固定注入与主动检索的完整对照</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

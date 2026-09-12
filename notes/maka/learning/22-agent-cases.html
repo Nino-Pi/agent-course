@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 22 章｜mini 与 Maka 的任务执行案例 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 22 / 62</div><article id="main-content"><span class="heading-alias" id="l03让真实-agent-走一遍同一个小项目几段值得细看的过程" aria-hidden="true"></span><span class="heading-alias" id="l03mini-与-maka-的任务执行案例" aria-hidden="true"></span><span class="heading-alias" id="第-21-章mini-与-maka-的任务执行案例" aria-hidden="true"></span><h1 id="第-22-章mini-与-maka-的任务执行案例">第 22 章｜mini 与 Maka 的任务执行案例</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：真实模型怎样依据文件与工具结果完成修复，哪些结果仍不足以证明任务成功？</p>
+<p><strong>关键概念</strong>：轨迹：实际请求与动作记录；工具观察：执行后返回的信息；任务范围：本次获准处理的内容；压缩检查点：后续请求使用的历史表示；Local Memory（本地记忆）：可按读取开关进入新请求的偏好。</p>
+<p><strong>关系主线</strong>：比较 mini 与 Maka 的修复、限定范围、压缩和记忆案例，把保存的事实、模型实际输入与最终结果逐一对应。</p>
+</blockquote>
+<p><a href="04-code-repair.html">第04章</a>使用固定回复；本章五个案例由真实模型选择下一步。</p>
+<p>所有案例仍使用 README、package.json、<code>src/duration.js</code> 和 <code>test/duration.test.js</code> 四个文件。每个独立实验从原始副本开始。模型为 K3（Kimi 的 <code>k3</code> 模型服务），实际请求携带 <code>reasoning_effort: max</code>；mini 运行原生 CLI，Maka 使用原生 Runtime Host 的生产执行链。这里展示一次实际发生的过程，不要求模型走出原先示意中的固定顺序。</p>
+<p>五个案例分别观察以下机制：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 第 22 章｜mini 与 Maka 的任务执行案例"><table><caption>表 1 / Table 1 · 第 22 章｜mini 与 Maka 的任务执行案例</caption><thead><tr><th scope="col">想观察什么</th><th scope="col">看哪一例</th><th scope="col">返回课程</th></tr></thead><tbody><tr><td>模型怎样依据文件和测试推进修复</td><td>下文第 1–2 例：mini 与 Maka 的同任务记录</td><td><a href="03-actions-and-messages.html#%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%9B%9E%E6%89%A7">第03章</a>、<a href="16-tools-and-execution.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第16章</a></td></tr>
+<tr><td>只修 README 时怎样报告剩余失败</td><td>第 3 例：任务范围；未测试权限拦截</td><td><a href="17-permissions-and-sandbox.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第17章</a></td></tr>
+<tr><td>历史缩短后保留了什么、漏了什么</td><td><a href="#4-%E5%8E%8B%E7%BC%A9%E5%90%8E%E7%9A%84%E7%8A%B6%E6%80%81%E4%B8%8E%E9%81%97%E6%BC%8F">第 4 例：手动压缩</a></td><td><a href="19-context-compaction.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E5%BE%84%E7%BB%99%E6%9C%89%E9%99%90%E5%B7%A5%E4%BD%9C%E5%8F%B0%E6%95%B4%E7%90%86%E6%9D%90%E6%96%99">第19章</a></td></tr>
+<tr><td>保存的偏好有没有进入新请求</td><td><a href="#5-memory%E6%96%B0%E4%BC%9A%E8%AF%9D%E7%9A%84%E8%BF%99%E4%B8%89%E4%B8%AA%E5%B0%8F%E6%A0%87%E9%A2%98%E4%BB%8E%E5%93%AA%E9%87%8C%E6%9D%A5">第 5 例：Local Memory</a></td><td><a href="20-memory.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB%E4%B8%80%E6%9D%A1%E5%81%8F%E5%A5%BD%E5%9B%9B%E4%B8%AA%E4%B8%8D%E5%90%8C%E7%9A%84%E5%8A%A8%E4%BD%9C">第20章</a></td></tr></tbody></table></div>
+<h2 id="1-mini它先看什么什么时候才有证据">1. mini：它先看什么，什么时候才有证据</h2>
+<p>**用户任务：**修正 README 测试步骤，修复函数，运行测试并检查修改范围；只允许改 README 和函数文件。</p>
+<p>这次 mini 共向模型请求 8 次。每次模型回答里的 Bash 动作由真实 <code>LocalEnvironment</code> 执行，结果进入下一次请求。下表按信息产生的顺序合并相邻步骤。</p>
+<p>表中 <code>find</code> 按条件遍历目录树、查找路径，<code>ls</code> 列出目录中的条目信息；本次先用它们看项目结构。第04章已见过的 <code>cat</code> 随后读取并拼接文件内容；<code>sed</code> 在这里改用文本替换规则，不再只是第02章的按行打印。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 1. mini：它先看什么，什么时候才有证据"><table><caption>表 2 / Table 2 · 1. mini：它先看什么，什么时候才有证据</caption><thead><tr><th scope="col">实际片段</th><th scope="col">此时发生了什么</th><th scope="col">支持的判断</th></tr></thead><tbody><tr><td>第 1 次请求：模型说“我先查看项目结构”，调用 <code>find</code>、<code>ls</code></td><td>环境返回四文件目录</td><td>这次工具观察只提供文件名，还没有提供函数内容</td></tr>
+<tr><td>第 2 次：调用 <code>cat</code> 读取四份文件</td><td>下一次输入出现真实 <code>scripts</code>、README、函数与测试</td><td>项目知识来自这次返回，不是模型自动看见了磁盘</td></tr>
+<tr><td>第 3 次：指出 <code>% 100</code> 与测试入口问题，运行 <code>npm test</code> 和几个输入</td><td>原测试 2 通过、2 失败，60/125 秒输出错误</td><td>它先从源码形成判断，再用执行结果核对</td></tr>
+<tr><td>第 4–5 次：检查不存在的 <code>check</code> 脚本，用 <code>sed</code> 改两处并回读</td><td>README 改为 <code>npm test</code>，余数改为 <code>% 60</code></td><td>这次修改由 Bash 执行，不存在单独的 mini Edit 工具</td></tr>
+<tr><td>第 6–7 次：复测、检查额外输入、查看 diff</td><td>原测试全过，额外样本正确，只有两文件改变</td><td>修改、测试、检查范围是三种不同观察</td></tr>
+<tr><td>第 8 次：中文总结，再调用 <code>echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code></td><td>mini 识别结束标记并保存 trajectory</td><td>完成 action 是特殊控制入口，不是又执行一次普通 Shell 工作</td></tr></tbody></table></div>
+<p>默认 CLI 的 <code>InteractiveAgent</code> 还会为这个控制动作补上 <code>not executed</code> 占位，具体顺序见<a href="05-exit-and-trajectory.html#%E5%AE%8C%E6%88%90%E5%91%BD%E4%BB%A4%E4%B8%BA%E4%BD%95%E4%BC%9A%E7%95%99%E4%B8%8B-not-executed-%E5%8D%A0%E4%BD%8D">第05章的完成动作说明</a>。它表示这项动作未走普通 Shell 执行分支，不是对之前所有动作效果的判断；也不能据此给第04章的 <code>DefaultAgent</code> 记录补出第八条普通 observation。</p>
+<h3 id="一个真实的小插曲为什么退出码不能脱离命令看">一个真实的小插曲：为什么退出码不能脱离命令看</h3>
+<p>模型检查错误测试命令时实际使用：</p>
+<pre><code class="language-sh">npm run check 2&gt;&amp;1 | head -10; echo &quot;---exit: $?---&quot;</code></pre>
+<p>输出有 <code>Missing script: &quot;check&quot;</code>，但记录中的外层返回码是 0。这不矛盾：管道末端是 <code>head</code>，后面又执行了 <code>echo</code>；外层成功不等于 <code>npm run check</code> 成功。因此，返回码必须结合命令结构与输出正文解释。</p>
+<p>**判断：**只知道“编辑命令返回成功”，能否写“所有测试通过”？</p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不能。第 5 次之后只有修改与回读证据；测试通过来自第 6 次的执行结果。最终外部检查再次运行测试，确认 4 项通过；原测试和配置文件保持不变。</p>
+<h2 id="2-maka同一件工作换一种工具表达">2. Maka：同一件工作，换一种工具表达</h2>
+<p>Maka 在另一份原始副本中使用同一个模型完成任务，共 7 次模型请求。它先 <code>Bash</code> 列文件，再一次提出四个 <code>Read</code>，随后提出两个 <code>Edit</code>；它<strong>直接根据源码修复，再运行测试</strong>，没有复制 mini 的“先运行失败测试”顺序。</p>
+<p>两种修改路径分别是：</p>
+<p>下面保留两条真实修改路径。两项 Maka Edit 汇入同一结果节点，只表示两个结果都成为后续输入，不由并列布局额外推断执行时序。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Maka：同一件工作，换一种工具表达：可滚动示意图"><a href="../../../assets/diagrams/22-agent-cases-1.svg"><img src="../../../assets/diagrams/22-agent-cases-1.svg" alt="mini 通过 Bash 中的 sed 修改并用 cat 回读；Maka 的两项 Edit 返回结果后进入下一次模型请求，再调用 Bash 测试。并列布局不额外证明两项编辑的执行时序。" width="1023" height="1019" loading="lazy" style="width:1023px;min-width:870px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>Maka 的模型收到编辑结果后，才提出测试调用。实际 <code>npm test</code> 返回 4 通过、0 失败；之后它又检查 59、61、119、3599、3600、3661 秒等输入并查看 diff。外部检查确认只有 README 与函数文件改变。</p>
+<p><strong>它与 mini 的共同点是“动作 → 观察 → 下一次决策”。</strong> 工具名称、消息表达和持久记录不同，实际行动顺序也不同。这次成功不支持模型能力排名；工具与状态边界的比较见 <a href="08-mini-to-maka.html">第08章</a>。</p>
+<h3 id="看见了编辑报告还没看见整个最终文件">看见了编辑报告，还没看见整个最终文件</h3>
+<p>Maka 的 Edit 返回可供模型阅读的简短修改报告；这份报告与原始工具结果分别存在记录中。正文没有自动展开完整 diff。后面真实调用 <code>git diff</code> 才给模型补上完整的两处变更。这可以接到 <a href="14-events-and-projections.html#%E5%AF%B9%E7%85%A7%E4%B8%80%E6%AC%A1%E7%9C%9F%E5%AE%9E-edit-%E7%9A%84%E4%B8%A4%E7%A7%8D%E8%A1%A8%E7%A4%BA">第14章 的事实与投影</a> 和 <a href="15-model-context.html#%E6%8A%8A%E5%9B%9B%E6%AD%A5%E7%A4%BA%E6%84%8F%E5%AF%B9%E7%85%A7%E4%B8%80%E6%9D%A1%E7%9C%9F%E5%AE%9E%E8%BD%A8%E8%BF%B9">第15章 的模型视野</a>。</p>
+<p>以 README 这次修改为例，省略机器路径后，两份记录可以这样并排读：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 看见了编辑报告，还没看见整个最终文件"><table><caption>表 3 / Table 3 · 看见了编辑报告，还没看见整个最终文件</caption><thead><tr><th scope="col">保存的工具结果（Tool result）</th><th scope="col">下一次模型输入（Model input）中的编辑报告</th></tr></thead><tbody><tr><td>diff 中有 <code>-npm run check</code> 和 <code>+npm test</code></td><td><code>Edited …/README.md (+1 -1)</code></td></tr></tbody></table></div>
+<p>两者都来自这次真实编辑，但承载的细节不同。不能因为存储里有完整 diff，就假设模型已经读到了它。</p>
+<p>**判断：**Maka 没有先跑出红色测试，是否应该重跑直到它照着 mini 的顺序走？</p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不需要。这条路线已从源码形成判断，再用实际测试与 diff 检查修复。没有先跑失败测试会少一份运行前对照，但不能因此认定修复无效；反复重跑直到顺序符合预期，反而改变了要分析的那次过程。</p>
+<h2 id="3-只修-readme为什么测试仍红也能完成这项任务">3. 只修 README：为什么测试仍红，也能完成这项任务</h2>
+<p>第三个案例从原始副本开始，把要求改为“只修 README，运行并解释测试，不修改源码”。Maka 共 6 次模型请求，实际只改 README；原测试仍为 2 通过、2 失败。</p>
+<p>模型最后准确列出 <code>1:60</code> 对 <code>1:00</code>、<code>2:25</code> 对 <code>2:05</code> 的差异，并写道：</p>
+<blockquote><p>按照你的要求，我没有修改源码、package.json 或测试文件，也未创建任何新文件。</p>
+</blockquote>
+<p>文件检查与这句话一致。它知道 <code>% 100</code> 应为 <code>% 60</code>，但没有继续改源码。这个片段用于讲清<strong>本次任务范围与所有问题是否解决是两回事</strong>。</p>
+<p>这里的约束由用户任务表达；该次运行没有通过审批或 OS 拒绝来阻止源码写入。它说明 Agent 遵守了任务范围，不能用来证明执行环境会强制拦住越界修改。<a href="17-permissions-and-sandbox.html">第17章</a>分别解释授权判断与强制执行边界。</p>
+<p>**判断：**为了展示更“成功”的 Agent，把源码也修掉再记作通过，是否合适？</p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不合适。那会违反本次只改 README 的要求。正确的完成报告应保留源码失败，并说明哪些事情尚未授权处理。</p>
+<span class="heading-alias" id="4-压缩看看它实际留下了什么" aria-hidden="true"></span><h2 id="4-压缩后的状态与遗漏">4. 压缩后的状态与遗漏</h2>
+<p>这一例让 Maka 在新会话中依次完成三轮工作：读文件并跑失败测试、分析边界输入、只修 README。随后通过原生 <code>context.compact</code> 显式压缩，再要求它继续修函数。它是一次手动压缩教学案例，没有把短历史冒充自然触发的窗口溢出。</p>
+<p>摘要调用读到此前消息后产生了下面的英文摘要。右侧解释它保留了哪些状态：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 4. 压缩后的状态与遗漏"><table><caption>表 4 / Table 4 · 4. 压缩后的状态与遗漏</caption><thead><tr><th scope="col">真实摘要片段</th><th scope="col">用中文读出它保留的状态</th></tr></thead><tbody><tr><td><code>do not change the function name/parameters of formatDuration</code></td><td>函数名和参数仍是限制</td></tr>
+<tr><td><code>Fixed README.md: changed npm run check → npm test</code></td><td>文档修改已经完成</td></tr>
+<tr><td><code>Core bug fix ... explicitly deferred awaiting user instruction; tests still 2 pass / 2 fail</code></td><td>函数尚未修，旧测试仍失败，不能把下一步计划当成完成</td></tr>
+<tr><td><code>Re-run npm test to confirm all 4 tests pass</code></td><td>复测仍是未来要做的工作</td></tr></tbody></table></div>
+<p>下一次真实请求使用了该 checkpoint。Agent 随后修改 <code>% 100</code>、运行测试和边界输入，最后确认两文件差异；外部测试与独立输入检查通过。这里能对照历史事实、摘要状态与后续动作；它不覆盖自动溢出触发。</p>
+<h3 id="摘要也会省略东西">摘要也会省略东西</h3>
+<p>此前用户要求“最后用中文解释”，这份摘要没有复述语言要求。继续任务的消息又明确说了“用中文说明最终结果”，所以最终中文报告不能证明语言偏好经过摘要保留。这是本次实际可见的遗漏，不据此推断每次压缩都丢失语言要求。</p>
+<p>**判断：**看到摘要把“修函数”放在 Next Steps，就能说文件已改吗？</p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不能。摘要明确区分了已完成的 README 与待处理的函数。修改是否发生，要看后续真实 Edit 和文件结果；测试是否通过，要看实际测试输出。</p>
+<h2 id="5-memory新会话的这三个小标题从哪里来">5. Memory：新会话的这三个小标题从哪里来</h2>
+<p>实验通过原生 Local Memory 管理接口保存了一条合成偏好：</p>
+<blockquote><p>解释测试结果时，固定使用“已修改”“已验证”“待处理”三个部分；没有做过的修改或测试必须明确说明。</p>
+</blockquote>
+<p>这一步由实验客户端调用保存接口，<strong>不是模型说了“记住了”就算保存</strong>。然后在两个全新的 Session 中提交完全相同的任务：“请运行这个项目的测试，并解释这次测试结果。不要修改任何文件。”第二个 Session 没有第一个的对话历史。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 5. Memory：新会话的这三个小标题从哪里来"><table><caption>表 5 / Table 5 · 5. Memory：新会话的这三个小标题从哪里来</caption><thead><tr><th scope="col">实际观察（Observation）</th><th scope="col">允许读取</th><th scope="col">关闭读取</th></tr></thead><tbody><tr><td>保存的条目</td><td>同一条 workspace 范围偏好</td><td>条目仍在，没有删除</td></tr>
+<tr><td>新请求的背景</td><td>出现 <code>&lt;local-memory&gt;</code> 与格式要求</td><td>没有该 Memory 块，也没有格式要求</td></tr>
+<tr><td>实际回答结构</td><td><code>已修改</code>、<code>已验证</code>、<code>待处理</code></td><td><code>结果摘要</code>、<code>失败的测试及原因</code>、<code>通过的测试</code>、<code>另一个小问题</code></td></tr>
+<tr><td>实际项目状态</td><td>没有修改；测试 2 通过、2 失败</td><td>没有修改；测试 2 通过、2 失败</td></tr></tbody></table></div>
+<p>开启读取时，模型在“已修改”下明确写“无”，在“待处理”下保留尚未修复的 bug。这样可以在输入与回答中分别指认格式要求和相符的输出；它支持本例的采用判断，但单次对照还不能排除采样波动，或量化这种效果在新任务中多稳定。关闭读取后条目仍存在，却没有进入新请求，正好接上 <a href="21-memory-lifecycle.html">第21章</a>已经演示的“存”与“读”的区别。</p>
+<p>这是一个小对照教学案例，不是长期记忆效果统计。两次运行都用中文提问，因此两边都回答中文并不能说明 Memory 生效；这里辨认的是保存的特定结构，以及实际输入中有没有这条要求。也没有把 Local Memory 的结果扩展成 Atomic 自动召回已经实现。</p>
+<p>**判断：**第二个会话没有采用那三个标题，能否断言偏好文件被删了？</p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不能。本例只关闭了 Agent 读取，条目仍在。查看保存状态、查看本次输入、查看实际回答，分别回答“存了没有”“读了没有”“用了没有”。</p>
+<span class="heading-alias" id="从案例回到自己的实验" aria-hidden="true"></span><h2 id="案例能解释什么不能证明什么">案例能解释什么，不能证明什么</h2>
+<p>表格摘取了真实的文件、工具和模型返回；模型自己解释“为什么这样做”，仍不等于我们看到了它的内部因果过程。单次案例也不能用于成功率排名。<a href="../../../extended-reading.html#reference-11" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="labs/assets/live-agent/README.md">案例运行说明</a>保留了原运行条件；这里的结论只覆盖这些已记录的输入与结果。</p>
+<p>本页主案例不替代 <a href="06-crash-window.html">第06章 的崩溃实验</a>。正常修复没有发生 crash，也不能证明所有工具效果只会执行一次。真实例子与确定性实验各自承担适合的教学任务。</p>
+<p>返回 <a href="labs/README.html">实验导航</a> · <a href="README.html">学习路线</a></p>
+<hr>
+<p><a href="21-memory-lifecycle.html">上一章：第 21 章｜记忆的保存、读取与使用</a> · <a href="23-skills-and-subagents.html">下一章：第 23 章｜Skills、插件与子 Agent</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="21-memory-lifecycle.html"><span>← 上一章</span><strong>第 21 章｜记忆的保存、读取与使用</strong></a><a href="23-skills-and-subagents.html"><span>下一章 →</span><strong>第 23 章｜Skills、插件与子 Agent</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-mini%E5%AE%83%E5%85%88%E7%9C%8B%E4%BB%80%E4%B9%88%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E6%89%8D%E6%9C%89%E8%AF%81%E6%8D%AE">1. mini：它先看什么，什么时候才有证据</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E4%B8%AA%E7%9C%9F%E5%AE%9E%E7%9A%84%E5%B0%8F%E6%8F%92%E6%9B%B2%E4%B8%BA%E4%BB%80%E4%B9%88%E9%80%80%E5%87%BA%E7%A0%81%E4%B8%8D%E8%83%BD%E8%84%B1%E7%A6%BB%E5%91%BD%E4%BB%A4%E7%9C%8B">一个真实的小插曲：为什么退出码不能脱离命令看</a></li><li class="toc-level-2"><a href="#2-maka%E5%90%8C%E4%B8%80%E4%BB%B6%E5%B7%A5%E4%BD%9C%E6%8D%A2%E4%B8%80%E7%A7%8D%E5%B7%A5%E5%85%B7%E8%A1%A8%E8%BE%BE">2. Maka：同一件工作，换一种工具表达</a></li><li class="toc-level-3"><a href="#%E7%9C%8B%E8%A7%81%E4%BA%86%E7%BC%96%E8%BE%91%E6%8A%A5%E5%91%8A%E8%BF%98%E6%B2%A1%E7%9C%8B%E8%A7%81%E6%95%B4%E4%B8%AA%E6%9C%80%E7%BB%88%E6%96%87%E4%BB%B6">看见了编辑报告，还没看见整个最终文件</a></li><li class="toc-level-2"><a href="#3-%E5%8F%AA%E4%BF%AE-readme%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B5%8B%E8%AF%95%E4%BB%8D%E7%BA%A2%E4%B9%9F%E8%83%BD%E5%AE%8C%E6%88%90%E8%BF%99%E9%A1%B9%E4%BB%BB%E5%8A%A1">3. 只修 README：为什么测试仍红，也能完成这项任务</a></li><li class="toc-level-2"><a href="#4-%E5%8E%8B%E7%BC%A9%E5%90%8E%E7%9A%84%E7%8A%B6%E6%80%81%E4%B8%8E%E9%81%97%E6%BC%8F">4. 压缩后的状态与遗漏</a></li><li class="toc-level-3"><a href="#%E6%91%98%E8%A6%81%E4%B9%9F%E4%BC%9A%E7%9C%81%E7%95%A5%E4%B8%9C%E8%A5%BF">摘要也会省略东西</a></li><li class="toc-level-2"><a href="#5-memory%E6%96%B0%E4%BC%9A%E8%AF%9D%E7%9A%84%E8%BF%99%E4%B8%89%E4%B8%AA%E5%B0%8F%E6%A0%87%E9%A2%98%E4%BB%8E%E5%93%AA%E9%87%8C%E6%9D%A5">5. Memory：新会话的这三个小标题从哪里来</a></li><li class="toc-level-2"><a href="#%E6%A1%88%E4%BE%8B%E8%83%BD%E8%A7%A3%E9%87%8A%E4%BB%80%E4%B9%88%E4%B8%8D%E8%83%BD%E8%AF%81%E6%98%8E%E4%BB%80%E4%B9%88">案例能解释什么，不能证明什么</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

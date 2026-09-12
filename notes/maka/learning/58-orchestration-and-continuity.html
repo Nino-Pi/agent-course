@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 58 章｜设计编排与连续执行 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 58 / 62</div><article id="main-content"><span class="heading-alias" id="i10谁让下一轮开始断线后怎样继续" aria-hidden="true"></span><span class="heading-alias" id="i10设计编排与连续执行" aria-hidden="true"></span><span class="heading-alias" id="第-55-章设计编排与连续执行" aria-hidden="true"></span><span class="heading-alias" id="第-57-章设计编排与连续执行" aria-hidden="true"></span><h1 id="第-58-章设计编排与连续执行">第 58 章｜设计编排与连续执行</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：批准、目标、定时触发和依赖就绪怎样启动工作，并在客户端断线后保持正确观察？</p>
+<p><strong>关键概念</strong>：执行意图：待准入的稳定工作身份；认领：取得本次触发的处理权；Admission（准入）：由 Host 接纳执行；Run（执行实例）：运行模型与工具；Snapshot（快照）：重建当前视图；序列：识别观察流中的位置。</p>
+<p><strong>关系主线</strong>：不同控制者按各自条件形成意图，再共享接纳与执行基础；重连先核对权威状态，恢复连接不重放命令，也不保证机器关闭后原进程继续运行。</p>
+</blockquote>
+<p>前置：<a href="13-session-turn-run.html">第13章</a>、<a href="14-events-and-projections.html">第14章</a>、<a href="24-continuation-and-orchestration.html">第24章</a>、<a href="25-host-and-client.html">第25章</a>。依赖图部分另需 <a href="57-skills-and-subagents.html">第57章</a>。</p>
+<h2 id="1-原题与约束">1. 原题与约束</h2>
+<blockquote><p>Agent 要在用户批准后执行计划，也要能持续追目标、定时运行、多 Agent 协作。用户关闭界面后，还能从另一端查看。怎样设计？</p>
+</blockquote>
+<p>控制状态决定能否创建下一份工作；连接状态决定用户怎样重新观察已存在的工作。查询任务不会因此重放执行命令。</p>
+<p>假设 Host 负责接纳执行，控制状态可持久保存；客户端可断线重连。本题不假定机器关机后进程仍运行，也不承诺任意跨机器迁移。</p>
+<span class="heading-alias" id="2-两分钟主答" aria-hidden="true"></span><h2 id="2-参考方案">2. 参考方案</h2>
+<blockquote><p>我会让普通 AgentRun 负责模型和工具执行，再由不同控制者决定何时创建下一轮。计划需要用户批准，目标需要根据结果和预算判断，定时任务需要认领一次触发机会，依赖图需要等前置节点的可用结果。它们可以复用接纳和执行基础，但各自的合法条件不同。触发先形成可恢复的意图，再进入准入，不能把 ready 当成已经开跑。客户端只提交意图和观察状态，重连时先取权威快照，再按序列补变化；重发命令要有身份与内容核对，避免重复工作。取消和完成并发时由对应状态 owner 收敛，已产生效果另行结算。最后分别验证重复触发、评估失败、取消竞争、连接断开和状态补齐。</p>
+</blockquote>
+<h2 id="3-主图不同触发进入共同执行">3. 主图：不同触发进入共同执行</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="主图：不同触发进入共同执行：可滚动示意图"><a href="../../../assets/diagrams/58-orchestration-and-continuity-1.svg"><img src="../../../assets/diagrams/58-orchestration-and-continuity-1.svg" alt="已批准计划、允许继续且预算足够的目标、已认领触发的定时任务、依赖与交接就绪的图分别形成持久意图；Host 接纳并绑定 Run，取得派发许可后才启动执行。结果与终态保存后由对应控制域决定后续，已有运行或终态不重新开跑。" width="1276" height="1231" loading="lazy" style="width:1276px;min-width:1085px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>四种触发共享 Run 执行基础，却不共享无条件 resume。Graph 的就绪、调度认领、Host 接纳是不同阶段；图中的接纳到 Run 箭头还要求取得派发许可。已有 Run 正在运行或已经终止时，入口只返回观察或已有结果，不沿箭头重新执行。</p>
+<h2 id="4-控制契约与具体状态">4. 控制契约与具体状态</h2>
+<p>教学接口，非 Maka 实际操作名：</p>
+<pre><code class="language-python">intent = {
+    &quot;domain&quot;: &quot;schedule&quot;,
+    &quot;domain_id&quot;: &quot;daily-check&quot;,
+    &quot;trigger_identity&quot;: &quot;one-specific-fire&quot;,
+    &quot;revision&quot;: current_revision,
+    &quot;payload&quot;: frozen_task_input,
+    &quot;status&quot;: &quot;pending_admission&quot;
+}
+
+def reconcile(intent):
+    # 同一状态 owner 内原子读取当前 revision、取消状态和既有 admission
+    decision = claim_or_observe_atomically(intent)
+    if decision.kind == &quot;existing&quot;:
+        if decision.stop_required:
+            request_stop_idempotently(decision.run_id)
+            return observe(decision.run_id)
+        return dispatch_or_reconcile(decision.run_id)  # 恢复认领后尚未派发的工作
+    if decision.kind == &quot;rejected_before_admission&quot;:
+        return record_rejection(decision.reason)
+    if decision.kind == &quot;new_admission&quot;:
+        return dispatch_or_reconcile(decision.accepted_run_id)
+    return report_admission_problem(decision)  # 冲突或未识别状态不派发</code></pre>
+<p><code>claim_or_observe_atomically</code> 是本题要求实现的原子合同：先核对调用者是否有权提交或观察该控制域，再按控制域、触发身份和作用域查找既有 admission，并核对冻结的 payload 与授权范围。已有绑定不能被新内容覆盖；只对尚未接纳的意图核对当前取消与 revision，再持久创建唯一 admission。该判断与取消/修订写入必须经过同一事务或串行 owner，不能只用 <code>if not exists</code>。原子判定之后的新取消按已接纳 Run 的停止路径处理；停止请求失败要能重试/对账。</p>
+<p>这里的 <code>dispatch_or_reconcile</code> 与<a href="49-agent-architecture.html#4-%E6%9C%80%E5%B0%8F%E7%8A%B6%E6%80%81%E4%B8%8E%E4%B8%BB%E5%BE%AA%E7%8E%AF">第49章主循环</a>使用同一合同。第49章已给出首次、并发重复、运行中、终态后、派发前崩溃和效果未知六种情境的参考表。本章展开恢复者如何作决定：</p>
+<pre><code class="language-python">def dispatch_or_reconcile(run_id):
+    state = read_authoritative_state(run_id)
+    if state.is_terminal:  # 成功、失败、取消、预算耗尽均属于终态
+        return read_recorded_result(run_id)
+    if state.phase == &quot;running&quot;:
+        return query_or_subscribe(run_id)
+    if state.phase == &quot;admitted_not_dispatched&quot;:
+        # 执行 owner 再核对当前状态和取消，与其他恢复者竞争同一启动权
+        permit = claim_dispatch_atomically(run_id)
+        if not permit.granted:
+            return observe(run_id)
+        return dispatch_same_run_once(run_id, permit.owner_token)
+    if state.phase in {&quot;dispatch_unknown&quot;, &quot;effect_unknown&quot;, &quot;interrupted&quot;}:
+        return reconcile_known_facts(run_id)  # 核对后分类，不能直接从头跑
+    return report_recovery_state_problem(run_id, state)</code></pre>
+<p><code>read_authoritative_state</code> 的读取只能提供判断起点；真正派发前，<code>claim_dispatch_atomically</code> 必须再次核对取消与状态，避免“读到未开始，别人已派发，我又开跑”的竞争。<code>dispatch_same_run_once</code> 则要求执行入口按同一 Run 与有效 owner 凭证识别重复派发；若执行入口没有这一合同，单靠接纳记录仍不能承诺不重复开跑。该入口还要加载原先冻结的任务与允许范围，继续应用当前有效的授权限制，不能用恢复请求中的新内容替换原任务。恢复入口启动的是第49章取得派发许可后的执行骨架，不重新提交一次用户请求。</p>
+<p>“已认领、确定未启动”可以恢复首次派发；“派发请求已发出但响应丢失”必须先查询原 Run，不能误标为未启动。若工具效果可能已经发生、结果却未保存，<code>reconcile_known_facts</code> 还要核对对应工具身份和外部事实。查不到可靠结果时保留未知，采用该工具支持的查询、幂等重试或人工处置策略；请求 ID 本身不提供外部效果 exactly-once（恰好一次）。</p>
+<p>本题的单 owner 可以靠串行仲裁实现上述合同；如果改为可超时接管的租约（Lease），还须让执行入口与事实存储拒绝旧 owner 的代次凭证，这称为 fencing。多个恢复者不能只看到租约过期就各自开跑；租约过期也不能证明旧工具已经停下。派发、停止与终态竞争都要回到当前执行 owner 收敛，已结束的 Run 保留原结果，恢复不能刷新预算或扩大授权。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 4. 控制契约与具体状态"><table><caption>表 1 / Table 1 · 4. 控制契约与具体状态</caption><thead><tr><th scope="col">控制域（Control Domain）</th><th scope="col">继续的依据</th><th scope="col">不能误认作完成</th></tr></thead><tbody><tr><td>计划（Plan）</td><td>明确批准及当前计划状态</td><td>进度文字或步骤标记</td></tr>
+<tr><td>目标（Goal）</td><td>当前证据、策略、预算与合法评估</td><td>任意一次模型文本结束</td></tr>
+<tr><td>定时任务（Schedule）</td><td>本次 fire 身份与接纳</td><td>时钟到点、触发请求发出</td></tr>
+<tr><td>依赖图（Graph）</td><td>依赖满足、可用交付与调度状态</td><td>节点 ready 或 child 文字“完成”</td></tr></tbody></table></div>
+<p>本题把 evaluator 不可解析的结果保留为评估错误，再按有界策略处理。它与“有效判断为没有进展”不同；如果采用 Maka Goal 的策略，还要分别检查判断有效性、停滞计数、迭代额度和总预算。</p>
+<h2 id="5-断线重连时序图">5. 断线重连时序图</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="断线重连时序图：可滚动示意图"><a href="../../../assets/diagrams/58-orchestration-and-continuity-2.svg"><img src="../../../assets/diagrams/58-orchestration-and-continuity-2.svg" alt="首次任务意图由 Host 接纳并取得派发许可后启动 Runtime；Client 断线期间 Runtime 在既定存活条件下继续保存结果。重连后先读权威快照与序列游标，再补齐变化，不重放原任务命令。" width="1078" height="827" loading="lazy" style="width:1078px;min-width:917px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这是首次获准派发后发生断线的教学协议图；重复请求按第 4 节查询或恢复既有 Run。具体 API 与快照/订阅握手由实现决定。要防“取快照到订阅之间丢事件”的间隙，可以用可回放游标或订阅缓冲配合快照；不能仅画“先 GET 后 subscribe”就声称无缝。</p>
+<p>序列用于发现缺口，epoch 可用于区分不兼容的连接或状态代际。它们不自动恢复进程栈，也不证明文件、环境和远端资源已经迁移。</p>
+<h2 id="6-正常与失败走读">6. 正常与失败走读</h2>
+<p>正常：明天检查 README → 保存 Schedule → 到点认领该次 fire → 接纳 Run → 执行检查 → 保存终态 → 控制者记录该次结果。用户重连只读取既有 Run，不重新触发检查。</p>
+<p>重复触发：进程在接纳后、更新 Schedule 展示状态前崩溃。恢复时按原 fire 身份找到已有 admission，修复投影；不能因展示仍 pending 再开一轮。</p>
+<p>取消竞争：取消发生在接纳前，可以阻止该意图；接纳后必须定位已存在 Run 请求停止；如果结果已完成，保留既有终态与效果，不靠覆盖 status 抹去事实。</p>
+<p>UI 落后：界面显示 running，持久结果已 terminal。修复客户端投影；不要让 UI 回写 running 以“保持一致”。</p>
+<h2 id="7-递进追问">7. 递进追问</h2>
+<p><strong>为什么不能只用一个 background_tasks 表？</strong></p>
+<p>可以共用存储技术，但仍要表达批准、目标评估、触发身份和依赖的不同约束。一张表不是问题，无差别的 <code>status != done → run</code> 才掩盖合法触发条件。</p>
+<p><strong>Goal 没完成就一直调用模型可以吗？</strong></p>
+<p>要限制预算与重试，区分有进展、无进展、评估不可用和真正完成。自动继续不会扩大授权范围；目标要求无法在现有权限下达成时，需要明确处理。</p>
+<p><strong>关窗口后一定继续吗？</strong></p>
+<p>取决于执行 owner 的实际寿命和 Host 驻留合同。网络连接断开、UI 退出、Host 退出、机器关机是不同事件；本题不把逻辑责任等同于进程永远存活。</p>
+<p><strong>多机可以同时当 owner 吗？</strong></p>
+<p>这会引入协调、租约、fencing 和资源归属问题。先明确是否真的需要多机接管，再为过期 owner 的写入定义保护；不能把单机 run id 当成分布式互斥。</p>
+<span class="heading-alias" id="8-取舍验证与自测" aria-hidden="true"></span><h2 id="8-取舍与三个断线窗口">8. 取舍与三个断线窗口</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 8. 取舍与三个断线窗口"><table><caption>表 2 / Table 2 · 8. 取舍与三个断线窗口</caption><thead><tr><th scope="col">选择</th><th scope="col">收益</th><th scope="col">验证重点</th></tr></thead><tbody><tr><td>单宿主与可重连客户端（Host · Client）</td><td>执行 ownership 简单</td><td>快照/增量间隙、重复命令</td></tr>
+<tr><td>持久控制域与对账（Domain · Reconcile）</td><td>可核对触发状态</td><td>接纳前后崩溃、旧 revision</td></tr>
+<tr><td>依赖图调度（Graph Scheduling）</td><td>工作可拆分且依赖显式</td><td>部分失败、结果不可读、取消竞争</td></tr>
+<tr><td>多机接管（Failover）</td><td>主机故障时可转移责任</td><td>fencing、外部资源可达性、环境恢复</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 8. 取舍与三个断线窗口"><table><caption>表 3 / Table 3 · 8. 取舍与三个断线窗口</caption><thead><tr><th scope="col">故障窗口（Failure Window）</th><th scope="col">可靠事实</th><th scope="col">完整处理</th></tr></thead><tbody><tr><td>请求已接纳，响应丢失</td><td>已存在 intent→Run 绑定</td><td>按原 intent 查询；允许同身份重发时核对同一 payload，并返回既有 admission，不另建 Run</td></tr>
+<tr><td>Client 断线，Host 与普通执行器仍工作</td><td>Run 可继续追加结果</td><td>新 Client 恢复快照与当前订阅，检测并补齐事件缺口；不重复任务命令</td></tr>
+<tr><td>Host 也退出</td><td>只保留已经持久提交的身份和结果</td><td>新 Host 先恢复已知状态，再按实际恢复合同分类未结束执行；没有进程/环境恢复能力时记录中断，而不是宣称原栈继续</td></tr></tbody></table></div>
+<p>若工具执行能力本来由断开的 Client 提供，第二行的存活前提不成立，应另行结算该能力丢失与未知效果。三种窗口都不能简化成重新调用模型并从头执行。</p>
+<p>相关机制：<a href="24-continuation-and-orchestration.html">第24章 触发与准入</a>、<a href="25-host-and-client.html">第25章 观察重连与执行连续性</a>。</p>
+<hr>
+<p><a href="57-skills-and-subagents.html">上一章：第 57 章｜选择 Skills 与子 Agent</a> · <a href="59-evaluation-and-progress.html">下一章：第 59 章｜评价设计与任务进展</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="57-skills-and-subagents.html"><span>← 上一章</span><strong>第 57 章｜选择 Skills 与子 Agent</strong></a><a href="59-evaluation-and-progress.html"><span>下一章 →</span><strong>第 59 章｜评价设计与任务进展</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E4%B8%8E%E7%BA%A6%E6%9D%9F">1. 原题与约束</a></li><li class="toc-level-2"><a href="#2-%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 参考方案</a></li><li class="toc-level-2"><a href="#3-%E4%B8%BB%E5%9B%BE%E4%B8%8D%E5%90%8C%E8%A7%A6%E5%8F%91%E8%BF%9B%E5%85%A5%E5%85%B1%E5%90%8C%E6%89%A7%E8%A1%8C">3. 主图：不同触发进入共同执行</a></li><li class="toc-level-2"><a href="#4-%E6%8E%A7%E5%88%B6%E5%A5%91%E7%BA%A6%E4%B8%8E%E5%85%B7%E4%BD%93%E7%8A%B6%E6%80%81">4. 控制契约与具体状态</a></li><li class="toc-level-2"><a href="#5-%E6%96%AD%E7%BA%BF%E9%87%8D%E8%BF%9E%E6%97%B6%E5%BA%8F%E5%9B%BE">5. 断线重连时序图</a></li><li class="toc-level-2"><a href="#6-%E6%AD%A3%E5%B8%B8%E4%B8%8E%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB">6. 正常与失败走读</a></li><li class="toc-level-2"><a href="#7-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE">7. 递进追问</a></li><li class="toc-level-2"><a href="#8-%E5%8F%96%E8%88%8D%E4%B8%8E%E4%B8%89%E4%B8%AA%E6%96%AD%E7%BA%BF%E7%AA%97%E5%8F%A3">8. 取舍与三个断线窗口</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>mini-code-lab.py · Agent 工程课程</title><link rel="stylesheet" href="../assets/site.css"><link rel="stylesheet" href="../assets/course-visual-style.css"><script defer src="../assets/site.js"></script></head><body data-course-root="../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../index.html">全部章节</a><a href="../notes/maka/learning/README.html">学习路线</a><a href="../notes/maka/learning/glossary.html">术语表</a><a class="back-link" data-course-back href="../index.html">← 返回</a></nav></header><main class="reading-layout attachment-layout"><div class="reading-column"><div class="page-kicker">教学附件</div><p class="attachment-note">用于查看课程引用的原始输入或脚本。此页面只展示文件内容；运行条件和已有结果以对应章节的说明为准。</p><article id="main-content"><h1>mini-code-lab.py</h1><pre><code>#!/usr/bin/env python3
+&quot;&quot;&quot;Offline control-flow lab using unmodified mini-SWE-agent source.
+
+The response sequence is scripted. It cannot discover or adapt to another bug.
+All generated files belong in .workspace/learning-labs; existing runs are retained.
+&quot;&quot;&quot;
+
+import argparse
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+from types import SimpleNamespace
+
+ASSETS = Path(__file__).resolve().parent
+ROOT = ASSETS.parents[4]
+TASK = &quot;核对 README 的测试命令，修复时长函数的缺陷，运行测试，检查 diff，用中文总结。&quot;
+
+
+def command(args, cwd=None, check=True):
+    return subprocess.run(args, cwd=cwd, text=True, capture_output=True, check=check)
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + &quot;\n&quot;)
+
+
+def prepare_source(source, output):
+    required = [&quot;agents/default.py&quot;, &quot;environments/local.py&quot;, &quot;models/test_models.py&quot;]
+    for module in required:
+        if not (source / &quot;src/minisweagent&quot; / module).is_file():
+            raise SystemExit(f&quot;Missing mini source module: {module}&quot;)
+    if command([&quot;git&quot;, &quot;-C&quot;, str(source), &quot;status&quot;, &quot;--porcelain&quot;, &quot;--untracked-files=no&quot;]).stdout:
+        raise SystemExit(&quot;The mini source has tracked modifications; use a clean source directory.&quot;)
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, str(source / &quot;src&quot;))
+    os.environ.update({
+        &quot;MSWEA_GLOBAL_CONFIG_DIR&quot;: str(output / &quot;mini-config&quot;),
+        &quot;MSWEA_SILENT_STARTUP&quot;: &quot;1&quot;,
+        &quot;MSWEA_GLOBAL_COST_LIMIT&quot;: &quot;0&quot;,
+        &quot;MSWEA_GLOBAL_CALL_LIMIT&quot;: &quot;0&quot;,
+    })
+
+
+def create_fixture(output):
+    fixture = output / &quot;repo&quot;
+    shutil.copytree(ASSETS / &quot;fixture&quot;, fixture)
+    command([&quot;git&quot;, &quot;init&quot;, &quot;-q&quot;], cwd=fixture)
+    command([&quot;git&quot;, &quot;add&quot;, &quot;README.md&quot;, &quot;package.json&quot;, &quot;src&quot;, &quot;test&quot;], cwd=fixture)
+    command([&quot;git&quot;, &quot;-c&quot;, &quot;core.hooksPath=/dev/null&quot;, &quot;-c&quot;, &quot;commit.gpgsign=false&quot;,
+             &quot;-c&quot;, &quot;user.name=Learning Lab&quot;, &quot;-c&quot;, &quot;user.email=lab@example.invalid&quot;,
+             &quot;commit&quot;, &quot;-qm&quot;, &quot;Initial intentionally broken teaching fixture&quot;], cwd=fixture)
+    return fixture
+
+
+def python_action(code):
+    return f&quot;{shlex.quote(sys.executable)} -c {shlex.quote(code)}&quot;
+
+
+def repair_readme():
+    return &quot;from pathlib import Path; p=Path(&#39;README.md&#39;); p.write_text(p.read_text().replace(&#39;npm run check&#39;, &#39;npm test&#39;))&quot;
+
+
+def make_agent(output, plan):
+    from minisweagent.agents.default import DefaultAgent
+    from minisweagent.environments.local import LocalEnvironment
+    from minisweagent.models.test_models import DeterministicToolcallModel, make_toolcall_output
+    from minisweagent.models.utils.actions_toolcall import parse_toolcall_actions
+
+    responses = []
+    for index, (label, shell_command) in enumerate(plan, start=1):
+        call = {&quot;id&quot;: f&quot;call_{index}&quot;, &quot;type&quot;: &quot;function&quot;, &quot;function&quot;: {
+            &quot;name&quot;: &quot;bash&quot;, &quot;arguments&quot;: json.dumps({&quot;command&quot;: shell_command})}}
+        parsed = parse_toolcall_actions(
+            [SimpleNamespace(id=call[&quot;id&quot;], function=SimpleNamespace(**call[&quot;function&quot;]))],
+            format_error_template=&quot;{{ error }}&quot;,
+        )
+        responses.append(make_toolcall_output(label, [call], parsed))
+    model = DeterministicToolcallModel(outputs=responses)
+    env = LocalEnvironment(cwd=str(output / &quot;repo&quot;), timeout=15,
+                           env={&quot;npm_config_cache&quot;: str(output / &quot;npm-cache&quot;),
+                                &quot;npm_config_update_notifier&quot;: &quot;false&quot;})
+    return DefaultAgent(model, env, system_template=&quot;Follow the task with the bash tool.&quot;,
+                        instance_template=&quot;{{ task }}&quot;, cost_limit=0, step_limit=len(plan) + 1,
+                        output_path=output / &quot;trajectory.json&quot;)
+
+
+def run_repair(output):
+    plan = [
+        (&quot;读取 README 和测试入口&quot;, &quot;cat README.md package.json&quot;),
+        (&quot;照 README 执行，观察不存在的脚本&quot;, &quot;npm run check&quot;),
+        (&quot;定位函数及测试断言&quot;, &quot;cat src/duration.js test/duration.test.js&quot;),
+        (&quot;使用真实测试入口，观察函数失败&quot;, &quot;npm test&quot;),
+        (&quot;修正文档和取余基数&quot;, python_action(repair_readme() +
+            &quot;; p=Path(&#39;src/duration.js&#39;); p.write_text(p.read_text().replace(&#39;seconds % 100&#39;, &#39;seconds % 60&#39;))&quot;)),
+        (&quot;再次运行测试&quot;, &quot;npm test&quot;),
+        (&quot;查看修改范围&quot;, &quot;git diff -- README.md src/duration.js&quot;),
+        (&quot;提交已观察到的结果&quot;, &quot;printf &#39;%s\\n&#39; COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT &#39;已修正测试命令和秒数取余，4 个测试通过；diff 仅含两个目标文件。&#39;&quot;),
+    ]
+    agent = make_agent(output, plan)
+    result = agent.run(TASK)
+    observations = [message for message in agent.messages if message.get(&quot;role&quot;) == &quot;tool&quot;]
+    returncodes = [message[&quot;extra&quot;][&quot;returncode&quot;] for message in observations]
+    expected = [0, 1, 0, 1, 0, 0, 0]
+    if returncodes != expected:
+        raise AssertionError(f&quot;Expected observed return codes {expected}; found {returncodes}&quot;)
+    if &quot;Missing script&quot; not in observations[1][&quot;extra&quot;][&quot;raw_output&quot;]:
+        raise AssertionError(&quot;The README failure was not the missing-script case&quot;)
+    before = observations[3][&quot;extra&quot;][&quot;raw_output&quot;]
+    after = observations[5][&quot;extra&quot;][&quot;raw_output&quot;]
+    if &quot;fail 2&quot; not in before or &quot;pass 4&quot; not in after or &quot;fail 0&quot; not in after:
+        raise AssertionError(&quot;Expected two failing tests followed by four passing tests&quot;)
+    diff = command([&quot;git&quot;, &quot;diff&quot;, &quot;--&quot;, &quot;README.md&quot;, &quot;src/duration.js&quot;], cwd=output / &quot;repo&quot;).stdout
+    changed = command([&quot;git&quot;, &quot;diff&quot;, &quot;--name-only&quot;], cwd=output / &quot;repo&quot;).stdout.splitlines()
+    if changed != [&quot;README.md&quot;, &quot;src/duration.js&quot;] or result[&quot;exit_status&quot;] != &quot;Submitted&quot;:
+        raise AssertionError(&quot;Unexpected changed-file scope or agent exit&quot;)
+    (output / &quot;diff.patch&quot;).write_text(diff)
+    write_json(output / &quot;command-trace.json&quot;, [
+        {&quot;step&quot;: index, &quot;label&quot;: label, &quot;command&quot;: shell_command,
+         &quot;observation&quot;: observations[index - 1][&quot;extra&quot;] if index &lt;= len(observations) else None}
+        for index, (label, shell_command) in enumerate(plan, 1)
+    ])
+    verification = {&quot;scenario&quot;: &quot;repair&quot;, &quot;source&quot;: &quot;mini-swe-agent&quot;, &quot;model&quot;: &quot;DeterministicToolcallModel&quot;,
+                    &quot;scripted_not_model_evaluation&quot;: True, &quot;model_calls&quot;: agent.n_calls,
+                    &quot;synthetic_cost_units&quot;: agent.cost, &quot;tool_observations&quot;: len(observations),
+                    &quot;observed_returncodes&quot;: returncodes, &quot;tests_before&quot;: {&quot;pass&quot;: 2, &quot;fail&quot;: 2},
+                    &quot;tests_after&quot;: {&quot;pass&quot;: 4, &quot;fail&quot;: 0}, &quot;changed_files&quot;: changed,
+                    &quot;exit_status&quot;: result[&quot;exit_status&quot;], &quot;acceptance&quot;: &quot;PASS&quot;}
+    write_json(output / &quot;verification.json&quot;, verification)
+    print(json.dumps(verification, ensure_ascii=False, indent=2))
+
+
+def crash_worker(output):
+    # The shell writes only this generated README, then kills this specific child agent.
+    # It exits immediately afterwards; no sleeping or detached tool is created.
+    effect = python_action(repair_readme() +
+                           &quot;; Path(&#39;../effect-written.txt&#39;).write_text(&#39;README changed before owner exit\\n&#39;)&quot;)
+    plan = [(&quot;读取修改前的 README&quot;, &quot;cat README.md&quot;),
+            (&quot;写入后在 observation 返回前注入崩溃&quot;, f&quot;{effect} &amp;&amp; kill -KILL {os.getpid()}&quot;)]
+    make_agent(output, plan).run(TASK)
+    raise AssertionError(&quot;Crash worker unexpectedly survived&quot;)
+
+
+def run_crash(source, output):
+    if os.name != &quot;posix&quot;:
+        raise SystemExit(&quot;The injected SIGKILL scenario currently requires a POSIX environment.&quot;)
+    worker = command([sys.executable, str(Path(__file__).resolve()), &quot;crash-worker&quot;,
+                      &quot;--source&quot;, str(source), &quot;--output&quot;, str(output)], check=False)
+    (output / &quot;worker.stdout.log&quot;).write_text(worker.stdout)
+    (output / &quot;worker.stderr.log&quot;).write_text(worker.stderr)
+    if worker.returncode != -signal.SIGKILL:
+        raise AssertionError(f&quot;Expected SIGKILL (-9); found {worker.returncode}&quot;)
+    trajectory = json.loads((output / &quot;trajectory.json&quot;).read_text())
+    roles = [message[&quot;role&quot;] for message in trajectory[&quot;messages&quot;]]
+    old_observation = trajectory[&quot;messages&quot;][-1][&quot;extra&quot;][&quot;raw_output&quot;]
+    readme = (output / &quot;repo&quot; / &quot;README.md&quot;).read_text()
+    if roles != [&quot;system&quot;, &quot;user&quot;, &quot;assistant&quot;, &quot;tool&quot;] or &quot;npm run check&quot; not in old_observation:
+        raise AssertionError(&quot;The saved trajectory was not the first completed read step&quot;)
+    if &quot;npm test&quot; not in readme or not (output / &quot;effect-written.txt&quot;).exists():
+        raise AssertionError(&quot;The intended filesystem effect did not precede the crash&quot;)
+    diff = command([&quot;git&quot;, &quot;diff&quot;, &quot;--&quot;, &quot;README.md&quot;], cwd=output / &quot;repo&quot;).stdout
+    (output / &quot;diff.patch&quot;).write_text(diff)
+    verification = {&quot;scenario&quot;: &quot;crash&quot;, &quot;source&quot;: &quot;mini-swe-agent&quot;, &quot;worker_returncode&quot;: worker.returncode,
+                    &quot;saved_roles&quot;: roles, &quot;saved_model_calls&quot;: trajectory[&quot;info&quot;][&quot;model_stats&quot;][&quot;api_calls&quot;],
+                    &quot;saved_observation_has_old_command&quot;: True, &quot;filesystem_has_corrected_command&quot;: True,
+                    &quot;saved_write_action_in_messages&quot;: False, &quot;saved_write_observation&quot;: False,
+                    &quot;saved_exit&quot;: False, &quot;automatic_recovery_tested&quot;: False, &quot;acceptance&quot;: &quot;PASS&quot;}
+    write_json(output / &quot;verification.json&quot;, verification)
+    print(json.dumps(verification, ensure_ascii=False, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(&quot;scenario&quot;, choices=[&quot;prepare&quot;, &quot;repair&quot;, &quot;crash&quot;, &quot;crash-worker&quot;])
+    parser.add_argument(&quot;--source&quot;, type=Path,
+                        default=ROOT / &quot;repositories/upstreams/mini-swe-agent&quot;)
+    parser.add_argument(&quot;--output&quot;, required=True, type=Path)
+    args = parser.parse_args()
+    source, output = args.source.resolve(), args.output.resolve()
+    generated_root = ROOT / &quot;.workspace/learning-labs&quot;
+    if not output.is_relative_to(generated_root) or output == generated_root:
+        raise SystemExit(&quot;Output must be a new subdirectory of .workspace/learning-labs&quot;)
+    if args.scenario == &quot;crash-worker&quot;:
+        prepare_source(source, output)
+        crash_worker(output)
+        return
+    if output.exists():
+        raise SystemExit(&quot;Output already exists. Choose a new directory to preserve earlier runs.&quot;)
+    for executable in [&quot;git&quot;, &quot;node&quot;, &quot;npm&quot;]:
+        if not shutil.which(executable):
+            raise SystemExit(f&quot;Missing required executable: {executable}&quot;)
+    output.mkdir(parents=True)
+    prepare_source(source, output)
+    create_fixture(output)
+    write_json(output / &quot;versions.json&quot;, {&quot;source&quot;: os.path.relpath(source, ROOT), &quot;python&quot;: sys.version.split()[0],
+               &quot;node&quot;: command([&quot;node&quot;, &quot;--version&quot;]).stdout.strip(),
+               &quot;npm&quot;: command([&quot;npm&quot;, &quot;--version&quot;]).stdout.strip(), &quot;platform&quot;: sys.platform})
+    if args.scenario == &quot;prepare&quot;:
+        print(&quot;Prepared intentionally broken fixture; no agent was run.&quot;)
+    elif args.scenario == &quot;repair&quot;:
+        run_repair(output)
+    else:
+        run_crash(source, output)
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre></article></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../index.html">返回课程目录</a><a href="../extended-reading.html">扩展资料说明</a></footer></body></html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>duration.test.js · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="../../../notes/maka/learning/README.html">学习路线</a><a href="../../../notes/maka/learning/glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout attachment-layout"><div class="reading-column"><div class="page-kicker">教学附件</div><p class="attachment-note">用于查看课程引用的原始输入或脚本。此页面只展示文件内容；运行条件和已有结果以对应章节的说明为准。</p><article id="main-content"><h1>duration.test.js</h1><pre><code>import test from &#39;node:test&#39;;
+import assert from &#39;node:assert/strict&#39;;
+import { formatDuration } from &#39;../src/duration.js&#39;;
+
+test(&#39;formats zero seconds&#39;, () =&gt; {
+  assert.equal(formatDuration(0), &#39;0:00&#39;);
+});
+
+test(&#39;formats seconds below one minute&#39;, () =&gt; {
+  assert.equal(formatDuration(9), &#39;0:09&#39;);
+});
+
+test(&#39;rolls over at exactly one minute&#39;, () =&gt; {
+  assert.equal(formatDuration(60), &#39;1:00&#39;);
+});
+
+test(&#39;keeps the seconds after a complete minute&#39;, () =&gt; {
+  assert.equal(formatDuration(125), &#39;2:05&#39;);
+});
+</code></pre></article></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

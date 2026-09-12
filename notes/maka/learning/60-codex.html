@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 60 章｜Codex 的机制与设计取舍 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 60 / 62</div><article id="main-content"><span class="heading-alias" id="i12你了解-codex-怎么设计吗" aria-hidden="true"></span><span class="heading-alias" id="i12codex-机制设计题" aria-hidden="true"></span><span class="heading-alias" id="第-57-章codex-机制设计题" aria-hidden="true"></span><span class="heading-alias" id="第-57-章codex-的机制与设计取舍" aria-hidden="true"></span><span class="heading-alias" id="第-59-章codex-的机制与设计取舍" aria-hidden="true"></span><h1 id="第-60-章codex-的机制与设计取舍">第 60 章｜Codex 的机制与设计取舍</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：Codex 怎样连接工具执行、输入延续和子任务，哪些责任划分值得借鉴？</p>
+<p><strong>关键概念</strong>：App-server（应用服务）：承接产品协议；Session（会话）：持有内核运行状态；ToolRouter（工具路由）：匹配声明与处理器；Hook（钩子）：介入执行前后处理；压缩：更新后续历史表示；Memory（记忆）：经整理与读取复用跨任务信息。</p>
+<p><strong>关系主线</strong>：客户端意图进入内核，工具结果回到后续输入，子任务产物由父任务消费；压缩和后台记忆各有接线条件，执行后拒绝不能回滚已发生效果。</p>
+</blockquote>
+<p>前置：<a href="49-agent-architecture.html">整体架构</a>、<a href="50-tool-contracts.html">Tool 契约</a>、<a href="54-context-compaction.html">压缩</a>、<a href="55-memory.html">Memory</a>、<a href="57-skills-and-subagents.html">Skills 与子任务</a>。</p>
+<p>机制详解：<a href="29-codex-runtime-and-lifecycle.html">运行与生命周期</a> → <a href="32-codex-tools-and-permissions.html">工具与权限</a> → <a href="38-codex-context-compaction.html">上下文与压缩</a> → <a href="41-codex-memory-and-collaboration.html">Memory、Skills 与子任务</a>。</p>
+<p>以下机制限定到 Codex 开源客户端的相应路径；provider、feature 和宿主接线不同，行为也可能不同。</p>
+<span class="heading-alias" id="面试原题约束与最小起点" aria-hidden="true"></span><h2 id="设计问题与实现范围">设计问题与实现范围</h2>
+<blockquote><p>Codex 怎样从用户需求走到工具执行？压缩、Memory 与子任务分别改变哪些状态，哪些设计值得在相似约束下采用？</p>
+</blockquote>
+<p>以下以经过 app-server 的工作路径为例：用户要求修正 README 测试步骤、修复时间格式化函数、运行相关测试并用中文汇报。coding agent 内核、app-server 集成和特定客户端的部署行为分别判断。</p>
+<p>模型调用、工具执行和观察回写构成主循环，会话归属、展示、授权、窗口管理与长期信息围绕该循环提供不同合同。</p>
+<span class="heading-alias" id="两分钟主答" aria-hidden="true"></span><h2 id="机制总览">机制总览</h2>
+<blockquote><p>架构上，我把它分成产品协议和执行内核两层。app-server 用 Thread、Turn、Item 表达对话、一轮工作和过程中的消息或工具事件；core Session 持有运行状态，处理输入、打断、批准和压缩。客户端读取过程，不应自己再运行一份工具循环。</p>
+<p>工具方面，一个 step 的 ToolRouter 同时带着模型可见的 specs 和匹配的 registry。调用回来以后还有真实的名称与输入检查、hook、handler；涉及执行权限的工具再由执行编排器处理 approval、环境权限和 sandbox。一个 schema 不能替代执行边界。</p>
+<p>长会话要区分当前窗口和长期 Memory。源码会按 feature 与 provider 能力选路：有的路径生成摘要或压缩输出，TokenBudget 路径则安装新窗口，相关恢复扩展按条件提供。长期 Memory 另有旧 rollout 提取、跨记录整合、摘要注入与按需读取；不能把这些机制统称为一段聊天摘要。</p>
+<p>Skills 主要提供可发现、可读取的方法资料；这里的协作路径会创建真实 child Thread，并支持历史分叉、发消息或触发继续工作。我会借鉴这些责任边界，再按项目需要选择复杂度；机制存在不等于效果质量更好，仍应说明适用条件，并用任务和故障场景检验。</p>
+</blockquote>
+<p>这些机制的共同连接点是实际消费者：模型请求消费工具说明和输入材料，handler 消费工具调用，父任务消费子任务产物；只有真实经过的路径才支持相应结论。</p>
+<span class="heading-alias" id="白板一先画组件与所有权" aria-hidden="true"></span><h2 id="组件与状态所有权">组件与状态所有权</h2>
+<p>下面是依据工具调用与模型输入路径简化的组件图。实线是调用或数据方向，虚线是可选扩展/后台信息进入请求；它不是完整部署图。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="组件与状态所有权：可滚动示意图"><a href="../../../assets/diagrams/60-codex-1.svg"><img src="../../../assets/diagrams/60-codex-1.svg" alt="客户端经 app-server 进入 core Session，当前 history 与工具 specs 组装模型请求；模型调用经 ToolRouter 和 handler 执行，观察回到 history。过程供协议层展示，持久记录另存，Skills、Memory 和 child Thread 按配置参与。" width="1422" height="1481" loading="lazy" style="width:1422px;min-width:1209px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>客户端经协议层进入 Session，再由模型与工具循环推进工作。Memory 与 child 是有条件的扩展，主循环不以它们存在为前提。</p>
+<p>关键箭头解释：</p>
+<ul>
+<li><code>start 或 steer</code>：新工作与给正在工作的 Agent 追加输入不同，app-server 的 <code>turn_start_inner</code> 检查实际提交结果。</li>
+<li><code>ToolRouter → 请求</code> 和 <code>模型 → ToolRouter</code>：同一份计划连接工具声明与执行选择，便于检查两端是否一致。</li>
+<li><code>handler → history</code>：执行结果是后续行动的依据，图中不把命令发出当成任务完成。</li>
+<li><code>Session → rollout</code>：保存可定位记录；这条箭头本身不证明任意外部副作用与记录有原子事务。</li>
+</ul>
+<p>边界条件：<strong>UI 的连接状态不能替代执行状态；模型看到工具不能替代 runtime 允许效果；子任务结果不能替代父任务验收。</strong> 精确路径和配置条件见前述机制章节。</p>
+<span class="heading-alias" id="白板二从工具计划到一次效果" aria-hidden="true"></span><h2 id="从工具计划到一次效果">从工具计划到一次效果</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从工具计划到一次效果：可滚动示意图"><a href="../../../assets/diagrams/60-codex-2.svg"><img src="../../../assets/diagrams/60-codex-2.svg" alt="多来源工具构建同一 registry 与 router，模型依本步 specs 提出调用；检查 payload 和前置 hook 后进入 handler，执行型工具经批准与沙箱编排，执行后的结果与后置 hook 才形成模型观察。" width="720" height="1485" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中的 approval/sandbox 是所选执行型 handler 的路径；不能据此说所有 MCP、provider-native 或远端工具共享完全相同的强制边界。已核对的实际 consumer 包括补丁执行的 <code>execute_verified_patch</code>。</p>
+<p><code>E → O</code> 表示效果发生后才处理结果：post hook 在效果之后，可以拒绝结果进入模型，却不能撤销文件已经改变。需要防越界时，把许可判断放在效果之前，并让实际执行环境限制它。</p>
+<span class="heading-alias" id="概念契约用自己的接口复述设计" aria-hidden="true"></span><h3 id="教学接口将声明与执行绑定到同一身份">教学接口：将声明与执行绑定到同一身份</h3>
+<p>以下 TypeScript 是<strong>教学设计，非 Codex 官方 API，也不是原 Rust 类型的完整翻译</strong>。它只要求声明与执行引用同一工具身份：</p>
+<pre><code class="language-ts">type ToolIdentity = { namespace: string; name: string };
+type StepToolPlan = {
+  advertised: Array&lt;{ id: ToolIdentity; schema: object }&gt;;
+  executors: Map&lt;string, Executor&gt;;
+};
+type Executor = {
+  parse(raw: string): unknown;
+  execute(input: unknown, context: ExecutionContext): Promise&lt;Observation&gt;;
+};
+type ExecutionContext = { permissions: object; signal: AbortSignal };
+type Observation = { status: &quot;ok&quot; | &quot;rejected&quot; | &quot;failed&quot; | &quot;unknown&quot;; text: string };
+type ModelCall = { identity: ToolIdentity; rawArguments: string; callId: string };
+
+async function dispatch(plan: StepToolPlan, call: ModelCall) {
+  const handler = lookup(plan.executors, call.identity);
+  if (!handler) return observation(&quot;rejected&quot;, &quot;unknown tool&quot;);
+  const input = handler.parse(call.rawArguments);
+  // pre hook、许可检查与真实 sandbox 仍须在具体执行路径落实。
+  return handler.execute(input, executionContextFor(call));
+}</code></pre>
+<p><code>ModelCall</code> 固定调用身份、原始参数与 callId。<code>lookup</code> 使用与建表相同的 namespace/name 编码查找当前计划中的 handler，不接受模型传入新的执行对象。<code>executionContextFor</code> 从受信运行状态提供当前权限和取消信号，不能从 rawArguments 读取授权。</p>
+<p>解析失败发生在 execute 之前，可返回 rejected；执行后的异常则必须结合 handler 证据区分 failed 与 unknown，不能一律标记没有效果。运行器保存 callId 与结果，取消信号传入已开始执行的 handler；动态工具更换时，当前 step 继续使用固定计划，新 step 才安装新计划。这里展开接口责任，没有实现所有 provider、存储和 sandbox 分支，因此不是可直接部署的完整运行器。</p>
+<span class="heading-alias" id="白板三先选压缩实现再安装新历史" aria-hidden="true"></span><h2 id="压缩选路与新历史安装">压缩选路与新历史安装</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="压缩选路与新历史安装：可滚动示意图"><a href="../../../assets/diagrams/60-codex-3.svg"><img src="../../../assets/diagrams/60-codex-3.svg" alt="压缩触发先检查 TokenBudget，开启则以初始上下文和 world state 换窗；否则按 provider 能力走客户端摘要或 remote v2 流式输出，构建并安装新 history、记录 CompactedItem，再继续请求。" width="935" height="1906" loading="lazy" style="width:935px;min-width:795px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>各分支最终都需要建立下一次请求可消费的状态，但产生该状态的方式不同。路径选择节点说明 provider 能力与客户端配置怎样共同影响压缩；公开 Compaction API 不能代表所有 Codex Host 的接线。</p>
+<p>这张图只表达正常完成路径。TokenBudget 优先，其余为客户端摘要与流式远程压缩；客户端摘要仍会调用模型，TokenBudget 的这条换窗路径则不请求摘要。历史恢复扩展有装配条件，不能因窗口已切换就认定旧信息已经取回。完整走读见<a href="38-codex-context-compaction.html">第38章</a>。</p>
+<h3 id="用具体消息走一遍">用具体消息走一遍</h3>
+<p>教学输入是以下历史片段，内容与标号都不是一次真实 Codex 运行日志：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 用具体消息走一遍"><table><caption>表 1 / Table 1 · 用具体消息走一遍</caption><thead><tr><th scope="col">当前信息</th><th scope="col">下一个阶段为什么可能需要</th></tr></thead><tbody><tr><td>U1：修 README 和格式化函数，用中文说明</td><td>用户目标与表达约束</td></tr>
+<tr><td>C1/O1：读取 package.json，测试命令是 npm test</td><td>选择验证入口的依据</td></tr>
+<tr><td>C2/O2：查看函数，125 秒被错误显示为 2:25</td><td>已定位的失败事实与代码位置</td></tr>
+<tr><td>C3/O3：测试产生很长的失败日志</td><td>只需要相关错误，但原始细节可能仍有用</td></tr>
+<tr><td>U2：保留我刚刚修改的 README 开头</td><td>新的写入约束</td></tr></tbody></table></div>
+<p>正常路径：先确定本次分支，以 local 为例，由压缩任务组织 summarization 输入并请求模型；随后构造有预算的用户消息与摘要，并处理初始上下文补回；安装 replacement 后继续请求模型。这里不是承诺每个字段逐字保留，而是说明应在验证时检查哪些信息仍可用。</p>
+<p>教学候选摘要可以是：“目标是修正 README 与时间格式化；125 秒的预期结果为 2:05；验证入口 npm test；保留 README 用户新增开头；尚未完成修复后的回归。”<strong>这段摘要由教材编写，不是 Codex 的固定格式或模型实测输出。</strong></p>
+<p>失败路径：如果压缩调用自己已经超窗，local 压缩实现会在仍有多项输入时删除最旧项后重试；无法继续缩减时报告错误。此时不能说“压缩工具返回了，所以任务安全继续”，需要区分失败、重试成本和删掉关键约束的风险。</p>
+<p>验证方法是给后续任务加入必须使用 U1/U2 的检查，记录是否覆盖用户改动、是否按预期修复以及费用和延迟。只量 token 减少无法证明压缩质量。测试代码存在同样不能代替真实模型的保真评估。</p>
+<h2 id="memory-与-skills子任务放在哪里">Memory 与 Skills、子任务放在哪里</h2>
+<p><strong>Memory 主链。</strong> 本地 app-server 在含输入的 Turn 确实 started 且主环境就绪时调用后台入口；入口还看 feature、root、ephemeral、DB 和额度等条件。Phase 1 从合格 rollout 提取原始记忆与摘要，Phase 2 取得全局 claim 后整合 memory workspace。读取侧根据配置把有界 summary 加入上下文，专门 list/read/search 等工具还有独立开关。</p>
+<p>这与当前长会话压缩的目标不同。压缩为了在这个窗口继续工作；Memory 为未来任务准备可复用信息。对于“以后用中文”，必须分别观察有没有写入、下次有没有读取、模型最终有没有遵循；后台任务启动不等于三者都已发生。</p>
+<p><strong>Skills。</strong> 先有 catalog 的名字和描述，再按可用 package、authority 和资源身份读取正文。正文告诉 Agent 怎样做事，不能代替执行器。读到了测试规范之后，还要看到实际测试调用与结果。</p>
+<p><strong>子任务。</strong> 这里的协作路径的 spawn 创建 child Thread，历史参数可以是 none/all/最近 N turns；本地此路径默认 all。它还区分 QueueOnly 的 send_message 与 TriggerTurn 的 followup_task。前者向普通空闲目标送材料，不要求新开工作；但 Thread 保留 outstanding durable sleep 时也能触发新的普通 Turn，不能概括为永远不唤醒。若两个 child 要改同一文件，还得单独设计工作副本与合并策略；Thread 独立不自动证明文件独立。</p>
+<h2 id="递进追问与参考答案">递进追问与参考答案</h2>
+<h3 id="追问一我看到工具-schema就能执行这个工具吗">追问一：我看到工具 schema，就能执行这个工具吗？</h3>
+<p>不够。schema 是请求界面，runtime 仍要按名称解析实际 handler、校验输入、检查策略，并由真实执行环境落实许可。Codex 的同份 ToolRouter 方便连接两侧；它不自动证明每种外部工具的动态绑定和权限都经过相同路径。在参考接口中，未知身份由 lookup 拒绝，坏参数在解析时拒绝，权限不足由具体执行入口拒绝；三者不会因为 schema 曾出现而自动消失。</p>
+<h3 id="追问二codex-的压缩是不是老消息都删掉剩一段摘要">追问二：Codex 的压缩是不是“老消息都删掉，剩一段摘要”？</h3>
+<p>这句话漏掉选路、保留消息、初始上下文补回、provider 表示和持久记录。local 是模型摘要加有预算的用户消息；remote 路径会处理返回的 compacted history/output；TokenBudget 换窗并不在该函数里请求摘要。活跃输入改变不等于持久记录被同样删除，更不等于它使用 Maka 的 exact-prefix checkpoint 合同。</p>
+<h3 id="追问三memory-已有两阶段是不是就比向量数据库更先进">追问三：Memory 已有两阶段，是不是就比向量数据库更先进？</h3>
+<p>不能这样比较。两阶段描述写入与整合，向量检索描述一种读取方法，它们属于不同设计轴。本次 local search 读到的是文本匹配与分页。该任务应比较事实正确率、过期信息误用、召回成本与实际任务成功率；源码结构不能提供这些结果。</p>
+<h3 id="追问四子代理默认继承所有历史你会照搬吗">追问四：子代理默认继承所有历史，你会照搬吗？</h3>
+<p>本题选择的 spawn 路径默认 all，也支持 none/N。若子任务只有“检查 README 测试说明”，显式给文件、约束与结果格式可能更节省成本；若任务强依赖前文协商，全历史可能减少漏传。设计建议和产品默认值必须分开。还需单独限制工具、预算和文件写入。</p>
+<h3 id="追问五memory-consolidation-是内部任务可以直接认定安全隔离吗">追问五：Memory consolidation 是内部任务，可以直接认定安全隔离吗？</h3>
+<p>不能。这里的整合 worker 对父 Managed profile 设置 memory root 写入和禁网；父 Disabled/External profile 有保留分支。内部 worker 也可能读取或写入敏感内容，实际边界须按环境配置解释。</p>
+<h2 id="你会借鉴什么何时不值得增加复杂度">你会借鉴什么，何时不值得增加复杂度</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 你会借鉴什么，何时不值得增加复杂度"><table><caption>表 2 / Table 2 · 你会借鉴什么，何时不值得增加复杂度</caption><thead><tr><th scope="col">可选设计</th><th scope="col">值得采用的约束</th><th scope="col">代价与验证</th></tr></thead><tbody><tr><td>一个内存循环，直接提供少量工具</td><td>小任务、单客户端、可接受手工重新开始</td><td>最容易实现；用明确完成协议与行为测试验收</td></tr>
+<tr><td>协议层与执行状态分开</td><td>多客户端、过程可观察、需要区分输入与 steering</td><td>状态投影与兼容成本增加；验证事件顺序、重复输入、断线</td></tr>
+<tr><td>同源工具计划（Tool Plan）</td><td>多来源工具、动态 exposure 或 code mode</td><td>计划构建复杂；验证名称冲突、不可执行调用和计划/绑定一致性</td></tr>
+<tr><td>多条压缩实现（Compaction）</td><td>provider 能力和任务窗口不同</td><td>分支、预算与失败处理变多；固定任务比较约束保真、成本与成功率</td></tr>
+<tr><td>后台两阶段记忆（Memory）</td><td>需要跨会话复用大量任务经验</td><td>提取调用、归并竞争与治理成本；单独测存对、读对、用对</td></tr></tbody></table></div>
+<p>用“约束出现 → 增加机制 → 引入代价 → 设计验证”组织采用判断。</p>
+<span class="heading-alias" id="自测评分与失分点" aria-hidden="true"></span><h2 id="两种失败的完整处理">两种失败的完整处理</h2>
+<p><strong>压缩失败。</strong> 沿用 U1/U2 的修复任务，local 压缩请求自身超窗，尚未取得可用 replacement。该分支可以在仍有多项输入时移除最旧项后有界重试；因此要分别保留压缩失败、已花费用和可能丢失的约束。不能因为发起过压缩就报告完成，也不能假设候选文字已经安装。仍不能形成合法输入时，明确停止或按实际路径允许的方式缩减；恢复后修改 README 仍需当前文件观察和用户新增开头的约束。</p>
+<p><strong>post hook 拒绝结果。</strong> 假设补丁执行者已修改 README，后置 hook 拒绝将该结果交给模型。后置拒绝影响结果消费，不撤销已发生的文件效果。后续处理区分执行器记录、文件当前内容与模型可见观察：读取可靠结果或当前 diff，修复结果传递问题；不能把“模型没看见成功”当成重做补丁的理由。更强的自动恢复取决于选定 handler 与存储合同，不能只由 post hook 名称推出。</p>
+<p>这两类故障分别发生在输入重建和效果之后。它们都可能让下一步模型缺少材料，但前者不等同于文件已改，后者也不等同于文件已回滚。</p>
+<p>相关章节：<a href="61-claude-code.html">第61章 Claude Code</a>、<a href="62-complete-design-cases.html">第62章 完整设计案例</a>、<a href="25-host-and-client.html">第25章 Host 与连接</a>。</p>
+<hr>
+<p><a href="59-evaluation-and-progress.html">上一章：第 59 章｜评价设计与任务进展</a> · <a href="61-claude-code.html">下一章：第 61 章｜Claude Code 的机制与设计取舍</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="59-evaluation-and-progress.html"><span>← 上一章</span><strong>第 59 章｜评价设计与任务进展</strong></a><a href="61-claude-code.html"><span>下一章 →</span><strong>第 61 章｜Claude Code 的机制与设计取舍</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E8%AE%BE%E8%AE%A1%E9%97%AE%E9%A2%98%E4%B8%8E%E5%AE%9E%E7%8E%B0%E8%8C%83%E5%9B%B4">设计问题与实现范围</a></li><li class="toc-level-2"><a href="#%E6%9C%BA%E5%88%B6%E6%80%BB%E8%A7%88">机制总览</a></li><li class="toc-level-2"><a href="#%E7%BB%84%E4%BB%B6%E4%B8%8E%E7%8A%B6%E6%80%81%E6%89%80%E6%9C%89%E6%9D%83">组件与状态所有权</a></li><li class="toc-level-2"><a href="#%E4%BB%8E%E5%B7%A5%E5%85%B7%E8%AE%A1%E5%88%92%E5%88%B0%E4%B8%80%E6%AC%A1%E6%95%88%E6%9E%9C">从工具计划到一次效果</a></li><li class="toc-level-3"><a href="#%E6%95%99%E5%AD%A6%E6%8E%A5%E5%8F%A3%E5%B0%86%E5%A3%B0%E6%98%8E%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%91%E5%AE%9A%E5%88%B0%E5%90%8C%E4%B8%80%E8%BA%AB%E4%BB%BD">教学接口：将声明与执行绑定到同一身份</a></li><li class="toc-level-2"><a href="#%E5%8E%8B%E7%BC%A9%E9%80%89%E8%B7%AF%E4%B8%8E%E6%96%B0%E5%8E%86%E5%8F%B2%E5%AE%89%E8%A3%85">压缩选路与新历史安装</a></li><li class="toc-level-3"><a href="#%E7%94%A8%E5%85%B7%E4%BD%93%E6%B6%88%E6%81%AF%E8%B5%B0%E4%B8%80%E9%81%8D">用具体消息走一遍</a></li><li class="toc-level-2"><a href="#memory-%E4%B8%8E-skills%E5%AD%90%E4%BB%BB%E5%8A%A1%E6%94%BE%E5%9C%A8%E5%93%AA%E9%87%8C">Memory 与 Skills、子任务放在哪里</a></li><li class="toc-level-2"><a href="#%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE%E4%B8%8E%E5%8F%82%E8%80%83%E7%AD%94%E6%A1%88">递进追问与参考答案</a></li><li class="toc-level-3"><a href="#%E8%BF%BD%E9%97%AE%E4%B8%80%E6%88%91%E7%9C%8B%E5%88%B0%E5%B7%A5%E5%85%B7-schema%E5%B0%B1%E8%83%BD%E6%89%A7%E8%A1%8C%E8%BF%99%E4%B8%AA%E5%B7%A5%E5%85%B7%E5%90%97">追问一：我看到工具 schema，就能执行这个工具吗？</a></li><li class="toc-level-3"><a href="#%E8%BF%BD%E9%97%AE%E4%BA%8Ccodex-%E7%9A%84%E5%8E%8B%E7%BC%A9%E6%98%AF%E4%B8%8D%E6%98%AF%E8%80%81%E6%B6%88%E6%81%AF%E9%83%BD%E5%88%A0%E6%8E%89%E5%89%A9%E4%B8%80%E6%AE%B5%E6%91%98%E8%A6%81">追问二：Codex 的压缩是不是“老消息都删掉，剩一段摘要”？</a></li><li class="toc-level-3"><a href="#%E8%BF%BD%E9%97%AE%E4%B8%89memory-%E5%B7%B2%E6%9C%89%E4%B8%A4%E9%98%B6%E6%AE%B5%E6%98%AF%E4%B8%8D%E6%98%AF%E5%B0%B1%E6%AF%94%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93%E6%9B%B4%E5%85%88%E8%BF%9B">追问三：Memory 已有两阶段，是不是就比向量数据库更先进？</a></li><li class="toc-level-3"><a href="#%E8%BF%BD%E9%97%AE%E5%9B%9B%E5%AD%90%E4%BB%A3%E7%90%86%E9%BB%98%E8%AE%A4%E7%BB%A7%E6%89%BF%E6%89%80%E6%9C%89%E5%8E%86%E5%8F%B2%E4%BD%A0%E4%BC%9A%E7%85%A7%E6%90%AC%E5%90%97">追问四：子代理默认继承所有历史，你会照搬吗？</a></li><li class="toc-level-3"><a href="#%E8%BF%BD%E9%97%AE%E4%BA%94memory-consolidation-%E6%98%AF%E5%86%85%E9%83%A8%E4%BB%BB%E5%8A%A1%E5%8F%AF%E4%BB%A5%E7%9B%B4%E6%8E%A5%E8%AE%A4%E5%AE%9A%E5%AE%89%E5%85%A8%E9%9A%94%E7%A6%BB%E5%90%97">追问五：Memory consolidation 是内部任务，可以直接认定安全隔离吗？</a></li><li class="toc-level-2"><a href="#%E4%BD%A0%E4%BC%9A%E5%80%9F%E9%89%B4%E4%BB%80%E4%B9%88%E4%BD%95%E6%97%B6%E4%B8%8D%E5%80%BC%E5%BE%97%E5%A2%9E%E5%8A%A0%E5%A4%8D%E6%9D%82%E5%BA%A6">你会借鉴什么，何时不值得增加复杂度</a></li><li class="toc-level-2"><a href="#%E4%B8%A4%E7%A7%8D%E5%A4%B1%E8%B4%A5%E7%9A%84%E5%AE%8C%E6%95%B4%E5%A4%84%E7%90%86">两种失败的完整处理</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

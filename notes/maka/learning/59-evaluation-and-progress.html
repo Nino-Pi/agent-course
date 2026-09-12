@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 59 章｜评价设计与任务进展 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 59 / 62</div><article id="main-content"><span class="heading-alias" id="i11怎样证明设计更好怎样发现-agent-没有进展" aria-hidden="true"></span><span class="heading-alias" id="i11评价设计与任务进展" aria-hidden="true"></span><span class="heading-alias" id="第-56-章评价设计与任务进展" aria-hidden="true"></span><span class="heading-alias" id="第-58-章评价设计与任务进展" aria-hidden="true"></span><h1 id="第-59-章评价设计与任务进展">第 59 章｜评价设计与任务进展</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：怎样判断一次机制改动真正改善任务，又避免把合法等待误判为无进展？</p>
+<p><strong>关键概念</strong>：任务合同：固定成功条件；有效评分：有可采用判定的结果；未知状态：暂缺任务真值；截止交付：期限内确认成功；分层指标：分别衡量工具、输入、记忆与总任务；无进展信号：重复活动没有增加相关信息或改变目标状态。</p>
+<p><strong>关系主线</strong>：在相同任务条件下收集结果、失败和总成本，再按明确分母比较；控制策略结合新观察与等待状态决定继续、提示或停止，不能只数相同调用。</p>
+</blockquote>
+<p>前置：<a href="49-agent-architecture.html">第49章</a>、<a href="54-context-compaction.html">第54章</a>、<a href="55-memory.html">第55章</a>，以及 <a href="26-evaluation-and-design.html#%E8%AF%84%E4%BB%B7%E6%9C%80%E5%B0%8F%E6%A8%A1%E5%9E%8B">第26章 评价最小模型</a>中的完整试次、选择与成本。无进展检测部分是教学提案；Maka 已有具体 loop gate 的范围需按当前文档核对。</p>
+<h2 id="1-原题与约束">1. 原题与约束</h2>
+<blockquote><p>你换了工具接口、压缩策略和 Memory 检索，怎样证明改进有效？Agent 一直调用工具但没有推进时怎样处理？</p>
+</blockquote>
+<p>评价对象与成功条件必须对应。工具合法调用率、任务完成率、费用和恢复正确性各回答不同问题。只看一个综合分可能掩盖严重退化。</p>
+<p>本题使用已有代码修复场景，但增加陌生输入、错误命令、长日志和偏好变化。评价过程同时比较结果、解释失败并计入成本。</p>
+<span class="heading-alias" id="2-两分钟主答" aria-hidden="true"></span><h2 id="2-参考方案">2. 参考方案</h2>
+<blockquote><p>我会先固定任务与可检验目标，再做可比对照。工具层看选对工具、参数合法、执行结果和错误是否可用；Context 层看约束保留、证据能否找回与总成本；Memory 分开看写入、检索、注入和实际行为；整体任务看需求是否满足、修改范围和验证证据。比较时尽量固定模型、权限、环境和任务，随机性需要多次运行并报告波动。无进展控制也不能只数重复调用：分页、轮询和重新读取都可能合法。应记录任务范围和新观察，区分重复失败、等待中的外部工作、目标状态变化。先采用提示或有界等待，停止要保留已知效果，并单独处理提供方错误和用户取消，避免把所有失败归成模型循环。</p>
+</blockquote>
+<span class="heading-alias" id="3-白板图从任务到判断" aria-hidden="true"></span><h2 id="3-从任务到评价判断">3. 从任务到评价判断</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从任务到评价判断：可滚动示意图"><a href="../../../assets/diagrams/59-evaluation-and-progress-1.svg"><img src="../../../assets/diagrams/59-evaluation-and-progress-1.svg" alt="固定任务与验收合同下运行基线和候选，收集请求、工具、状态与最终产物证据；分层错误归因和质量、成本、延迟、恢复指标共同支持是否采纳改动的判断。" width="720" height="1021" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>基线与候选方案接受同一任务和验收合同，汇入同一套证据与判断。只比较各自作者挑选的成功 demo，不构成可比实验。</p>
+<h2 id="4-评价合同与一个可识别失败的用例">4. 评价合同与一个可识别失败的用例</h2>
+<p>教学接口：</p>
+<pre><code class="language-python">case = {
+    &quot;task&quot;: &quot;修复 formatDuration 并更新 README&quot;,
+    &quot;allowed_files&quot;: [&quot;src/duration.js&quot;, &quot;README.md&quot;],
+    &quot;behavior_checks&quot;: [&quot;125 秒为 2:05&quot;, &quot;分钟/余秒边界正确&quot;],
+    &quot;must_not&quot;: [&quot;修改测试掩盖错误&quot;, &quot;假报未执行的测试&quot;],
+    &quot;stress&quot;: &quot;测试日志包含大量重复进度和少量关键断言&quot;
+}
+
+result = {
+    &quot;task_success&quot;: check_task_evidence(case, artifacts),
+    &quot;scope_ok&quot;: check_diff_scope(case, diff),
+    &quot;cost&quot;: measured_total_usage,
+    &quot;latency&quot;: measured_end_to_end_time,
+    &quot;failure_stage&quot;: classify_from_recorded_evidence(trace)
+}</code></pre>
+<p>本题的 <code>check_task_evidence</code> 可以先分三项：对未被篡改的程序运行约定的行为检查；确认 README 指向项目实际测试入口；检查 diff 是否只包含获准修改、是否保留用户内容。三项均满足才给出本题成功；运行检查器本身失败时应返回无法判定，而不是伪造一个通过或行为失败。人工审核、确定性测试和模型判断可以组合，但要记录各自盲点。</p>
+<p>手算一个教学小样本：预先分配 5 个任务，得到成功、成功、失败、基础设施不可用、缺失结果。按约定，前三个有有效评分，所以评分覆盖为 <code>3/5</code>，有效评分内成功为 <code>2/3</code>；确认成功交付占全部任务的 <code>2/5</code>。这三个分母回答不同问题。若五项分别已花费 10、12、9、2、4 个成本单位，已知总成本仍是 37，不能因为后两项没分数就只记 31；尚未确定的追加费用另列。样本与金额单位仅供计算，不是产品结果。</p>
+<p><a href="40-task-evaluation.html#6-%E5%AE%8C%E6%88%90%E5%88%A4%E6%96%AD%E4%B8%8E%E4%BB%BB%E5%8A%A1%E8%AF%84%E5%88%86%E5%90%84%E8%87%AA%E4%BE%9D%E6%8D%AE%E4%BB%80%E4%B9%88">第40章 的评价证据链</a>给出三个实现对象：Maka Goal 的文本窗口、Maka Eval 的 subject/verifier 分工与 Harbor 的 reward 文件。<a href="../../../extended-reading.html#reference-14" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/evaluation/agent-evaluation-and-feedback.md">完成判断与评估专题</a>进一步推导 attempt 选择、pass@k 和观察盲区。</p>
+<h2 id="5-分层指标与误读">5. 分层指标与误读</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 5. 分层指标与误读"><table><caption>表 1 / Table 1 · 5. 分层指标与误读</caption><thead><tr><th scope="col">层次</th><th scope="col">应记录什么</th><th scope="col">单独不能证明什么</th></tr></thead><tbody><tr><td>工具（Tools）</td><td>选择、参数错误、结果可用性、未知效果</td><td>任务最终成功</td></tr>
+<tr><td>上下文（Context）</td><td>关键约束/错误保留、回读回合、总 token</td><td>摘要语义完全正确</td></tr>
+<tr><td>记忆（Memory）</td><td>候选、scope 过滤、输入、最终行为</td><td>检索排名高等于使用正确</td></tr>
+<tr><td>任务（Task）</td><td>需求检查、回归、diff、未完成范围</td><td>单次通过代表所有任务</td></tr>
+<tr><td>工程（Engineering）</td><td>崩溃点、重复效果、恢复状态、取消</td><td>有日志代表恢复闭环</td></tr></tbody></table></div>
+<p>正常走读：两方案都面对同一长日志，候选方案先返回关键断言与 ref，之后成功定位并修复。只有测得全部回读和压缩成本后，才能判断是否节省资源。</p>
+<p>失败走读另采用一个 <strong>README-only 变体</strong>：<code>allowed_files</code> 只有 <code>README.md</code>，用户要求只修文档并报告源码测试失败。候选方案 token 更少，却裁掉“只改 README”并修改了源码。长度指标改善，授权范围指标失败，不能写为无条件优化。这个变体与上面允许修函数的完整任务分别建 case，不能混用验收合同。</p>
+<h2 id="6-无进展检测的最小设计">6. 无进展检测的最小设计</h2>
+<p>下面是教学控制器，不声称 Maka 已实现完整语义 detector。已有专题见 <a href="../../../extended-reading.html#reference-19" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/tools/semantic-stagnation.md">语义停滞研究</a>，其提案与历史实现范围独立保留。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="无进展检测的最小设计：可滚动示意图"><a href="../../../assets/diagrams/59-evaluation-and-progress-2.svg"><img src="../../../assets/diagrams/59-evaluation-and-progress-2.svg" alt="工具结果与任务状态先区分分页轮询和探索修改，分别核对游标、外部状态、预算或新增证据；有进展或合法等待就继续，否则提示、重规划或有界停止。" width="720" height="1423" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>教学记录可包含 <code>scope、action_identity、observation_summary、target_state、cursor、wait_reason</code>。计数应有作用范围，不能把上一个文件的失败直接累计到一个新的修复目标。</p>
+<p>停止决定要放在能结算工具结果的位置，保留已发生的效果；不能在收到一半输出时就把整个操作标成“从未发生”。策略初期可以先只记录或提示，观察误报后再决定哪些情况适合自动停止。</p>
+<h2 id="7-递进追问">7. 递进追问</h2>
+<p><strong>同一个命令执行三次就是死循环吗？</strong></p>
+<p>不是。外部 job 状态可能在变化，文件可能被用户修改，分页可能有新 cursor。要问有没有新信息、是否仍在合法等待预算内；重复文本与无进展不是同一判据。</p>
+<p><strong>模型自评可以作为唯一完成判断吗？</strong></p>
+<p>可作为一个信号，但代码任务还应有实际测试、diff 和用户需求映射。自评输入是否包含失败日志也要核对，否则再聪明的评估器也可能基于缺失材料误判。</p>
+<p><strong>只跑一遍成功可以报告提升吗？</strong></p>
+<p>只能报告那次运行的结果。存在模型随机性时使用重复运行、配对任务并报告样本数和波动；样本小就保留不确定性。不应生成没有真实运行支撑的百分比。</p>
+<p><strong>同一任务第一次明确失败，之后重试到成功，只保留成功能否算单次能力？</strong></p>
+<p>不能。先区分基础设施不可用的替换、完整策略中的自主重试与独立统计 repetition。Maka 的结果选择会保留首个不可替换结果，并非取最高分；若评估允许 k 次候选或带反馈重试，必须明确预算、状态重置及选择器，不能直接冒充单次成功率。</p>
+<p><strong>检测器误停了一个合法任务怎么办？</strong></p>
+<p>记录触发证据、范围与当时动作，用离线回放检查规则。将误停率与节省调用一并考虑；恢复时先核对已完成效果，不盲目重启全部工作。</p>
+<span class="heading-alias" id="8-取舍与独立练习" aria-hidden="true"></span><h2 id="8-三种重复活动的完整判定">8. 三种重复活动的完整判定</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 8. 三种重复活动的完整判定"><table><caption>表 2 / Table 2 · 8. 三种重复活动的完整判定</caption><thead><tr><th scope="col">策略（Policy）</th><th scope="col">收益</th><th scope="col">风险</th></tr></thead><tbody><tr><td>固定步数与时间上限（Limits）</td><td>简单、成本有界</td><td>可能截断有价值工作</td></tr>
+<tr><td>精确重复失败规则（Repetition）</td><td>可解释、成本低</td><td>漏掉语义重复，误判合法重试</td></tr>
+<tr><td>结果与状态感知（State-aware）</td><td>能利用新证据</td><td>状态设计和错误归因更复杂</td></tr>
+<tr><td>模型判断进展（Progress Assessment）</td><td>可处理丰富语义</td><td>增加成本、自评偏差、输出解析问题</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 8. 三种重复活动的完整判定"><table><caption>表 3 / Table 3 · 8. 三种重复活动的完整判定</caption><thead><tr><th scope="col">连续观察（Observation）</th><th scope="col">判定</th><th scope="col">下一步与停止条件</th></tr></thead><tbody><tr><td>分页从 cursor=c1 前进到 c2，返回新订单</td><td>获得新数据，属于有效推进</td><td>继续到任务所需范围；达到页数、费用或期限上限时结束，不能无限翻页</td></tr>
+<tr><td>测试仍失败，但 expected/actual 或失败位置改变</td><td>新观察可能缩小根因，也可能是退化，不能只按非零退出累计停滞</td><td>比较补丁与两次错误；有诊断依据时再调整，无依据时补充观察，保留累计预算</td></tr>
+<tr><td>相同 Edit 三次返回同一零匹配，文件版本也没变</td><td>没有新输入支撑重复调用</td><td>停止原样重试，提示重新 Read 并定位；新观察仍不能确定目标时报告未完成</td></tr></tbody></table></div>
+<p>例如分页节省了 3 次请求而多遗漏 1 项必须检查的订单，就没有满足原验收合同。检测器误停合法分页也应计入失败分析，不能只报告减少的调用数。</p>
+<p>评价分母与成本演算见 <a href="26-evaluation-and-design.html">第26章</a> 和 <a href="40-task-evaluation.html#3-%E5%9B%9B%E4%B8%AA%E4%BB%BB%E5%8A%A1%E4%B8%A4%E4%B8%AA%E8%AF%95%E6%AC%A1%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%89%E4%B8%AA%E6%88%90%E5%8A%9F%E7%8E%87%E9%83%BD%E5%8F%AF%E8%83%BD%E7%AE%97%E5%AF%B9">第40章 配对评价</a>；失败、未知和费用都保留在预先定义的口径中。</p>
+<hr>
+<p><a href="58-orchestration-and-continuity.html">上一章：第 58 章｜设计编排与连续执行</a> · <a href="60-codex.html">下一章：第 60 章｜Codex 的机制与设计取舍</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="58-orchestration-and-continuity.html"><span>← 上一章</span><strong>第 58 章｜设计编排与连续执行</strong></a><a href="60-codex.html"><span>下一章 →</span><strong>第 60 章｜Codex 的机制与设计取舍</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E4%B8%8E%E7%BA%A6%E6%9D%9F">1. 原题与约束</a></li><li class="toc-level-2"><a href="#2-%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 参考方案</a></li><li class="toc-level-2"><a href="#3-%E4%BB%8E%E4%BB%BB%E5%8A%A1%E5%88%B0%E8%AF%84%E4%BB%B7%E5%88%A4%E6%96%AD">3. 从任务到评价判断</a></li><li class="toc-level-2"><a href="#4-%E8%AF%84%E4%BB%B7%E5%90%88%E5%90%8C%E4%B8%8E%E4%B8%80%E4%B8%AA%E5%8F%AF%E8%AF%86%E5%88%AB%E5%A4%B1%E8%B4%A5%E7%9A%84%E7%94%A8%E4%BE%8B">4. 评价合同与一个可识别失败的用例</a></li><li class="toc-level-2"><a href="#5-%E5%88%86%E5%B1%82%E6%8C%87%E6%A0%87%E4%B8%8E%E8%AF%AF%E8%AF%BB">5. 分层指标与误读</a></li><li class="toc-level-2"><a href="#6-%E6%97%A0%E8%BF%9B%E5%B1%95%E6%A3%80%E6%B5%8B%E7%9A%84%E6%9C%80%E5%B0%8F%E8%AE%BE%E8%AE%A1">6. 无进展检测的最小设计</a></li><li class="toc-level-2"><a href="#7-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE">7. 递进追问</a></li><li class="toc-level-2"><a href="#8-%E4%B8%89%E7%A7%8D%E9%87%8D%E5%A4%8D%E6%B4%BB%E5%8A%A8%E7%9A%84%E5%AE%8C%E6%95%B4%E5%88%A4%E5%AE%9A">8. 三种重复活动的完整判定</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

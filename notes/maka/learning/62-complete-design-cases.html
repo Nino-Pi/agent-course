@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 62 章｜三组完整设计案例 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 62 / 62</div><article id="main-content"><span class="heading-alias" id="i14三套模拟面试从空白题目到可评估方案" aria-hidden="true"></span><span class="heading-alias" id="i14综合模拟面试" aria-hidden="true"></span><span class="heading-alias" id="第-59-章综合模拟面试" aria-hidden="true"></span><span class="heading-alias" id="第-59-章三组完整设计案例" aria-hidden="true"></span><span class="heading-alias" id="第-61-章三组完整设计案例" aria-hidden="true"></span><h1 id="第-62-章三组完整设计案例">第 62 章｜三组完整设计案例</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：路径修复、巨型日志和定时协作，怎样分别形成从输入到故障恢复的完整方案？</p>
+<p><strong>关键概念</strong>：参数数组：保留路径的参数边界；条件编辑：保护读取后的用户修改；有效输入：当前实际提供的材料；记忆撤回：使旧规则不再参与新读取；采纳：检查并使用子任务产物；未知效果：缺回执时保留未确认状态。</p>
+<p><strong>关系主线</strong>：三组教学案例分别连接工具与验收、输入与偏好、触发与批准；恢复围绕原操作和当前许可判断，窗口重连、子任务完成和任务成功属于不同状态。</p>
+</blockquote>
+<p>输入、接口与预期结果是教学设计，不是产品运行记录；Codex 与 Claude Code 的对照保留各自公开实现或产品资料的范围。</p>
+<span class="heading-alias" id="1-模拟-a工具与代码修复35-分钟" aria-hidden="true"></span><h2 id="1-案例-a路径包含空格的代码修复">1. 案例 A：路径包含空格的代码修复</h2>
+<p>相关机制：<a href="49-agent-architecture.html">第49章</a>至<a href="52-permissions-and-recovery.html">第52章</a>。</p>
+<span class="heading-alias" id="面试官题面" aria-hidden="true"></span><h3 id="设计问题与条件">设计问题与条件</h3>
+<blockquote><p>一个 Python 文档检查器在路径包含空格时失败。用户允许修改检查器和 README，要求保留已有改动，确认相关行为后报告 diff。</p>
+</blockquote>
+<p>初始任务没有给出测试入口，不能默认采用 npm。本例补充以下教学观察：项目配置声明使用 pytest；检查器的包装函数通过 shell 拼接字符串启动子程序；无空格路径正常，<code>docs/guide draft.md</code> 被拆成两个参数；用户在 README 开头保留一段自己的部署说明。以下参考方案以这些已给定观察为依据。</p>
+<p>允许写入范围只有检查器包装函数和 README，测试文件不在修改范围内。成功需要路径参数保持完整、错误仍能返回、相关测试确实执行、diff 不覆盖用户说明。没有远端发布需求。</p>
+<h3 id="正常流程与完整参考方案">正常流程与完整参考方案</h3>
+<p>执行链是：接纳任务与范围 → 读取配置、包装函数和相关测试 → 用正确入口复现 → 将字符串命令改为参数数组 → 更新 README 中实际测试说明 → 复测 → 核对 diff → 报告。</p>
+<p>包装函数的关键修改如下。代码展示参数边界的修复，<code>cwd</code> 与允许的脚本路径由可信运行配置固定；它不代替 sandbox、超时或权限系统。</p>
+<pre><code class="language-python">import subprocess
+import sys
+
+def run_checker(path: str, cwd: str):
+    return subprocess.run(
+        [sys.executable, &quot;checker.py&quot;, path],
+        cwd=cwd,
+        shell=False,
+        capture_output=True,
+        text=True,
+        check=False,
+    )</code></pre>
+<p><code>path</code> 作为列表中的一个元素传递，即使包含空格也不会被 shell 分词。<code>check=False</code> 保留非零退出状态供调用者解释，不把它伪装成成功；上层应读取 returncode、stdout 和 stderr。<code>shell=False</code> 减少 shell 解释，仍不证明 checker 本身没有文件或网络副作用。</p>
+<p>实际编辑交给资源 owner 的条件提交：Read 返回内容与 v7；模型形成仅修改包装函数的补丁；owner 在同一受保护操作中核对当前版本仍为 v7、目标唯一，再提交 v8。普通文件系统若没有覆盖竞争写者的合同，就必须保留并发风险或使用隔离工作副本；不能把普通 rename 叫作版本 CAS。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 正常流程与完整参考方案"><table><caption>表 1 / Table 1 · 正常流程与完整参考方案</caption><thead><tr><th scope="col">检查输入（Input）</th><th scope="col">参考结果</th><th scope="col">支持的结论</th></tr></thead><tbody><tr><td><code>docs/guide.md</code></td><td>checker 收到一个文件参数，正常检查</td><td>原正常路径保持</td></tr>
+<tr><td><code>docs/guide draft.md</code></td><td>checker 收到完整的单个路径</td><td>空格不再导致参数拆分</td></tr>
+<tr><td>文件不存在</td><td>checker 的非零退出与诊断被保留</td><td>包装层没有吞掉错误</td></tr>
+<tr><td>项目声明的相关测试</td><td>实际发现并执行目标用例，通过</td><td>受测范围内回归成立</td></tr>
+<tr><td>diff</td><td>仅包装函数与 README，用户开头不变</td><td>修改符合授权范围</td></tr></tbody></table></div>
+<p>这些是给定条件下的预期验收结果，不能写成已经运行过的测试记录。参考交付说明是：“修改了子程序的参数传递方式，保留退出状态和诊断；相关行为与修改范围按表中条件验收。没有扩大到其他文件、远端任务或所有操作系统的保证。”</p>
+<span class="heading-alias" id="分阶段追问" aria-hidden="true"></span><h3 id="故障分支与参考处理">故障分支与参考处理</h3>
+<p><strong>Read 后用户再次保存文件。</strong> 若 owner 当前版本变为 v8，旧 v7 条件提交拒绝且本次不写入。重新读取用户变化后重建补丁；用户已经修好同一位置时直接进入验证，不重复修改。匹配仍唯一也不能消除版本已陈旧的事实。</p>
+<p><strong>命令 exit 0，却没有发现测试。</strong> 这里另设一层故障：外层脚本吞掉测试进程的非零退出状态，自己返回 0，并非 pytest 在未收集到用例时正常通过。外层退出结果不是任务验证；保留“0 tests collected”等实际输出，检查测试选择、入口与各层退出状态。可以使用项目定义的正确用例或受控最小复现；没有取得行为结果前，报告“修改已准备，验证尚不充分”。</p>
+<p><strong>用户在模型等待期间停止，模型随后返回两条 Edit。</strong> 运行器在模型返回后、每次新工具准入前检查停止意图，拒绝启动这两条尚未执行的修改。已开始的其他操作接收取消信号，并结算真实结果或 unknown；停止不抹去先前写入。</p>
+<p><strong>文件似乎已改，最终回执丢失。</strong> 保存原 operation 身份并查询 owner 或只读核对文件。若内容已符合目标，可以确认当前状态并继续获准的验证；没有可归因回执时，不能宣称一定是原操作成功，更不能因为没收到结果就再次覆盖文件。</p>
+<span class="heading-alias" id="本题评分20-分" aria-hidden="true"></span><h3 id="方案验收结果">方案验收结果</h3>
+<p>本方案将“错误测试入口”“断言失败”“陈旧版本”“停止请求”“效果未知”分成不同结果，分别导向找入口、诊断、重读、停止新调用和对账。完整验收不是只看最终 exit 0，而是同时核对行为、实际测试执行、diff 范围和未确认的效果。</p>
+<span class="heading-alias" id="2-模拟-b长任务与-memory40-分钟" aria-hidden="true"></span><h2 id="2-案例-b巨型日志与长期偏好撤回">2. 案例 B：巨型日志与长期偏好撤回</h2>
+<p>相关机制：<a href="53-context-composition.html">第53章</a>至<a href="55-memory.html">第55章</a>、<a href="59-evaluation-and-progress.html">第59章</a>。</p>
+<span class="heading-alias" id="面试官题面-1" aria-hidden="true"></span><h3 id="设计问题与条件-1">设计问题与条件</h3>
+<blockquote><p>历史接近窗口上限，最新工具返回 20 万字符。当前只允许改文档；Memory 已保存“全局中文、工作区 A 英文”，用户现在撤回 A 的例外。下一请求与长期更新怎样形成？</p>
+</blockquote>
+<p>当前工作区为 A，没有正在执行的写入。已知 b1 调用了项目确认的测试入口，结果 <code>exit=1</code>；关键行是“125 秒期望 2:05，实际 2:25”，其余主要是重复进度。完整输出已保存为本 Session 有权读取的 <code>log-b1</code>。这是本例给定的存储与读取合同，不是某个产品的 API。</p>
+<p>撤回尚未确认持久提交。用户的撤回请求授权更新这条长期偏好，但不扩大项目文件修改范围；当前源码和测试仍不能改。旧历史的具体内容没有全部给出，摘要只能使用实际选中且可核对的材料。</p>
+<h3 id="正常流程与完整参考方案-1">正常流程与完整参考方案</h3>
+<p>请求组装将四类对象分开：当前规则、旧历史、最新工具结果、长期 Memory。当前“只改文档”与撤回意图独立进入请求；旧前缀按完整协议单元选择，近期 b1 的调用与结果关联保留；20 万字符的正文另做有界表示，并带可靠引用。</p>
+<p>如果还需要压缩旧前缀，候选摘要只概括实际收到的范围，记录原始覆盖与有效输入身份；来源/协议检查通过且 checkpoint 已持久保存后才安装。结构正确不保证语义正确，也不保证新请求一定更短或被 provider 接受。</p>
+<p>下一请求的完整教学表示可以是：</p>
+<pre><code class="language-text">当前任务：只修改文档，不修改源码或测试。
+当前工作区：A。用户现在撤回 A 的英文例外；本次解释采用全局中文。
+长期状态：已保存 global=zh 与 A=en；本次撤回尚未确认持久提交。
+Memory 后续工作：撤回 A 例外，取得提交确认后才报告长期更新完成。
+工具调用：b1，运行项目已确认的测试入口。
+工具结果：exit=1；125 秒期望 2:05，实际 2:25。
+结果范围：其余主要是重复进度；完整日志通过本 Session 的 log-b1 回读。
+可得结论：测试未通过，不能宣称函数已经修好。
+后续动作：在文档范围内处理说明并报告源码问题；需要细节时受控回读。</code></pre>
+<p>这里没有编造旧阶段完成了哪些修复。当前用户指令足以决定本轮中文，不需要等长期写入完成；但“未来会按新规则读取”必须由持久更新及后续读取另行证明。</p>
+<p>Memory 使用如下状态轨迹。M1/M2 是教学条目标识，具体版本提交由选定 Store 合同实现。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 正常流程与完整参考方案"><table><caption>表 2 / Table 2 · 正常流程与完整参考方案</caption><thead><tr><th scope="col">时点</th><th scope="col">长期有效状态（Memory State）</th><th scope="col">A / B 新任务应选择的规则</th></tr></thead><tbody><tr><td>原状态</td><td>M1 global=zh；M2 A=en</td><td>en / zh</td></tr>
+<tr><td>收到撤回，尚未提交</td><td>Store 暂未改变，当前请求另含用户最新指令</td><td>当前 A 依用户指令中文；不能报告长期更新已完成</td></tr>
+<tr><td>撤回提交成功</td><td>M2 inactive，保留撤回来源；M1 不变</td><td>zh / zh</td></tr>
+<tr><td>后来全局改为 ja</td><td>M1=ja，M2 仍 inactive</td><td>ja / ja</td></tr></tbody></table></div>
+<p>若把撤回错误实现成“A 固定中文”，第三行看似正确，第四行 A 却仍是 zh。这就是“删除例外、跟随全局”与“增加一个新的中文例外”的区别。并发更新遇到版本冲突时先重读，不能无条件覆写另一条更新；已捕获的旧请求也不会被 Store 改写追溯替换。</p>
+<span class="heading-alias" id="分阶段追问-1" aria-hidden="true"></span><h3 id="故障分支与参考处理-1">故障分支与参考处理</h3>
+<p><strong>最新结果无法放进 tail。</strong> 压旧 prefix 不能保证解决单个巨大结果。保留 b1 身份、退出状态、关键差异、截断说明和 log-b1，按需求回读；若必须保留的结构自身仍超限，则缩小任务或明确停止，不能无限摘要。</p>
+<p><strong>摘要写“修复成功”。</strong> 源范围和格式校验可能通过，语义仍与 exit=1 矛盾。候选不应作为完成证据；本例用关键事实约束检查“测试失败、未改源码、只改文档”，后续报告仍以实际结果为准。digest 不能证明文字理解正确。</p>
+<p><strong>摘要保存失败。</strong> 新 checkpoint 不应用，旧有效表示保留。若旧请求已超窗，接下来选择针对大结果的缩减或停止；“保留旧表示”不等于可继续发送同一无效请求。</p>
+<p><strong>log-b1 已失效。</strong> 返回明确的引用失效；已有 exit 与关键错误仍可报告，全文缺失单列。只在任务允许且检查可安全重跑时重新观察，不能因正文不可读而重做先前编辑。</p>
+<p><strong>Memory 服务失败。</strong> 返回 unavailable，而不是空列表或 no_match；当前用户撤回仍是本轮有效输入，长期更新保持未确认。服务恢复后按原操作身份查询或受控重提，避免重复写入或虚报保存。</p>
+<span class="heading-alias" id="本题评分20-分-1" aria-hidden="true"></span><h3 id="方案验收结果-1">方案验收结果</h3>
+<p>本轮请求保留“只改文档”、b1 的失败与可靠来源，不把工具结果截短当作任务成功。Memory 的长期完成要求撤回提交成功；后续新读取排除 M2，才能得到跟随 global 的行为。</p>
+<p>比较另一方案时同时记录输入/输出成本、压缩与回读延迟、约束保留、错误细节可找回率、M1/M2 更新状态和最终回答。只减少 token 却越权改源码，或者写成功却没有被读取，都不能判为全面改善。</p>
+<span class="heading-alias" id="3-模拟-c协作连续性与产品比较45-分钟" aria-hidden="true"></span><h2 id="3-案例-c定时协作批准与跨客户端观察">3. 案例 C：定时协作、批准与跨客户端观察</h2>
+<p>相关机制：<a href="56-tool-scheduling.html">第56章</a>至<a href="61-claude-code.html">第61章</a>。</p>
+<span class="heading-alias" id="面试官题面-2" aria-hidden="true"></span><h3 id="设计问题与条件-2">设计问题与条件</h3>
+<blockquote><p>系统每天核对文档与测试入口，可派子任务检查不同模块；任何修改都要用户批准。用户从桌面端发起，也可能换一个客户端查看。</p>
+</blockquote>
+<p>本例假设一个持续驻留的 Host 管理持久控制状态，两个模块的配置可以只读检查。每日 fire 有唯一身份，父任务负责汇总；初始没有写入授权。子任务默认只读、使用明确材料和文件范围，不能从“每天检查”推出每天自动修改。Host 退出或机器关机不在“进程继续运行”的承诺内。</p>
+<h3 id="正常流程与完整参考方案-2">正常流程与完整参考方案</h3>
+<p>控制链为：保存 Schedule → 到点认领 fire <code>f7</code> → 原子查找或创建 admission → 绑定父 Run <code>r7</code> → 分派只读 child <code>c1/c2</code> → 保存带来源结果 → 父任务汇总差异 → 形成具体修改请求 → 用户批准后重新核对范围与基线 → 应用修改并验收。</p>
+<p>三个 owner 分开：Schedule owner 决定某次触发；权限裁决者（Permissions Authority）决定当前允许的动作；Run/资源 owner 管理执行和结果。共用持久存储不意味着这三者可以用一个 <code>pending → run</code> 规则替代。</p>
+<p>教学接纳骨架如下；<code>claim_fire_atomically</code> 的实现必须与取消/修订经过同一事务或串行 owner，单独的先查后写不满足合同。</p>
+<pre><code class="language-python">def resume_fire(fire_id, payload, revision):
+    decision = claim_fire_atomically(fire_id, payload, revision)
+    if decision.kind == &quot;existing&quot;:
+        return query_or_resume_dispatch(decision.run_id)
+    if decision.kind == &quot;rejected&quot;:
+        return decision.reason
+    return query_or_resume_dispatch(decision.run_id)</code></pre>
+<p><code>query_or_resume_dispatch</code> 按原 Run 身份处理已认领但未开始的派发；运行中或已 terminal 的 Run 只查询与收敛。它还必须在执行 owner 处与停止请求仲裁，不能每次恢复都创建新进程。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 正常流程与完整参考方案"><table><caption>表 3 / Table 3 · 正常流程与完整参考方案</caption><thead><tr><th scope="col">里程碑（Milestone）</th><th scope="col">已确认状态（State）</th><th scope="col">尚不能推出</th></tr></thead><tbody><tr><td>f7 被接纳为 r7</td><td>本次 fire 有唯一执行归属</td><td>child 已完成或用户允许修改</td></tr>
+<tr><td>c1/c2 保存只读结果</td><td>各自检查过的范围与观察可查询</td><td>父任务已核对、当前文件仍与观察相同</td></tr>
+<tr><td>用户批准具体 patch</td><td>在给定对象、版本与范围内取得许可</td><td>patch 已应用或测试通过</td></tr>
+<tr><td>父工作区应用成功</td><td>当前文件已改变</td><td>集成行为正确</td></tr>
+<tr><td>测试与 diff 验收通过</td><td>本题受测范围内可交付</td><td>任意后续部署或外部服务也正确</td></tr></tbody></table></div>
+<p>例如 c1 发现模块 A 的 README 仍写旧命令，c2 确认模块 B 无差异。父任务只为 A 形成修改请求；批准前不编辑，批准后若文件版本已变，重读并重新判断原许可是否仍覆盖新动作，而不把旧批准当无限授权。</p>
+<span class="heading-alias" id="分阶段追问-2" aria-hidden="true"></span><h3 id="故障分支与参考处理-2">故障分支与参考处理</h3>
+<p><strong>接纳成功但调度器没收到响应。</strong> 恢复后按 f7 查到 r7，修复 pending 展示并查询其状态。重复请求还要核对相同 payload；不能新建另一个 r8 执行同一 fire。</p>
+<p><strong>两个 child 的局部测试都通过，合并后失败。</strong> 这是加入批准后的并行修改变体：两个 child 分别从明确基线产出 patch。独立 worktree 只隔离执行期间文件，父任务仍要处理文本和语义冲突。父区集成测试失败时保留两份产物及失败观察，由父任务诊断；不能用“两票通过”宣布总体成功。</p>
+<p><strong>父任务停止时 child 恰好完成。</strong> 停止后不再派新工作，向运行中的 child 发送停止并收集可得结果。已完成结果保留；父任务可以标为未采纳，不能删除事实来伪装未执行。结果引用不可读时先恢复交付，不重跑 child 修改。</p>
+<p><strong>快照与订阅之间漏掉完成事件。</strong> 参考协议在同一观察流中取得快照与游标，并回放游标后的事件，或在快照期间缓冲增量。消费者核对订阅身份、序列与 revision；发现缺口后补齐或重取快照。新的订阅可以有新序列起点，不能拼接旧订阅迟到帧。查询状态不会重放原修改命令。</p>
+<p><strong>Client 断线，或 Host 也退出。</strong> 只有 Client 断线且普通执行器随 Host 存活时，r7 可以继续。Client 提供的能力丢失要另行处理；Host 退出后，新进程读取已提交事实，并按实际恢复合同收束或接管，不能承诺恢复任意执行栈和远端资源。</p>
+<h3 id="产品对照与适用边界">产品对照与适用边界</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 产品对照与适用边界"><table><caption>表 4 / Table 4 · 产品对照与适用边界</caption><thead><tr><th scope="col">实例</th><th scope="col">可以借鉴的机制</th><th scope="col">不能推出的保证</th></tr></thead><tbody><tr><td>Codex</td><td>协议 Thread/Turn/Item 与 core 执行分开；按 feature/provider 选择压缩路径</td><td>公开 Compaction API 不证明所有 Host 采用相同实现；child Thread 也不自动等于独立 worktree</td></tr>
+<tr><td>Claude Code</td><td>明确区分子任务背景类型、方法装载与实际执行；按公开模式使用 fork 或 brief</td><td>不是所有子任务都从空上下文开始；sandbox 覆盖与初始化失败行为有入口和配置条件</td></tr>
+<tr><td>本例参考方案（Reference Design）</td><td>fire 身份、具体批准、只读委派、父任务采纳、带游标观察</td><td>这些教学字段不是两家产品共同的 API，也没有因此证明其内部事务相同</td></tr></tbody></table></div>
+<span class="heading-alias" id="本题评分20-分-2" aria-hidden="true"></span><h3 id="方案验收结果-2">方案验收结果</h3>
+<p>重复 f7 不产生第二份父工作；初始只读检查不产生编辑；旧观察不能直接覆盖新文件；child 完成与父区验收分开；断线只恢复观察而不重做效果。对多 Host 接管、更强远端取消或全部客户端模式，需另有实现合同，不能由本例单 Host 正常链推广。</p>
+<span class="heading-alias" id="4-面试官加难卡" aria-hidden="true"></span><h2 id="4-改变约束后的完整处理">4. 改变约束后的完整处理</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 4. 改变约束后的完整处理"><table><caption>表 5 / Table 5 · 4. 改变约束后的完整处理</caption><thead><tr><th scope="col">新条件</th><th scope="col">参考方案的具体变化</th><th scope="col">保留的边界</th></tr></thead><tbody><tr><td>文件被外部编辑器修改</td><td>按新版本重新观察和生成 patch；受控 owner 做条件提交，或使用隔离副本再合并</td><td>不协作外部写者不能被每进程私有 mutex 约束</td></tr>
+<tr><td>工具从 5 个增至 500 个</td><td>高频工具直接提供，低频从可信绑定范围检索；下个 step 安装新 schema</td><td>搜索不授予权限，同步骤调用未激活工具仍拒绝</td></tr>
+<tr><td>用户撤回联网许可</td><td>新准入采用收紧范围；在运行请求单独停止与结算</td><td>已发生的远端效果不会因 revision 变化消失</td></tr>
+<tr><td>只允许离线</td><td>只选实际可离线的模型和本地资料；外部能力不可用时明确报告</td><td>不能静默调用云模型或把缓存当最新远端状态</td></tr>
+<tr><td>历史含未完成工具调用</td><td>在可确认的完整协议单元处选择输入；未结束操作先查状态</td><td>不生成虚假的 tool result，也不把 partial 当完整历史</td></tr>
+<tr><td>外部 job 持续 running</td><td>查询同一 job，保留等待原因、费用与期限；到期停止新轮询并报告状态</td><td>合法等待不等于停滞，也不能无界等待或另建 job</td></tr></tbody></table></div>
+<span class="heading-alias" id="5-空白答题模板与完成标准" aria-hidden="true"></span><h2 id="5-三组案例的状态结论">5. 三组案例的状态结论</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 5. 三组案例的状态结论"><table><caption>表 6 / Table 6 · 5. 三组案例的状态结论</caption><thead><tr><th scope="col">案例</th><th scope="col">当前输入的作用（Input）</th><th scope="col">持久状态的作用（Persistent State）</th><th scope="col">完整参考结论</th></tr></thead><tbody><tr><td>A：文件与进程</td><td>当前文件、失败复现、允许范围决定补丁</td><td>操作身份与接受结果支持恢复判断</td><td>参数修复、行为验证、diff 范围同时满足才交付；未知效果先核对</td></tr>
+<tr><td>B：输入与 Memory</td><td>当前约束、失败结果、适用偏好决定下一请求</td><td>checkpoint 与条目状态分别支持后续读取</td><td>摘要、正文裁剪和长期更新分开；本次中文不证明长期撤回已提交</td></tr>
+<tr><td>C：协作与连续性</td><td>fire、批准、依赖和资源条件决定何时执行</td><td>admission、child 结果和终态支持查询与收敛</td><td>控制、执行、交付、采纳与观察是不同状态，恢复不能越过它们</td></tr></tbody></table></div>
+<p>这些参考方案的技术深度来自具体输入、真实效果位置和失败后的可知状态。每项完成结论都对应可检查的结果，未确认部分保留为未完成或 unknown；没有以设计图代替实际运行结果。</p>
+<hr>
+<p><a href="61-claude-code.html">上一章：第 61 章｜Claude Code 的机制与设计取舍</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="61-claude-code.html"><span>← 上一章</span><strong>第 61 章｜Claude Code 的机制与设计取舍</strong></a><a href="../../../index.html"><span>返回课程目录 →</span><strong>回查章节与设计案例</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E6%A1%88%E4%BE%8B-a%E8%B7%AF%E5%BE%84%E5%8C%85%E5%90%AB%E7%A9%BA%E6%A0%BC%E7%9A%84%E4%BB%A3%E7%A0%81%E4%BF%AE%E5%A4%8D">1. 案例 A：路径包含空格的代码修复</a></li><li class="toc-level-3"><a href="#%E8%AE%BE%E8%AE%A1%E9%97%AE%E9%A2%98%E4%B8%8E%E6%9D%A1%E4%BB%B6">设计问题与条件</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E6%B5%81%E7%A8%8B%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">正常流程与完整参考方案</a></li><li class="toc-level-3"><a href="#%E6%95%85%E9%9A%9C%E5%88%86%E6%94%AF%E4%B8%8E%E5%8F%82%E8%80%83%E5%A4%84%E7%90%86">故障分支与参考处理</a></li><li class="toc-level-3"><a href="#%E6%96%B9%E6%A1%88%E9%AA%8C%E6%94%B6%E7%BB%93%E6%9E%9C">方案验收结果</a></li><li class="toc-level-2"><a href="#2-%E6%A1%88%E4%BE%8B-b%E5%B7%A8%E5%9E%8B%E6%97%A5%E5%BF%97%E4%B8%8E%E9%95%BF%E6%9C%9F%E5%81%8F%E5%A5%BD%E6%92%A4%E5%9B%9E">2. 案例 B：巨型日志与长期偏好撤回</a></li><li class="toc-level-3"><a href="#%E8%AE%BE%E8%AE%A1%E9%97%AE%E9%A2%98%E4%B8%8E%E6%9D%A1%E4%BB%B6-1">设计问题与条件</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E6%B5%81%E7%A8%8B%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88-1">正常流程与完整参考方案</a></li><li class="toc-level-3"><a href="#%E6%95%85%E9%9A%9C%E5%88%86%E6%94%AF%E4%B8%8E%E5%8F%82%E8%80%83%E5%A4%84%E7%90%86-1">故障分支与参考处理</a></li><li class="toc-level-3"><a href="#%E6%96%B9%E6%A1%88%E9%AA%8C%E6%94%B6%E7%BB%93%E6%9E%9C-1">方案验收结果</a></li><li class="toc-level-2"><a href="#3-%E6%A1%88%E4%BE%8B-c%E5%AE%9A%E6%97%B6%E5%8D%8F%E4%BD%9C%E6%89%B9%E5%87%86%E4%B8%8E%E8%B7%A8%E5%AE%A2%E6%88%B7%E7%AB%AF%E8%A7%82%E5%AF%9F">3. 案例 C：定时协作、批准与跨客户端观察</a></li><li class="toc-level-3"><a href="#%E8%AE%BE%E8%AE%A1%E9%97%AE%E9%A2%98%E4%B8%8E%E6%9D%A1%E4%BB%B6-2">设计问题与条件</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E6%B5%81%E7%A8%8B%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88-2">正常流程与完整参考方案</a></li><li class="toc-level-3"><a href="#%E6%95%85%E9%9A%9C%E5%88%86%E6%94%AF%E4%B8%8E%E5%8F%82%E8%80%83%E5%A4%84%E7%90%86-2">故障分支与参考处理</a></li><li class="toc-level-3"><a href="#%E4%BA%A7%E5%93%81%E5%AF%B9%E7%85%A7%E4%B8%8E%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C">产品对照与适用边界</a></li><li class="toc-level-3"><a href="#%E6%96%B9%E6%A1%88%E9%AA%8C%E6%94%B6%E7%BB%93%E6%9E%9C-2">方案验收结果</a></li><li class="toc-level-2"><a href="#4-%E6%94%B9%E5%8F%98%E7%BA%A6%E6%9D%9F%E5%90%8E%E7%9A%84%E5%AE%8C%E6%95%B4%E5%A4%84%E7%90%86">4. 改变约束后的完整处理</a></li><li class="toc-level-2"><a href="#5-%E4%B8%89%E7%BB%84%E6%A1%88%E4%BE%8B%E7%9A%84%E7%8A%B6%E6%80%81%E7%BB%93%E8%AE%BA">5. 三组案例的状态结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 50 章｜设计工具契约 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 50 / 62</div><article id="main-content"><span class="heading-alias" id="i02设计一个-tool从操作语义写到结果合同" aria-hidden="true"></span><span class="heading-alias" id="i02设计工具契约" aria-hidden="true"></span><span class="heading-alias" id="第-47-章设计工具契约" aria-hidden="true"></span><span class="heading-alias" id="第-49-章设计工具契约" aria-hidden="true"></span><h1 id="第-50-章设计工具契约">第 50 章｜设计工具契约</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：一个工具怎样让模型表达意图，又让可信运行时控制实际效果和失败后的下一步？</p>
+<p><strong>关键概念</strong>：Schema（参数结构）：限定调用输入；可信上下文：注入身份、工作区与权限；观察版本：绑定编辑所依据的内容；条件提交：前提通过才写入；结构化结果：区分成功、失败与未知；操作身份：关联远端任务和重试。</p>
+<p><strong>关系主线</strong>：声明帮助选择，参数与当前执行边界接受检查，资源负责者提交效果并返回可用观察；单次编辑成功不等于任务完成，远端任务接纳也不等于测试通过。</p>
+</blockquote>
+<p>前置：<a href="16-tools-and-execution.html">第16章 工具与 Agent Loop</a>、<a href="49-agent-architecture.html">第49章 整体架构</a>。设计结构见 <a href="48-design-answers.html">第48章</a>。本文接口、状态和值均为教学设计，不是 Maka API。</p>
+<h2 id="1-原题约束与最小起点">1. 原题、约束与最小起点</h2>
+<blockquote><p>让 Agent 修正 README 的测试命令。你会怎么设计它使用的 Tool？工具描述、参数、结果和失败处理如何配合？</p>
+</blockquote>
+<p>工具粒度、并行写入者和任务验收者决定接口边界。本题假定模型负责判断修改位置，Runtime 管理执行，工具只完成一次明确的文件编辑；用户可能同时编辑文件。</p>
+<p>最小能力集合是 <code>Read</code>、<code>Edit</code>、<code>Bash</code>：测试入口、修改选择与测试反馈各需要独立观察。合成一个 <code>FixEverything</code> 会隐藏中间判断；细拆到“取一行”“数一个字符”又会增加调用开销。工具粒度应保留必要观察，并有明确的成功条件。</p>
+<p>一次编辑的合同是：<strong>在指定工作区，将基于指定观察版本的唯一片段替换为新文本；只有资源 owner 接受提交才报告修改成功。</strong> 版本条件是本题选用的方案，不能据此声称 Maka 的 <code>old_string</code> 已代表文件版本。</p>
+<span class="heading-alias" id="2-两分钟完整主答" aria-hidden="true"></span><h2 id="2-完整参考方案">2. 完整参考方案</h2>
+<blockquote><p>我先定义工具要完成的单次操作，以及它允许产生的效果。对 README 修复，我保留 Read、Edit 和执行测试三个操作，让模型在读到真实 scripts 之后再提出编辑，编辑以后再用测试和 diff 验证任务。</p>
+<p>Edit 的模型声明包含名字、适用场景和严格输入 schema。参数包含工作区内路径、Read 返回的观察版本、唯一旧片段和新片段；不让模型传入“我是管理员”这样的授权字段。description 要说明何时使用、何时先 Read，以及失配后应重新定位。</p>
+<p>Runtime 从可信上下文注入工作区、调用身份、取消信号和权限边界，校验参数和本步可用性，再把操作交给实际的文件执行者。执行者检查当前对象和版本，以原子条件提交或受可靠锁保护的检查写入完成修改。只在字符串里找到旧片段，不能证明文件没有被别人改过。</p>
+<p>结果不能只有 ok。我会区分成功、明确失败与效果未知，并返回匹配或版本冲突的原因、可回读证据和下一步需要的新观察。成功只表示编辑合同满足，不表示代码已经修好。大 diff 可以保存为产物，再给模型有界摘要；模型需要细节时按需读取。</p>
+<p>验证时我会覆盖唯一匹配、零匹配、多匹配、陈旧版本、并发写入、写后断线和大输出，检查是否覆盖他人改动、是否错误重试，以及模型能否根据失败改下一步。</p>
+</blockquote>
+<p>声明、执行和任务验收分别负责调用含义、真实效果与整体结果；崩溃恢复进一步要求保存操作身份和未知状态。</p>
+<span class="heading-alias" id="3-白板把模型声明和执行能力画成两条线" aria-hidden="true"></span><h2 id="3-模型声明与真实执行的两条链">3. 模型声明与真实执行的两条链</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="模型声明与真实执行的两条链：可滚动示意图"><a href="../../../assets/diagrams/50-tool-contracts-1.svg"><img src="../../../assets/diagrams/50-tool-contracts-1.svg" alt="可信工具声明指导模型表达调用，可信执行上下文另向 Runtime 提供工作区和权限；文件执行者交给资源 owner 条件提交，成功、失败或未知结果保存后以有界观察和证据引用返回。" width="767" height="1284" loading="lazy" style="width:767px;min-width:652px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中四条关键箭头承担不同责任：</p>
+<ol>
+<li>声明 → 模型只提供“怎么提出动作”，没有把执行权限交给模型。</li>
+<li>可信上下文 → Runtime 绑定本次执行身份，不能由模型参数覆盖。</li>
+<li>执行者 → 资源 owner 是可能改变现实的位置，校验和描述本身不产生编辑效果。</li>
+<li>结果 → 模型提供下一步证据，不能把调用意图或生成的 patch 当作成功结果。</li>
+</ol>
+<p>图上的不变量：<strong>未通过执行准入的参数不进入效果操作；只有实际接受的结果才能成为后续模型观察。</strong> 持久化失败时如何停止循环，交给 <a href="52-permissions-and-recovery.html">第52章</a>。</p>
+<span class="heading-alias" id="4-写接口哪些给模型哪些由系统提供" aria-hidden="true"></span><h2 id="4-接口模型参数与可信执行上下文">4. 接口：模型参数与可信执行上下文</h2>
+<p>以下 TypeScript 是教学接口。<code>Version</code> 是资源 owner 发放的观察标识；其作用域和有效性必须由该 owner 定义。<code>Schema</code>、<code>Boundary</code> 等是省略底层实现的抽象类型。</p>
+<pre><code class="language-ts">type EditArgs = {
+  path: string
+  observedVersion: string
+  oldText: string
+  newText: string
+}
+
+type ToolContext = {
+  workspaceId: string
+  callId: string
+  boundary: Boundary
+  signal: AbortSignal
+}
+
+type Outcome&lt;T&gt; =
+  | { status: &quot;succeeded&quot;; value: T; evidenceRef?: string }
+  | { status: &quot;failed&quot;; code: string; message: string;
+      effect: &quot;none&quot; | &quot;partial_known&quot;; retry: &quot;reobserve&quot; | &quot;do_not_retry&quot; }
+  | { status: &quot;unknown&quot;; code: string; message: string;
+      operationRef: string; retry: &quot;reconcile_first&quot; }
+
+type Tool&lt;A, T&gt; = {
+  name: string
+  description: string
+  inputSchema: Schema&lt;A&gt;
+  execute(args: A, ctx: ToolContext): Promise&lt;Outcome&lt;T&gt;&gt;
+}</code></pre>
+<p><code>failed</code> 表示已知的失败结果，不保证所有工具都没有部分效果，因此单独写 <code>effect</code>。若到底改没改无法确认，就用 <code>unknown</code>，不能塞进 <code>failed/no-effect</code>。取消是一个控制请求，也不能直接决定结果属于哪一类。</p>
+<p>模型看到的声明可以这样写；限制值是本题起点，不是通用最优值：</p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;Edit&quot;,
+  &quot;description&quot;: &quot;将当前工作区文件中的唯一旧片段替换为新片段。先用 Read 获取当前内容与观察版本。版本过期或目标不唯一时不写入，应重新读取并定位。编辑成功后仍需审查 diff 并验证任务。&quot;,
+  &quot;inputSchema&quot;: {
+    &quot;type&quot;: &quot;object&quot;,
+    &quot;additionalProperties&quot;: false,
+    &quot;required&quot;: [&quot;path&quot;, &quot;observedVersion&quot;, &quot;oldText&quot;, &quot;newText&quot;],
+    &quot;properties&quot;: {
+      &quot;path&quot;: { &quot;type&quot;: &quot;string&quot;, &quot;minLength&quot;: 1 },
+      &quot;observedVersion&quot;: { &quot;type&quot;: &quot;string&quot;, &quot;minLength&quot;: 1 },
+      &quot;oldText&quot;: { &quot;type&quot;: &quot;string&quot;, &quot;minLength&quot;: 1 },
+      &quot;newText&quot;: { &quot;type&quot;: &quot;string&quot; }
+    }
+  }
+}</code></pre>
+<p>schema 检查类型、必填项和基本形状；实际路径是否越界、目标是否唯一、观察版本是否仍有效，都要在执行层检查。这里允许空 <code>newText</code> 表达删除，但禁止空 <code>oldText</code>，避免把“插入哪里”的语义藏在空字符串匹配里；需要插入时另定义明确的位置合同。</p>
+<p>运行前还需设置输入字节上限、超时和输出预算。这些是可信配置，不能允许模型把上限改成无限大。工具的“只读”“可并行”等执行事实也由可信绑定提供，不能仅相信第三方 description 或 annotation。</p>
+<h2 id="5-正常走读一次成功编辑怎样变成下一步证据">5. 正常走读：一次成功编辑怎样变成下一步证据</h2>
+<p>教学输入是：<code>Read package.json</code> 得到 <code>scripts.test = &quot;node --test&quot;</code>；<code>Read README.md</code> 得到观察版本 <code>v17</code>，旧段落为 <code>Run npm run check.</code>。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 5. 正常走读：一次成功编辑怎样变成下一步证据"><table><caption>表 1 / Table 1 · 5. 正常走读：一次成功编辑怎样变成下一步证据</caption><thead><tr><th scope="col">步骤</th><th scope="col">输入或状态（Input · State）</th><th scope="col">检查与输出（Output）</th></tr></thead><tbody><tr><td>提出编辑</td><td>path=README.md，version=v17，旧片段与新片段</td><td>模型只表达将入口改为 <code>Run npm test.</code></td></tr>
+<tr><td>运行时准入（Runtime Admission）</td><td>当前工具面包含 Edit，参数结构有效</td><td>注入工作区和调用身份，进入文件执行者</td></tr>
+<tr><td>条件提交（Conditional Commit）</td><td>owner 当前版本仍为 v17，旧片段一处</td><td>owner 原子接受新内容，产生 v18</td></tr>
+<tr><td>接受结果（Accepted Outcome）</td><td>succeeded，v18，diff 引用</td><td>给模型“README 已修改”的有界观察</td></tr>
+<tr><td>后续验证（Verification）</td><td>读取必要 diff；执行实际测试入口</td><td>测试结果与修改范围共同支持最终说明</td></tr></tbody></table></div>
+<p>即使测试退出 0，也要确认 README 是否写对；即使 diff 只改一行，也不能证明测试命令可用。每个结果都有自己的证明范围。</p>
+<h2 id="6-失败走读同样一句没改成下一步并不相同">6. 失败走读：同样一句“没改成”，下一步并不相同</h2>
+<p>假设模型拿着 v17 准备编辑，用户先加入一段测试环境说明，当前版本变成 v18。owner 在条件提交时发现版本不一致，返回 <code>failed/version_conflict/effect=none/retry=reobserve</code>。Runtime 不自行删除版本条件重试；模型重新 Read，保留用户的新段落，再基于新观察提出另一调用。</p>
+<p>再换一个故障点：owner 可能已接受编辑，但回执通道断开。调用者返回 <code>unknown</code>，保存 operation 引用。它先查询 owner 或核对当前文件；不能因为没有收到成功结果就原样写第二遍。只读核对发现内容符合目标，只能先证明当前状态，若没有可靠回执仍不能断言是谁完成了该写入。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 6. 失败走读：同样一句“没改成”，下一步并不相同"><table><caption>表 2 / Table 2 · 6. 失败走读：同样一句“没改成”，下一步并不相同</caption><thead><tr><th scope="col">错误（Error）</th><th scope="col">已知什么</th><th scope="col">合理的下一步</th></tr></thead><tbody><tr><td>参数结构 schema 缺少 path</td><td>未形成合法执行输入</td><td>修正字段，不重读文件也能解决</td></tr>
+<tr><td>旧片段 oldText 匹配两处</td><td>本次目标不唯一，未写入</td><td>Read 更多上下文，缩小目标</td></tr>
+<tr><td>版本冲突（version_conflict）</td><td>观察已陈旧，本次条件提交未接受</td><td>重新 Read，保留并发变化</td></tr>
+<tr><td>访问拒绝（access_denied）</td><td>当前边界不足</td><td>判断任务是否仍可在边界内完成；确需扩权才走授权链</td></tr>
+<tr><td>响应丢失（response_lost）</td><td>效果无法确认</td><td>查询或对账，阻止盲目重试</td></tr></tbody></table></div>
+<h2 id="7-递进追问与参考答案">7. 递进追问与参考答案</h2>
+<p><strong>追问一：为什么不用一个 Bash 完成所有读、改、测？</strong></p>
+<p>可以，尤其现成 CLI 已满足需求时。代价是目标匹配、引用、cwd、多个退出码和部分成功由脚本承担。若脚本把几步串起来最后只输出 done，模型会失去重新判断的机会。应保留每步状态，在需要诊断时返回控制权。结构化工具的价值来自清楚的语义和检查，不来自名字本身。</p>
+<p><strong>追问二：description 越详细越好吗？</strong></p>
+<p>不一定。先保留用途、输入语义、前提、主要副作用和最关键失败行为。重复背景会增加 schema 成本；相似工具需要具体的选择差异。用容易混淆的任务测选错率，不能仅凭文案长度判断质量。</p>
+<p><strong>追问三：让模型传 <code>authorized=true</code> 可以简化执行吗？</strong></p>
+<p>不可以。模型可填写任务参数，授权来自用户和可信策略。执行身份、权限上限、已批准范围与取消信号由 Runtime 注入；schema 合法也不构成授权。</p>
+<p><strong>追问四：工具返回 success，Agent 就能结束吗？</strong></p>
+<p>不能。工具成功只证明该操作合同完成。Edit 不证明函数正确，测试通过不证明没有无关修改。主任务完成由目标和对应验证证据共同判定。</p>
+<p><strong>追问五：工具接口需要版本化吗？</strong></p>
+<p>当名称不变但参数或结果语义改变时需要兼容策略。可在可信 registry 中绑定版本或 generation，让一次调用固定使用某代实现；不能搜索时看旧说明、执行时静默换成不兼容实现。只有新增可选字段且旧语义保持时，才可能兼容扩展。</p>
+<h2 id="8-取舍与验证先证明解决了什么">8. 取舍与验证：先证明解决了什么</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 8. 取舍与验证：先证明解决了什么"><table><caption>表 3 / Table 3 · 8. 取舍与验证：先证明解决了什么</caption><thead><tr><th scope="col">方案</th><th scope="col">适用条件</th><th scope="col">代价</th><th scope="col">优先验证</th></tr></thead><tbody><tr><td>少量通用 Read/Edit/Bash</td><td>任务类型变化较多，模型能分步判断</td><td>模型需要多轮组织工作</td><td>目标定位、错误反馈、任务成功率</td></tr>
+<tr><td>领域工具（Domain Tool）<code>UpdateTestCommand</code></td><td>稳定领域有明确结构和高重复操作</td><td>领域规则维护，超出领域能力不足</td><td>非标准文档、正确拒绝、额外修改</td></tr>
+<tr><td>多步组合工具（Composite Tool）</td><td>控制流固定、机械处理多</td><td>中间反馈容易被吞掉，部分成功复杂</td><td>每个失败点、取消、子调用证据</td></tr></tbody></table></div>
+<p>测试输入应覆盖缺字段、越界路径、空旧片段、唯一/零/多匹配、并发版本冲突、成功后的结果投影、写后回执丢失。模型层另测是否会在 <code>reobserve</code> 后增加新观察，而非机械重试。例如版本冲突预期为本次无写入并要求重读，回执丢失预期为 unknown 并先对账；两者不能共用无条件重试。</p>
+<span class="heading-alias" id="9-评分自测与回读" aria-hidden="true"></span><h2 id="9-远端测试任务的完整契约">9. 远端测试任务的完整契约</h2>
+<p>将单次 Edit 换成“为当前变更创建远端测试任务”时，资源 owner 变为 CI 服务。教学请求固定 <code>repository</code>、<code>revision</code>、<code>testPlan</code> 和 <code>businessIntentKey</code>；其中 <code>revision=rev18</code> 标识整个待测代码快照，与前文单个文件的观察版本 v17/v18 不同。用户授权与凭据仍由可信上下文提供。相同 key 必须绑定相同业务参数，不能由模型随意换 key 来绕过去重。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 9. 远端测试任务的完整契约"><table><caption>表 4 / Table 4 · 9. 远端测试任务的完整契约</caption><thead><tr><th scope="col">阶段</th><th scope="col">请求或观察（Request · Observation）</th><th scope="col">参考处理</th></tr></thead><tbody><tr><td>首次提交前</td><td>业务 key=k7，revision=rev18，testPlan=regression</td><td>先持久保存 key 与参数，再调用服务端</td></tr>
+<tr><td>服务已接受</td><td>返回 jobId=j9、queued</td><td>保存回执；queued 只表示任务存在，不表示测试通过</td></tr>
+<tr><td>提交响应丢失</td><td>不知道是否已创建 j9</td><td>按 k7 查询，或仅在服务端明确的幂等合同内重提相同参数</td></tr>
+<tr><td>查询返回 running</td><td>测试仍进行中</td><td>在等待预算内查询同一 job，不创建第二份任务</td></tr>
+<tr><td>查询返回 finished/failed</td><td>有退出状态与失败用例</td><td>作为任务观察交回 Agent，再决定修改或报告</td></tr></tbody></table></div>
+<p>服务端若不提供查询或幂等保证，响应丢失只能保留 unknown；调用者自造 UUID 不会补出服务端去重能力。这个结果模型也解释了为什么一个 <code>ok: true</code> 不足以表达“提交成功、执行完成、测试通过”三个阶段。</p>
+<p>普通 Maka Edit 没有本文的 <code>observedVersion</code> 参数。该字段表达更强的条件提交设计，必须由资源层实现，不能靠给默认工具多传一个字段获得。</p>
+<p>相关机制：<a href="51-file-and-shell-tools.html">第51章 文件与 Shell</a>、<a href="52-permissions-and-recovery.html">第52章 权限与效果恢复</a>、<a href="56-tool-scheduling.html">第56章 工具发现与调度</a>。</p>
+<hr>
+<p><a href="49-agent-architecture.html">上一章：第 49 章｜设计代码修复 Agent</a> · <a href="51-file-and-shell-tools.html">下一章：第 51 章｜设计 Read、Edit 与 Bash</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="49-agent-architecture.html"><span>← 上一章</span><strong>第 49 章｜设计代码修复 Agent</strong></a><a href="51-file-and-shell-tools.html"><span>下一章 →</span><strong>第 51 章｜设计 Read、Edit 与 Bash</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E7%BA%A6%E6%9D%9F%E4%B8%8E%E6%9C%80%E5%B0%8F%E8%B5%B7%E7%82%B9">1. 原题、约束与最小起点</a></li><li class="toc-level-2"><a href="#2-%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 完整参考方案</a></li><li class="toc-level-2"><a href="#3-%E6%A8%A1%E5%9E%8B%E5%A3%B0%E6%98%8E%E4%B8%8E%E7%9C%9F%E5%AE%9E%E6%89%A7%E8%A1%8C%E7%9A%84%E4%B8%A4%E6%9D%A1%E9%93%BE">3. 模型声明与真实执行的两条链</a></li><li class="toc-level-2"><a href="#4-%E6%8E%A5%E5%8F%A3%E6%A8%A1%E5%9E%8B%E5%8F%82%E6%95%B0%E4%B8%8E%E5%8F%AF%E4%BF%A1%E6%89%A7%E8%A1%8C%E4%B8%8A%E4%B8%8B%E6%96%87">4. 接口：模型参数与可信执行上下文</a></li><li class="toc-level-2"><a href="#5-%E6%AD%A3%E5%B8%B8%E8%B5%B0%E8%AF%BB%E4%B8%80%E6%AC%A1%E6%88%90%E5%8A%9F%E7%BC%96%E8%BE%91%E6%80%8E%E6%A0%B7%E5%8F%98%E6%88%90%E4%B8%8B%E4%B8%80%E6%AD%A5%E8%AF%81%E6%8D%AE">5. 正常走读：一次成功编辑怎样变成下一步证据</a></li><li class="toc-level-2"><a href="#6-%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB%E5%90%8C%E6%A0%B7%E4%B8%80%E5%8F%A5%E6%B2%A1%E6%94%B9%E6%88%90%E4%B8%8B%E4%B8%80%E6%AD%A5%E5%B9%B6%E4%B8%8D%E7%9B%B8%E5%90%8C">6. 失败走读：同样一句“没改成”，下一步并不相同</a></li><li class="toc-level-2"><a href="#7-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE%E4%B8%8E%E5%8F%82%E8%80%83%E7%AD%94%E6%A1%88">7. 递进追问与参考答案</a></li><li class="toc-level-2"><a href="#8-%E5%8F%96%E8%88%8D%E4%B8%8E%E9%AA%8C%E8%AF%81%E5%85%88%E8%AF%81%E6%98%8E%E8%A7%A3%E5%86%B3%E4%BA%86%E4%BB%80%E4%B9%88">8. 取舍与验证：先证明解决了什么</a></li><li class="toc-level-2"><a href="#9-%E8%BF%9C%E7%AB%AF%E6%B5%8B%E8%AF%95%E4%BB%BB%E5%8A%A1%E7%9A%84%E5%AE%8C%E6%95%B4%E5%A5%91%E7%BA%A6">9. 远端测试任务的完整契约</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

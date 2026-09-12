@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 20 章｜记忆的写入、读取与更新 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 20 / 62</div><article id="main-content"><span class="heading-alias" id="09memory保存以后下一次怎样真正用上" aria-hidden="true"></span><span class="heading-alias" id="m09记忆的写入读取与更新" aria-hidden="true"></span><span class="heading-alias" id="第-19-章记忆的写入读取与更新" aria-hidden="true"></span><h1 id="第-20-章记忆的写入读取与更新">第 20 章｜记忆的写入、读取与更新</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：“以后用中文解释”怎样从当前要求变成未来任务可用、可更正的信息？</p>
+<p><strong>关键概念</strong>：Memory（记忆）保存可复用信息；scope（范围）限定适用对象；Local Memory（本地记忆）通过读取门进入输入；CAS（原子比较并更新）仅在版本匹配时接受写入；Atomic LTM（结构化长期记忆）已有写入与查询基础。</p>
+<p><strong>关系主线</strong>：写入、持久化、选择、输入组装与实际采用是不同步骤。更正要处理旧规则和并发版本；同 Turn 已捕获正文不会自动撤回，Atomic 查询也不等于已接通自动召回。</p>
+</blockquote>
+<p>贯穿案例中，用户在修复 <code>formatDuration(seconds)</code>、运行测试并更新 README 时补充：“以后请用中文解释结果。”当前模型输入与历史压缩分别见 <a href="15-model-context.html">第15章</a>和 <a href="19-context-compaction.html">第19章</a>。</p>
+<h2 id="核心阅读一条偏好四个不同的动作">核心阅读：一条偏好，四个不同的动作</h2>
+<h3 id="1-当前能用中文还不需要长期记忆">1. 当前能用中文，还不需要长期记忆</h3>
+<p>用户刚刚说过中文要求，它就在本次模型输入中。本轮输出中文可以说明回答符合这项当前要求，却不能证明已经保存长期记忆。模型回复“我记住了”也只是生成了一句话。</p>
+<p>困难出现在新会话：新输入只有“解释这次测试结果”，没有旧偏好。要再次使用那条信息，系统必须在当前对话之外保留它，并建立后续读取和使用的路径。这里讨论的是 Agent 的外部记忆机制，不讨论改变模型权重的训练。</p>
+<p>若旧对话不再进入输入，又没有保存偏好，这条路径就无法为新请求提供中文要求；偶然输出中文也不构成记忆生效的证据。</p>
+<h3 id="2-最小闭环不要求先建复杂数据库">2. 最小闭环不要求先建复杂数据库</h3>
+<p>先采用一个限定设计：用户显式保存一条偏好，程序串行执行，只有一个使用者。一个可读取的文件就能承担存储。</p>
+<p>旧会话中的明确要求是“以后用中文”，新会话只说“解释这次测试结果”。下图的两个外框分开这两次会话，存储连接它们；最后的核对还需实际模型回答，不能从写入成功直接跳到记忆生效。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="最小闭环不要求先建复杂数据库：可滚动示意图"><a href="../../../assets/diagrams/20-memory-1.svg"><img src="../../../assets/diagrams/20-memory-1.svg" alt="旧会话明确要求保存偏好，经写入和跨进程存储，在新会话按当前任务选择读取，组成模型输入后再核对实际行为；存储存在、请求可见和正确使用是不同证据。" width="720" height="1284" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>文件、JSON、数据库是表示和存储选择。版本号、幂等 receipt、向量索引分别解决进一步的更新、重试和检索问题，不属于上述最小闭环必需的固定字段。</p>
+<p>下面是教学伪代码，不是 Maka API，也未单独执行：</p>
+<pre><code class="language-python"># 旧会话：用户显式要求保存
+save_preference(&quot;解释结果时使用中文&quot;)
+
+# 新会话：当前请求没有重复语言偏好
+background = read_relevant_preference(current_task)
+model_input = compose(current_task, background)</code></pre>
+<p>此处尚未证明模型实际遵守了偏好。伪代码最后只组好了请求；只有调用模型并检查回答，才能继续判断使用效果。可以沿同一条证据线逐项核对：</p>
+<pre><code class="language-text">存储里有这条信息 → 本任务实际取回了它 → 它确实进入本次输入 → 回答按适用条件使用了它</code></pre>
+<p>任何一个箭头都需要自己的接线或观察。数据库提供查询函数，不代表 Agent 调用了它；内容进入输入，也不代表模型一定遵循。四步闭环中的“用”既要检查输入组装，也要检查最终行为。</p>
+<h3 id="3-每出现一个新问题再增加一种机制">3. 每出现一个新问题，再增加一种机制</h3>
+<p>现在用户说：“工作区 A 用英文，其他项目仍用中文。”这不一定推翻全局偏好，而可能增加一个局部例外。只按字符串相似度选旧信息无法判断适用范围。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 3. 每出现一个新问题，再增加一种机制"><table><caption>表 1 / Table 1 · 3. 每出现一个新问题，再增加一种机制</caption><thead><tr><th scope="col">新出现的问题</th><th scope="col">需要增加的能力</th><th scope="col">可能采用的设计，尚不是唯一答案</th></tr></thead><tbody><tr><td>A 与 B 的偏好不同</td><td>表达适用范围并在读取时选择</td><td>分文件、scope 字段、按项目装配</td></tr>
+<tr><td>旧偏好已经改变</td><td>判断补充、替代或失效</td><td>显式编辑、时序条目、更新/合并器</td></tr>
+<tr><td>多处同时修改同一记忆</td><td>识别冲突与确定写入顺序</td><td>版本检查、单写者、事务</td></tr>
+<tr><td>保存请求重发</td><td>避免重复或给出可查询结果</td><td>稳定请求身份、幂等操作或去重规则</td></tr>
+<tr><td>记录太多，无法全部注入</td><td>有界选择并保留回读入口</td><td>目录、字面检索、向量或混合检索</td></tr></tbody></table></div>
+<p>表示和机制取决于要解决的问题：单用户顺序读写未必需要冲突协议，跨项目选择则不能仅靠多存几条文本。</p>
+<p>记忆还可能过期或含有不可信指令。它可以提供任务背景，不能因为保存得久就获得授予文件、网络权限的权力。若当前用户说“这次发布说明用英文”，不能拿旧中文偏好压过这次明确要求；但这次例外也不自动授权永久覆盖旧偏好。<strong>本次怎么用、长期怎么改、实际能执行什么</strong>是三个需要分别作出的判断。</p>
+<h3 id="4-将这条检查线映射到-maka">4. 将这条检查线映射到 Maka</h3>
+<p>Maka 当前有两套互不自动同步的长期记忆路径。两套路径分别连接了不同的写入与消费入口。表中的 bundle 是共同读取和提交的一组文件，Local 路径用它关联记忆正文与待审提案。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 4. 将这条检查线映射到 Maka"><table><caption>表 2 / Table 2 · 4. 将这条检查线映射到 Maka</caption><thead><tr><th scope="col">当前实现</th><th scope="col">保存在哪里</th><th scope="col">下一次模型怎样获得内容</th></tr></thead><tbody><tr><td>透明本地记忆（Local Memory）</td><td>用户可见的 <code>MEMORY.md</code> / <code>PENDING.md</code> bundle</td><td>允许 Agent 读取且条目适用时，由 Host 从 <code>MEMORY.md</code> 筛选后加入 prompt；Agent 读取默认关闭</td></tr>
+<tr><td>结构化长期记忆（Atomic LTM）</td><td><code>memory.sqlite</code> 中的结构化条目</td><td>已有提取、写入和 Store 查询 API；当前没有 Agent-facing recall 或 prompt 注入接线</td></tr></tbody></table></div>
+<p><code>PENDING.md</code> 保存记忆提案及其审阅状态；批准的内容进入 <code>MEMORY.md</code>，被拒绝的提案也可以留在 PENDING 并标记为 rejected。</p>
+<p>因此，如果保存到了透明文件却没有开启 Agent 读取，偏好仍不会由这条路径进入下一次请求。如果保存到了 Atomic LTM，不能从数据库可查询推出 Agent 已经会调用它。</p>
+<p>“分成两套”是 Maka 的实现选择，不属于 Memory 的通用定义。</p>
+<h3 id="5-用同一案例区分四种观察">5. 用同一案例区分四种观察</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 5. 用同一案例区分四种观察"><table><caption>表 3 / Table 3 · 5. 用同一案例区分四种观察</caption><thead><tr><th scope="col">观察（Observation）</th><th scope="col">可以说明什么</th><th scope="col">仍不能说明什么</th></tr></thead><tbody><tr><td>T7 的回答用了中文</td><td>当前要求可能被遵守</td><td>任何长期存储已写入</td></tr>
+<tr><td>旧进程退出后，文件中还能读到偏好</td><td>数据在这次进程切换后保留</td><td>下次请求会查询它</td></tr>
+<tr><td>新会话的背景中出现适用偏好</td><td>读取与输入组装链在该场景生效</td><td>模型必然正确使用，或所有隐私/恢复路径可靠</td></tr>
+<tr><td>新会话按适用偏好解释了结果</td><td>本次最终行为符合要求</td><td>行为一定由 Memory 导致；还需要关闭读取等对照</td></tr></tbody></table></div>
+<p>面向用户的结论也应跟随观察：透明文件保存成功但读取关闭时，可说明“偏好已保存，自动读取尚未开启”；Atomic 保存成功时，应同时说明当前自动召回尚未接入，不能承诺未来必然遵循。</p>
+<p><a href="21-memory-lifecycle.html">第21章</a> 使用真正的文件与新进程检验文件留存、适用背景选择和关闭读取的对照；它不生成或验证任何模型回答。</p>
+<h3 id="真实补例条目没删为什么新会话不再用那个格式">真实补例：条目没删，为什么新会话不再用那个格式</h3>
+<p><a href="22-agent-cases.html#5-memory%E6%96%B0%E4%BC%9A%E8%AF%9D%E7%9A%84%E8%BF%99%E4%B8%89%E4%B8%AA%E5%B0%8F%E6%A0%87%E9%A2%98%E4%BB%8E%E5%93%AA%E9%87%8C%E6%9D%A5">第22章 的 Local Memory 小对照</a>保存“已修改／已验证／待处理”三段报告格式，然后让两个新 Session 完成相同的只读测试任务。开启读取时，实际请求含有这条偏好，回答使用这三个标题；关闭读取后，条目仍在，实际请求不再包含它，回答变为普通的结果摘要和失败说明。</p>
+<p>这个对照把同一条存储内容、两份输入和两次回答关联起来。保存由原生管理接口完成，展示的是 Local Memory；不是模型凭一句“记住了”写入，也不是 Atomic recall 实验。两边都用中文提问，所以不拿中文回答本身作为记忆证据。</p>
+<span class="heading-alias" id="基础完成条件" aria-hidden="true"></span><span class="heading-alias" id="自测保存读取与使用" aria-hidden="true"></span><h3 id="保存读取与使用问答">保存、读取与使用问答</h3>
+<p><strong>问题 1。</strong> 旧会话回答中文、并说“记住了”，为什么不足以证明 Memory？</p>
+<p><strong>解释。</strong> 当前输入本来就包含要求；模型承诺也未提供独立的写入和读取证据。必须在旧输入消失后继续检查保存、查询和组装。</p>
+<p><strong>问题 2。</strong> 用一个文件实现上述最小闭环，是否必须先添加 version、receipt 与向量索引？何时才需要讨论它们？</p>
+<p><strong>解释。</strong> 不必。先用显式保存与顺序读取建立闭环；多写者引出冲突控制，请求重发引出幂等，字面检索不足才引出其他检索方式。</p>
+<p><strong>问题 3。</strong> Maka 透明文件已保存但读开关关闭，与 Atomic Store 可查询但缺少 Agent caller，有什么共同点、什么区别？</p>
+<p><strong>解释。</strong> 两者都不能从“存在已保存内容”推出“进入本次输入”。透明路径已有受开关控制的读取接线；Atomic 目前缺少 Agent-facing recall/injection 消费者，开启透明读取不能补上它。</p>
+<p><strong>问题 4。</strong> 新会话仍然用中文，怎样排除“当前请求已经再次要求中文”这个替代解释？</p>
+<p><strong>解释。</strong> 让新请求不携带旧偏好，核对实际背景来源，再做关闭读取或移除记忆的对照。固定格式程序只能验证输入选择，真实模型的行为仍需另测。</p>
+<p><strong>问题 5。</strong> 旧记忆说“结果解释用中文”，用户这次明确要英文发布说明，应怎样使用和更新记忆？</p>
+<p><strong>解释。</strong> 本次按明确要求写英文；先把它视为当前任务条件，不自动改掉长期中文偏好。只有依据后续明确的更新意图和适用范围，才决定是否修改存储。记忆也不能改变文件或网络授权。</p>
+<h2 id="实现深化由失败约束理解-maka-的具体选择">实现深化：由失败约束理解 Maka 的具体选择</h2>
+<p>持久更新还会遇到 <a href="18-effects-and-recovery.html">第18章 的结果未知窗口</a>：写入可能已决定，返回却丢失。以下 S1/T7/R7 是教学身份，用于区分更新提交、重新读取和实际使用。</p>
+<h3 id="maka透明-memorymd-与-atomic-ltm-是两套系统">Maka：透明 <code>MEMORY.md</code> 与 Atomic LTM 是两套系统</h3>
+<h4 id="路径-a用户可见的-memorymd">路径 A：用户可见的 <code>MEMORY.md</code></h4>
+<p><a href="glossary.html#memorymd%E9%80%8F%E6%98%8E%E6%96%87%E4%BB%B6%E8%AE%B0%E5%BF%86"><code>MEMORY.md</code></a> 是透明 Local Memory 产品面。用户可以查看、编辑和审批内容，它与 <code>PENDING.md</code> 组成一个 revisioned bundle。</p>
+<p>显式 <code>remember</code> 可以直接追加已获用户批准的内容；<code>propose / approve / reject</code> 则处理 PENDING 中的提案及审阅状态。因此，保存到 MEMORY 并不要求每次先经过 PENDING。</p>
+<p>它有两个独立开关：</p>
+<pre><code class="language-text">enabled            Memory 产品是否启用
+agentReadEnabled   Agent 是否可以把 active entries 放进 prompt</code></pre>
+<p>当前默认值是：</p>
+<pre><code class="language-text">enabled = true
+agentReadEnabled = false</code></pre>
+<p>所以“文件里已经保存”并不自动意味着“下次 Agent 会读”。</p>
+<h5 id="读取链">读取链</h5>
+<p>开启 Agent 读取后，Host 会：</p>
+<pre><code class="language-text">读取 MEMORY.md / PENDING.md bundle
+  → 解析 active entries
+  → session 条目精确匹配当前 sessionId；workspace 条目不做项目过滤
+  → secret redaction
+  → Unicode-safe truncate
+  → 作为 &lt;local-memory&gt; untrusted system block 注入</code></pre>
+<p>正文超过 12,000 个 JavaScript 字符串长度单位（UTF-16 code units）时，先在不拆开代理对的位置截断，再追加截断提示；Host 随后还会添加标题和 <code>&lt;local-memory&gt;</code> 包装。因此 12,000 是正文截断阈值，不是 token 预算或包装后 prompt 的严格总长上限。Memory 文档另有 128 KiB 上限。两种限制约束不同的对象。</p>
+<p><code>untrusted</code> 是设计重点：Local Memory 可以影响语言和偏好，但不能授予文件、网络或 Host 权限。</p>
+<h5 id="写入与崩溃边界">写入与崩溃边界</h5>
+<p><code>remember / propose / approve / reject / archive / restore</code> 使用 revision CAS：只有预期版本仍匹配时才接受提交。bundle 发布采用：</p>
+<pre><code class="language-text">stage → durable decision → finish publication</code></pre>
+<p>如果 durable decision 后结果未知，Host 会<a href="glossary.html#poison--drain%E6%A0%87%E8%AE%B0%E6%9D%83%E5%A8%81%E4%B8%8D%E5%86%8D%E5%AE%89%E5%85%A8--%E6%8E%92%E7%A9%BA">标记当前 authority 不再安全并进入排空（poison/drain）</a>，而不是猜测重写。这避免两个 Client 或一次重启把已经决定的 Memory bundle 用旧 revision 覆盖。</p>
+<h4 id="路径-batomic-long-term-memory">路径 B：Atomic long-term memory</h4>
+<p><a href="glossary.html#atomic-ltm%E5%8E%9F%E5%AD%90%E9%95%BF%E6%9C%9F%E8%AE%B0%E5%BF%86">Atomic LTM</a> 把结构化 <code>MemoryItem</code> 存进独立的 <code>memory.sqlite</code>。它当前不会自动同步到 <code>MEMORY.md</code>。</p>
+<p>一条 Item 可包含：</p>
+<ul>
+<li><code>itemId</code> 与 optimistic <code>version</code>；</li>
+<li>kind：preference、identity、context、knowledge、failure、note；</li>
+<li>statement 与 temporal 类型；</li>
+<li>global 或显式 workspace scope；</li>
+<li>active / archived lifecycle；</li>
+<li>content hash 与时间；</li>
+<li>exact/entity/concept/alias/code keys；</li>
+<li>精确 <code>sessionId / runId / turnId / eventId</code> provenance。</li>
+</ul>
+<p>这些字段服务于当前 Maka 的可审计写入设计；向量检索可以是另一条读取轴，两者并不互相替代。</p>
+<p>提取 cursor 记录已经覆盖到哪段历史，receipt 保存一次操作的结算回执。原子提交可以用一行具体状态表示：<code>Items=[]，cursor=0，receipt=无</code>。一次提取成功后应成为 <code>Items=[偏好]，cursor=已覆盖位置，receipt=本次结果</code>。<code>commitExtraction</code> 在 <code>BEGIN IMMEDIATE</code> 后检查幂等 receipt 与期望 cursor，把三者放在同一事务里，再 COMMIT。如果 cursor 已写、receipt 未写时抛错，不能留下“已处理但没保存”的半状态；第21章 的 SQLite 故障实验重开后看到三者都回到未提交状态。</p>
+<p>COMMIT 后失去返回则相反：实验把子进程杀在 COMMIT 后，新进程读到三者均存在。此时应按 operation identity 查回/重放原结果；直接当失败再造一个新 operation，可能制造重复。相同请求重放得到 <code>replayed=true</code>，key 查询只有一个 Item。这里验证的是存储提交，不是模型是否正确提炼用户偏好。</p>
+<h5 id="三种触发">三种触发</h5>
+<p>当前设计有三类写侧触发：</p>
+<ol>
+<li><code>memory_remember</code>：用户明确要求记住，foreground 同步返回保存结果；</li>
+<li><code>memory_extract</code>：模型标记 incidental durable info，Turn terminal 后异步提取；</li>
+<li>compaction boundary：从 checkpoint 固定的 durable prefix 补做提取。</li>
+</ol>
+<p>显式“记住”和后台“发现可能值得记住”是不同意图，不能混成一次无边界扫描。</p>
+<h5 id="提取只信稳定用户证据">提取只信稳定用户证据</h5>
+<p>Atomic LTM 的提取链可以简化为：</p>
+<pre><code class="language-text">stable RuntimeEvent range
+  → 检查 cursor / receipt / pending failure
+  → 只选 non-partial user-authored text 作为 evidence
+  → 模型提出有界候选
+  → 必要时在同一 Session 做有界字面定位
+  → isolated canonicalization
+  → exact quote / secret / scope / schema admission
+  → 原子提交 Items + cursor + receipt</code></pre>
+<p>assistant 内容只可作为 interpretation context；tool 内容不能成为 evidence/provenance。quote 必须是 provider-visible 用户原文的 exact substring，防止模型虚构“用户曾说过”。</p>
+<h5 id="失败和隐私有-durable-语义">失败和隐私有 durable 语义</h5>
+<ul>
+<li>同一 coverage range 的 proposal、可选 localization 和 canonicalization 共享有界模型调用预算；</li>
+<li>background extraction 失败会冻结范围并只重试一次，再失败则原子 discard 并推进 cursor；</li>
+<li>incognito 或 disabled 可以在 compaction boundary 形成 durable policy denial，避免以后重新开启后追溯提取当时被拒绝的内容；</li>
+<li>sensitive requested batch 原子结算为空 no-op，不做一半成功、一半失败；</li>
+<li>subagent 和 archived Session 不参与自动 extraction。</li>
+</ul>
+<h4 id="两个-remember-名字相近但不会自动同步">两个 “remember” 名字相近，但不会自动同步</h4>
+<p>这两个名字很像，但实际写入的是不同存储：</p>
+<pre><code class="language-text">memory.mutate { kind: &quot;remember&quot; }
+  → 修改用户可见的 MEMORY.md bundle
+
+Agent tool memory_remember
+  → 写入 atomic LTM 的 memory.sqlite</code></pre>
+<p>两个路径当前不会自动互相同步。看到日志里有 <code>remember</code>，必须先问“是哪一个 owner、哪一个 store、哪一种读取路径”。</p>
+<h4 id="atomic-ltm-已可查询但-agent-recall-尚未接线">Atomic LTM 已可查询，但 Agent recall 尚未接线</h4>
+<p>当前 Storage facade 已提供 <code>readItem()</code> 和 <code>searchByKeys()</code>；SQLite 支持 exact/prefix、workspace、archived 和 limit 等有界查询。</p>
+<p>但 production Runtime/Host 目前：</p>
+<ul>
+<li>没有把查询结果注入 prompt；</li>
+<li>没有 <code>memory_recall</code> Agent tool；</li>
+<li>Composer 没有 Agent-facing atomic LTM recall caller；</li>
+<li>没有 embeddings、vector index 或 semantic ANN retrieval；</li>
+<li>自动 extraction 主要 create Item，没有成熟的自动 merge/update/semantic dedup；</li>
+<li>native OpenAI Responses lane 不支持这条 extraction 路径。</li>
+</ul>
+<p>因此准确状态是：</p>
+<pre><code class="language-text">Atomic LTM extraction / store     已接写侧
+Atomic LTM read / key-query API   Store 层已存在
+Agent-facing recall / injection   尚未接线</code></pre>
+<p>“数据库查得到”不能简写成“Agent 未来会想起”。</p>
+<h4 id="history-searchworkspace-instructions-和-archiveread-都不是-memory-recall">History search、Workspace instructions 和 ArchiveRead 都不是 Memory recall</h4>
+<p>几个相邻能力容易被误命名为 Memory：</p>
+<ul>
+<li><code>SearchHistory</code> 在 Session title 和 StoredMessage 中做有界 substring scan；</li>
+<li><code>ReadHistory</code> 根据 hit/message/Turn anchor 读取有界邻域；</li>
+<li><code>AGENTS.md</code> 等 workspace instructions 是项目规则，不是对话中学出的事实；</li>
+<li><code>ArchiveRead</code> 按引用回读大 tool result，不跨 Session 检索偏好；</li>
+<li>Compaction checkpoint 缩短旧 History，不负责长期偏好 lifecycle；</li>
+<li>Read image Context Offload 保存 payload，不做知识提取。</li>
+</ul>
+<p>这些入口分别按历史文本、固定引用或长期信息作用域寻找内容，因而有不同的读取条件与失败处理。</p>
+<h4 id="child-session-默认不继承父-memory">Child Session 默认不继承父 Memory</h4>
+<p>关联子会话（linked child Session）是被委派独立工作的一份会话，第23章会展开它的创建与结果交接。它会自己进行 composition，默认不隐式继承父历史、Local Memory 或 personalization。父 Agent 如果需要 child 用中文，应把这个要求显式写进 child task，而不是假设“同一个用户，所以所有长期信息都自动扩散”。</p>
+<h3 id="源码微步读取开关怎样改变实际输入">源码微步：读取开关怎样改变实际输入</h3>
+<p><code>HostMemoryCoordinator.readPromptProjection</code> 在读取文件前检查策略。下面两个源码片段之间的分支由文字展开；片段依赖方法上下文，不能独立执行。</p>
+<pre><code class="language-ts">      if (
+        policy.policy.privacy.incognitoActive ||
+        !policy.policy.memory.enabled ||
+        !policy.policy.memory.agentReadEnabled
+      ) {
+        return {
+          bundleRevision: null,
+          memoryRevision: null,
+        };
+      }</code></pre>
+<p>文件已经存在且 active，但 <code>agentReadEnabled=false</code> 时，这段检查会在 <code>this.#store.read()</code> 前返回，返回值也没有 <code>body</code>。文件没有因此被删除；改变的是本次投影的可用内容。</p>
+<p>允许读取后，同一方法先调用 <code>this.#store.read()</code>，再检查 <code>snapshot.memory.kind</code>。只有 <code>document</code> 分支继续解码并构造正文；缺席或 <code>safe_mode</code> 状态不会走到下面的代码。</p>
+<p>存储层的 <code>snapshotForBytes</code> 在文档超过 128 KiB 或字节不是有效 UTF-8 时返回 <code>safe_mode</code>。Host 此时可以保留 revision，但不生成正文。可读文档分支则调用 <code>decodeDocument</code> 与 <code>buildLocalMemoryPromptBody</code>：</p>
+<pre><code class="language-ts">      const content = decodeDocument(snapshot.memory);
+      const body = buildLocalMemoryPromptBody(content, { sessionId });
+      return {
+        bundleRevision: snapshot.revision,
+        memoryRevision: snapshot.memory.revision,
+        ...(body ? { body } : {}),
+      };</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 源码微步：读取开关怎样改变实际输入"><table><caption>表 4 / Table 4 · 源码微步：读取开关怎样改变实际输入</caption><thead><tr><th scope="col">执行位置</th><th scope="col">输入与前状态（Input / Prior State）</th><th scope="col">执行后的可观察区别</th></tr></thead><tbody><tr><td>策略检查（Policy Check）</td><td>incognito、产品与读取开关</td><td>被阻止时无正文，也不读 bundle</td></tr>
+<tr><td>存储读取与文档分支（Store Read）</td><td>bundle 是否有可解码 document</td><td>文档缺席或处于 safe_mode 时没有正文；safe_mode 仍可返回 revision</td></tr>
+<tr><td>背景正文构造（Prompt Body）</td><td>文档与当前 sessionId</td><td>只返回可用背景；全部被过滤时也可能没有 body</td></tr>
+<tr><td>组装器消费投影（Composer）</td><td>可选 body 与独立的请求组成</td><td>正文才能被加入本次输入；revision 本身不是 Memory 正文</td></tr></tbody></table></div>
+<p>调用方继续消费这份投影：<code>interactive-run-composer.ts::readPromptState</code> 只在 body 非空时调用 <code>renderMemoryPrompt</code>；<code>resolveSystemPrompt</code> 将这段带 <code>&lt;local-memory&gt;</code> 的 untrusted 文本加入主 Session system prompt，并带上 memory/bundle revisions。<code>execution-model-composition.ts</code> 的 systemPrompt 回调把它交给 <code>AiSdkTurn</code>，后者最终通过 <code>modelAdapter.startStream</code> 的 <code>system</code> 参数传给所选 adapter。revision 不会自动变成正文；数据库中的 Atomic Item 也没有在这条链中被查询。</p>
+<p>图中的 Local Memory 路径由<strong>新 Turn 首次采集</strong>触发，旁边的 bundle 是数据来源。“允许读取”要求产品启用、Agent 读取开启且非 incognito；默认 <code>enabled=true / agentReadEnabled=false</code> 会走“否”。无正文支路仍汇入普通模型请求，关闭的是 Memory 读取。两条虚线分别表示受门控的数据读取和仍需另外核对的使用效果。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="源码微步：读取开关怎样改变实际输入：可滚动示意图"><a href="../../../assets/diagrams/20-memory-2.svg"><img src="../../../assets/diagrams/20-memory-2.svg" alt="新 Turn 首次采集 Local Memory 时先检查读取策略；允许后读取 bundle、筛选、脱敏与截断，有无正文都进入普通模型请求。默认读取关闭不会删除存储，已捕获的 Turn 背景不随文件改变热更新，实际使用还需另查。" width="720" height="1424" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>“没有正文”可能来自读取被关闭、文档缺席或进入 safe mode，也可能是筛选后为空；不能一概解释成存储被删除。筛选只对 session 条目匹配 Session，workspace 条目没有项目目录过滤。有正文时仍以不可信背景包装，不能授予执行权限。已捕获的同一 Turn 不会随文件更新重采集；后续新 Turn 才重新判断。写入、请求可见与正确使用仍需分别取证。</p>
+<blockquote><p><strong>Atomic 使用另一条存储链：</strong> <code>memory.sqlite</code> 已有写入与 Store 查询 API，但所查主执行链尚未接通 Agent 读取与注入。它不自动流入 Local bundle，打开 Local 读取开关也不能补上这段消费链。</p>
+</blockquote>
+<p><strong>在实验中观察同一条链：</strong><a href="21-memory-lifecycle.html#maka-%E7%9A%84%E5%86%99%E5%85%A5%E9%87%8D%E5%BC%80%E4%B8%8E%E8%BE%93%E5%85%A5%E7%BB%84%E8%A3%85">第21章 Maka 后半节</a>保存真实 bundle 后结束写进程，启动新进程调用同一个 composer。开启读取的 prompt 含偏好；关闭读取没有 <code>&lt;local-memory&gt;</code>，MEMORY.md 字节不变。同一 Turn 已 capture 后再写一条偏好，同 Turn 仍用旧 prompt，下一 Turn 才包含新增内容，因为缓存按 Session/Turn 区分。该实验测到输入组成，未调用模型；不能把 prompt 中有中文偏好就记成模型已遵循中文。</p>
+<p><code>buildLocalMemoryPromptBody</code> 继续检查解析状态与 active entries，只对 session 条目精确匹配 sessionId；workspace 条目没有 cwd/project 过滤，这里也没有按 <code>decayTtlMs</code> 自动排除过期条目。随后才做 secret redaction 与有界截取。解析器 <code>parseLocalMemoryMarkdownRaw</code> 另有大小检查：字符串按 UTF-8 计超过 128 KiB 时，返回 <code>safeMode: true</code>，body builder 不再生成可注入正文。这是输入大小边界，不表示它已经判断内容可信。</p>
+<p>若省掉读取门，用户关闭读取的选择将不再由这里执行；若省掉适用范围筛选，其他 Session 的局部内容可能进入当前背景。这两个反例用于推演被省掉的检查会失去什么保证，并非故障实测结果。</p>
+<h3 id="连续推演从-pytest-改成-make-check哪一步才算改好了">连续推演：从 <code>pytest</code> 改成 <code>make check</code>，哪一步才算改好了</h3>
+<p>把语言偏好换成项目规则：A 原来用 <code>pytest</code>，用户明确更正“以后 A 用 <code>make check</code>，B 仍用 <code>pytest</code>”。难点是让未来任务读到新规则，同时保留 B 的规则，并说清当前正在运行的请求是否已经改变。下面是遵循实际接线的教学推演，不是产品运行记录；条目 ID 和内容均为示例，r0/r1/r2 是三个 revision 的教学标签，不表示接口返回递增数字。</p>
+<p>这是测试入口更正迁移到另一项目约束的纸面场景；第04章 四文件 fixture 仍用 <code>npm test</code>，不要求在那里执行 <code>pytest</code> 或 <code>make check</code>。</p>
+<p>部署假设是：<strong>A、B 使用不同 <a href="glossary.html#state-root--single-writer%E7%8A%B6%E6%80%81%E6%A0%B9--%E5%8D%95%E5%86%99%E8%80%85">State Root</a></strong>，各自拥有 Local bundle；State Root 在此是 Host 管理长期控制状态和 bundle 的存储边界，与命令的项目目录、Session 身份分别判断。这不是 Local 自动识别项目的能力。本例 <code>Turn-0</code> 表示已捕获旧正文的一次请求。A 使用 <code>scope=workspace</code>，条目正文写明项目和用户来源；未来读取限定为该 Root 的普通主 Session。Memory 产品已启用、非 incognito，且 Agent 读取已显式开启。用户这次已授权保存更正，所以使用原生管理接口的 <code>remember</code>，不必先制造 PENDING 提案；它不是写 Atomic 的 <code>memory_remember</code> 工具。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 连续推演：从 `pytest` 改成 `make check`，哪一步才算改好了"><table><caption>表 5 / Table 5 · 连续推演：从 `pytest` 改成 `make check`，哪一步才算改好了</caption><thead><tr><th scope="col">时点</th><th scope="col">A 的 bundle 与操作</th><th scope="col">随后捕获 Memory 投影会得到什么</th></tr></thead><tbody><tr><td>r0</td><td>E0 为 active，正文是“A 的测试入口为 pytest”，有原用户来源</td><td>Turn-0 已捕获含 E0 的输入</td></tr>
+<tr><td>r1</td><td>对 E0 执行 <code>set_status</code>，设为 archived，提交依据为 r0</td><td>此时新捕获的投影不再含 E0；若没有其他规则，该部分为空</td></tr>
+<tr><td>r2</td><td>执行 <code>remember</code>，追加 active 的 E1：“A 改用 make check”，附更正来源，提交依据为 r1</td><td>后续新 Turn 在读取条件满足时包含 E1，排除 E0</td></tr>
+<tr><td>r2 之后</td><td>B 的独立 bundle 没有修改；A 的 E0 仍以归档状态保留</td><td>B 的新请求仍可读自己的 pytest；Turn-0 已缓存的正文不会被追溯改写</td></tr></tbody></table></div>
+<p>这两次操作分别经过 <code>HostMemoryCoordinator.#commitSemantic</code>，每次都按 <code>expectedRevision</code> 提交 bundle。<strong>CAS 保护提交顺序，不判断两句话的语义关系。</strong> <code>remember</code> 只追加条目；如果省掉归档，它不会自行发现 E0 已被替代。反过来，归档成功、追加失败会留下暂时没有该规则的状态，必须报告“旧规则已归档，新规则尚未保存”，不能说原子替换已完成。并发冲突时，应重新读取状态再决定后续修改，不能拿旧 revision 盲目继续。</p>
+<p>r2 的新内容怎样到达模型？<code>readPromptProjection</code> 先检查读取门，再从 bundle 筛选正文；<code>readPromptState</code> 将其包装，composer 把结果装入主 Session 的 system prompt，最后通过 <code>modelAdapter.startStream</code> 交给模型。composer 按 Session/Turn 缓存已经捕获的材料，因此这里说的是<strong>后续新 Turn 的捕获</strong>，不是文件一改就推送替换当前请求。归档也不删除历史消息、旧工具结果或已经发生的动作。</p>
+<p>最后仍要走到“用”：新任务没有重述命令时，先检查实际输入是否包含 E1，再看 Agent 是否结合当前项目说明选择 <code>make check</code>、读取执行结果并判断验证是否通过。Memory 进入输入不保证采纳正确；命令执行成功也不证明它覆盖了应验证的行为。这些判断都满足后，才有条件讨论记忆是否改善了任务表现。</p>
+<p>改变边界会暴露哪些缺口？若 A/B 改用同一个 Root，workspace 条目不按项目键过滤，A 的文字也会进入 B 的候选正文；写上“A”只是给模型的范围线索。改用 session scope 可以限制到 S1，却不会自动带到新的 S2。child instruction 路径又省略父级 Local Memory，不能把上述主 Session 结论推广到所有执行分支。若改写 Atomic，当前 extraction 创建新 Item，不自动替换旧 Item；Store 独立 mutation 的 update/archive 等能力没有因此被这条提取链调用。已有查询 API 也没有在所查主执行链接成自动 recall。Local 读取开关不能补齐它。</p>
+<h3 id="同一更正交给-codex从显式修改变为后台整理">同一更正交给 Codex：从显式修改变为后台整理</h3>
+<p>Codex 给出另一条真实路线。这里选择生成 <code>MEMORY.md</code> 与 <code>memory_summary.md</code> 的文件整理路径，实现中称为 V1，且先假定已开启 <code>memories</code>。总 feature 默认关闭，不能把内部 generate/use 的默认 true 理解为所有用户默认启用。下文的 Thread 是 Codex 的可延续对话容器，app-server 是接收客户端工作的应用服务层。这里复用 A/B 的逻辑情境，但不继承 Maka 的 Root 隔离假设：Codex 所查选源与摘要读取没有按当前项目做硬过滤，项目差异需要来源材料表达并被正确理解。</p>
+<ol>
+<li><strong>选择来源。</strong> app-server 在有输入、Turn 为 Started（已启动新一轮工作）且有主环境等条件下触发后台任务。它选择其他合格旧 Thread，默认至少空闲 6 小时、每次最多认领 2 个，排除当前 Thread。“用户刚更正了”不等于该更正已进入本次输入集合。</li>
+<li><strong>提取并整理。</strong> 第一阶段将选定 rollout（旧任务的交互轨迹记录）交给模型提取，保存带来源的结果；第二阶段再用有界候选、旧材料和差异整理 <code>MEMORY.md</code>、<code>memory_summary.md</code> 等文件。要正确保留“A 改为 make check，B 仍为 pytest”，模型必须理解范围和时序。job 所有权、事务及文件格式校验不替它作语义判断。</li>
+<li><strong>提供入口，再由模型读用。</strong> 后续会话初始上下文装配时，Memory extension 读取有界摘要形成 developer 片段；摘要可引导模型搜索手册或阅读来源。进一步读取取决于实际工具与策略，专用 Memory 工具默认关闭，不是摘要注入的前置条件。</li>
+</ol>
+<p><strong>失败反例：更正刚发生，尚未达到空闲门槛。</strong> 旧摘要可能继续包含 A/pytest；后台管线没有出错，也不能凭空处理尚未被选入的更正。触发后台任务的当前 Turn 不等待整理完成，更不能承诺每一步自动热更新摘要。若当前用户已明确要求 make check，应按当前要求处理，不能用旧摘要否决它。</p>
+<p>对于少量、需立即审阅的项目规则，显式条目便于定位修改对象；跨许多任务积累经验时，后台提取与整理能承担更多材料组织，但增加模型成本、延迟和更新错误。需要同 Root 跨项目隔离时，应先补清作用域选择；需要即时撤回时，应先定义请求可见性，不能靠增加索引或换整理模型解决。<a href="36-context-and-memory.html#%E5%90%8C%E4%B8%80%E5%91%BD%E4%BB%A4%E5%8F%98%E6%9B%B4%E7%94%A8%E7%9F%A5%E8%AF%86%E8%AE%B0%E5%BD%95%E5%8C%BA%E5%88%86%E6%8F%90%E4%BA%A4%E6%88%90%E5%8A%9F%E5%92%8C%E4%BB%8D%E7%84%B6%E6%9C%89%E6%95%88">第36章 的知识记录模型与迁移题</a>用独立的设计字段表示这些差异，而不把它们当成两家产品共享的 schema。</p>
+<span class="heading-alias" id="失败约束为什么深化区需要更多字段和边界" aria-hidden="true"></span><h3 id="失败场景决定需要维护什么状态">失败场景决定需要维护什么状态</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 失败场景决定需要维护什么状态"><table><caption>表 6 / Table 6 · 失败场景决定需要维护什么状态</caption><thead><tr><th scope="col">失败场景</th><th scope="col">当前 Maka 追踪的状态 / 边界（State / Boundary）</th><th scope="col">它支持的判断</th></tr></thead><tbody><tr><td>把 assistant 猜测或日志当作用户偏好</td><td>Atomic 的用户原文、exact quote 与 admission</td><td>解释上下文不能伪造用户来源；工具经验需另一类证据策略</td></tr>
+<tr><td>明确偏好与后台 incidental 提取混合</td><td>显式 remember 与 terminal 后 extraction 的触发</td><td>用户意图与后台候选不能混成无边界扫描</td></tr>
+<tr><td>并发修改透明文件</td><td>bundle revision CAS 与发布决策</td><td>旧 revision 不能静默覆盖已接受的新状态</td></tr>
+<tr><td>写 Item 后、推进 cursor 前崩溃</td><td>Item mutation、cursor、receipt 的原子提交</td><td>避免同一覆盖范围重复保存或永久漏存</td></tr>
+<tr><td>错把项目例外当成全局更新</td><td>Atomic scope、来源与时间</td><td>相似内容也可能同时有效；不能只按相似度覆盖</td></tr>
+<tr><td>日志中含秘密</td><td>写前 admission、读前 redaction</td><td>不把暂时出现的敏感内容扩散为长期背景</td></tr>
+<tr><td>隐私模式后重新开启</td><td>durable policy denial 与覆盖范围</td><td>当前禁止的范围不能因后来开启而自动追溯提取</td></tr>
+<tr><td>委派 child</td><td>独立 composition 与显式任务背景</td><td>父任务知道的信息不等于子任务自动继承</td></tr></tbody></table></div>
+<p>这些失败说明了各项机制承担的责任，不意味着所有 Memory 实现都必须采用相同字段或事务形式。隐私模式也不等于删除旧 Memory；删除、归档、读取与提取是不同操作。</p>
+<h3 id="替代方法先改变约束再选择实例">替代方法：先改变约束，再选择实例</h3>
+<p>把中文偏好改成“工作区 A 英文，其他项目中文”，再添加一次从测试失败中提炼的环境经验。分别判断存得对、找得到、用得对；用户原话可以证明偏好，工具反馈与复测才能支持环境经验。</p>
+<p><a href="../../../extended-reading.html#reference-10" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../comparisons/memory-methods.md">Memory 方法空间</a>分别比较表示与按需读取、写前检索与更新、链接组织、带反馈的经验、主动检索和评估。每个实例只承担其方法轴的解释，文件记忆、向量检索、反思和图结构不构成互斥的产品名单。</p>
+<p>Maka Atomic 当前用户证据治理可以帮助判断写入来源，却不能直接补齐 recall、consolidation 或经验学习。一个替代方法是否值得引入，应看它是否解决眼前失败、增加多少成本，以及有什么未证实的假设。</p>
+<span class="heading-alias" id="深化自测与迁移" aria-hidden="true"></span><h3 id="机制与条件变化解析">机制与条件变化解析</h3>
+<p><strong>问题 1。</strong> <code>memory.mutate { kind: &quot;remember&quot; }</code> 与 Agent tool <code>memory_remember</code> 写到哪里？开启透明读取能让后者自动召回吗？</p>
+<p><strong>解释。</strong> 前者写透明 bundle，后者写 Atomic SQLite；两者不自动同步。透明读取开关不能创建缺失的 Atomic caller。</p>
+<p><strong>问题 2。</strong> 为什么一次 <code>readPromptProjection</code> 返回 revision，仍可能没有可注入正文？</p>
+<p><strong>解释。</strong> 文档缺席、存储层 safe_mode（过大或无效 UTF-8）、解析器大小检查未通过、没有 active 条目、scope 过滤或正文为空，都可能使 body 缺席。revision 用于识别状态，不能当正文。</p>
+<p><strong>问题 3。</strong> 已经写入 Item，却没有可靠记录提取范围，会遇到哪两类恢复错误？</p>
+<p><strong>解释。</strong> 写后未记范围可能重复提取；先推进范围但未可靠写入则可能漏存。当前Atomic通过同一提交边界处理Items、cursor与receipt，其他设计需提供自己的对应保证。</p>
+<p><strong>问题 4。</strong> 新场景：用户说“发布说明用英文，但排错解释继续中文”。应直接覆盖旧语言偏好吗？需要保留哪些可判定条件？</p>
+<p><strong>解释。</strong> 不应直接全局替代。这是按工作类型区分的要求，需要明确“发布说明/排错解释”的适用条件和来源；现有global/workspace字段是否足以表达，还需审查具体表示与选择策略，不能凭字段名假设已支持。</p>
+<p><strong>问题 5。</strong> <code>ArchiveRead</code>、History search 与 Memory recall 分别按什么信息寻找内容？</p>
+<p><strong>解释。</strong> ArchiveRead按受限引用回读大工具结果；History search按历史标题/文本寻找会话内容；Memory recall为当前任务选择已保存的可复用信息。它们可以协作，但输入契约和负责组件不同。</p>
+<h2 id="继续阅读">继续阅读</h2>
+<ul>
+<li>相关章节：<a href="26-evaluation-and-design.html#%E8%AF%84%E4%BB%B7%E6%9C%80%E5%B0%8F%E6%A8%A1%E5%9E%8B">第26章 评价最小模型</a> → <a href="26-evaluation-and-design.html#%E4%B8%80%E6%AC%A1%E5%AE%8C%E6%95%B4%E4%BF%AE%E5%A4%8D%E7%9A%84%E4%BA%94%E9%A1%B9%E5%88%A4%E6%96%AD">完整修复的判断</a></li>
+<li>相关机制：<a href="23-skills-and-subagents.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第23章 方法与委派</a> · <a href="24-continuation-and-orchestration.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第24章 跨轮触发</a> · <a href="25-host-and-client.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">第25章 断线与观察</a></li>
+<li>相关章节：<a href="19-context-compaction.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E5%BE%84%E7%BB%99%E6%9C%89%E9%99%90%E5%B7%A5%E4%BD%9C%E5%8F%B0%E6%95%B4%E7%90%86%E6%9D%90%E6%96%99">第19章 长上下文与 Compaction</a></li>
+<li>总导航：<a href="README.html">mini → Maka 学习路线</a></li>
+</ul>
+<h2 id="延伸阅读">延伸阅读</h2>
+<p><a href="../../../extended-reading.html#reference-5" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/memory-context-system.md">Memory / Context 系统分析</a>整理了两套 Memory 的完整实现与对应源码入口。</p>
+<hr>
+<p><a href="19-context-compaction.html">上一章：第 19 章｜长上下文与压缩</a> · <a href="21-memory-lifecycle.html">下一章：第 21 章｜记忆的保存、读取与使用</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="19-context-compaction.html"><span>← 上一章</span><strong>第 19 章｜长上下文与压缩</strong></a><a href="21-memory-lifecycle.html"><span>下一章 →</span><strong>第 21 章｜记忆的保存、读取与使用</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB%E4%B8%80%E6%9D%A1%E5%81%8F%E5%A5%BD%E5%9B%9B%E4%B8%AA%E4%B8%8D%E5%90%8C%E7%9A%84%E5%8A%A8%E4%BD%9C">核心阅读：一条偏好，四个不同的动作</a></li><li class="toc-level-3"><a href="#1-%E5%BD%93%E5%89%8D%E8%83%BD%E7%94%A8%E4%B8%AD%E6%96%87%E8%BF%98%E4%B8%8D%E9%9C%80%E8%A6%81%E9%95%BF%E6%9C%9F%E8%AE%B0%E5%BF%86">1. 当前能用中文，还不需要长期记忆</a></li><li class="toc-level-3"><a href="#2-%E6%9C%80%E5%B0%8F%E9%97%AD%E7%8E%AF%E4%B8%8D%E8%A6%81%E6%B1%82%E5%85%88%E5%BB%BA%E5%A4%8D%E6%9D%82%E6%95%B0%E6%8D%AE%E5%BA%93">2. 最小闭环不要求先建复杂数据库</a></li><li class="toc-level-3"><a href="#3-%E6%AF%8F%E5%87%BA%E7%8E%B0%E4%B8%80%E4%B8%AA%E6%96%B0%E9%97%AE%E9%A2%98%E5%86%8D%E5%A2%9E%E5%8A%A0%E4%B8%80%E7%A7%8D%E6%9C%BA%E5%88%B6">3. 每出现一个新问题，再增加一种机制</a></li><li class="toc-level-3"><a href="#4-%E5%B0%86%E8%BF%99%E6%9D%A1%E6%A3%80%E6%9F%A5%E7%BA%BF%E6%98%A0%E5%B0%84%E5%88%B0-maka">4. 将这条检查线映射到 Maka</a></li><li class="toc-level-3"><a href="#5-%E7%94%A8%E5%90%8C%E4%B8%80%E6%A1%88%E4%BE%8B%E5%8C%BA%E5%88%86%E5%9B%9B%E7%A7%8D%E8%A7%82%E5%AF%9F">5. 用同一案例区分四种观察</a></li><li class="toc-level-3"><a href="#%E7%9C%9F%E5%AE%9E%E8%A1%A5%E4%BE%8B%E6%9D%A1%E7%9B%AE%E6%B2%A1%E5%88%A0%E4%B8%BA%E4%BB%80%E4%B9%88%E6%96%B0%E4%BC%9A%E8%AF%9D%E4%B8%8D%E5%86%8D%E7%94%A8%E9%82%A3%E4%B8%AA%E6%A0%BC%E5%BC%8F">真实补例：条目没删，为什么新会话不再用那个格式</a></li><li class="toc-level-3"><a href="#%E4%BF%9D%E5%AD%98%E8%AF%BB%E5%8F%96%E4%B8%8E%E4%BD%BF%E7%94%A8%E9%97%AE%E7%AD%94">保存、读取与使用问答</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96%E7%94%B1%E5%A4%B1%E8%B4%A5%E7%BA%A6%E6%9D%9F%E7%90%86%E8%A7%A3-maka-%E7%9A%84%E5%85%B7%E4%BD%93%E9%80%89%E6%8B%A9">实现深化：由失败约束理解 Maka 的具体选择</a></li><li class="toc-level-3"><a href="#maka%E9%80%8F%E6%98%8E-memorymd-%E4%B8%8E-atomic-ltm-%E6%98%AF%E4%B8%A4%E5%A5%97%E7%B3%BB%E7%BB%9F">Maka：透明 MEMORY.md 与 Atomic LTM 是两套系统</a></li><li class="toc-level-3"><a href="#%E6%BA%90%E7%A0%81%E5%BE%AE%E6%AD%A5%E8%AF%BB%E5%8F%96%E5%BC%80%E5%85%B3%E6%80%8E%E6%A0%B7%E6%94%B9%E5%8F%98%E5%AE%9E%E9%99%85%E8%BE%93%E5%85%A5">源码微步：读取开关怎样改变实际输入</a></li><li class="toc-level-3"><a href="#%E8%BF%9E%E7%BB%AD%E6%8E%A8%E6%BC%94%E4%BB%8E-pytest-%E6%94%B9%E6%88%90-make-check%E5%93%AA%E4%B8%80%E6%AD%A5%E6%89%8D%E7%AE%97%E6%94%B9%E5%A5%BD%E4%BA%86">连续推演：从 pytest 改成 make check，哪一步才算改好了</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E6%9B%B4%E6%AD%A3%E4%BA%A4%E7%BB%99-codex%E4%BB%8E%E6%98%BE%E5%BC%8F%E4%BF%AE%E6%94%B9%E5%8F%98%E4%B8%BA%E5%90%8E%E5%8F%B0%E6%95%B4%E7%90%86">同一更正交给 Codex：从显式修改变为后台整理</a></li><li class="toc-level-3"><a href="#%E5%A4%B1%E8%B4%A5%E5%9C%BA%E6%99%AF%E5%86%B3%E5%AE%9A%E9%9C%80%E8%A6%81%E7%BB%B4%E6%8A%A4%E4%BB%80%E4%B9%88%E7%8A%B6%E6%80%81">失败场景决定需要维护什么状态</a></li><li class="toc-level-3"><a href="#%E6%9B%BF%E4%BB%A3%E6%96%B9%E6%B3%95%E5%85%88%E6%94%B9%E5%8F%98%E7%BA%A6%E6%9D%9F%E5%86%8D%E9%80%89%E6%8B%A9%E5%AE%9E%E4%BE%8B">替代方法：先改变约束，再选择实例</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E4%B8%8E%E6%9D%A1%E4%BB%B6%E5%8F%98%E5%8C%96%E8%A7%A3%E6%9E%90">机制与条件变化解析</a></li><li class="toc-level-2"><a href="#%E7%BB%A7%E7%BB%AD%E9%98%85%E8%AF%BB">继续阅读</a></li><li class="toc-level-2"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

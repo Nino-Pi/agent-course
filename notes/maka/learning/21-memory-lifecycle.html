@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 21 章｜记忆的保存、读取与使用 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 21 / 62</div><article id="main-content"><span class="heading-alias" id="l02文件里有偏好为什么新任务还可能看不见" aria-hidden="true"></span><span class="heading-alias" id="l02记忆的保存读取与使用" aria-hidden="true"></span><span class="heading-alias" id="第-20-章记忆的保存读取与使用" aria-hidden="true"></span><h1 id="第-21-章记忆的保存读取与使用">第 21 章｜记忆的保存、读取与使用</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：保存偏好、关闭读取和提交后崩溃，会怎样改变下一进程看到的状态与输入？</p>
+<p><strong>关键概念</strong>：跨进程读取检验信息是否保留；scope（范围）决定选择；composer（组装器）生成请求背景；COMMIT（事务提交）成功后使本次事务修改生效；receipt（回执记录）识别同一操作的重放。</p>
+<p><strong>关系主线</strong>：Python 案例展示范围选择，Maka 案例对照文件、数据库与组装结果。关闭读取不等于删除，提交后丢回执不等于回滚；两组都未调用模型，不能由此保证偏好被采用。</p>
+</blockquote>
+<p>第一项使用 Python 标准库、JSON 文件和顺序启动的新进程，不调用 Maka；第二项使用真实 Maka Memory 存储、composer 和 SQLite 事务。两项都不调用模型，相关定义见 <a href="20-memory.html">第20章</a>。</p>
+<p>旧会话保存“解释用中文”，随后增加“工作区 A 用英文，其他工作区继续中文”。新请求始终只有“解释 formatDuration 的测试结果”，没有重述偏好。</p>
+<span class="heading-alias" id="先预测再运行" aria-hidden="true"></span><h2 id="工作区规则与预期背景">工作区规则与预期背景</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 工作区规则与预期背景"><table><caption>表 1 / Table 1 · 工作区规则与预期背景</caption><thead><tr><th scope="col">情况</th><th scope="col">新请求背景（Request context）应包含什么</th></tr></thead><tbody><tr><td>只有全局中文偏好，在 A 中读取</td><td>中文偏好</td></tr>
+<tr><td>保存 A 英文例外后，在 A 中读取</td><td>英文偏好</td></tr>
+<tr><td>保存 A 英文例外后，在 B 中读取</td><td>原来的中文偏好</td></tr>
+<tr><td>在 A 中关闭读取</td><td>空背景，文件仍存在</td></tr>
+<tr><td>故意忽略工作区例外，只读全局偏好</td><td>错误的中文背景；用于检验断言能否辨认范围错误</td></tr></tbody></table></div>
+<p>这个工作区选择规则是教学设计，不是对 Maka Local Memory scope 的复刻。Maka 两套 Memory 的真实 scope 与读取链应查 <a href="20-memory.html#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96%E7%94%B1%E5%A4%B1%E8%B4%A5%E7%BA%A6%E6%9D%9F%E7%90%86%E8%A7%A3-maka-%E7%9A%84%E5%85%B7%E4%BD%93%E9%80%89%E6%8B%A9">第20章 实现深化</a>。</p>
+<span class="heading-alias" id="执行一次完整过程" aria-hidden="true"></span><h2 id="跨进程保存与读取的完整过程">跨进程保存与读取的完整过程</h2>
+<p>这个固定输入案例的结果为 <code>PASS</code>，七项检查均通过。它只调用 Python 标准库，没有调用 Maka 或模型。</p>
+<p>脚本每次保存或读取都用 <code>subprocess.run</code> 启动新进程，并等待它退出后才启动下一步。trace 记录动作与 PID，因此读取不会依赖上一个进程里的 Python 字典。文件是本实验跨进程保留信息的载体。</p>
+<h2 id="关键代码改变了什么">关键代码改变了什么</h2>
+<p><a href="../../../attachments/memory-write-read-lab.py.html">实验脚本</a>中，三个分支决定状态变化：</p>
+<ol>
+<li><code>worker</code> 的两个保存分支：先保存全局偏好，再添加 A 的例外，原全局值仍保留。</li>
+<li><code>worker</code> 的读取分支：关闭读取时直接返回空背景；开启时按工作区选择。这一步决定“已经保存的信息”是否进入背景。</li>
+<li><code>run</code> 的正反对照：比较 A、B、关闭读取和故意只读全局偏好的结果，同时核对关闭读取前后的文件 hash 相同。</li>
+</ol>
+<p>实际状态依次为：</p>
+<pre><code class="language-text">文件：global=zh
+  → 新读进程A：background=zh
+文件：global=zh，workspace A=en
+  → 新读进程A：background=en
+  → 新读进程B：background=zh
+  → 关闭读取的A：background=[]；文件不变
+  → 错误读取器A：background=zh；暴露scope选择错误</code></pre>
+<p>输出的 <code>background</code> 是供请求装配使用的数据，不是模型回答。即使程序选择了 <code>en</code>，也没有验证模型最终用英文、更没有证明模型正确解释了测试。</p>
+<span class="heading-alias" id="接着看真实模型怎样使用" aria-hidden="true"></span><h2 id="真实模型的输出对照">真实模型的输出对照</h2>
+<p><a href="22-agent-cases.html#5-memory%E6%96%B0%E4%BC%9A%E8%AF%9D%E7%9A%84%E8%BF%99%E4%B8%89%E4%B8%AA%E5%B0%8F%E6%A0%87%E9%A2%98%E4%BB%8E%E5%93%AA%E9%87%8C%E6%9D%A5">第22章 的真实 Local Memory 案例</a>继续观察模型输出：相同保存条目，开启读取的新会话按指定三段格式解释测试，关闭读取的新会话使用普通结构。程序选择了什么与模型怎样回答，是两项独立观察。</p>
+<span class="heading-alias" id="补全与迁移" aria-hidden="true"></span><span class="heading-alias" id="练习增加工作区与任务规则" aria-hidden="true"></span><h2 id="增加工作区例外与任务规则">增加工作区例外与任务规则</h2>
+<p><strong>问题。</strong> 新用户要求“B 用日文，其他工作区照旧”。存储中增加什么，A、B、C 分别读取什么？</p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>在既有工作区映射中增加 B 的日文例外，保留 global=zh 和 A=en。A 读英文，B 读日文，C 回落到全局中文。实现时还需让写入分支接收对应值；本实验源为便于观察而固定写入 en，因此仅更换 workspace 参数不能完成该迁移。</p>
+<p><strong>问题。</strong> 若要求变成“发布说明用英文，排错解释用中文”，仅按 workspace 选择还够吗？</p>
+<p><strong>解释。</strong> 不够，新规则区分的是任务类型。一个明确的教学方案是先由本次任务确定 <code>task_type</code>，再按 <code>release_notes → en</code>、<code>debug_explanation → zh</code> 选择；未知类型继续使用原工作区规则。这样，A 的发布说明用英文、A 的排错解释用中文，B 的发布说明也用英文。这里假定任务规则优先于工作区规则，并由用户要求支持这一优先级；若任务同时属于两类且没有优先规则，应保留冲突。该选择器是新条件的设计推演，原 Python 脚本没有实现它。</p>
+<p>这个 Python 实验用 <code>write_text</code> 保存文件，没有建立崩溃事务，也没有处理多写者或幂等重试。真实存储的重开、事务和故障行为由下面的 Maka 实验检查。</p>
+<span class="heading-alias" id="二读实现让当前-maka-真正写入重开和组装" aria-hidden="true"></span><h2 id="maka-的写入重开与输入组装">Maka 的写入、重开与输入组装</h2>
+<p>第二个案例直接使用构建后的 Maka 模块，在独立测试状态根中保存明确给定的内容。写入进程退出后，新进程重新打开同一状态并组成输入；它不读取用户实际 Memory，也不调用模型。</p>
+<p>运行环境需与编译产物和原生依赖匹配。若进程未能启动，或尚未取得状态根的使用资格，失败发生在 Memory 操作之前，不能据此判断保存或事务行为。</p>
+<span class="heading-alias" id="先画清楚这次到底执行谁" aria-hidden="true"></span><h3 id="local-与-atomic-的实验调用链">Local 与 Atomic 的实验调用链</h3>
+<p>两组实验各自有完整消费者：Local 路线读取后组成输入，Atomic 路线重开后查询事务与回执。两条路径没有画出模型调用，也没有把 Atomic 接到 Local composer。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Local 与 Atomic 的实验调用链：可滚动示意图"><a href="../../../assets/diagrams/21-memory-lifecycle-1.svg"><img src="../../../assets/diagrams/21-memory-lifecycle-1.svg" alt="两条记忆实验路径分别展示 Local 的条目写入、取得状态根资格与输入组装，以及 Atomic 的事务提交、故障、新进程查询与同操作重放；两条路径没有自动模型消费连接。" width="804" height="1228" loading="lazy" style="width:804px;min-width:684px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>Local 部分使用真实 root lease（对该状态根的独占写入资格）、policy Store、Memory coordinator 与 composer；为了隔离本题，可用 Skill 方法目录（inventory）与工具集合均设为空，workspace instructions 关闭。Skill 的加载机制将在第23章展开。Atomic 部分直接调用低层 Store 的 failpoint，测试事务本身；它不运行模型提取器，也不绕此接口宣称生产权限已验证。</p>
+<span class="heading-alias" id="打开产物逐个判断成功发生在哪" aria-hidden="true"></span><h3 id="产物与结算时点">产物与结算时点</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 产物与结算时点"><table><caption>表 2 / Table 2 · 产物与结算时点</caption><thead><tr><th scope="col">操作（Operation）</th><th scope="col">核对的对象</th><th scope="col">本例结果</th></tr></thead><tbody><tr><td>使用当前 revision 正常保存 workspace 与 Session A 偏好</td><td>写入结果与 <code>MEMORY.md</code></td><td>保存成功，文档包含对应偏好</td></tr>
+<tr><td>随后故意使用旧 revision 再写一次</td><td>拒绝结果与当前 <code>MEMORY.md</code></td><td>旧 revision 被拒绝，没有覆盖已保存内容</td></tr>
+<tr><td>新进程分别为 Session A/B 组成输入</td><td>两个 Session 的 prompt</td><td>两者有 workspace 偏好；只有 A 有 Session A 条目，带 untrusted block</td></tr>
+<tr><td>关闭读取再组成输入</td><td>prompt 与关闭前后的记忆文件</td><td>无 local-memory block；关闭前后 MEMORY.md digest 相同，文件未删除</td></tr>
+<tr><td>同一 Turn 已抓取后新增条目</td><td>当前 Turn 与新 Turn 的 prompt</td><td>同 Turn 不含新增条目；新 Turn 含新增条目</td></tr>
+<tr><td>Item 与 cursor 写入后、COMMIT 前抛错</td><td>新进程重开的数据库</td><td>新进程重开后 Item/cursor/receipt 全部不存在</td></tr>
+<tr><td>提取 COMMIT 后杀死子进程</td><td>数据库状态与同一操作的重放结果</td><td>新进程读到 Item、cursor=1、receipt；相同 operation 返回 replayed，查询仅一条</td></tr>
+<tr><td>Atomic 已在同一 root 的 memory.sqlite 中，再组成 Local prompt</td><td>数据库内容与 Local prompt</td><td>数据库有 Atomic 标记，prompt 没有；不能把“保存成功”写成“Agent 会自动召回”</td></tr></tbody></table></div>
+<p>输出的 prompt 是真实 composer 的结果，但不是 provider wire 请求，更不是模型回答。后续链会将其送到 adapter 的 <code>system</code> 参数；本实验停在 composer。<a href="22-agent-cases.html#5-memory%E6%96%B0%E4%BC%9A%E8%AF%9D%E7%9A%84%E8%BF%99%E4%B8%89%E4%B8%AA%E5%B0%8F%E6%A0%87%E9%A2%98%E4%BB%8E%E5%93%AA%E9%87%8C%E6%9D%A5">第22章</a>另以真实模型输入与回答对照说明采用情况；两组实验的结果不能混成同一次执行。</p>
+<span class="heading-alias" id="从实验结果追到实现" aria-hidden="true"></span><h3 id="写入事务与重读怎样解释结果">写入、事务与重读怎样解释结果</h3>
+<p>该案例的 10 项检查均通过，真实调用了 Maka 存储与组装组件，没有调用模型或 provider。下面的调用顺序解释了表中结果为何不同。</p>
+<p>三个调用窗口分别负责写入、事务与重读：</p>
+<ol>
+<li><code>memory-coordinator.ts::#commitSemantic/readPromptProjection</code>：写入用 revision CAS；读关闭在 bundle read 前返回。<code>interactive-run-composer.ts::readPromptState/resolveSystemPrompt</code> 则把 body 放进输入，并按 Session/Turn 缓存。</li>
+<li><code>sqlite-long-term-memory-store.ts::commitExtraction</code>：<code>BEGIN IMMEDIATE</code> 开启事务，<code>after_cursor_write</code> 位于 cursor 写入后，随后写 operation/receipt 并 <code>COMMIT</code>；<code>after_commit</code> 已在提交之后。因此两侧抛错会留下不同持久结果，统一 catch 中的 rollback 不能撤销已经提交的事务。</li>
+<li>同文件 <code>readItem/searchByKeys/#readSnapshot</code>：重开的读侧查询真实数据库，不依赖写进程中的对象。composer 没有调用 Atomic 查询来组成输入，因此 Store 查询成功仍不等于自动召回。</li>
+</ol>
+<p>这里的关键反例是：<strong>commit 后抛错或进程死掉，调用者没收到成功，却不能推出数据库没有提交。</strong> 重试应携带原 operation identity，先识别 receipt；另造新 identity 会丢失这层幂等关系。实验中的固定 key/用户文本是明确输入，不是模型实际抽取的成果。</p>
+<p><strong>实现问题解析</strong></p>
+<ul>
+<li>文件已更新而同 Turn prompt 不变，是持久化失败吗？不是；先检查是否命中了同一 Session/Turn 的 composer 缓存。新 Turn 能读到新增内容才是这个实验的下一步观察。</li>
+<li>COMMIT 前后两个故障都使调用失败，为什么数据库结果相反？前者仍可整体回滚，后者已提交，只是结果未交到调用者；重开与 receipt 才能区分。</li>
+<li><code>memory.sqlite</code> 有 Item 且 key query 命中，为什么没有进入 prompt？这证明了 Store 查询；当前 composer 只接 Local Memory，不能自动补出缺失的 Atomic recall caller。</li>
+<li>这 10 项能证明模型会遵守偏好吗？不能；它们覆盖存储与输入组成，没有模型输出。还需固定当前请求、读取条件与验收标准，观察实际回答。</li>
+</ul>
+<p>相关机制：<a href="20-memory.html">第20章 Memory</a>；<a href="26-evaluation-and-design.html">第26章 设计分析</a>。</p>
+<hr>
+<p><a href="20-memory.html">上一章：第 20 章｜记忆的写入、读取与更新</a> · <a href="22-agent-cases.html">下一章：第 22 章｜mini 与 Maka 的任务执行案例</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="20-memory.html"><span>← 上一章</span><strong>第 20 章｜记忆的写入、读取与更新</strong></a><a href="22-agent-cases.html"><span>下一章 →</span><strong>第 22 章｜mini 与 Maka 的任务执行案例</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%B7%A5%E4%BD%9C%E5%8C%BA%E8%A7%84%E5%88%99%E4%B8%8E%E9%A2%84%E6%9C%9F%E8%83%8C%E6%99%AF">工作区规则与预期背景</a></li><li class="toc-level-2"><a href="#%E8%B7%A8%E8%BF%9B%E7%A8%8B%E4%BF%9D%E5%AD%98%E4%B8%8E%E8%AF%BB%E5%8F%96%E7%9A%84%E5%AE%8C%E6%95%B4%E8%BF%87%E7%A8%8B">跨进程保存与读取的完整过程</a></li><li class="toc-level-2"><a href="#%E5%85%B3%E9%94%AE%E4%BB%A3%E7%A0%81%E6%94%B9%E5%8F%98%E4%BA%86%E4%BB%80%E4%B9%88">关键代码改变了什么</a></li><li class="toc-level-2"><a href="#%E7%9C%9F%E5%AE%9E%E6%A8%A1%E5%9E%8B%E7%9A%84%E8%BE%93%E5%87%BA%E5%AF%B9%E7%85%A7">真实模型的输出对照</a></li><li class="toc-level-2"><a href="#%E5%A2%9E%E5%8A%A0%E5%B7%A5%E4%BD%9C%E5%8C%BA%E4%BE%8B%E5%A4%96%E4%B8%8E%E4%BB%BB%E5%8A%A1%E8%A7%84%E5%88%99">增加工作区例外与任务规则</a></li><li class="toc-level-2"><a href="#maka-%E7%9A%84%E5%86%99%E5%85%A5%E9%87%8D%E5%BC%80%E4%B8%8E%E8%BE%93%E5%85%A5%E7%BB%84%E8%A3%85">Maka 的写入、重开与输入组装</a></li><li class="toc-level-3"><a href="#local-%E4%B8%8E-atomic-%E7%9A%84%E5%AE%9E%E9%AA%8C%E8%B0%83%E7%94%A8%E9%93%BE">Local 与 Atomic 的实验调用链</a></li><li class="toc-level-3"><a href="#%E4%BA%A7%E7%89%A9%E4%B8%8E%E7%BB%93%E7%AE%97%E6%97%B6%E7%82%B9">产物与结算时点</a></li><li class="toc-level-3"><a href="#%E5%86%99%E5%85%A5%E4%BA%8B%E5%8A%A1%E4%B8%8E%E9%87%8D%E8%AF%BB%E6%80%8E%E6%A0%B7%E8%A7%A3%E9%87%8A%E7%BB%93%E6%9E%9C">写入、事务与重读怎样解释结果</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

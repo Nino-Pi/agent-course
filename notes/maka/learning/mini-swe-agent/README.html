@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>mini-SWE-agent 课程目录 · Agent 工程课程</title><link rel="stylesheet" href="../../../../assets/site.css"><link rel="stylesheet" href="../../../../assets/course-visual-style.css"><script defer src="../../../../assets/site.js"></script></head><body data-course-root="../../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../../index.html">全部章节</a><a href="../README.html">学习路线</a><a href="../glossary.html">术语表</a><a class="back-link" data-course-back href="../../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">查阅入口</div><article id="main-content"><span class="heading-alias" id="第一阶段先用-mini-swe-agent-看懂最小-agent" aria-hidden="true"></span><h1 id="mini-swe-agent-课程目录">mini-SWE-agent 课程目录</h1>
+<p>mini-SWE-agent 用一个 Bash 工具、线性消息列表和可替换的执行环境组织代码任务。模型提出动作，Environment 执行并返回观察，Agent 把观察加入下一次模型输入，直到提交或停止。课程以 v2.4.6 为例；native tool call、文本解析和成本统计依赖具体实现。</p>
+<p>需要用到的 Python、文件与命令行概念会在前几章就近解释；零基础读者从第01章开始，已有基础时可按下表定位。</p>
+<span class="heading-alias" id="为什么先学一个小系统" aria-hidden="true"></span><span class="heading-alias" id="本阶段的完整路线" aria-hidden="true"></span><span class="heading-alias" id="这四章分别解决什么问题" aria-hidden="true"></span><span class="heading-alias" id="a00先回答为什么聊天模型还不是-agent" aria-hidden="true"></span><span class="heading-alias" id="a01跟着源码走一轮循环" aria-hidden="true"></span><span class="heading-alias" id="a02拆开-actionobservation-与-messages" aria-hidden="true"></span><span class="heading-alias" id="a03理解人在环中退出限制与-trajectory" aria-hidden="true"></span><span class="heading-alias" id="建议的阅读方式" aria-hidden="true"></span><span class="heading-alias" id="第一遍只跟故事" aria-hidden="true"></span><span class="heading-alias" id="第二遍再对照源码" aria-hidden="true"></span><span class="heading-alias" id="本阶段不展开哪些实现细节" aria-hidden="true"></span><span class="heading-alias" id="阅读使用的实现" aria-hidden="true"></span><span class="heading-alias" id="课程与实验" aria-hidden="true"></span><h2 id="课程与案例">课程与案例</h2>
+<pre><code class="language-text">第01–03章：部件、循环与消息
+→ 第04–06章：代码修复、退出与崩溃窗口
+→ 第07–08章：能力边界与 Maka 机制对应
+→ 第09章：项目工作环境
+→ 第10章：TypeScript 对照（可按基础略过）
+→ 第11章：Maka 系统结构</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 课程与案例"><table><caption>表 1 / Table 1 · 课程与案例</caption><thead><tr><th scope="col">部分</th><th scope="col">阅读入口</th><th scope="col">问题与机制</th></tr></thead><tbody><tr><td>最小循环（Agent Loop）</td><td><a href="../01-agent-components.html#agent%E6%A8%A1%E5%9E%8B%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%94%AF%E6%92%91">第01章</a> → <a href="../02-agent-loop.html#defaultagent-%E7%9A%84%E6%89%A7%E8%A1%8C%E5%BE%AA%E7%8E%AF">第02章</a> → <a href="../03-actions-and-messages.html#%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%9B%9E%E6%89%A7">第03章</a></td><td>请求、执行、观察怎样推进下一轮</td></tr>
+<tr><td>修复与执行边界（Execution Boundary）</td><td><a href="../04-code-repair.html">第04章</a> → <a href="../05-exit-and-trajectory.html#%E4%BA%A4%E4%BA%92%E9%80%80%E5%87%BA%E4%B8%8E%E8%BD%A8%E8%BF%B9">第05章</a> → <a href="../06-crash-window.html">第06章</a></td><td>错误怎样引导修复；效果发生与记录保存为什么可能不同步</td></tr>
+<tr><td>mini 阶段收尾</td><td><a href="../07-loop-boundaries.html#1-%E6%AD%A3%E5%B8%B8%E6%83%85%E5%86%B5%E4%B8%8B%E4%B8%89%E4%BB%B6%E4%BA%8B%E7%B4%A7%E6%8C%A8%E7%9D%80%E5%8F%91%E7%94%9F">第07章 最小循环的缺口</a> → <a href="../08-mini-to-maka.html#%E7%AC%AC-08-%E7%AB%A0%E4%BB%8E-mini-%E5%88%B0-maka-%E7%9A%84%E6%9C%BA%E5%88%B6%E5%AF%B9%E5%BA%94">第08章 通往 Maka 的概念地图</a></td><td>为什么后续需要明确工作身份、持久事实和负责者</td></tr>
+<tr><td>项目接手（Workspace Handoff）</td><td><a href="../09-project-workspace.html">第09章 项目工作环境</a></td><td>怎样准备规则和资料、保留原有改动并确认测试基线</td></tr>
+<tr><td>随用随查</td><td><a href="../10-reading-typescript.html">第10章 TypeScript 阅读辅助</a></td><td>读源码时理解当前遇到的类型和异步写法</td></tr>
+<tr><td>完成后进入</td><td><a href="../11-agent-architecture.html#%E7%AC%AC-11-%E7%AB%A0maka-%E7%9A%84-agent-harness-%E7%BB%93%E6%9E%84">第11章 Maka 的 Harness 结构</a></td><td>把上述问题带进 Maka 的系统学习</td></tr></tbody></table></div>
+<span class="heading-alias" id="固定使用的贯穿案例" aria-hidden="true"></span><h2 id="readme-任务与三种材料">README 任务与三种材料</h2>
+<p>贯穿任务是修正文档中的测试入口：</p>
+<blockquote><p>检查项目里的 <code>package.json</code> 和 <code>README.md</code>，把 README 中的测试命令改正确，运行测试，然后用中文总结结果。</p>
+</blockquote>
+<p>教学示意使用三个条件：</p>
+<ol>
+<li><code>package.json</code> 的 scripts 声明 <code>&quot;test&quot;: &quot;node --test&quot;</code>，调用入口是 <code>npm test</code>；</li>
+<li><code>README.md</code> 还写着过时的 <code>npm run check</code>；</li>
+<li>简化故事先假设项目代码正确，修正文档后测试通过。</li>
+</ol>
+<p><a href="../04-code-repair.html#%E7%AC%AC-04-%E7%AB%A0%E4%BB%A3%E7%A0%81%E4%BF%AE%E5%A4%8D%E4%B8%8E%E6%B5%8B%E8%AF%95">第04章 修复案例</a> 把要求扩展为完整代码修复：除了修正文档，还要修复 <code>formatDuration(seconds)</code>，使非负整数秒正确显示成 <code>minutes:ss</code>。正确测试入口启动后先有 2 个断言失败，修复函数后才有 4 个测试通过。只改 README 并不满足 第04章 的完整任务。</p>
+<p>同一项目的三类材料具有不同用途：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · README 任务与三种材料"><table><caption>表 2 / Table 2 · README 任务与三种材料</caption><thead><tr><th scope="col">材料</th><th scope="col">动作从哪里来</th><th scope="col">能据此判断什么</th></tr></thead><tbody><tr><td>第01–03、05章 的四轮故事与 JSON 示例</td><td>为解释关系而编写的教学示意</td><td>请求、执行、回执的顺序；不是实际 trace</td></tr>
+<tr><td>第04章 的八步实验</td><td>确定性脚本预写响应，真实 DefaultAgent / LocalEnvironment 执行</td><td>指定命令序列与记录行为确实发生；不是模型自主诊断</td></tr>
+<tr><td><a href="../22-agent-cases.html">第22章 真实案例</a></td><td>真实模型生成下一步</td><td>一次修复的具体经过；不保证固定步数或顺序</td></tr></tbody></table></div>
+<span class="heading-alias" id="动手路线分别验收读懂与会做" aria-hidden="true"></span><span class="heading-alias" id="学完后必须能画出的图" aria-hidden="true"></span><span class="heading-alias" id="mini-阶段结业带着三个问题进入-maka" aria-hidden="true"></span><span class="heading-alias" id="练习执行与记录出现分歧" aria-hidden="true"></span><h2 id="问答执行与记录出现分歧">问答：执行与记录出现分歧</h2>
+<p><strong>README 已改变，但 trajectory 没有 observation，为什么不能直接重做？</strong> 记录缺失只说明结果未被保存，不能否定现实中的写入。重复执行可能重复产生效果；本例先读取实际文件，确认修改是否存在，再判断剩余工作。详见<a href="../07-loop-boundaries.html">第07章</a>。</p>
+<p><strong>恢复为什么还需要身份、可信记录和有权决策的负责者？</strong> 身份用于确定正在恢复哪一份工作；可信记录区分已完成、未执行和未知部分；负责者据此决定接回、停止或补偿，避免多个进程同时推进同一任务。详见<a href="../08-mini-to-maka.html">第08章</a>。</p>
+<p><strong>用户确认命令为什么不等于执行环境已隔离？</strong> 确认是授权决定，隔离是执行时限制文件、进程和网络访问的机制。<code>LocalEnvironment</code> 仍按宿主用户权限运行 Shell；一个确认提示不会建立 OS 资源边界。详见<a href="../05-exit-and-trajectory.html">第05章</a>。</p>
+<p>第04章呈现修复前后的代码、失败断言与测试结果；第06章呈现文件已变而轨迹尚未保存的状态。两章直接给出诊断与解释。</p>
+<span class="heading-alias" id="按需源码语言桥" aria-hidden="true"></span><span class="heading-alias" id="课程入口与阶段出口" aria-hidden="true"></span><h2 id="相关课程">相关课程</h2>
+<ul>
+<li><a href="../README.html">学习总入口</a></li>
+<li><a href="../01-agent-components.html">第01章｜什么是 Agent 与 Agent Harness</a></li>
+<li><a href="../bridge/README.html">第07章/第08章：从最小循环到 Maka</a></li>
+<li><a href="../11-agent-architecture.html">第11章｜Maka 的 Agent Harness 结构</a></li>
+</ul>
+</article></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E8%AF%BE%E7%A8%8B%E4%B8%8E%E6%A1%88%E4%BE%8B">课程与案例</a></li><li class="toc-level-2"><a href="#readme-%E4%BB%BB%E5%8A%A1%E4%B8%8E%E4%B8%89%E7%A7%8D%E6%9D%90%E6%96%99">README 任务与三种材料</a></li><li class="toc-level-2"><a href="#%E9%97%AE%E7%AD%94%E6%89%A7%E8%A1%8C%E4%B8%8E%E8%AE%B0%E5%BD%95%E5%87%BA%E7%8E%B0%E5%88%86%E6%AD%A7">问答：执行与记录出现分歧</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E8%AF%BE%E7%A8%8B">相关课程</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../../index.html">返回课程目录</a><a href="../../../../extended-reading.html">扩展资料说明</a></footer></body></html>

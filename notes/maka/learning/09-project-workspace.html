@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 09 章｜Code Agent 的项目工作环境 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 09 / 62</div><article id="main-content"><span class="heading-alias" id="code-agent-的项目工作环境" aria-hidden="true"></span><h1 id="第-09-章code-agent-的项目工作环境">第 09 章｜Code Agent 的项目工作环境</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：Code Agent 接手一个仓库时，怎样把任务、项目资料和可执行检查连成可靠的工作过程？</p>
+<p><strong>关键概念</strong>：任务范围界定允许的改动；基线记录开始前的状态；项目地图指向规则与实现；按需读取补充当前所需内容；检查结果说明实际观察到的行为。</p>
+<p><strong>关系主线</strong>：目标决定读取和修改范围，基线提供前后比较，项目资料帮助找到入口；执行器运行检查，结果进入后续判断，决定继续修复、调整诊断或交付。</p>
+</blockquote>
+<h2 id="目标先决定允许做什么">目标先决定允许做什么</h2>
+<p>Code Agent 的工作环境包括仓库文件、运行命令所需的程序，以及把文件和执行结果送入模型输入的工具。把仓库目录交给 Agent，只给出了工作地点；它仍需要知道这一次要改变什么、哪些现有内容必须保留。</p>
+<p>沿用<a href="04-code-repair.html">代码修复与测试</a>的小仓库。任务是修正 README 的测试命令，并修复 <code>formatDuration(seconds)</code> 的余秒计算。函数接受非负安全整数秒，返回 <code>minutes:ss</code>，余秒在 <code>0…59</code> 之间并显示为两位。这里要改的是两个具体问题，并没有授权升级依赖、改动测试期望值或重写整个项目。</p>
+<p>再加入一个条件：README 已有用户写好的说明段，必须保留。这个条件改变了修改方法——Agent 要读取当前内容并做局部修改，不能拿自己的完整 README 覆盖文件。工作区里有未提交改动，也不意味着这些改动都属于本次任务；开始前的差异与本次新增差异需要分别识别。</p>
+<p>“修复功能”和“只改文档”会导向不同动作。若用户只允许更新 README，Agent 即使发现 <code>% 100</code> 的缺陷，也只能报告函数问题，不能把发现问题当成扩大范围的授权。项目里的规则文件可以说明约定，但不能自行增加用户没有给出的权限。</p>
+<h2 id="运行前基线先分清环境入口与失败">运行前基线：先分清环境、入口与失败</h2>
+<p><strong>基线</strong>是开始修改前的状态，供后续结果比较。它既包括文件已有差异，也包括程序能否启动、检查命令是否存在、检查实际执行了哪些断言。基线不要求所有测试都通过：修复任务常常就是从红测，也就是失败的测试，开始的。</p>
+<p>同样是命令返回非零，下一步可能完全不同：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 运行前基线：先分清环境、入口与失败"><table><caption>表 1 / Table 1 · 运行前基线：先分清环境、入口与失败</caption><thead><tr><th scope="col">开始前看到的结果</th><th scope="col">它说明什么</th><th scope="col">合理的后续动作</th></tr></thead><tbody><tr><td>找不到 <code>node</code> 或 <code>npm</code></td><td>运行环境缺失，测试还没有开始</td><td>说明缺少哪个前提；安装需要另外满足任务授权和执行权限</td></tr>
+<tr><td><code>npm run check</code> 报 <code>Missing script: &quot;check&quot;</code></td><td>这个脚本名不存在</td><td>读取 <code>package.json</code>，找到实际入口</td></tr>
+<tr><td><code>npm test</code> 执行四个测试，两个失败</td><td>环境和入口已能工作，具体行为不符合断言</td><td>沿失败输入、测试 import 和被测函数定位</td></tr>
+<tr><td>测试结束且退出码为 0，但没有执行任何测试</td><td>命令正常退出，却没有覆盖目标行为</td><td>检查测试发现规则与路径，不能直接宣布修复完成</td></tr></tbody></table></div>
+<p>这份仓库的 <code>package.json</code> 声明 <code>&quot;test&quot;: &quot;node --test&quot;</code>，所以 <code>npm test</code> 会启动 Node 的测试程序。README 的命令只是说明文字，真正决定 npm 启动什么的是脚本配置。</p>
+<p>如果初始四个测试中已有两个失败，修复后的“四个通过”才有明确比较对象。如果另外出现一个与任务无关的失败，则要记录它在修改前是否已存在，分析它是否阻断当前验证；不能为了得到一张全绿结果，顺手改变未授权的功能。</p>
+<h2 id="项目知识地图文件各自回答不同问题">项目知识地图：文件各自回答不同问题</h2>
+<p>下面为小仓库增加一层教学用资料。<code>AGENTS.md</code>、<code>docs/architecture.md</code> 和 <code>tasks/duration-fix.md</code> 是本章的教学扩展，原有修复案例的 fixture 并不包含这些新增文件。它们也不是每个项目都必须采用的目录标准。</p>
+<pre><code class="language-text">duration-demo/
+├── README.md                 使用方式与常用命令
+├── AGENTS.md                 Agent 的项目工作约定（新增）
+├── package.json              实际脚本和依赖配置
+├── docs/architecture.md      文件职责与调用关系（新增）
+├── tasks/duration-fix.md     本次问题和完成条件（新增）
+├── src/duration.js           被测函数
+└── test/duration.test.js     输入与期望输出</code></pre>
+<p>README 面向使用者，适合解释项目用途和启动方法。AGENTS 面向在仓库里工作的 Agent，适合放稳定、简短、可操作的约定，例如保留用户改动、使用既有测试入口、遇到环境缺失时报告原因。架构说明帮助缩小搜索范围；任务说明记录本次要解决的问题。脚本配置和源码则提供实际执行定义。</p>
+<p>本例的架构说明只需指出：测试文件导入 <code>src/duration.js</code>，函数没有网络或数据库依赖。Agent 因而能优先检查纯函数计算，不必先阅读一整套无关的部署资料。但这张地图可能过时：若说明里的路径与测试 import 不一致，当前 import 才能说明这份测试实际加载哪个模块。</p>
+<p>一份有用的任务说明可以很短：</p>
+<pre><code class="language-text">修正 README 的测试入口及 formatDuration 的余秒计算。
+保留 README 已有说明，不修改测试文件与依赖。
+比较修改前后的既有测试，并确认本次差异只涉及两个目标文件。</code></pre>
+<p>这里分别给出了目标、范围和可观察的完成条件。写下“结果必须正确”还不够，资料需要把 Agent 引到能检查这句话的具体入口。</p>
+<h2 id="常驻与按需地图不是整座仓库">常驻与按需：地图不是整座仓库</h2>
+<p><strong>常驻信息</strong>在这里指为连续判断保留的简短任务与工作规则；<strong>按需信息</strong>是为当前问题读取的源码、配置或日志。常驻不代表永久记忆，也不保证文件改动后下一次模型请求就会自动更新。</p>
+<p>本例适合保留“只修两个问题、保留用户段落、不改测试”这几条约束。定位命令时读取 <code>package.json</code>，定位断言时读取测试，定位余秒时读取函数。整份架构文档和所有历史日志不必反复塞进每次输入。需要的是能指导下一步的内容，而不是尽可能多的文件。</p>
+<p>图中区分了“指向哪里”与“实际内容进入输入”。只有文件名或目录树时，还不能把文件正文当作已观察到的信息。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="常驻与按需：地图不是整座仓库：可滚动示意图"><a href="../../../assets/diagrams/09-project-workspace-1.svg"><img src="../../../assets/diagrams/09-project-workspace-1.svg" alt="任务与短规则可进入当前模型输入；项目地图只指引按需读取，读取取得的文件和检查结果进入输入后，才成为模型下一动作的依据。" width="720" height="936" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>文件存在并不保证自动进入模型输入。这里采用的 mini <code>DefaultAgent</code> 把任务和模板组成初始消息，随后把环境结果加入消息；这段循环本身不负责自动发现项目中的全部 AGENTS 文件。项目规则可以由入口明确加入模板，也可以通过读文件动作取得，具体方式需要看入口怎样接线。</p>
+<p>OpenAI Codex 的本地 Agent 实现提供了另一种项目指令读取路径：按项目根到工作目录寻找适用文件，受信任状态、文件选择和大小预算等条件约束，再把加载结果用于模型上下文。这些内容还有缓存，不是每一步重新读磁盘。因此“默认会读规则”也是某个产品、某种配置下的行为，不能推广成所有 Code Agent 的共同能力。更细的输入组成见<a href="15-model-context.html">模型输入与上下文组成</a>，带着问题定位文件见<a href="37-code-retrieval.html">代码检索</a>。</p>
+<h2 id="从规则文字到真正运行的检查">从规则文字到真正运行的检查</h2>
+<p>AGENTS 中写“结束前运行测试”，作用是告诉模型应该选择什么动作。它不会自行启动测试，也不会因这句话出现，就阻止文件越界或禁止错误提交。</p>
+<p>mini 的实际分工很直接：模型给出命令动作，<code>LocalEnvironment</code> 启动进程并取得输出和退出码，Agent 再把这些结果加入后续消息。模型据此继续诊断或报告。如果使用预写动作的固定回放，下一动作来自脚本，不能称为模型根据失败自主改了计划。</p>
+<p>下图只画检查的执行与结果分支。执行输出进入判断，分支分别指向需要补充的诊断或范围核查；这些结果提供下一步依据，不保证每次判断都正确。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从规则文字到真正运行的检查：可滚动示意图"><a href="../../../assets/diagrams/09-project-workspace-2.svg"><img src="../../../assets/diagrams/09-project-workspace-2.svg" alt="规则要求转成检查动作，由执行器取得输出和退出码；解释结果后分别处理无法启动、断言失败或目标检查通过，再转向环境诊断、修复或改动范围核查。" width="860" height="1311" loading="lazy" style="width:860px;min-width:731px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>如果需要“缺少检查就不接受交付”的程序保证，还要有真正读取结果并决定是否接纳的组件。课程原有的修复回放脚本在 Agent 结束后做具体校验：检查预期返回码、测试从两个失败变为四个通过、退出状态，以及改动文件是否恰为 README 和实现。任一条件不符，脚本抛出错误，拒绝把这次回放记为通过；它不会撤销已经写入的文件，也不阻止 Agent 先自报结束。这个校验针对已知的小场景，并不是所有 mini 任务自带的通用完成门；仅匹配测试摘要，也不能替代完整需求检查。</p>
+<p>检查还必须覆盖目标。只给 60、125 秒写特判的补丁也可能让原有四例通过，却仍把 61 秒算错。因此检查数量和通过摘要之外，还要看一般计算及其适用条件；“四例通过”只回答这四例，不能独自完成整个任务的验收。</p>
+<p>执行器能运行命令，也不等于有安全隔离。项目文字约定、程序完成检查和执行层权限分别解决动作选择、结果接纳和资源访问；不能用 AGENTS 里的“禁止”代替真正的权限控制。</p>
+<h2 id="完整接手案例从输入到交付">完整接手案例：从输入到交付</h2>
+<p>以下过程把同一仓库串起来。命令错误、两项红测和修复后四项通过，复用<a href="04-code-repair.html">原有固定回放</a>的结果；新增资料和用户段落是教学设定，整段接手过程没有作为一个新增产品场景运行。</p>
+<p><strong>接到的输入。</strong> 用户要求修正文档命令与余秒计算，保留原说明段，只允许修改 <code>README.md</code> 和 <code>src/duration.js</code>。环境已能使用 Node 和 npm，不需要下载或安装依赖。本教学入口读取 AGENTS 的短规则，连同用户要求放入初始消息；任务说明和架构资料则通过后续读文件动作取得。前者固定工作约定，后两者帮助定位问题和测试。这个装载方式是本例明确选择的接线。</p>
+<p><strong>读取起点。</strong> Agent 根据用户说明标记需要保留的段落，记录修改前的当前全文与差异，作为比较基线。diff 说明内容变化，不能单独证明作者身份。它随后读取 README 与 <code>package.json</code>：一个写 <code>npm run check</code>，另一个只定义 <code>test</code>。原回放里错误命令的输出是 <code>Missing script</code>；已有这项观察后，正确下一步是使用实际入口，而不是反复重试同一个不存在的脚本。</p>
+<p><strong>建立行为基线。</strong> <code>npm test</code> 执行四个测试，两个通过、两个失败。测试导入 <code>src/duration.js</code>；60 秒得到 <code>1:60</code>，125 秒得到 <code>2:25</code>。读取函数后可见分钟按 60 取整，余秒却用 <code>% 100</code>。125 秒已经扣除了两分钟，剩余应为 <code>125 − 2 × 60 = 5</code>，因此输出应是 <code>2:05</code>。这条计算把失败现象连到了实际需要改变的表达式。</p>
+<p><strong>实施最小修改。</strong> README 仅把入口改成 <code>npm test</code>，保留用户说明段；函数仅把余秒的 <code>% 100</code> 改成 <code>% 60</code>。测试期望值、依赖和其他功能不变。AGENTS 不负责替 Agent 写这两个文件，写入仍由实际文件工具或命令完成。</p>
+<p><strong>比较结果。</strong> 复测得到四个通过、零失败；差异检查确认本次只改变命令文字和余秒计算，没有覆盖已有段落，也没有修改测试。这里比较的是开始前状态与结束状态；相对 Git 提交的 diff 还可能包含用户原有改动，不能全部算作本次产出。于是交付结论是：“两个目标问题已修正，四个既有断言通过，本次改动限于两个目标文件。”它没有声称所有合法输入都已逐一测试，也没有把无关功能纳入完成范围。</p>
+<p>如果过程中出现新的条件，工作路线随之改变：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 完整接手案例：从输入到交付"><table><caption>表 2 / Table 2 · 完整接手案例：从输入到交付</caption><thead><tr><th scope="col">变化后的条件</th><th scope="col">完整的处理结果</th></tr></thead><tbody><tr><td>实际执行时找不到 Node，当前又没有安装授权</td><td>可以继续静态定位命令和计算问题；报告缺少运行环境，不能沿用“四个通过”作为本次结果</td></tr>
+<tr><td>新的用户要求把范围缩成只改 README</td><td>只修入口并保留已有段落；函数缺陷记录为未修改问题，原有红测不能报成已修复</td></tr>
+<tr><td>写入前重新读取，发现用户已把 <code>% 100</code> 改成 <code>% 60</code></td><td>基于当前内容检查问题是否仍存在，不重复套用旧修改；重新区分用户完成的工作与本次工作</td></tr>
+<tr><td>复测通过，但差异中出现了删除测试的改动</td><td>不能仅凭通过摘要交付；检查删除的来源和授权，恢复可靠的检查依据后再判断，不能擅自丢弃用户改动</td></tr></tbody></table></div>
+<p>这些分支使用同一套联系：任务范围决定可做的动作，当前文件决定可修改的对象，实际执行决定可报告的结果。项目工作环境的价值就在于把这三者接上，让接手工作不依赖一句含糊的“按照惯例完成”。</p>
+<hr>
+<p><a href="08-mini-to-maka.html">上一章：第 08 章｜从 mini 到 Maka 的机制对应</a> · <a href="10-reading-typescript.html">下一章：第 10 章｜Python 与 TypeScript 控制流对照</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="08-mini-to-maka.html"><span>← 上一章</span><strong>第 08 章｜从 mini 到 Maka 的机制对应</strong></a><a href="10-reading-typescript.html"><span>下一章 →</span><strong>第 10 章｜Python 与 TypeScript 控制流对照</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E7%9B%AE%E6%A0%87%E5%85%88%E5%86%B3%E5%AE%9A%E5%85%81%E8%AE%B8%E5%81%9A%E4%BB%80%E4%B9%88">目标先决定允许做什么</a></li><li class="toc-level-2"><a href="#%E8%BF%90%E8%A1%8C%E5%89%8D%E5%9F%BA%E7%BA%BF%E5%85%88%E5%88%86%E6%B8%85%E7%8E%AF%E5%A2%83%E5%85%A5%E5%8F%A3%E4%B8%8E%E5%A4%B1%E8%B4%A5">运行前基线：先分清环境、入口与失败</a></li><li class="toc-level-2"><a href="#%E9%A1%B9%E7%9B%AE%E7%9F%A5%E8%AF%86%E5%9C%B0%E5%9B%BE%E6%96%87%E4%BB%B6%E5%90%84%E8%87%AA%E5%9B%9E%E7%AD%94%E4%B8%8D%E5%90%8C%E9%97%AE%E9%A2%98">项目知识地图：文件各自回答不同问题</a></li><li class="toc-level-2"><a href="#%E5%B8%B8%E9%A9%BB%E4%B8%8E%E6%8C%89%E9%9C%80%E5%9C%B0%E5%9B%BE%E4%B8%8D%E6%98%AF%E6%95%B4%E5%BA%A7%E4%BB%93%E5%BA%93">常驻与按需：地图不是整座仓库</a></li><li class="toc-level-2"><a href="#%E4%BB%8E%E8%A7%84%E5%88%99%E6%96%87%E5%AD%97%E5%88%B0%E7%9C%9F%E6%AD%A3%E8%BF%90%E8%A1%8C%E7%9A%84%E6%A3%80%E6%9F%A5">从规则文字到真正运行的检查</a></li><li class="toc-level-2"><a href="#%E5%AE%8C%E6%95%B4%E6%8E%A5%E6%89%8B%E6%A1%88%E4%BE%8B%E4%BB%8E%E8%BE%93%E5%85%A5%E5%88%B0%E4%BA%A4%E4%BB%98">完整接手案例：从输入到交付</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

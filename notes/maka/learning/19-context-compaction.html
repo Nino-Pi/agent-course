@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 19 章｜长上下文与压缩 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 19 / 62</div><article id="main-content"><span class="heading-alias" id="08长上下文与-compaction历史还在为什么模型不必每次全看" aria-hidden="true"></span><span class="heading-alias" id="m08长上下文与压缩" aria-hidden="true"></span><span class="heading-alias" id="第-18-章长上下文与压缩" aria-hidden="true"></span><h1 id="第-19-章长上下文与压缩">第 19 章｜长上下文与压缩</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：长任务装不下历史时，怎样缩小模型输入而不把未完成工作写成已经完成？</p>
+<p><strong>关键概念</strong>：raw history（原始历史）保留事件；effective history（有效历史）服务当前输入；compaction（压缩）整理旧前缀；checkpoint（检查点）记录来源与覆盖；归档引用支持有界回读。</p>
+<p><strong>关系主线</strong>：来源校验、摘要生成、持久提交与后续重载各有作用，提交失败不能让新检查点生效。压缩改变输入表示，不补做工具，也不自动保证摘要更小、请求可容纳或任务正确。</p>
+</blockquote>
+<p>工具结果怎样结算见 <a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章</a>；压缩处理已有记录的后续表示，不补做缺失的工具操作。</p>
+<h2 id="核心路径给有限工作台整理材料">核心路径：给有限工作台整理材料</h2>
+<h3 id="问题全部重发和随意删除都不能解决它">问题：全部重发和随意删除都不能解决它</h3>
+<p>继续使用 <code>S1 / T7 / R7</code>：读取 package.json 与 README、修改 README、运行测试、中文总结。假设前六个 Turn 已包含大量代码片段、工具调用、图片和三份 20 万字符的日志。每次请求全部重发，会超过窗口、增加成本，并让旧噪声遮住当前目标；只留最后五条消息，又可能删除用户决定和工具调用的另一半。</p>
+<p><a href="glossary.html#history%E5%8E%86%E5%8F%B2">History</a>是保存的事实；<a href="glossary.html#context%E4%B8%8A%E4%B8%8B%E6%96%87">Context</a>是当前工作台上的材料。<a href="glossary.html#projection--read-model%E6%8A%95%E5%BD%B1--%E8%AF%BB%E5%8F%96%E8%A7%86%E5%9B%BE">Projection</a>是为某种用途从事实生成的视图。整理工作台并不要求清空档案库。</p>
+<h3 id="机制旧前缀用书签近期原文继续保留">机制：旧前缀用书签，近期原文继续保留</h3>
+<p>在 Maka 的 <a href="glossary.html#compaction%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9">Compaction</a> 路径中，系统保留 canonical RuntimeEvents，选择一个可以安全处理的旧前缀，为它生成 checkpoint，并在模型输入里替换这一段：</p>
+<pre><code class="language-text">保存的事实       = [旧前缀] + [近期原文尾部]
+checkpoint       = 旧前缀的摘要或兼容状态 + 来源与覆盖信息
+下一次模型输入   = [有效 checkpoint] + [近期原文尾部] + 当前规则与工具</code></pre>
+<p>checkpoint 是可核对来源的摘要书签，不是新的历史真相。压缩不删除它覆盖的原始事件；删除或退役整个 Session 是另一项生命周期操作。prefix 是被它覆盖的旧前缀，tail 是继续保留的近期尾部；近期原文保住精确路径、错误码、刚发生的工具调用、当前要求和待验证的修改。Maka 用 prefix/tail 分工压缩较旧历史，同时保留近期细节。</p>
+<p><strong>工具 T2 保存“这次调用得到什么结果”，Context checkpoint 保存“后续输入怎样表示一段已有历史”。</strong> 如果 T2 记录测试失败，摘要应保留失败；如果效果仍未知，摘要也只能保留未知。checkpoint 不补做工具、不补出缺失的成功结果，也不保存旧进程的调用栈。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="机制：旧前缀用书签，近期原文继续保留：可滚动示意图"><a href="../../../assets/diagrams/19-context-compaction-1.svg"><img src="../../../assets/diagrams/19-context-compaction-1.svg" alt="已保存历史先选择安全旧前缀并保留尾部，生成候选检查点后校验来源与重放结构；持久保存成功才应用检查点与原文尾部，校验或保存失败保留此前投影，请求容量最终由 provider 判断。" width="720" height="1852" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这张图从已保存事实开始，依次选择范围、生成候选、校验与保存；只有保存成功，才将 checkpoint 与近期原文一起用于后续输入。校验或保存失败都保留此前投影并报告原因。本地验证仍不能证明摘要语义完全正确，也不能保证 provider 接受请求。</p>
+<h3 id="两条必须守住的边界">两条必须守住的边界</h3>
+<p><strong>调用和结果不能随意分家。</strong> 如果摘要只覆盖了 <code>Edit</code> 调用，却把对应失败结果留在尾部，模型或 provider 就失去完整关联。选择范围必须保护这种协议单元，也不能把尚未完成的流式内容当成完整事实。</p>
+<p><strong>先验证、保存，再应用。</strong> 如果内存已经用新摘要继续工作，保存前进程却崩溃，下次启动就无法证明模型刚才依据哪一份输入。顺序应是：</p>
+<pre><code class="language-text">validate → persist checkpoint → apply replacement</code></pre>
+<p>下面只是课程的 Python 概念骨架，不是 Maka 原码，也不是可独立运行的实验：</p>
+<pre><code class="language-python">prefix, tail = select_safe_prefix(effective_history)
+checkpoint = summarize_with_source(prefix)
+if replay_is_valid(checkpoint, prefix):
+    persist(checkpoint)  # 失败就不能走到 replacement
+    next_history = replay(checkpoint) + tail
+else:
+    next_history = effective_history</code></pre>
+<p>决定行为的是验证分支与 <code>persist</code> 的顺序；生成了字符串尚不构成有效 checkpoint。真实代码还处理异步保存、当前用户锚点和 provider 状态。</p>
+<h3 id="同一代码任务先保住当前要求再处理大日志">同一代码任务：先保住当前要求，再处理大日志</h3>
+<p><code>T7</code> 之前，第 1–4 轮讨论架构并贴出旧日志，第 5 轮明确“不升级 Node”，第 6 轮完成无关文档任务。Runtime 可以让前 4 轮使用有效 checkpoint，保留后两轮的必要原文，再加入 T7“更新 README 并用中文解释结果”。这里按轮次描述历史，避免与 第18章 的工具提交边界 T1/T2 混淆。</p>
+<p>两个 Read 结果加入近期尾部后，模型才看到真实 scripts 与文档。Edit 成功后仍要保留“尚未测试”的状态；压缩不能将“计划修改”改写成“修改并验证完成”。</p>
+<p>摘要是否保留任务状态，可以直接与原事实比较：</p>
+<pre><code class="language-text">原事实：README 已修改；测试尚未运行；用户要求不升级 Node
+可接受的表达：文档修改已完成，待运行现有测试入口；继续保留 Node 约束
+错误的表达：修改和测试全部完成；必要时升级 Node</code></pre>
+<p>第一种摘要仍需通过结构与来源检查；第二种即使格式正确、长度更短，也改变了完成状态和任务约束。</p>
+<p>若 Bash 返回退出码 1 和 30 万字符日志，另一种整理方式是<strong>把大结果正文外置，给模型一个可回读引用</strong>。这和总结整个旧前缀不是同一种操作：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 同一代码任务：先保住当前要求，再处理大日志"><table><caption>表 1 / Table 1 · 同一代码任务：先保住当前要求，再处理大日志</caption><thead><tr><th scope="col">方法</th><th scope="col">输入里留下什么</th><th scope="col">需要原文时怎么办</th></tr></thead><tbody><tr><td>前缀压缩（Prefix Compaction）</td><td>旧前缀的 checkpoint，近期事实继续保留</td><td>按来源核对历史；下一请求使用有效投影</td></tr>
+<tr><td>大结果归档（Result Archive）</td><td>有界内容与可证明恢复来源的引用</td><td>通过当前提供的 ArchiveRead 能力读取片段</td></tr></tbody></table></div>
+<p>归档引用必须能读，读取能力也必须实际存在；不能仅为了省字数造一个链接。整理后若 provider 仍拒绝请求，系统应保留真实失败，不得写出完成总结。若已得到失败测试与必要错误片段，模型可以准确说“README 已更新，测试失败，错误是……”。</p>
+<p>T7 的中文要求来自当前输入，不证明下一任务已拥有中文长期记忆。<a href="20-memory.html">第20章</a>将继续解释保存与召回这条独立路径。</p>
+<h3 id="真实补例摘要说还没修下一轮才继续修">真实补例：摘要说“还没修”，下一轮才继续修</h3>
+<p><a href="22-agent-cases.html#4-%E5%8E%8B%E7%BC%A9%E5%90%8E%E7%9A%84%E7%8A%B6%E6%80%81%E4%B8%8E%E9%81%97%E6%BC%8F">第22章 的真实压缩案例</a>先让 Maka 读文件、分析失败，再只改 README。原生手动压缩得到的摘要明确保留：文档已改，函数仍用 <code>% 100</code>，测试仍 2 通过、2 失败；下一步才是修函数并复测。之后真实 Agent 按当前请求继续完成修复。</p>
+<p>压缩前的对话、生成的摘要与后续工具结果展示了状态变化：摘要保留“待修复”，之后的工具结果才报告修复与验证。摘要也没有复述此前的中文要求；最终中文来自继续消息再次提出的要求，不能当成这条要求被摘要保留的证据。</p>
+<p>本例手动调用原生压缩入口，不演示自动溢出触发，也没有额外运行大日志 ArchiveRead。</p>
+<span class="heading-alias" id="首读出口五个问题与参考答案" aria-hidden="true"></span><span class="heading-alias" id="自测怎样缩短输入并保留事实" aria-hidden="true"></span><h3 id="缩短输入与保留事实问答">缩短输入与保留事实问答</h3>
+<p><strong>问题 1。</strong> 为什么完整 History 不等于下一次 Context？</p>
+<p><strong>解释。</strong> 历史保存过去，模型输入只装经过选择、投影和适配的本次材料；窗口和相关性都有限。</p>
+<p><strong>问题 2。</strong> prefix + raw tail 保住了什么？</p>
+<p><strong>解释。</strong> 旧前缀用 checkpoint 表示，近期原文保留精确请求、路径、错误码和新工具结果。摘要不需要承担所有细节。</p>
+<p><strong>问题 3。</strong> 为什么不能在 call 与 result 之间切？</p>
+<p><strong>解释。</strong> 它们共同表达一次动作及其观察。拆开可能破坏重放协议，也会让结果失去来源。</p>
+<p><strong>问题 4。</strong> 先保存再应用防止什么？它能代替工具 T2 吗？</p>
+<p><strong>解释。</strong> 防止后续执行已经依赖一份只在内存存在的摘要，崩溃后无法重建这份依据。保存失败应保持旧投影或报告失败。它不能代替 T2：摘要表示已有历史，不负责执行工具或结算缺失的工具结果。</p>
+<p><strong>问题 5。</strong> 大日志归档、compaction、Memory 是一回事吗？</p>
+<p><strong>解释。</strong> 不是。归档提供大正文的间接读取，compaction 整理历史输入，Memory 为以后选择性保留并召回信息；当前要求中文也不证明 Memory 已写入。</p>
+<h2 id="实现深化检查来源重放和持久化">实现深化：检查来源、重放和持久化</h2>
+<h3 id="失败错误压缩会让模型记得一段从未发生的过去">失败：错误压缩会让模型“记得一段从未发生的过去”</h3>
+<h4 id="切断-tool-callresult-pair">切断 tool call/result pair</h4>
+<p>假设旧前缀以 tool call 结束，raw tail 从 tool result 开始：</p>
+<pre><code class="language-text">checkpoint: “模型准备读取 package.json”
+raw tail:   tool result without matching call</code></pre>
+<p>很多 provider 协议要求工具调用与结果配对。不完整 pair 不只是信息损失，还可能让请求直接被 provider 拒绝。因此 compaction boundary 不能切在 pair 中间。</p>
+<h4 id="把-partial-stream-当作完整回答">把 partial stream 当作完整回答</h4>
+<p>模型正在流式输出时可能先产生半句话或半个工具参数。若把 partial event 纳入 checkpoint，摘要会把不完整状态固化成事实。安全前缀必须排除 partial event。</p>
+<h4 id="摘要吞掉-pinned-steering">摘要吞掉 pinned steering</h4>
+<p>用户可能在旧历史里明确说：“不要访问网络”或“任何删除都先问我”。如果 compactor 把这类仍有效的 steering 简写成“用户希望谨慎操作”，含义就变弱了。</p>
+<p>安全策略需要识别不可被普通摘要吞掉的 pinned 内容，或由当前 Host composition 重新注入 authoritative instructions。</p>
+<h4 id="摘要自己产生幻觉">摘要自己产生幻觉</h4>
+<p>LLM 可能把“测试尚未运行”总结成“测试已通过”。因此模型只能<strong>提出摘要内容</strong>；Runtime 必须决定覆盖范围、验证结构、绑定 digest（用于核对来源的内容指纹）并检查兼容性；摘要是否准确仍需独立评估。</p>
+<p>摘要不是新的 authority。与原始 ledger 冲突时，不能因为摘要更短就相信摘要。</p>
+<h4 id="保存了摘要却无法证明它对应当前前缀">保存了摘要，却无法证明它对应当前前缀</h4>
+<p>如果历史发生 repair、branch 或 migration，旧 checkpoint 可能仍在存储中，但其 source digest 不再匹配 exact prefix（它实际覆盖的完整旧前缀）。直接复用会把另一条历史的摘要塞进当前上下文。</p>
+<p>因此 replay 前要核对 through identity（覆盖到哪条事件）、exact prefix 和 digest，而不能只看“这是 <code>S1</code> 的最新摘要”。</p>
+<h4 id="压缩后反而更长">压缩后反而更长</h4>
+<p>短历史生成的摘要可能比原文更长，这是摘要质量与成本问题。当前 Maka 不把本地“严格更小”设为 checkpoint 应用门槛：结构安全、前缀匹配、兼容且可 materialize 后可应用，由 provider 判断请求能否容纳；字符/token 估算只作诊断。评估时仍应记录压缩收益，但不能把建议冒充现行代码条件。</p>
+<h4 id="大工具结果被复活">大工具结果被“复活”</h4>
+<p>假设 20 万字符测试日志已经被归档，effective history 只保留引用。下一次 compaction 若直接从 canonical raw result 取原文，日志会重新灌回模型窗口，绕过此前的裁剪决定。</p>
+<p>因此 compaction、replay、budgeting 必须读取同一个<a href="glossary.html#projection-transition--effective-fold%E6%8A%95%E5%BD%B1%E5%8F%98%E6%8D%A2--%E6%9C%89%E6%95%88%E6%8A%98%E5%8F%A0">有效投影折叠（effective projection fold）</a>，尊重持久的 projection transition，而不是各自随意读原始 body。</p>
+<h4 id="provider-native-state-被错误迁移">Provider-native state 被错误迁移</h4>
+<p>某些 provider 可以返回 opaque（内部内容不可直接解释）、甚至加密的 compact state。它把部分状态交给 provider 私有表示，但不能从 opaque 推断更高保真度；提供方原生状态的重放条件很严格：必须仍是 <strong>OpenAI Codex provider 类型</strong>，并且 <strong>exact <code>connectionId</code> 与 exact <code>modelId</code> 同时匹配</strong>。只匹配其中一项也不够；把它交给另一个连接或模型，可能无法解码或语义不成立。</p>
+<p>可移植的文本摘要和 provider-bound state 是两种不同 checkpoint，不能假装完全可互换。</p>
+<h4 id="反复对同一个失败输入做摘要">反复对同一个失败输入做摘要</h4>
+<p>若 summarizer 对同一来源和配置总是生成 malformed（结构不合法）结果，无限重试只会重复花费。Runtime 需要有界的 <a href="glossary.html#liveness-guard--circuit%E6%B4%BB%E6%80%A7%E4%BF%9D%E6%8A%A4--%E7%86%94%E6%96%AD">liveness guard（活性保护）</a>：相同 fingerprint（输入指纹）的重复失败应打开 circuit（熔断），保留尊重已提交 transition 的有效历史；无法安全重建时暴露真实失败，而不是陷入 compaction loop。</p>
+<h3 id="maka从-runtimeevent-重建每一次模型输入">Maka：从 RuntimeEvent 重建每一次模型输入</h3>
+<h4 id="正常事实源是-runtimeevent-ledger">正常事实源是 RuntimeEvent ledger</h4>
+<p>Maka 的正常主链是：</p>
+<pre><code class="language-text">prior AgentRuns / RuntimeEvents
+  → 读取 durable model-projection transitions
+  → fold 成 effective events
+  → RuntimeEvent-to-model-history projection
+  → checkpoint replay / stale-result pruning
+  → context measurement and shaping
+  → provider-specific messages</code></pre>
+<p>普通 Session 的 StoredMessage 展示视图现从 RuntimeEvents 派生，legacy/import 和 WorkHub coordination 的消息行另有边界；它仍不作为 provider-history fallback。缺少 RuntimeEvent context 时 prior history 为空；native 语义无法重放时，逐项过滤或 text-only 降级也只使用 RuntimeEvent。</p>
+<h4 id="system-composition-不伪装成历史消息">System composition 不伪装成历史消息</h4>
+<p>Workspace instructions、Local Memory、Skill inventory、Plan context 和当前工具面由 Host 在本 Turn 重新 compose。它们不是模型过去说过的话，不应写回 history 假装成旧对话。</p>
+<p>provider input 包含两类生命周期不同的材料：</p>
+<pre><code class="language-text">相对稳定的 envelope：system instructions、model config、工具与能力组成
+不断增长的 tail：user/model/tool 的有效事件投影</code></pre>
+<p>同一 Turn 内稳定部分可以复用，变化的部分按 step 重建。</p>
+<h4 id="tool-result-有-canonical-result-与-model-projection-两层">Tool result 有 canonical result 与 model projection 两层</h4>
+<p>工具执行结果可能很大。Maka 区分：</p>
+<ul>
+<li>canonical <code>function_response.result</code>：Runtime 接受并规范化的 durable 事实；</li>
+<li><code>modelProjection</code>：以后给模型看的有界形态。</li>
+</ul>
+<p>当 result 被归档或裁剪时，当前 Host 先证明 ledger 中的原投影与 transition 链能够重建待移出的有效表示，再在 Session admission 内复核并追加 durable projection transition。提交后 effective history 才改为可回读引用；新路径无需再写一份正文 Artifact，旧 Artifact 引用仍可兼容读取。恢复得到的是那份有效表示，更早已经省略的字段不会自动补回。</p>
+<p>用一次具体输入核对：raw result 含“完整日志及不应重发的内部字段”，初次 <code>modelProjection</code> 只含允许给模型看的测试错误；后来 transition 把这份错误正文替换为引用。ArchiveRead 应恢复<strong>被这一步移走的测试错误正文</strong>，不能恢复 raw 内部字段，也不能随便返回整条 transition 链最终的结果。当前实现先用 SQLite 按 Session/event 读取必要 projection 字段，再沿 reducer 接受的链找到这一步的前驱表示；缺少提交记录、Session/digest/前驱不匹配就拒绝。</p>
+<p>归档前的准备成功还不够：Host 在 Session admission 内再次检查 Session 未删除、来源未变化，才追加 transition；append 后根据共同 fold 的 winner 展示结果。这样两条并发分支即使都完成 append，也不能各自宣称自己的 replacement 就是模型应见的版本。此处的新写 ledger 路径无需单独再保存正文副本；旧 Artifact reader 是兼容分支。</p>
+<p>如果本次归档失败，应保留此前有效投影，而不是生成一个打不开的假链接。<code>ArchiveRead</code> 允许模型在有该 capability 时执行有界的 <code>inspect / read / query / search</code>，按需取回片段。</p>
+<h4 id="model-projection-transition-不改写原事件">Model projection transition 不改写原事件</h4>
+<p>正常可解码的 projection transition 以 source digest 和 predecessor digest 串联，折叠到目标 RuntimeEvent。它不删除 canonical response，但所有 effective-history consumer——live continuation、下一 Turn、冷启动、compaction 和 branch——都应尊重相同 fold。损坏记录是否也受到保护，还要检查各读取入口有没有把失败标记传到底。</p>
+<p>**判断一个恢复变体：**把这次 Bash 结果记作 B1。恢复时先问失败发生在哪个阶段，再决定能使用哪份内容：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · Model projection transition 不改写原事件"><table><caption>表 2 / Table 2 · Model projection transition 不改写原事件</caption><thead><tr><th scope="col">情况</th><th scope="col">当前可以怎么处理</th><th scope="col">结果与边界</th></tr></thead><tbody><tr><td>本次尝试归档 B1 失败，此前有效投影仍可读</td><td>继续保留此前有效投影</td><td>新替换未成功，不能生成打不开的归档引用</td></tr>
+<tr><td>重启后，“曾替换 B1”的持久 transition 无法解码，但能确定目标是 B1</td><td>prior-history 与当前 Turn 续步都返回投影不可用的表示</td><td>不能绕过损坏记录，直接取 raw B1 正文发给模型；这也没有修好记录</td></tr>
+<tr><td>持久 transition 无法解码，连目标都无法确定</td><td>两个入口共用的 loader 报告读取错误</td><td>不能猜测该保留或替换哪一个结果</td></tr>
+<tr><td>checkpoint 覆盖的历史后来改变了有效投影</td><td>重新核对覆盖来源与当前有效投影，旧 checkpoint 可能失效</td><td>不能借旧摘要找回已经被替换的正文</td></tr></tbody></table></div>
+<p>这里有两个独立问题：checkpoint 原来覆盖了哪段事实，以及那段事实现在允许怎样进入模型输入。来源匹配不能代替有效投影检查。</p>
+<p>正常记录按共同 fold 应用时，实现的目标是：</p>
+<pre><code class="language-text">审计事实仍在
+模型可见内容有界
+后续压缩不会绕过 transition 把旧大结果复活</code></pre>
+<h4 id="compaction-的安全前缀">Compaction 的安全前缀</h4>
+<p>Maka 选择 compact prefix 时会保护：</p>
+<ul>
+<li>连续 prefix；</li>
+<li>无 partial event；</li>
+<li>不切断 tool call/result pair；</li>
+<li>不吞掉 pinned steering；</li>
+<li>保留规定的 verbatim tail；</li>
+<li>mid-turn 情形下保留正确的 current user head anchor。</li>
+</ul>
+<p>这里的 head anchor 可以理解为“当前这项用户工作从哪里开始”，避免 mid-turn 压缩把本轮目标混进旧历史摘要。</p>
+<h4 id="两类-checkpoint">两类 checkpoint</h4>
+<p>Maka 使用两种表示：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 两类 checkpoint"><table><caption>表 3 / Table 3 · 两类 checkpoint</caption><thead><tr><th scope="col">检查点（Checkpoint）</th><th scope="col">通俗解释</th><th scope="col">主要限制</th></tr></thead><tbody><tr><td>文本摘要（Text Summary）</td><td>结构化文本 summary</td><td>可读、相对可移植，但保真度取决于摘要</td></tr>
+<tr><td>提供方原生状态（Provider-native State）</td><td>OpenAI Codex provider-native opaque state</td><td>provider-bound、不能直接人工审阅；只允许 OpenAI Codex provider 类型且 exact <code>connectionId</code>、exact <code>modelId</code> 同时匹配时 replay</td></tr></tbody></table></div>
+<p>checkpoint 保存 coverage、through identity、source digest、phase/head anchor。应用前必须 exact prefix 和 digest 匹配，并通过兼容性与 replay admission；没有本地 strict-smaller 门槛。对提供方原生状态来说，“兼容”不是宽泛的 model/provider 相似：它明确要求 OpenAI Codex provider 类型以及 exact <code>connectionId</code>、exact <code>modelId</code> 三项同时成立。</p>
+<h4 id="主动-shaping-与真实-overflow-分开">主动 shaping 与真实 overflow 分开</h4>
+<p>Runtime 的主动容量触发使用同 model/connection 上一次被接受的真实 <code>inputTokens + outputTokens</code>，再预留 <code>min(2 × 上次 outputTokens, 8000)</code>，与用户声明的 window 比较。没有声明或有效实测 input 就不开主动触发。新增日志、图片和用户文本是否能装下仍由 provider 判断；不以字符估算裁决发送。</p>
+<p>摘要请求本身被 provider 拒绝时，Maka 只退到同 route 先前接受过的输入边界，不猜测减半；无可证明边界或再次拒绝则保留原投影并报告失败。这种“曾接受过”不是保证：摘要指令与原请求不同，所以仍尊重 provider 的实际结果。</p>
+<p>若 provider 明确返回 context-length 拒绝，Maka 会进行一次有界恢复：先尝试省略历史图片；没有可省略的历史图片时再 compact，然后只重试一次。仍失败则暴露 <code>context_overflow</code>，而不是无限压缩和重发。</p>
+<h4 id="contextremaining-是观察值不是历史真理"><code>contextRemaining</code> 是观察值，不是历史真理</h4>
+<p>最后一次物理请求的 input token 数可以生成 <code>contextRemaining</code>，进入 durable message 和 live event，帮助 UI 在重启后继续显示窗口余量。但它描述某次 provider 请求的观测，不是永远精确的模型容量承诺。</p>
+<h4 id="context-offload-与-tool-result-archive-不等于-memory">Context Offload 与 Tool Result Archive 不等于 Memory</h4>
+<p>Maka 当前有两个容易混淆的大内容通道：</p>
+<ul>
+<li>Read image snapshot 使用 content-addressed <code>ContextOffloadStore</code>，有 Session ownership、copy、release、retirement 与 GC；</li>
+<li>大 tool result 使用 ledger archive capability 和 <code>ArchiveRead</code>，旧 Artifact ref 保留兼容。</li>
+</ul>
+<p>当前 <code>tool_result_archive</code> 的 ContextOffload owner quota 仍为 0，因此不能笼统说“所有工具结果都已统一迁入 ContextOffloadStore”。两者都解决 payload materialization，不会自动学习用户偏好，也不是长期 Memory recall。</p>
+<h3 id="源码走读一份可用摘要为什么还不能立即生效">源码走读：一份可用摘要，为什么还不能立即生效</h3>
+<p><a href="10-reading-typescript.html">第10章</a>的 <code>fail_open</code> 来自压缩规划结果 <code>PlanHistoryCompactionResult</code>，表示规划没有给出可用替换。这里进入负责保存与应用的外层函数 <code>compactActiveRequestHistory</code>，返回类型是 <code>ActiveRequestCompactionOutcome</code>：规划不可用、替换无法构造成消息，或保存失败，都会在这一层返回 <code>fail</code>。两个标签属于不同层，不能互相改名。</p>
+<pre><code class="language-text">规划 fail_open → 外层返回 fail
+规划得到候选 → 外层检查替换并等待保存
+                 ├─ 失败：返回 fail，不应用候选
+                 └─ 成功：更新投影状态，返回 compacted</code></pre>
+<p>这条简图只比较本节的成功与失败分支，不列全部返回类型。<code>fail</code> 也不是整个 Run 必然失败；继续、重试或终止由调用方结合当前条件处理。下面具体看“候选已准备好，但保存失败”的分支。</p>
+<p>进入这个窗口前，Runtime 已为 replacement 建立 replay plan，拒绝不可 materialize 的结构，并准备 replacement messages。<strong>准备出消息仍没有把它们应用为后续投影。</strong> 接下来必须跨过保存边界。<code>compactActiveRequestHistory</code> 调用 recorder 的代码是：</p>
+<pre><code class="language-ts">    try {
+      await Promise.resolve(recorder(plan.checkpoint, turnId));
+    } catch {
+      return {
+        decision: &#39;fail&#39;,
+        diagnosticReason: &#39;write_failed&#39;,
+      };
+    }</code></pre>
+<p><code>recorder</code> 可以同步返回或返回 Promise；<code>Promise.resolve</code> 统一为可等待结果，<code>await</code> 确保保存的成功或失败先被处理。失败分支直接返回，后面的 checkpoint 状态更新不可达。成功后，中间还有通知记忆模块处理该历史范围的独立步骤，写入机制将在第20章展开；其异常被限制在自身，不改变 compaction 的保存结论。随后才到同一函数中从 <code>state.previousCheckpoint = plan.checkpoint</code> 开始的连续窗口：</p>
+<pre><code class="language-ts">    state.previousCheckpoint = plan.checkpoint;
+    state.projectionCheckpoint = plan.checkpoint;
+    return {
+      decision: &#39;compacted&#39;,
+      checkpoint: plan.checkpoint,
+      replacementMessages,
+      estimatedTokensBefore: plan.estimatedTokensBefore,
+      estimatedTokensAfter: plan.estimatedTokensAfter,
+    };</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 源码走读：一份可用摘要，为什么还不能立即生效"><table><caption>表 4 / Table 4 · 源码走读：一份可用摘要，为什么还不能立即生效</caption><thead><tr><th scope="col">时刻</th><th scope="col">保存状态（Persistence）</th><th scope="col">当前投影选择（Projection）</th><th scope="col">下一步</th></tr></thead><tbody><tr><td>候选已 materialize</td><td>还未承认新 checkpoint 已保存</td><td>仍是旧投影</td><td>调用并等待 recorder</td></tr>
+<tr><td>recorder 失败</td><td>没有获得成功保存结果</td><td>不更新为新 checkpoint</td><td>返回 write_failed</td></tr>
+<tr><td>recorder 成功</td><td>已通过保存边界</td><td>更新 checkpoint 并返回 replacement</td><td>调用者可采用新投影，再观察 provider 结果</td></tr></tbody></table></div>
+<p>如果把后一个窗口的更新移到保存前，磁盘失败时内存就可能选择一个无法恢复的 checkpoint。如果去掉 <code>await</code>，异步 recorder 尚未结算，代码就可能错误报告 compacted。反过来，保存成功只证明这份 checkpoint 的提交顺序成立，不证明摘要没有遗漏、不证明请求一定装得下，也不保证整项代码修复已经完成。</p>
+<p>这与 <a href="06-crash-window.html">第06章 的窗口</a>可以并列思考：两者都要问“外部可观察状态与保存事实之间是否存在空隙”；checkpoint 的先保存后应用不意味着任意外部工具都可以获得相同事务边界。</p>
+<span class="heading-alias" id="继续往下追谁真的保存谁再次读出" aria-hidden="true"></span><h4 id="checkpoint-的保存与读取链">checkpoint 的保存与读取链</h4>
+<p>checkpoint 能在重新打开后使用，是因为保存回调连接到了持久账本，而读取入口会重新校验它。<code>compactActiveRequestHistory</code> 先等已完成 step 的事件被消费，再从当前 Turn 的 durable 事件池读取来源，和 prior events 拼成候选历史。队列已消费不等于持久读取一定成功；读取失败或找不到当前用户 head anchor，就不能继续生成覆盖它的 checkpoint。</p>
+<p>随后 <code>planHistoryCompaction</code> 选取合法前缀。<strong>覆盖身份来自 raw events，摘要输入来自 effective events。</strong> 前者回答“这份书签覆盖了哪些原始事实”，后者回答“生成摘要时，模型实际可读的是这些事实的哪种表示”。归档或裁剪可能只改变后者，因此 checkpoint 分别保存 <code>coverage.sourceDigest</code> 和 <code>coverage.effectiveSourceDigest</code>。digest 是核对来源是否一致的指纹，不是摘要真实性证明；本页的 <code>d_raw/d_eff_1</code> 都是教学标签，不是实际 hash 值。</p>
+<p>摘要生成后先做文本结构、配对与可重放检查，并构造 replacement messages。通过后，注入的 recorder 进入 <code>HistoryCompactCheckpointCoordinator.record</code>：以 Session 为范围排列提交，先读取已保存 checkpoint，再用 <code>canReplaceHistoryCompactCheckpoint</code> 判断候选是否已被较新结果取代。能替换才调用 <code>AgentRun.recordHistoryCompactCheckpoint</code>，经串行写队列等待 <code>runStore.appendEvent</code> 追加 <code>history_compact_checkpoint_recorded</code>。成功后才更新 coordinator 的内存缓存；调用返回后，compaction 才把本次 state 切换到新 checkpoint。保存的是摘要连同来源与覆盖信息，不是只写一个 summary 字符串。</p>
+<p>新加载时，<code>loadLatestHistoryCompactCheckpointFromRunLedger</code> 读取可用派生 checkpoint；需要恢复时再从 run ledger 选择合法记录。<strong>加载到记录仍不等于可直接重放。</strong> <code>AiSdkTurn</code> 的 <code>loadDurableTurnProjection</code> 再核 raw prefix；原始覆盖不匹配不能继续用它，effective digest 不匹配则放弃该 checkpoint 的旧内容，用当前有效来源重新组成可回放输入。之后才是 replay plan、消息物化、本次 shaping 和 <code>ModelAdapter.startStream</code>。若需要滚动生成新摘要，<code>planHistoryCompaction</code> 也不能继承来源已失效的旧摘要，否则会把过时正文带进新书签。</p>
+<p>“保存成功”在这里指 append 合同已经完成；是否还能抵抗断电，要继续看存储后端的刷盘与恢复保证。</p>
+<h4 id="h1h5原始历史没变旧摘要为什么仍会失效">H1–H5：原始历史没变，旧摘要为什么仍会失效</h4>
+<p>沿用 README 修复，但把它写成独立的<strong>教学历史</strong>，不声称 第22章 真实轨迹具有这些编号。H1 是旧任务，H2 是 Read 调用，H3 是关联结果，H4 是 assistant“仅阅读，尚未修改”；H5 是当前用户“只改 README”。本题选择首步整形中允许的 pre-turn 切点：H1–H4 已完整、可安全覆盖，H2/H3 不拆开，H5 作为当前 head anchor 原文留在 tail。这里的 head anchor 是当前工作起点；首步整形是在本 Turn 第一次调用前按规则调整输入表示，不是已经获得 provider 的容量确认。具体合法切点不是由这五个教学编号决定的。</p>
+<p>假设 H3 的 raw 正文有 20,000 字符，已有有效投影只给出 200 字符及来源；C1 摘要只读后者。下表假设摘要格式与重放结构检查均通过，简写的摘要句子本身不是可提交的真实 checkpoint payload。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · H1–H5：原始历史没变，旧摘要为什么仍会失效"><table><caption>表 5 / Table 5 · H1–H5：原始历史没变，旧摘要为什么仍会失效</caption><thead><tr><th scope="col">阶段或变化</th><th scope="col">原始覆盖（Raw Coverage）</th><th scope="col">生成/回放时的有效来源</th><th scope="col">C1 能否成为当前投影</th></tr></thead><tbody><tr><td>规划 C1</td><td>H1–H4，指纹 <code>d_raw</code></td><td>H3 为 200 字符，指纹 <code>d_eff_1</code>；H5 不被摘要替代</td><td>还不能；仅得到合法候选</td></tr>
+<tr><td>C1 的 recorder 被拒绝，例如较新 C2 已先提交</td><td>同上</td><td>同上</td><td>不能更新本次 state 为 C1；返回 <code>write_failed</code>，不报告本次 compacted</td></tr>
+<tr><td>另一次无竞争的 C1 提交成功</td><td>同上</td><td>同上</td><td>可更新 state 并返回 replacement；不证明摘要保真或 provider 接受</td></tr>
+<tr><td>成功后，另一条已提交 transition 又归档 H3，改为新的引用表示</td><td>H1–H4 未改，<code>d_raw</code> 仍相同</td><td>指纹变成 <code>d_eff_2</code></td><td>旧 C1 不能仅凭 raw match 直接重放；必须重新采用当前有效来源</td></tr></tbody></table></div>
+<p>拒绝行与成功行是两个分支，不是同一次失败提交自动转成成功。最后一行尤其关键：旧摘要可能仍复述 H3 先前的 200 字符。若只看原事件 id 和 raw digest，就会借摘要重新放回已经移出当前有效视图的内容。新投影必须再次 fold；重新摘要时也要放弃不再有效的 previous checkpoint。这个规则约束后续输入，不能撤回已经发给模型的旧请求，也不是删除原始事实。</p>
+<p><strong>简化字符计算</strong>可以量化这种差异：令 H1/H2/H4 合计 300 字符，H3 的有效正文 200，H5 为 50，暂忽略消息包装和系统/工具说明。整理前可见正文是 <code>300+200+50=550</code>。若 C1 的替代表示为 350 字符，整理后是 <code>350+50=400</code>，少 150 字符；这只说明本题正文节省约 <code>150/550≈27.3%</code>，不是 provider token 或总请求 fit 的测量。若替代表示为 600，结果反而是 650；当前 Maka 没有“必须严格更小”的本地 gate，在其他校验满足时仍可提交，最后请求是否装得下由 provider 判断。</p>
+<h4 id="同一历史换成-pi消费者靠树上切点继续">同一历史换成 Pi：消费者靠树上切点继续</h4>
+<p>Pi 是另一种开源 Code Agent，它提供另一份真实合同。默认压缩先找合法保留点、生成摘要；手动路径在未取消时调用 <code>SessionManager.appendCompaction(summary, firstKeptEntryId, ...)</code>，再 <code>buildSessionContext()</code> 更新 <code>agent.state.messages</code>。<code>buildContextEntries</code> 沿当前 leaf 的分支路径找最新 compaction entry，留下它、从 <code>firstKeptEntryId</code> 开始的旧尾以及之后的新 entries。若把同题 H5 选为 first-kept，对模型的目标表示同样是“摘要 + H5 原文”，但书签在树中的位置和边界引用参与了重建。</p>
+<p>这说明不同状态结构可以表达摘要消费者，不能只比较“两个项目都保存 summary”。Pi 的切点推导见 <a href="36-context-and-memory.html#3-%E7%9C%9F%E5%AE%9E%E7%AE%97%E6%B3%95%E4%B8%80pi-%E6%80%8E%E6%A0%B7%E6%8A%8A%E4%B8%80%E4%B8%AA%E9%95%BF-turn-%E5%88%86%E5%BC%80">第36章</a>。相似的摘要加尾部，不意味着两者有相同的持久化方式或 raw/effective 双指纹合同。</p>
+<h4 id="两道迁移题改来源或提交时机">两道迁移题：改来源或提交时机</h4>
+<p><strong>题 1。</strong> C1 刚通过 replay 检查，recorder 因并发候选 C2 已提交而拒绝。模型已经生成了一份很好的摘要，能否先放进下一请求，稍后再补存？若 C1 已成功保存，后来只有 H3 的 effective digest 变了，是否仍可按 raw digest 复用？</p>
+<p><strong>答案。</strong> 两种做法都不成立。第一种绕过 persist-before-apply；本次更新不可达，也不能把内存旧状态擅自当成已经加载了 C2。应沿失败/重新读取路径处理，不能报告 C1 生效。第二种混淆覆盖身份与内容时效性：raw 不变仍需通过 effective 检查，否则放弃旧 checkpoint 内容，基于当前有效来源重建或重新摘要，不能回灌 raw H3。</p>
+<p><strong>题 2。</strong> H5“只改 README”被错误地划进了可改写摘要；另一方案保留 H5，却把 550 字符正文换成 650 字符。哪一个问题能靠“摘要必须更短”解决？设置这个门以后，能否保证摘要忠实并装进模型窗口？</p>
+<p><strong>答案。</strong> 第一个问题要查当前 head anchor、保护内容与切点，长度门救不了被改写的权限/任务约束。第二个方案可用显式 strict-smaller 政策拒绝，但必须先定义比较的是 covered prefix、replacement messages 还是整个请求，不能比较一个 raw 大正文与早已缩短的有效输入来夸大收益。即使更短，语义仍可能错，系统/工具/媒体也可能让总请求超窗。当前 Maka 没有该本地门，新增它属于采用建议。</p>
+<p>若问题是重复大日志，先考虑带来源的归档回读；若问题是长历史关系，才需要摘要保留状态和约束；若问题是更换 provider，先查兼容性与实际请求组成。增加压缩率、改摘要模型与加检索分别改变不同环节，不能互相代替来源校验、提交合同或任务质量评价。</p>
+<span class="heading-alias" id="深化自测与方法比较" aria-hidden="true"></span><h3 id="机制问题与方法比较">机制问题与方法比较</h3>
+<p><strong>问题 1。</strong> StoredMessage 为什么不能替代 RuntimeEvent？</p>
+<p><strong>解释。</strong> 前者服务 UI/兼容，正常模型重放需要后者承载的配对、partial、可见性、terminal 和 provider 来源语义。当前没有 transcript fallback。</p>
+<p><strong>问题 2。</strong> 为什么不能从 canonical body 重新灌入已归档大结果？</p>
+<p><strong>解释。</strong> 所有有效历史消费者必须尊重 durable projection transition，否则会绕过此前裁剪并让内容复活。</p>
+<p><strong>问题 3。</strong> 文本摘要与提供方原生状态的主要差别是什么？</p>
+<p><strong>解释。</strong> 文本摘要较易审阅和迁移；提供方原生状态是 provider-native opaque state，要求 OpenAI Codex provider 类型、exact connectionId 与 exact modelId 同时匹配，不能由 opaque 推断更高保真度。</p>
+<p><strong>问题 4。</strong> 没有声明 window，是否靠字符估算主动触发容量压缩？</p>
+<p><strong>解释。</strong> 不会。当前主动触发还需要同 route 的有效 usage；未知不当作 0。真实 provider 拒绝后仍有独立的有界恢复。</p>
+<p><strong>问题 5。</strong> checkpoint 更长是否必然被本地拒绝？</p>
+<p><strong>解释。</strong> 不必然。现行 gate 验证结构与可重放，大小只是诊断，fit 由 provider 裁决。摘要质量和压缩收益还应另行评价。</p>
+<p><strong>问题 6。</strong> recorder 抛错后会更新 projectionCheckpoint 吗？</p>
+<p><strong>解释。</strong> 不会。<code>catch</code> 返回 write_failed，更新语句不可达；这就是短窗口中可直接检查的控制关系。</p>
+<p><a href="../../../extended-reading.html#reference-3" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../comparisons/context-methods.md#纸面练习同一历史怎样变成三份具体输入">同一历史的三份具体输入对照</a>用固定 H1–H9 比较全文、summary + tail 与 placeholder + ref：哪份包含失败断言，哪份需要回读，哪种摘要错误地把未完成写成“全部通过”。该对照沿 README-only 权限分支展开。</p>
+<p>**换模型的反例：**同一历史从模型 A 换到 B，能否继续使用完全相同的压缩预算和 provider-native 摘要？不能仅由历史未变作判断；应核对当前模型预算、提示投影与 replay compatibility。Pi 的逐模型设置和 DeepSeek 开源 Harness（DSH）的 system prompt 投影提供两种具体对照，见<a href="../../../extended-reading.html#reference-3" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../comparisons/context-methods.md#换模型时要重新解释预算和历史表示">模型身份与压缩</a>。</p>
+<span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
+<ul>
+<li>相关章节：<a href="18-effects-and-recovery.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第18章｜持久效果与故障恢复</a></li>
+<li>相关章节：<a href="20-memory.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB%E4%B8%80%E6%9D%A1%E5%81%8F%E5%A5%BD%E5%9B%9B%E4%B8%AA%E4%B8%8D%E5%90%8C%E7%9A%84%E5%8A%A8%E4%BD%9C">第20章｜记忆的写入、读取与更新</a></li>
+<li>总导航：<a href="README.html">从零学习 Maka Agent</a></li>
+</ul>
+<h2 id="延伸阅读">延伸阅读</h2>
+<p><a href="../../../extended-reading.html#reference-5" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/memory-context-system.md">Memory 与 Context 系统说明</a>进一步梳理摘要提交、有效投影与归档回读的生产者和消费者。</p>
+<hr>
+<p><a href="18-effects-and-recovery.html">上一章：第 18 章｜持久效果与故障恢复</a> · <a href="20-memory.html">下一章：第 20 章｜记忆的写入、读取与更新</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="18-effects-and-recovery.html"><span>← 上一章</span><strong>第 18 章｜持久效果与故障恢复</strong></a><a href="20-memory.html"><span>下一章 →</span><strong>第 20 章｜记忆的写入、读取与更新</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E5%BE%84%E7%BB%99%E6%9C%89%E9%99%90%E5%B7%A5%E4%BD%9C%E5%8F%B0%E6%95%B4%E7%90%86%E6%9D%90%E6%96%99">核心路径：给有限工作台整理材料</a></li><li class="toc-level-3"><a href="#%E9%97%AE%E9%A2%98%E5%85%A8%E9%83%A8%E9%87%8D%E5%8F%91%E5%92%8C%E9%9A%8F%E6%84%8F%E5%88%A0%E9%99%A4%E9%83%BD%E4%B8%8D%E8%83%BD%E8%A7%A3%E5%86%B3%E5%AE%83">问题：全部重发和随意删除都不能解决它</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E6%97%A7%E5%89%8D%E7%BC%80%E7%94%A8%E4%B9%A6%E7%AD%BE%E8%BF%91%E6%9C%9F%E5%8E%9F%E6%96%87%E7%BB%A7%E7%BB%AD%E4%BF%9D%E7%95%99">机制：旧前缀用书签，近期原文继续保留</a></li><li class="toc-level-3"><a href="#%E4%B8%A4%E6%9D%A1%E5%BF%85%E9%A1%BB%E5%AE%88%E4%BD%8F%E7%9A%84%E8%BE%B9%E7%95%8C">两条必须守住的边界</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E4%BB%A3%E7%A0%81%E4%BB%BB%E5%8A%A1%E5%85%88%E4%BF%9D%E4%BD%8F%E5%BD%93%E5%89%8D%E8%A6%81%E6%B1%82%E5%86%8D%E5%A4%84%E7%90%86%E5%A4%A7%E6%97%A5%E5%BF%97">同一代码任务：先保住当前要求，再处理大日志</a></li><li class="toc-level-3"><a href="#%E7%9C%9F%E5%AE%9E%E8%A1%A5%E4%BE%8B%E6%91%98%E8%A6%81%E8%AF%B4%E8%BF%98%E6%B2%A1%E4%BF%AE%E4%B8%8B%E4%B8%80%E8%BD%AE%E6%89%8D%E7%BB%A7%E7%BB%AD%E4%BF%AE">真实补例：摘要说“还没修”，下一轮才继续修</a></li><li class="toc-level-3"><a href="#%E7%BC%A9%E7%9F%AD%E8%BE%93%E5%85%A5%E4%B8%8E%E4%BF%9D%E7%95%99%E4%BA%8B%E5%AE%9E%E9%97%AE%E7%AD%94">缩短输入与保留事实问答</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96%E6%A3%80%E6%9F%A5%E6%9D%A5%E6%BA%90%E9%87%8D%E6%94%BE%E5%92%8C%E6%8C%81%E4%B9%85%E5%8C%96">实现深化：检查来源、重放和持久化</a></li><li class="toc-level-3"><a href="#%E5%A4%B1%E8%B4%A5%E9%94%99%E8%AF%AF%E5%8E%8B%E7%BC%A9%E4%BC%9A%E8%AE%A9%E6%A8%A1%E5%9E%8B%E8%AE%B0%E5%BE%97%E4%B8%80%E6%AE%B5%E4%BB%8E%E6%9C%AA%E5%8F%91%E7%94%9F%E7%9A%84%E8%BF%87%E5%8E%BB">失败：错误压缩会让模型“记得一段从未发生的过去”</a></li><li class="toc-level-3"><a href="#maka%E4%BB%8E-runtimeevent-%E9%87%8D%E5%BB%BA%E6%AF%8F%E4%B8%80%E6%AC%A1%E6%A8%A1%E5%9E%8B%E8%BE%93%E5%85%A5">Maka：从 RuntimeEvent 重建每一次模型输入</a></li><li class="toc-level-3"><a href="#%E6%BA%90%E7%A0%81%E8%B5%B0%E8%AF%BB%E4%B8%80%E4%BB%BD%E5%8F%AF%E7%94%A8%E6%91%98%E8%A6%81%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%98%E4%B8%8D%E8%83%BD%E7%AB%8B%E5%8D%B3%E7%94%9F%E6%95%88">源码走读：一份可用摘要，为什么还不能立即生效</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E4%B8%8E%E6%96%B9%E6%B3%95%E6%AF%94%E8%BE%83">机制问题与方法比较</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-2"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

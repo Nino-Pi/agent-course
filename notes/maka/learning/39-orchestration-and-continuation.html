@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 39 章｜持续工作与协作 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 39 / 62</div><article id="main-content"><span class="heading-alias" id="d03让工作可靠地继续并证明复杂度值得" aria-hidden="true"></span><span class="heading-alias" id="d03持续工作协作与评价" aria-hidden="true"></span><span class="heading-alias" id="第-37-章持续工作协作与评价" aria-hidden="true"></span><span class="heading-alias" id="第-39-章持续工作协作与评价" aria-hidden="true"></span><h1 id="第-39-章持续工作与协作">第 39 章｜持续工作与协作</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：一项工作拆给多个子任务、等待外部事件或中途换执行者后，怎样可靠地继续？</p>
+<p><strong>关键概念</strong>：委派规定独立工作的输入与交回合同；认领绑定一次执行责任；租约是有期限的持有条件；反思把失败反馈带入后续尝试；通知策略决定何时向用户报告变化。</p>
+<p><strong>关系主线</strong>：依赖和资源条件决定能否派发，身份与持久记录支撑接续，父任务负责采纳和整体验收；跨天委托还要分别维护目标、行动许可与通知偏好。</p>
+</blockquote>
+<p>沿用第23章的父子任务与第18章的未知效果：本章先安排分工与共享资源，再处理认领、恢复和进展判断。Host与连接的基础见第25章。这里解释工作怎样推进；下一章将独立比较整项工作的结果与成本。</p>
+<h2 id="1-先区分复用步骤和委派工作">1. 先区分复用步骤和委派工作</h2>
+<p>修复同一项目时，可能反复需要“识别测试入口、运行相关测试、解释失败”。如果只是复用这套方法，Skill 或明确步骤就可能足够。只有当一部分工作能独立接收目标、建立自己的调查过程并交回可验收产物时，才有必要增加子任务。</p>
+<p>可以让一个子任务只调查函数缺陷，另一个只核对文档和测试入口。父任务仍负责整合完整修复、保留用户改动、运行整体相关验证。两个子任务都写“完成”，不能证明交付合在一起仍正确。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 先区分复用步骤和委派工作"><table><caption>表 1 / Table 1 · 1. 先区分复用步骤和委派工作</caption><thead><tr><th scope="col">设计维度</th><th scope="col">必须明确的内容</th><th scope="col">遗漏后的典型问题</th></tr></thead><tbody><tr><td>输入（Input）</td><td>目标、必要背景、约束、允许范围</td><td>子任务凭不完整目标修改错误对象</td></tr>
+<tr><td>工具（Tool）</td><td>可见工具与实际权限</td><td>把正文“只读”当作执行器限制</td></tr>
+<tr><td>文件（Files）</td><td>共享目录或独立工作副本</td><td>上下文隔离了，文件仍互相覆盖</td></tr>
+<tr><td>输出（Output）</td><td>结论、改动、检查、残留问题</td><td>父任务只能收到不可核查的总结</td></tr>
+<tr><td>终止（Termination）</td><td>预算、停止传播和效果结算</td><td>父任务退出后子进程继续产生效果</td></tr>
+<tr><td>采纳（Adoption）</td><td>谁检查、应用、合并和复测</td><td>把产物返回当成已被主工作区采用</td></tr></tbody></table></div>
+<span class="heading-alias" id="2-把交付画成一条显式链" aria-hidden="true"></span><h2 id="2-从子任务交付到父任务验收">2. 从子任务交付到父任务验收</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从子任务交付到父任务验收：可滚动示意图"><a href="../../../assets/diagrams/39-orchestration-and-continuation-1.svg"><img src="../../../assets/diagrams/39-orchestration-and-continuation-1.svg" alt="子任务按目标和边界操作工作副本并返回产物、差异、检查与问题；父任务核对当前冲突，采纳后整体检查，必要时再给限定后续任务。" width="1088" height="797" loading="lazy" style="width:1088px;min-width:925px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中委派与返回连接了工作副本和验收，<code>返回 → 采纳 → 复测</code>是三个不同的阶段。文件隔离能减少同时写入碰撞，但合并时仍可能发生语义冲突；它也不隔离共享数据库、远端服务或其他外部资源。</p>
+<p>以下交接结构是教学合同，不是产品 API：</p>
+<pre><code class="language-ts">type Handoff = {
+  taskId: string;
+  status: &quot;completed&quot; | &quot;blocked&quot; | &quot;cancelled&quot;;
+  artifacts: { location: string; baseVersion?: string; kind: string }[];
+  changedResources: string[];
+  checks: { name: string; outcome: &quot;pass&quot; | &quot;fail&quot; | &quot;not-run&quot; }[];
+  unresolved: string[];
+};</code></pre>
+<p>父任务应核查产物内容与真实检查结果，不能只信任 <code>status</code>。例如接口显示 completed，但 <code>checks</code> 全为 not-run，只能说明提交者声称完成了某项工作，不能说明修复已经验证。</p>
+<h2 id="3-调度问题包含依赖和资源冲突">3. 调度问题包含依赖和资源冲突</h2>
+<p>假设有四项工作：A 读函数，B 读测试，C 基于 A/B 修改函数，D 验证 C 的改动。A/B 可以并行，C 等待 A/B，D 等待修改可见。若另一项 E 也写同一函数，即使图上没有数据依赖，也要处理写入冲突。</p>
+<p>调度器因此至少要看三件事：依赖是否满足，预算/并发数是否允许，资源使用是否兼容。对未知结果的上游工作，不能只按“工具已经返回”释放依赖；必须按下游实际需要的后置条件判断。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="调度问题包含依赖和资源冲突：可滚动示意图"><a href="../../../assets/diagrams/39-orchestration-and-continuation-2.svg"><img src="../../../assets/diagrams/39-orchestration-and-continuation-2.svg" alt="调度先保存目标修订，由负责者检查依赖、停止与预算，再认领并派发确切执行；结果结算更新依赖，等待和停止各有明确出口。" width="1030" height="1358" loading="lazy" style="width:1030px;min-width:876px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中“同一负责者”是一项设计要求：停止、修订和认领之间需要一致的决策点。把三者放在三个无条件更新语句里，会留下“用户已停止，但旧触发仍新开 Run”的窗口。</p>
+<p>持久化已认领、尚未派发时崩溃，恢复应根据原执行身份继续派发或明确取消，不能随手新建一个任务身份。持久记录只解决本地决策连续性；要避免远端效果重复，还需要相应服务提供幂等、查询或更强协调能力。</p>
+<p><strong>为什么只画依赖图还不够？</strong> A 读函数成功而 B 读测试失败时，图只说 C 要等二者，没说 A 的结果是否保存、重启后是否重复读取。LangGraph 把一组并行节点的计算轮次称为 superstep，并把轮次未完成时已成功任务的输出另存为 pending writes，用这两层记录区分“本轮尚未完成”和“其中某项已经成功”；Temporal 通过事件历史重放控制代码、复用已记录的 Activity 结果。两者都能解释部分进展，但恢复单位不同，不能统称为“有 checkpoint”。具体算法与成本见<a href="44-checkpoints-and-replay.html#3-langgraph%E6%8A%8A%E6%81%A2%E5%A4%8D%E5%8D%95%E4%BD%8D%E6%94%BE%E5%9C%A8%E5%9B%BE%E7%8A%B6%E6%80%81%E4%B8%8E%E8%AE%A1%E7%AE%97%E8%BD%AE%E6%AC%A1">深度课第 3–6 节</a>。</p>
+<h2 id="4-三个容易混淆的恢复场景">4. 三个容易混淆的恢复场景</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 4. 三个容易混淆的恢复场景"><table><caption>表 2 / Table 2 · 4. 三个容易混淆的恢复场景</caption><thead><tr><th scope="col">场景</th><th scope="col">仍成立的事实</th><th scope="col">恢复需要做什么</th></tr></thead><tbody><tr><td>Client 连接断开，执行仍在运行</td><td>Host/Runtime 可能仍拥有工作</td><td>重新获取状态快照并补齐变化；不要重复启动</td></tr>
+<tr><td>Worker 崩溃，认领记录存在</td><td>本地知道曾分配工作</td><td>判断过期认领、既有执行和未知效果，按原身份恢复</td></tr>
+<tr><td>子任务返回，父任务采纳失败</td><td>子产物可能仍然存在</td><td>保存交接状态、解决冲突，再由父任务验收</td></tr></tbody></table></div>
+<p>如果使用 lease，过期只表示允许重新分配的条件之一，不表示旧 Worker 一定停止。旧 Worker 迟到时仍可能提交结果或产生效果。需要提交负责者检查代际；fencing 就是在接纳写入的位置，依据代际标记拒绝过时参与者。外部资源不配合该检查时，仍必须讨论重复效果和对账。</p>
+<p>因此不能把“有数据库”“有 lease”“可恢复会话”当作通用 exactly-once 证明。每个保证必须落到特定对象与操作边界。</p>
+<p><strong>把“停下”写成明确范围。</strong> 当前 Run 取消、已经排队的用户消息暂停、未来定时触发禁用，可能由三个 owner 分别负责。若只暂停用户队列，后台 completion 仍应能结算；若用户改了任务约束，旧待批准动作应重新判断，不能把新消息当作批准。先明确停止哪些工作，再决定队列、执行和通知各自怎样处理。</p>
+<p>同样，20 个流式 chunk 不是 20 个工作轮次；等待 child 的观察者取消也不表示 child 没有完成。评估要固定轮次定义并从相应持久记录取数。这些规则补充下文持续任务的“Goal、行动许可、通知”拆分，不替换已有任务验收。</p>
+<p>若队列需要跨重启，应像检查执行账本一样追踪 pending 与 claim 的持久来源；若用户暂停 Goal，模型不能凭旧轮次自行恢复它。输入队列、Goal 状态和执行认领各有负责者，不能把其中一项暂停理解成全部停止。</p>
+<p>现在把恢复问题写成四个连续问题：<strong>恢复读取哪份状态？从哪个边界重新执行？哪些已完成结果被复用？哪些外部效果仍需检查？</strong> Pi 的会话路径、DeepSeek Harness（DSH）的待处理输入队列、Cline 的 Git 工作区 checkpoint，以及 LangGraph/Temporal 的执行进展分别回答其中不同部分。选型的关键不是“谁也有 resume”，而是所需对象有没有被覆盖；完整失败表与选型见<a href="44-checkpoints-and-replay.html">编排深度课</a>。</p>
+<h3 id="maka-的两条真实链换-host-与换连接路径为何要分开">Maka 的两条真实链：换 Host 与换连接路径为何要分开</h3>
+<p>先看有活动任务时的合作交接。Host Kernel 不能只观察“当前没在调用模型”就退出；调度器可能正在接纳新工作，旧工具结果也可能尚未结算。Maka 按下列顺序收窄不确定性：</p>
+<ol>
+<li><code>execution-composition.prepareHandoff</code> 暂停 Goal、Schedule、Daily Review 的新驱动，并等待各自已接纳的操作结算，然后交给 root coordinator。暂停未来调度并不伪造正在工作的完成状态。</li>
+<li><code>root-turn-coordinator.prepareHandoff</code> 为活动 root 请求边界；<code>SessionManager.requestRunHandoff</code> 经 Runtime Kernel 找到对应 <code>AgentRun</code>，还要用持久事实评估这个边界能否接续。请求边界是预约，不是已经取得恢复权。</li>
+<li>AgentRun 到达允许边界后构造隐藏的交接预备材料（handoff preview）。commit 后，<code>finalize</code> 先写出累积的流式片段（flush partial），再写包含 handoff pause 的 Runtime 事实；只有封存成功才兑现 sealed。先发一个内存通知再退出，无法提供这份证据。</li>
+<li>Kernel 还要检查连接、命令和被纳入交接的待结算工作（drain residency）；封存（seal）后才分离（detach）。提交切换后，迟到的取消不能重新放行旧 Run，否则新旧 owner 可能同时继续工作。</li>
+</ol>
+<p>这条链结束旧的物理 invocation，逻辑 Turn 可以继续。封印明确关联 host epoch、root/successor Run、后继 invocation、claim 和剩余预算；Session/Turn/Run 是工作关联，Host epoch 是本次 Host 身份，不能拿 UI 会话 ID 替代全部关联。它也没有保存 JavaScript 调用栈或迁移正在执行的任意进程。</p>
+<p>再看 Host 仍活着时的 Peer 换路径。<code>peer-listener</code> 校验 Peer/credential/principal，把新路径附着到原 <code>ResumablePeerStream</code>。后者的 <code>read</code> 被 <code>RuntimeHostPeerByteStream</code> 消费，字节进入 <code>FramedByteStreamTransport</code> 的帧队列；Kernel 握手后创建的 <code>RuntimeHostConnectionSession</code> 才解码业务请求、授权、接纳，并经 <code>dispatchOperation</code> 调用 handler。<strong>恢复字节流发生在业务消费者之前。</strong></p>
+<p>用两组手算检查这一层到底保证什么。ACK 是确认回执，offset 是流内累计字节位置；1 KiB 为 1,024 字节。以下数字用于协议推演：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · Maka 的两条真实链：换 Host 与换连接路径为何要分开"><table><caption>表 3 / Table 3 · Maka 的两条真实链：换 Host 与换连接路径为何要分开</caption><thead><tr><th scope="col">时点</th><th scope="col">内存中的事实</th><th scope="col">可以推出什么</th></tr></thead><tbody><tr><td>旧路径代际为 6；新路径 7 在异步认证前 <code>reserve</code></td><td>当前代际已变为 7</td><td>更旧预约不能竞争 attach</td></tr>
+<tr><td>路径 8 随后 reserve 并 attach；路径 7 的认证才返回</td><td>当前代际为 8</td><td><code>attach(7)</code> 因代际不匹配被拒绝；不能覆盖路径 8</td></tr>
+<tr><td>接收了两个 64 KiB chunk，只向上读出第一个</td><td>内部 <code>received = 131072</code>，<code>consumed = 65536</code></td><td>对外确认 65536；第二块仍属于未消费数据</td></tr>
+<tr><td>丢 ACK 后换路，从已消费的 65536 恢复</td><td>原对象仍保留第二块；对端可能重送它</td><td>按 offset 识别重复，不再次入队；上层读走后才确认到 131072</td></tr></tbody></table></div>
+<p>源码的公开 <code>received</code> getter 实际返回 <code>consumed</code>，因此只看字段名称很容易读错确认口径。ACK 说明字节被上层读走；它们此时可能还在帧队列，尚未进入 handler，更没有证明数据库提交或外部工具成功。这也解释了为什么业务 requestId、执行身份和效果回执仍然必要。</p>
+<p>容量也分层：当前 Peer 窗口为 2 MiB，排队 write 最多 8 MiB；窗口满会等待 ACK，排队超限拒绝这次 write。帧队列达到容量时暂停底层 read，再向上恢复消费；业务连接另有限制在途请求数量。由此可以逐段查出“谁变慢会让谁停”，但不能据此给整个模型、工具和订阅系统证明统一内存上限。Host 退出后这些 Peer 内存状态不在，旧 resume 请求会被拒绝；这条链不提供跨进程 durable queue。</p>
+<h3 id="从现有实现迁移原理先写清保证所在的层">从现有实现迁移原理，先写清保证所在的层</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 从现有实现迁移原理，先写清保证所在的层"><table><caption>表 4 / Table 4 · 从现有实现迁移原理，先写清保证所在的层</caption><thead><tr><th scope="col">Agent 机制</th><th scope="col">邻域机制帮助解释的原理</th><th scope="col">不能继承的保证</th></tr></thead><tbody><tr><td>DSH 事件投影与 flush barrier（等待写入完成的屏障）</td><td>业务事件、派生状态、存储提交是不同边界</td><td>用数据库预写日志（WAL）自动重做一次业务调用</td></tr>
+<tr><td>Pi 按步骤取 steering/follow-up</td><td>消息邮箱（mailbox）的消费顺序与输入所有权</td><td>Actor（独立接收消息的计算单元）框架的持久邮箱、全局顺序或容量控制</td></tr>
+<tr><td>Maka Peer reserve/attach 代际</td><td>在最终接纳点拒绝过时参与者</td><td>外部资源也自动执行同一 fencing 检查</td></tr>
+<tr><td>Maka Host hold/seal/detach</td><td>关闭接纳后再结算、释放和转移拥有权</td><td>任意崩溃都能合作交接、取消能回滚效果</td></tr></tbody></table></div>
+<p>这些迁移的推导见<a href="../../../extended-reading.html#reference-16" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/runtime/agent-runtime-and-distributed-systems.md">Runtime 与分布式系统深研</a>。其中还有待发送记录（outbox）、资源侧 fencing，以及下游消费不及便限制上游继续发送的背压设计；本节没有把它们宣布为每个 Agent 已实现的能力。图与 Workflow 的恢复过程在后面的<a href="44-checkpoints-and-replay.html">checkpoint/replay 深度课</a>展开。</p>
+<h2 id="5-判断进展时区分合法等待和无效重复">5. 判断进展时，区分合法等待和无效重复</h2>
+<p>同一个 job 连续两次查询都返回 running，可能是合理等待。重复读取同一文件，也可能是在确认外部编辑是否出现。仅比较工具名字、参数文本或相邻回答相似度，会把这些工作误判为停滞。</p>
+<p>更有用的进展表示包含：当前假设是否改变、是否出现新观察、候选方案是否缩小、完成条件是否更接近、外部等待是否仍有合理预算。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 5. 判断进展时，区分合法等待和无效重复"><table><caption>表 5 / Table 5 · 5. 判断进展时，区分合法等待和无效重复</caption><thead><tr><th scope="col">观察</th><th scope="col">可能意味着什么</th><th scope="col">合理下一步</th></tr></thead><tbody><tr><td>job running 且仍在等待期限</td><td>外部工作尚未完成</td><td>延后查询，保留等待预算</td></tr>
+<tr><td>同样错误重复出现且未改变输入</td><td>原方案没有新信息</td><td>改假设、换检验或报告卡点</td></tr>
+<tr><td>文件版本变化</td><td>环境产生新事实</td><td>重新读取和判断，不能沿用旧补丁</td></tr>
+<tr><td>改动变大但行为测试持续失败</td><td>活动增加，目标没有接近</td><td>缩小变更、验证原因、考虑回退</td></tr>
+<tr><td>已满足全部验收条件</td><td>继续动作可能只增加成本</td><td>交付并结束</td></tr></tbody></table></div>
+<p>这是一套工程判断框架，不是已验证的停滞分类器。若要自动停止，应使用代表性任务校准误停率，保留继续等待、请求帮助和明确失败的不同出口。</p>
+<h3 id="一次-goal-判断没有进展与不知道有没有进展">一次 Goal 判断：没有进展与不知道有没有进展</h3>
+<p>Maka 当前 Host 在一轮结束后，把目标和最近六条截断的 user/assistant 文字交给一次无工具的辅助模型调用。它没有在这条判断中重新读取文件或执行测试。模型返回的布尔标记（flags）表达是否完成 <code>met</code>、是否等待 <code>waiting</code>、是否有进展 <code>progress</code> 等判断，再由代码决定 Goal 的后续状态；另一次调用并不使这些文字自动成为独立证据。</p>
+<p>用一个小初态看清消费者：Goal 正在运行，连续无进展为 2，停滞阈值为 3，token 与迭代预算仍足够。本题是源码演算，不是模型实验。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 一次 Goal 判断：没有进展与不知道有没有进展"><table><caption>表 6 / Table 6 · 一次 Goal 判断：没有进展与不知道有没有进展</caption><thead><tr><th scope="col">得到的返回</th><th scope="col">当前代码怎样理解</th><th scope="col">下一步</th></tr></thead><tbody><tr><td><code>{}</code></td><td>缺失 flags 默认为 false，且不是 evaluatorFailed</td><td>作为有效的无进展判断，2→3，停止为 stalled</td></tr>
+<tr><td><code>{&quot;met&quot;:&quot;true&quot;}</code> 或调用超时</td><td>非布尔值或没有及时得到判断，evaluatorFailed=true</td><td>不增加停滞，仍是 2；继续检查预算与迭代限制</td></tr>
+<tr><td><code>{&quot;waiting&quot;:true,&quot;progress&quot;:false}</code></td><td>进入 waiting 分支，不传进展更新</td><td>停滞仍是 2；token 预算与迭代上限允许后才进入 waiting</td></tr></tbody></table></div>
+<p>所以“都是 false”不足以解释控制行为，必须把<strong>判断是否有效</strong>也带到状态更新。若迭代额度在这一步耗尽，即使停滞未增加，Goal 仍会停止。解析器也不拒绝所有语义矛盾：同时给 <code>met=true</code>、<code>impossible=true</code> 时，当前消费者优先 met。</p>
+<p>判断后的 reason 会进入下一轮提示，连同目标和计数指导继续工作；旧 Goal 的迟到判断则要经过 id/revision 复核；当前 lane 或 active Goal 已不匹配时，<code>processCompletion</code> 直接返回，不用这份旧判断结算新 Goal。这不等于自动为新 Goal 重新评估。假设“已修好”的文字之外还有一份真实失败日志：如果日志没有进入这六条文字，就不能声称这次判断检查过该日志；即使结论碰巧正确，也不证明它依据了这份工具证据。要提高验收可信度，应增加明确的证据来源并测量误判，而不是只增加反思次数。</p>
+<h3 id="从-react-到-reflexion反馈究竟改变了哪一步">从 ReAct 到 Reflexion：反馈究竟改变了哪一步</h3>
+<p>ReAct 在一次任务轨迹中交替使用推理、动作和环境观察，让下一次选择条件包含新观察。用简化记号表示：<code>动作 a_t = 策略(目标, 历史 h_t)</code>，执行得到 <code>o_t</code>，再令 <code>h_(t+1) = h_t + (a_t, o_t)</code>。原论文的 reasoning trace 是其提示方法的一部分；工程系统不必向用户展示完整内部推理，仍可检查动作是否利用了新证据。</p>
+<p>以处理带空格路径<code>sample data</code>的扫描任务为例，第一次怀疑路径不存在，读目录后却发现完整的 <code>sample data</code>；下一步应检查参数传递，而不是继续重复列目录。发现当前代码按空格切分后，才提出保持参数边界的补丁。这条短推演说明：工具调用的价值在于排除候选解释、改变下一步；反复说“再认真想想”却不引入新事实，不能充当环境反馈。</p>
+<p>Reflexion 增加的是<strong>跨尝试</strong>的反馈：行动者（Actor，此处是模型角色）产生轨迹，评估者（Evaluator）给出成败或评价，自我反思环节（Self-Reflection）根据轨迹与评价生成可复用经验，下一次尝试把经验作为上下文。它不要求更新模型权重，经验也不是动作执行账本；原论文将经验容量限制在有限条目，以适应上下文预算。</p>
+<p>本例一次失败后的有用经验是“只对 shell 命令补引号没有改变程序内部的 split；下次先检查入口参数数组与下游再次切分的位置”。这说明错误归因如何改变调查顺序。若反思写成“所有路径错误都来自 split”，就把局部经验变成错误规则；如果 evaluator 用的断言本身不正确，更多反思还会巩固误判。反思应保存条件与证据，下一次仍接受新观察的反驳。</p>
+<p>两种反馈都不提供跨崩溃恢复算法，也不保证成功。原 Reflexion 在 ALFWorld 用过重复动作/响应与步数上限触发反思的启发式；那是特定环境中的控制条件，不能原样用于跨天等待的任务。我们的 job <code>running</code> 例子正是反例：没有新内容，仍可能有合法进展来源。比较“加入反思是否值得”时，应固定总尝试预算，并观察它是否降低同因错误、误停和最终失败，而不是只统计生成了多少反思文本。</p>
+<span class="heading-alias" id="延伸持续工作还要分别决定能否行动和是否通知" aria-hidden="true"></span><h2 id="6-持续委托分别决定能否行动和是否通知">6. 持续委托：分别决定能否行动和是否通知</h2>
+<p>沿用 <a href="31-tool-contracts.html#%E5%BB%B6%E4%BC%B8%E5%90%8C%E4%B8%80%E4%B8%AA%E8%B4%AD%E4%B9%B0%E5%8A%A8%E4%BD%9C%E5%8F%AF%E4%BB%A5%E4%BB%8E%E4%B8%A4%E4%B8%AA%E5%B7%A5%E5%85%B7%E5%85%A5%E5%8F%A3%E5%88%B0%E8%BE%BE">第31章 的购买委托</a>，增加七天期限，并约定：确认买到一件后结束；否则到期停止；没有实质变化不提醒。Muse 的产品设计说明描述了按时间与事件推进任务，并判断后台结果是否值得通知。这提供了持续委托的设计动机；下面不假定 Muse 使用同名内部状态。下面的对象与规则均为教学设计。</p>
+<p>一次后台运行要分别作出三个决定：<strong>当前是否允许继续工作，候选动作是否获准，结果是否值得打扰用户。</strong> 保存 Goal 不能代替付款批准；一次运行成功也不能把尚未成交的七天委托标成完成。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 6. 持续委托：分别决定能否行动和是否通知"><table><caption>表 7 / Table 7 · 6. 持续委托：分别决定能否行动和是否通知</caption><thead><tr><th scope="col">对象</th><th scope="col">谁决定</th><th scope="col">本例需要保留的事实</th></tr></thead><tbody><tr><td>委托目标（Goal）</td><td>用户定义范围；目标控制器维护</td><td>期限、预算、修订、是否暂停/取消、购买完成证据</td></tr>
+<tr><td>触发与执行（Trigger / Run）</td><td>事件源/时钟产生；准入组件和 Runtime 接纳执行</td><td>来源版本、工作身份、使用的目标修订、等待原因</td></tr>
+<tr><td>动作与批准（Action / Approval）</td><td>Agent 提议；可信权限组件及用户裁决</td><td>本次购买参数、批准范围、有效期、实际效果状态</td></tr>
+<tr><td>通知（Notification）</td><td>通知策略判断；发送组件交付</td><td>实质变化、去重依据、当前通知偏好、送达结果</td></tr></tbody></table></div>
+<p>例如，10:00 事件推送首次带来报价 Q7，10:01 定时扫描再次发现同一商家、商品和报价版本。可以保存两次观察，但两次触发不应该各自准备一笔独立购买。应按业务对象和来源版本判断重复工作；只有不同的事件 ID，并不足以证明是两件事。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 6. 持续委托：分别决定能否行动和是否通知"><table><caption>表 8 / Table 8 · 6. 持续委托：分别决定能否行动和是否通知</caption><thead><tr><th scope="col">时点</th><th scope="col">工作如何推进</th><th scope="col">动作许可</th><th scope="col">是否通知</th></tr></thead><tbody><tr><td>首次报价符合预算</td><td>保存候选，等待用户处理</td><td>尚未获准付款</td><td>呈现一次具体批准请求；它同时告知本次机会</td></tr>
+<tr><td>再次发现同一报价</td><td>合并或记录重复观察</td><td>仍等待原批准</td><td>不重复催促，不另发一条同义“进展”</td></tr>
+<tr><td>用户下调预算，候选不再符合</td><td>保存新修订，使旧候选失效</td><td>旧批准不得直接用于该候选</td><td>在当前交互确认变更；后台是否再提醒按最新偏好决定</td></tr>
+<tr><td>订单已确认</td><td>保存证据，结束目标及后续检查</td><td>本次动作已结算</td><td>按约定通知完成</td></tr></tbody></table></div>
+<p>执行准入应检查当前目标与许可，通知发送前也应检查最新偏好及是否重复。用户暂停提醒不必等于暂停工作；用户取消购买委托则应阻止新的购买动作。若动作已经提交，取消仍需与效果对账分开，沿用前文恢复规则。</p>
+<p><strong>今天系统没有给用户发消息，能否据此判断它按要求安静地完成了检查？</strong></p>
+<p>不能。它可能检查后发现无变化，也可能没有获得执行机会或检查失败。后台执行记录、观察结果、通知裁决与发送结果需要分开保存，才能区分这几种情况。</p>
+<p>持续委托是否有效，还需要看重要变化有没有及时提醒、重复通知有多少、后台花了多少成本。这些指标将在<a href="40-task-evaluation.html#5-%E6%8C%81%E7%BB%AD%E5%A7%94%E6%89%98%E6%80%8E%E6%A0%B7%E8%AF%84%E4%BB%B7%E9%80%9A%E7%9F%A5%E8%B4%A8%E9%87%8F">整项任务评价</a>用明确分母解释。</p>
+<h2 id="7-把设计落到-codex-与-claude-code">7. 把设计落到 Codex 与 Claude Code</h2>
+<p>让子任务调查测试入口时，先决定它收到什么，再决定它操作哪份文件。Codex 的历史 fork 与 Claude Code 的几种初始化方式各有合同；同样叫 fork，也不能推导出同样的输入。文件隔离、结果交接和恢复仍需另行设计，父任务保留整体验收责任。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 9 / Table 9 · 7. 把设计落到 Codex 与 Claude Code"><table><caption>表 9 / Table 9 · 7. 把设计落到 Codex 与 Claude Code</caption><thead><tr><th scope="col">工程问题</th><th scope="col">Codex</th><th scope="col">Claude Code</th><th scope="col">两个只读调查任务的参考选择</th></tr></thead><tbody><tr><td>方法与任务输入</td><td>Skill 目录与正文分开；child 可选择历史 fork 范围</td><td>主会话 Skill、Skill fork、brief 子任务与 conversation fork 分开</td><td>一个调查函数、一个调查测试入口；各自收到当前目标、只读范围、相关背景和输出合同</td></tr>
+<tr><td>是否隔离文件</td><td>child Thread 不自动等于独立文件副本</td><td><code>isolation: worktree</code> 是独立选择；上下文 fork 不替代它</td><td>子任务仅调查，父任务统一修改；读取仍受实际权限控制，不以提示文字替代执法</td></tr>
+<tr><td>返回后怎样继续</td><td>消息、followup 与父任务验收职责不同</td><td>返回产物仍需父验收；checkpoint 只覆盖特定恢复对象</td><td>父任务核对来源与当前文件，再应用修复并整体复测；子任务 completed 不等于已采纳</td></tr></tbody></table></div>
+<p>对应细节见 <a href="41-codex-memory-and-collaboration.html">Codex 协作案例</a>、<a href="42-claude-code-memory-and-skills.html">Claude Code Skill 案例</a>和 <a href="43-claude-code-subagents-and-recovery.html">Claude Code 协作与恢复案例</a>。“两个只读调查、父任务实施”减少共享写入碰撞；增加并行写入是否值得，还取决于它节省的关键路径是否大于协调、冲突和整体验收成本。</p>
+<span class="heading-alias" id="8-自测与参考答案" aria-hidden="true"></span><h2 id="8-常见场景与完整参考设计">8. 常见场景与完整参考设计</h2>
+<p><strong>题一：子任务使用独立上下文，能否放心并行写同一文件？</strong></p>
+<p>不能。上下文独立减少输入污染，文件写入是另一种共享资源。要明确工作副本、受控资源锁、条件写或合并策略，并由父任务验证最终组合。</p>
+<p><strong>题二：lease 到期后直接换 Worker，旧 Worker 的成功结果要接受吗？</strong></p>
+<p>不能只看成功字段。应检查结果所属执行身份、认领代际和当前状态；陈旧结果不应推进当前代际状态，但应保留对账记录。拒绝采纳结果不撤销已经发生的外部效果，仍需要资源侧控制或对账。</p>
+<p><strong>跨实现题：能否给两种产品统一下达“fork 一份继续做，失败后恢复”，不再说明其他条件？</strong></p>
+<p>不能。必须说明 fork 的输入合同、工作目录、写入范围、交付与采纳标准，以及恢复的是对话、可追踪文件还是外部效果。尤其不能把 Claude Code 的 Skill fork 当作完整父历史复制，也不能把 Codex child 身份当作文件隔离证明。</p>
+<p><strong>四步修复的完整参考设计。</strong> A 读函数、B 读测试，依赖为 <code>A/B → C 编辑 → D 验证</code>。新增 E 也写同一函数时，参考方案让资源 owner 串行接纳 C/E；后到者重新读取前一提交后的版本，再决定是否仍需修改，不能仅因图上无依赖就同时覆盖。</p>
+<p>若 C 已认领执行 X7、尚未派发时崩溃，恢复沿 X7 检查既有派发和结果，不创建 X8 冒充首次尝试。若派发可能已产生效果，则先查询资源状态，不能只凭缺回执重复写入。Client 断线而 Host 仍活着时，新的连接获取快照与后续事件，观察原工作，断线本身不重开 C。</p>
+<p>并行也有可以直接算出的反例。给定两项调查各 5 秒、串行编辑与验收合计 5 秒：无其他开销的串行方案用 <code>5+5+5=15 秒</code>；并行调查省下 5 秒，但若额外协调与冲突处理占 8 秒，交付需 <code>max(5,5)+8+5=18 秒</code>。这些是教学时长，不是测量；在同样完成合同下，这组条件已足以推翻“增加子任务必然更快”。各模块组合见 <a href="47-integrated-design.html">第47章 综合设计示例</a>。</p>
+<hr>
+<p><a href="38-codex-context-compaction.html">上一章：第 38 章｜Codex：上下文与压缩</a> · <a href="40-task-evaluation.html">下一章：第 40 章｜整项任务评价与成本比较</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="38-codex-context-compaction.html"><span>← 上一章</span><strong>第 38 章｜Codex：上下文与压缩</strong></a><a href="40-task-evaluation.html"><span>下一章 →</span><strong>第 40 章｜整项任务评价与成本比较</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%85%88%E5%8C%BA%E5%88%86%E5%A4%8D%E7%94%A8%E6%AD%A5%E9%AA%A4%E5%92%8C%E5%A7%94%E6%B4%BE%E5%B7%A5%E4%BD%9C">1. 先区分复用步骤和委派工作</a></li><li class="toc-level-2"><a href="#2-%E4%BB%8E%E5%AD%90%E4%BB%BB%E5%8A%A1%E4%BA%A4%E4%BB%98%E5%88%B0%E7%88%B6%E4%BB%BB%E5%8A%A1%E9%AA%8C%E6%94%B6">2. 从子任务交付到父任务验收</a></li><li class="toc-level-2"><a href="#3-%E8%B0%83%E5%BA%A6%E9%97%AE%E9%A2%98%E5%8C%85%E5%90%AB%E4%BE%9D%E8%B5%96%E5%92%8C%E8%B5%84%E6%BA%90%E5%86%B2%E7%AA%81">3. 调度问题包含依赖和资源冲突</a></li><li class="toc-level-2"><a href="#4-%E4%B8%89%E4%B8%AA%E5%AE%B9%E6%98%93%E6%B7%B7%E6%B7%86%E7%9A%84%E6%81%A2%E5%A4%8D%E5%9C%BA%E6%99%AF">4. 三个容易混淆的恢复场景</a></li><li class="toc-level-3"><a href="#maka-%E7%9A%84%E4%B8%A4%E6%9D%A1%E7%9C%9F%E5%AE%9E%E9%93%BE%E6%8D%A2-host-%E4%B8%8E%E6%8D%A2%E8%BF%9E%E6%8E%A5%E8%B7%AF%E5%BE%84%E4%B8%BA%E4%BD%95%E8%A6%81%E5%88%86%E5%BC%80">Maka 的两条真实链：换 Host 与换连接路径为何要分开</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E7%8E%B0%E6%9C%89%E5%AE%9E%E7%8E%B0%E8%BF%81%E7%A7%BB%E5%8E%9F%E7%90%86%E5%85%88%E5%86%99%E6%B8%85%E4%BF%9D%E8%AF%81%E6%89%80%E5%9C%A8%E7%9A%84%E5%B1%82">从现有实现迁移原理，先写清保证所在的层</a></li><li class="toc-level-2"><a href="#5-%E5%88%A4%E6%96%AD%E8%BF%9B%E5%B1%95%E6%97%B6%E5%8C%BA%E5%88%86%E5%90%88%E6%B3%95%E7%AD%89%E5%BE%85%E5%92%8C%E6%97%A0%E6%95%88%E9%87%8D%E5%A4%8D">5. 判断进展时，区分合法等待和无效重复</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E6%AC%A1-goal-%E5%88%A4%E6%96%AD%E6%B2%A1%E6%9C%89%E8%BF%9B%E5%B1%95%E4%B8%8E%E4%B8%8D%E7%9F%A5%E9%81%93%E6%9C%89%E6%B2%A1%E6%9C%89%E8%BF%9B%E5%B1%95">一次 Goal 判断：没有进展与不知道有没有进展</a></li><li class="toc-level-3"><a href="#%E4%BB%8E-react-%E5%88%B0-reflexion%E5%8F%8D%E9%A6%88%E7%A9%B6%E7%AB%9F%E6%94%B9%E5%8F%98%E4%BA%86%E5%93%AA%E4%B8%80%E6%AD%A5">从 ReAct 到 Reflexion：反馈究竟改变了哪一步</a></li><li class="toc-level-2"><a href="#6-%E6%8C%81%E7%BB%AD%E5%A7%94%E6%89%98%E5%88%86%E5%88%AB%E5%86%B3%E5%AE%9A%E8%83%BD%E5%90%A6%E8%A1%8C%E5%8A%A8%E5%92%8C%E6%98%AF%E5%90%A6%E9%80%9A%E7%9F%A5">6. 持续委托：分别决定能否行动和是否通知</a></li><li class="toc-level-2"><a href="#7-%E6%8A%8A%E8%AE%BE%E8%AE%A1%E8%90%BD%E5%88%B0-codex-%E4%B8%8E-claude-code">7. 把设计落到 Codex 与 Claude Code</a></li><li class="toc-level-2"><a href="#8-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E8%AE%BE%E8%AE%A1">8. 常见场景与完整参考设计</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

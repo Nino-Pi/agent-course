@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 27 章｜跨会话任务推进与工作交接 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 27 / 62</div><article id="main-content"><span class="heading-alias" id="跨会话任务推进与工作交接" aria-hidden="true"></span><h1 id="第-27-章跨会话任务推进与工作交接">第 27 章｜跨会话任务推进与工作交接</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：一项修复跨越多次工作，下一次怎样接着推进，又不沿用过时结论或重复操作？</p>
+<p><strong>关键概念</strong>：任务要求：当前要达到的结果与范围；进度：已经做过和仍待处理的工作；检查观察：绑定文件与条件的结果；交接：下一执行者可读取的工作材料；当前验收：按现行要求判断产物；阻塞：缺少继续所需的条件。</p>
+<p><strong>关系主线</strong>：保存进度和观察 → 回读当前要求与文件 → 重新判断检查是否适用 → 选择允许的下一工作，最终交付已完成部分和明确的停止原因。</p>
+</blockquote>
+<h2 id="四份材料回答四个不同问题">四份材料，回答四个不同问题</h2>
+<p>任务可以跨越多次会话。本例每次工作都有明确停止点；一次工作结束不等于整项委托完成。接手者需要知道目标、产物现状和剩余工作，而不只是看到上一位执行者写了“进行中”。</p>
+<p>案例仍是修复 <code>formatDuration(seconds)</code> 和 README：对安全整数范围内的非负整数秒，返回 <code>minutes:ss</code>，余秒显示两位；README 应说明项目实际的测试入口。只允许修改 <code>README.md</code> 与 <code>src/duration.js</code>，保留用户已有及随后新增的内容，不修改测试、配置和其他项目文件。</p>
+<p>本章将它拆成两次工作的<strong>教学案例</strong>。后面的文件变化、交接记录和参考程序用于说明设计，没有新增运行结果，也不是 Maka 已有的自动任务清单调度功能。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 四份材料，回答四个不同问题"><table><caption>表 1 / Table 1 · 四份材料，回答四个不同问题</caption><thead><tr><th scope="col">材料</th><th scope="col">本例填写的内容</th><th scope="col">回答的问题</th></tr></thead><tbody><tr><td>要求（Requirements）</td><td>一般分秒转换、正确测试说明、限定两个可改文件</td><td>现在要实现什么，允许做什么？</td></tr>
+<tr><td>进度（Progress）</td><td>函数已修改；README 尚未修改</td><td>哪些工作做过，哪些还欠着？</td></tr>
+<tr><td>检查观察（Observation）</td><td>某份代码运行四个断言通过；某次读取发现 README 命令错误</td><td>当时检查了什么，看到了什么？</td></tr>
+<tr><td>当前验收（Acceptance）</td><td>函数的公式与样例符合要求，但文档仍不符合，整项任务未完成</td><td>当前产物是否满足当前要求？</td></tr></tbody></table></div>
+<p>“代码已编辑”不能代替“代码正确”，“四例通过”不能代替“整项任务通过”。进度可以保留过去完成的工作，当前验收则必须面对今天的文件与要求。</p>
+<h2 id="第一次工作函数修好了readme-还欠着">第一次工作：函数修好了，README 还欠着</h2>
+<p>本例给定项目测试入口为 <code>npm test</code>，它调用 <code>node --test</code>。原函数使用 <code>% 100</code>，因此 60 秒得到 <code>1:60</code>，125 秒得到 <code>2:25</code>。执行者将取余基数改为 60，保留分钟取整与补零：</p>
+<pre><code class="language-js">export function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, &#39;0&#39;)}`;
+}</code></pre>
+<p>这一公式表达 <code>seconds = 60 × minutes + remainder</code>，其中余秒在 0 到 59 之间。它解释了一般计算；四个样例只覆盖四个输入，不能取代这个要求。</p>
+<p>现在固定第一次工作的停止点：函数修改和测试都已结束，没有仍在执行的工具；本次预算已用完，README 尚未处理。以下是交接要使用的完整状态。W1 是本章这次核对所对应的文件状态标签，用来和后来状态区分；它与第24章的 Graph 节点 W1 无关，也<strong>不是能恢复进程的快照</strong>。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 第一次工作：函数修好了，README 还欠着"><table><caption>表 2 / Table 2 · 第一次工作：函数修好了，README 还欠着</caption><thead><tr><th scope="col">W1 中的对象</th><th scope="col">当前内容或给定观察</th><th scope="col">判断</th></tr></thead><tbody><tr><td><code>package.json</code></td><td><code>&quot;test&quot;: &quot;node --test&quot;</code>，未修改</td><td>测试入口已知</td></tr>
+<tr><td><code>src/duration.js</code></td><td>上面的完整函数，属于允许修改范围</td><td>修复已实施</td></tr>
+<tr><td><code>test/duration.test.js</code></td><td>原有 0、9、60、125 秒四例，未修改</td><td>检查集合未被缩减</td></tr>
+<tr><td><code>npm test</code></td><td>本案例设定观察为 4 通过、0 失败、退出码 0</td><td>这四例在 W1 上通过</td></tr>
+<tr><td>README</td><td>仍写 <code>npm run check</code>，其他用户内容保留</td><td>文档条件未满足</td></tr>
+<tr><td>项目差异</td><td>目前只改变 <code>src/duration.js</code> 的取余基数</td><td>本次修改范围符合要求</td></tr></tbody></table></div>
+<p>正确的结束报告是：“函数部分已完成，README 尚未修正，任务部分完成；所有已开始工具均已结算。”不需要把代码回滚成错误版本，也不能把整项任务标成通过。预算停止的是继续工作，并没有否认已经取得的有效产物。</p>
+<h2 id="一份能被下一次工作读取的交接">一份能被下一次工作读取的交接</h2>
+<p>本例设置一个任务协调者：它保存用户的当前要求、接纳工作、发布交接，并记录是否已有执行者在工作。模型可以提出下一步建议，协调者按当前范围与依赖决定是否接纳，工具执行者在真正产生效果前再次检查条件。</p>
+<p>交接保存在协调者自己的任务库中，不写入用户项目，因此不会突破“项目只改两个文件”的范围。任务库还保留开始前的文件内容与差异基线 B0；后续比较以此识别本次修改，并结合用户说明保留已有内容，不能把相对 Git 提交的全部差异都算作 Agent 的产出。任务 ID 用来找到同一项委托；下面的内容均已填写。</p>
+<pre><code class="language-text">任务：duration-doc
+开始前基线：B0（由任务库保存文件内容与已有差异）
+操作引用：edit-function-1（函数修改已确认，当前无在途执行）
+要求修订：r1
+  目标：非负安全整数秒转换为 minutes:ss；余秒两位；README测试入口正确
+  可改项目文件：README.md、src/duration.js
+  必须保留：用户内容、测试、配置、其他文件
+
+已核文件状态：W1
+  函数：分钟Math.floor(seconds/60)，余秒seconds%60，padStart(2,&#39;0&#39;)
+  配置：test = node --test
+  测试：0、9、60、125四例，原文件未改
+  README：仍含npm run check
+
+工作进度：
+  函数修复：已实施，已有样例检查与公式分析
+  文档修复：未开始
+
+检查：
+  C1：W1，npm test，四例通过，退出0；没有覆盖所有输入
+  C2：W1，公式分析符合一般分秒关系；不是额外运行
+  C3：W1，README与test脚本不一致
+  C4：W1，项目diff仅含函数取余基数修改，未改测试
+
+当前验收：部分完成；文档要求未满足
+效果待核：无；已开始工具均已取得结算结果
+本次停止：预算已用完
+下一步建议：回读当前要求、配置、函数、测试和README；
+  若条件仍有效，只替换错误命令，保留其余内容，再做交付检查
+执行状态：本次工作已结束，没有可沿用的在途执行</code></pre>
+<p>这份记录有三个实际消费者。协调者使用任务 ID、当前执行状态和停止原因判断能否接纳新工作；接手的执行者使用文件入口、观察与未完成项重建上下文；交付判定使用当前要求和新检查决定能否结束整项委托。</p>
+<p>发布也有先后：执行者提交交接草稿，协调者保存成功后，才把它登记为可被下一次读取的交接。保存失败就只能报告“工作已有这些结果，交接尚未确认保存”，不能声称新会话已经能读到。下一次用户要求继续时，协调者主动按任务 ID 读取它；文件仅仅存在，不会自动进入模型请求。</p>
+<p>下图把下一次工作的触发与交接资料分开。用户继续请求或已授权的调度先进入协调者准入，接手执行者再读取资料；虚线只提供已保存的交接，不触发新工作：</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="一份能被下一次工作读取的交接：可滚动示意图"><a href="../../../assets/diagrams/27-task-continuity-1.svg"><img src="../../../assets/diagrams/27-task-continuity-1.svg" alt="产物和观察保存为交接资料，用户继续请求或已授权调度另行触发准入；接手者读交接和现行要求，再回读文件并选择范围内的下一步。" width="720" height="1048" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>若任务库读不到交接，接手者仍可以在允许范围内重新调查，但应明确缺少哪些历史结果。若原工作仍在执行，则先观察它，不能仅因换了会话就派出第二个修改者。一次任务的进度也不宜直接写成全局 Memory：临时修复状态需要随当前文件更新，不能成为其他项目长期沿用的事实。</p>
+<h2 id="第二次工作先回读再选择下一项">第二次工作：先回读，再选择下一项</h2>
+<p>以下两条接续分支都假设新一次工作已获准，并重新分配了足够的只读核对预算；正常分支还具有编辑和复测预算。上次“预算已用完”描述已结束的那次工作，不会自动授予新的额度或权限。</p>
+<p>下一工作不是“永远执行清单里第一个没打勾的项目”。它至少要满足三项条件：对应当前尚未满足的要求；前置事实已经取得；动作仍在当前范围内。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 第二次工作：先回读，再选择下一项"><table><caption>表 3 / Table 3 · 第二次工作：先回读，再选择下一项</caption><thead><tr><th scope="col">候选工作</th><th scope="col">所需前提</th><th scope="col">在第一次交接之后怎样判断</th></tr></thead><tbody><tr><td>修改 README 命令</td><td>当前配置仍声明该入口；当前 README 已读；允许编辑文档</td><td>条件满足时可以接纳</td></tr>
+<tr><td>再次修复函数</td><td>当前函数确有未满足的行为，且允许修改源码</td><td>不能因为旧清单里有“修复”就重复编辑</td></tr>
+<tr><td>宣布整项完成</td><td>函数、文档、范围检查均适用于当前产物</td><td>README 仍错误时不能宣布完成</td></tr></tbody></table></div>
+<p>依赖是信息与结果关系：README 修正依赖当前测试入口，不必为了等函数测试全绿而拖延；最终交付则要等待函数、文档和范围都获得适当判断。模型可以建议优先处理哪项，决定执行的程序仍要过滤无前提、越范围或已经完成的工作。</p>
+<h3 id="正常接续现态仍是-w1">正常接续：现态仍是 W1</h3>
+<p>第二次工作回读后，确认 r1 未变、函数与测试仍是 W1，配置仍声明 <code>test</code>。执行者读取 README 当前全文，只将错误命令改为 <code>npm test</code>，保留用户段落。产生写入前，还要确认这次读取依据仍有效；若中间被别人修改，就拒绝旧补丁，重新读取后合并。</p>
+<p>本参考方案要求负责文件写入的一方把“核对读取版本”和“提交编辑”放在同一个受保护边界。这是额外设计条件，不是把普通 Read 后再 Edit 就称为自动防覆盖。</p>
+<p>假设本次编辑已确认，重新运行现有测试仍是四例通过，并且检查一般公式、README 入口及全部项目差异均符合 r1，协调者才将当前验收改为完成。最终结果应列明两份文件的修改、四例检查的范围、公式分析及无关内容保留情况；不把“检查过”缩成一个没有对象的绿色标记。</p>
+<h3 id="条件改变旧-passing-只剩历史意义">条件改变：旧 passing 只剩历史意义</h3>
+<p>另一条分支中，用户在两次工作之间做了三件事：把函数的 <code>Math.floor</code> 改成 <code>Math.round</code>；给 README 增加一段尚未完成的说明；发出 r2：“先只读检查并报告，暂时不要编辑；原修复目标保留。”</p>
+<p>接手者回读到的是 W2，而交接中的 C1/C2 仍针对 W1。旧的四例通过没有变成假记录，但不能再用来验收 W2。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 条件改变：旧 passing 只剩历史意义"><table><caption>表 4 / Table 4 · 条件改变：旧 passing 只剩历史意义</caption><thead><tr><th scope="col">回读后的事实</th><th scope="col">当前参考判断</th></tr></thead><tbody><tr><td>分钟改为 <code>Math.round(seconds / 60)</code></td><td>59秒得到分钟1、余秒59，组合为<code>1:59</code>，违反一般分秒要求；这是源码推演，尚未新运行测试</td></tr>
+<tr><td>README 仍是错误命令，另有用户新段落</td><td>文档问题仍在；新段落必须保留</td></tr>
+<tr><td>用户当前要求只读</td><td>可以报告问题，不能执行原交接建议的两处编辑</td></tr>
+<tr><td>旧 C1 写着 passing</td><td>保留为 W1 的历史观察，当前检查状态需重新判断</td></tr></tbody></table></div>
+<p>对这里给出的修改，按源码计算，旧四例仍会全过：0、9、60、125 秒区分不了这两个实现，而 59 秒可以；这不是新增测试记录。检查结果是否新鲜和检查是否覆盖当前要求，是两个独立问题。</p>
+<p>这次合理的交付是：“发现函数与文档仍不符合目标；本次只读检查已完成；修复委托因当前不可写而阻塞。”原委托未完成，但本次受限工作可以有效结束。下一步需要用户改变范围或处理依赖，不能由“目标还没完成”自行恢复写权限。</p>
+<h2 id="参考程序怎样消费交接">参考程序怎样消费交接</h2>
+<p>下面是任务协调者的一小段伪代码。它不执行文件修改，而是返回下一项可交给执行层的工作。<code>readCurrentTask</code> 读取可信任务库中的现行要求，不能用交接正文中的旧范围替代。</p>
+<pre><code class="language-text">chooseNext(taskId):
+  task = readCurrentTask(taskId)
+  if task.hasActiveExecution:
+    return ObserveExistingExecution(task.executionId)
+
+  effects = readCurrentOperationStates(taskId)
+  if effects.hasUnknown:
+    if task.remainingBudget &lt;= 0:
+      return HandoffUnknown(effects, reason=&quot;缺少核对额度&quot;)
+    return ReconcileOriginalEffects(effects.unknownIds)
+  if task.remainingBudget &lt;= 0:
+    return HandoffPartial(reason=&quot;预算不足，尚未回读项目现态&quot;)
+
+  handoff = readPublishedHandoff(task.handoffId)
+  if handoff is missing:
+    return InspectCurrentTask(reason=&quot;交接缺失，重新调查现态&quot;)
+
+  baseline = readTaskBaseline(task.baselineId)
+  now = readAllowedProjectFilesAndDiff(task, baseline)
+  observations = []
+  for check in handoff.checks:
+    if sameRelevantFiles(check, now)
+       and sameCheckConditions(check, task)
+       and supportsCurrentRequirement(check, task):
+      observations.add(check)
+    else:
+      keepAsHistory(check)
+
+  assessment = inspectCurrentRequirements(task, now, observations)
+  if assessment.allSatisfied:
+    return Deliver(assessment)
+  if assessment.needsMoreReadOnlyEvidence:
+    return Inspect(assessment.nextMissingEvidence)
+
+  candidates = []
+  if assessment.functionFailed:
+    candidates.add(EditFunction)
+  if assessment.readmeCommandWrong and assessment.currentScriptKnown:
+    candidates.add(EditReadmeCommand)
+
+  allowed = candidates.filter(work =&gt; task.currentScope.allows(work))
+  if allowed.isEmpty:
+    return HandoffBlocked(assessment, reason=&quot;剩余工作缺少允许条件&quot;)
+  return Propose(allowed.first, requirement=task.revision, files=now.versions)</code></pre>
+<p>操作记录由任务库关联到 taskId，交接中的 <code>edit-function-1</code> 用于定位；读取的是操作的当前状态，而非把交接中的旧状态直接当真。读取不到交接时，程序返回重新调查任务的工作；该工作同样遵守当前读取权限和预算。</p>
+<p><code>sameRelevantFiles</code> 比较的是该检查真正依赖的代码、测试、配置等对象；不是只看文件名相同。<code>inspectCurrentRequirements</code> 使用本例已经展开的规则：分钟取完整分钟、余秒范围与两位显示、文档入口、修改范围。它不能把任意实现的正确性简化成几个字符串匹配；缺少有效观察时返回“还需核对”，而不默认通过。</p>
+<p>代入 W1，程序会得到“函数已满足、README 错、脚本已知”，于是提出文档修改。代入 W2+r2，它保留旧检查为历史，得到当前函数和文档问题，却找不到允许的编辑，于是返回阻塞交接。效果查询结果由协调者更新到原操作记录后，再进入选择流程；旧交接中的未知不能覆盖后来已确认的结果。</p>
+<p>选择和执行之间若又发生用户修订，执行层还必须拒绝过时提案。回读、核对和新工作也都消耗预算，每项实际动作还要检查剩余额度；没有查询额度时交付未知及所缺条件。这段选择代码本身不提供事务、权限执行或自动调度。</p>
+<h2 id="未完成也有合理的停止方式">未完成也有合理的停止方式</h2>
+<p>部分完成、效果未知与阻塞可以同时出现在一项任务中；它们描述不同事实，不宜挤进一个含糊的 <code>done</code> 字段。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 未完成也有合理的停止方式"><table><caption>表 5 / Table 5 · 未完成也有合理的停止方式</caption><thead><tr><th scope="col">情况</th><th scope="col">有效交付内容</th><th scope="col">继续前需要什么</th></tr></thead><tbody><tr><td>部分完成（Partial completion）</td><td>已取得的产物、剩余要求、本次停止原因</td><td>新的合法工作机会和足够预算</td></tr>
+<tr><td>效果未知（Unknown effect）</td><td>原操作身份、可能影响的对象、缺少的结果</td><td>先查询效果或按资源方恢复合同处理</td></tr>
+<tr><td>工作阻塞（Blocked）</td><td>缺少的权限、输入或依赖，以及仍能确定的结论</td><td>条件实际改变，不能只多调用一次模型</td></tr>
+<tr><td>当前验收通过</td><td>产物、适用的检查与未覆盖范围</td><td>交付；后来的修改需重新判断</td></tr></tbody></table></div>
+<p>例如 README 编辑可能已发生，却没收到回执。接手者先查原操作记录和当前 README，不能将它当作“未开始”再次执行。读取目标文本能确认当前内容，却未必证明是哪个调用写的。若当前内容已满足目标且不存在仍会迟到执行的旧工作，可以据现态继续验收，同时保留调用归属仍未知的事实；若旧执行仍可能写入，或效果无法核清，就停止新的写入并保留未知。远端下单、发信更不能靠重新调用来“补回执”。</p>
+<p>图中的检查先处理原效果，再决定新工作；停止新动作不等于撤销已经发生的效果：</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="未完成也有合理的停止方式：可滚动示意图"><a href="../../../assets/diagrams/27-task-continuity-2.svg"><img src="../../../assets/diagrams/27-task-continuity-2.svg" alt="发现原效果未知时先查询操作与当前资源；安全条件可确认才按现态验收并决定新工作，否则交付已知结果及停止原因。" width="720" height="1628" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><h2 id="业务接手与运行恢复有什么不同">业务接手与运行恢复有什么不同</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 业务接手与运行恢复有什么不同"><table><caption>表 6 / Table 6 · 业务接手与运行恢复有什么不同</caption><thead><tr><th scope="col">所说的“继续”</th><th scope="col">恢复的对象</th><th scope="col">不能随之继承的东西</th></tr></thead><tbody><tr><td>根据交接继续修复</td><td>目标、文件现态、检查和剩余工作</td><td>旧批准、旧文件版本、已结束Run的执行权</td></tr>
+<tr><td>恢复同一会话的观察</td><td>会话记录、当前运行状态与结果</td><td>不能因此重做同一编辑</td></tr>
+<tr><td>通过合法 continuation 开始下一工作</td><td>当前允许继续的业务理由与新执行</td><td>不会复活已经终结的旧Run</td></tr>
+<tr><td>Host 移交执行管理</td><td>宿主owner和对应资源的接续条件</td><td>不自动转移浏览器、文件及远端操作的全部状态</td></tr></tbody></table></div>
+<p>Maka 的 Plan 可以保存步骤进度，Goal 可以按判断和预算推动后续工作，Host 负责执行准入。这些已有机制能参与装配本章方案，却不能仅凭 Plan 显示完成或 Goal 判定满足，就证明交接材料新鲜、测试全面、项目正确。业务接手先确认“还欠什么”，运行系统再确认“当前谁有权做”。</p>
+<h2 id="交接问题与完整答案">交接问题与完整答案</h2>
+<p><strong>问题：交接记录保存成功，为什么新会话仍可能不知道 README 没改？</strong></p>
+<p>保存解决数据存在。协调者还须按任务 ID 找到正确记录，把它加入新执行输入；执行者再回读文件并使用它。若读取错误任务、只传目标不传剩余项，或将交接挤出输入预算，保存成功也无法完成这条消费链。</p>
+<p><strong>问题：第一会话函数通过、第二会话文档通过，可以直接相加成整项通过吗？</strong></p>
+<p>不能只拼两个标签。要确认两项检查适用于同一份当前交付物和现行要求。函数被用户改过时旧结果失效；文档依赖的脚本若变化，旧命令判断也失效。不变且条件相同的检查可以复用，改变的部分需要重新核对。</p>
+<p><strong>问题：预算到期时任务还有红项，为什么不应一律回滚？</strong></p>
+<p>红项描述未满足的要求，不表示所有改动都无效。已确认、范围内且有价值的函数修复可以保留，连同未完成README交付。只有任务明确要求失败全量撤回，且撤回能保护用户内容和已发生效果时，才按相应合同处理；它不是通用的退出规则。</p>
+<p><strong>问题：旧交接写着“继续修改README”，用户后来要求只读，模型该听哪份？</strong></p>
+<p>当前用户要求控制本次范围。交接建议是历史工作材料，不能签发权限。模型可以指出问题和所需改动；执行层也必须拒绝仍引用旧范围的编辑提案。本次只读报告可以完成，原修复委托保留阻塞状态。</p>
+<hr>
+<p><a href="26-evaluation-and-design.html">上一章：第 26 章｜任务评价与综合设计</a> · <a href="28-system-design.html">下一章：第 28 章｜Agent 系统的设计方法</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="26-evaluation-and-design.html"><span>← 上一章</span><strong>第 26 章｜任务评价与综合设计</strong></a><a href="28-system-design.html"><span>下一章 →</span><strong>第 28 章｜Agent 系统的设计方法</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%9B%9B%E4%BB%BD%E6%9D%90%E6%96%99%E5%9B%9E%E7%AD%94%E5%9B%9B%E4%B8%AA%E4%B8%8D%E5%90%8C%E9%97%AE%E9%A2%98">四份材料，回答四个不同问题</a></li><li class="toc-level-2"><a href="#%E7%AC%AC%E4%B8%80%E6%AC%A1%E5%B7%A5%E4%BD%9C%E5%87%BD%E6%95%B0%E4%BF%AE%E5%A5%BD%E4%BA%86readme-%E8%BF%98%E6%AC%A0%E7%9D%80">第一次工作：函数修好了，README 还欠着</a></li><li class="toc-level-2"><a href="#%E4%B8%80%E4%BB%BD%E8%83%BD%E8%A2%AB%E4%B8%8B%E4%B8%80%E6%AC%A1%E5%B7%A5%E4%BD%9C%E8%AF%BB%E5%8F%96%E7%9A%84%E4%BA%A4%E6%8E%A5">一份能被下一次工作读取的交接</a></li><li class="toc-level-2"><a href="#%E7%AC%AC%E4%BA%8C%E6%AC%A1%E5%B7%A5%E4%BD%9C%E5%85%88%E5%9B%9E%E8%AF%BB%E5%86%8D%E9%80%89%E6%8B%A9%E4%B8%8B%E4%B8%80%E9%A1%B9">第二次工作：先回读，再选择下一项</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E6%8E%A5%E7%BB%AD%E7%8E%B0%E6%80%81%E4%BB%8D%E6%98%AF-w1">正常接续：现态仍是 W1</a></li><li class="toc-level-3"><a href="#%E6%9D%A1%E4%BB%B6%E6%94%B9%E5%8F%98%E6%97%A7-passing-%E5%8F%AA%E5%89%A9%E5%8E%86%E5%8F%B2%E6%84%8F%E4%B9%89">条件改变：旧 passing 只剩历史意义</a></li><li class="toc-level-2"><a href="#%E5%8F%82%E8%80%83%E7%A8%8B%E5%BA%8F%E6%80%8E%E6%A0%B7%E6%B6%88%E8%B4%B9%E4%BA%A4%E6%8E%A5">参考程序怎样消费交接</a></li><li class="toc-level-2"><a href="#%E6%9C%AA%E5%AE%8C%E6%88%90%E4%B9%9F%E6%9C%89%E5%90%88%E7%90%86%E7%9A%84%E5%81%9C%E6%AD%A2%E6%96%B9%E5%BC%8F">未完成也有合理的停止方式</a></li><li class="toc-level-2"><a href="#%E4%B8%9A%E5%8A%A1%E6%8E%A5%E6%89%8B%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%81%A2%E5%A4%8D%E6%9C%89%E4%BB%80%E4%B9%88%E4%B8%8D%E5%90%8C">业务接手与运行恢复有什么不同</a></li><li class="toc-level-2"><a href="#%E4%BA%A4%E6%8E%A5%E9%97%AE%E9%A2%98%E4%B8%8E%E5%AE%8C%E6%95%B4%E7%AD%94%E6%A1%88">交接问题与完整答案</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

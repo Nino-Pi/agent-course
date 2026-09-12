@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 46 章｜执行轨迹与学习信号 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 46 / 62</div><article id="main-content"><span class="heading-alias" id="b03从执行轨迹到学习信号" aria-hidden="true"></span><span class="heading-alias" id="b03执行轨迹与学习信号" aria-hidden="true"></span><span class="heading-alias" id="第-43-章执行轨迹与学习信号" aria-hidden="true"></span><span class="heading-alias" id="第-45-章执行轨迹与学习信号" aria-hidden="true"></span><h1 id="第-46-章执行轨迹与学习信号">第 46 章｜执行轨迹与学习信号</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：怎样从执行轨迹构造学习信号，并检验改参数、存经验或改程序是否改善任务表现？</p>
+<p><strong>关键概念</strong>：Rollout（任务尝试）：一次可含多次调用的完整尝试；状态与观察：现实情况和模型所得信息；Mask（位置掩码）：指定参与损失的生成位置；Reward／Credit（奖励／归因）：评价结果并分配学习信号；Surrogate（代理目标）：局部优化式；Heldout（保留评估集）：未参与方案选择的任务。</p>
+<p><strong>关系主线</strong>：保留真实输入和尝试分组，再定义局部训练目标；用配对任务检查经验收益，章末选读区分任务程序与改进程序。切片、存储和程序修改本身都不等于能力提升。</p>
+</blockquote>
+<p>前置概念是 <a href="26-evaluation-and-design.html#%E8%AF%84%E4%BB%B7%E6%9C%80%E5%B0%8F%E6%A8%A1%E5%9E%8B">第26章</a>中的任务、试次、有效评分与未知状态。<a href="40-task-evaluation.html#3-%E5%9B%9B%E4%B8%AA%E4%BB%BB%E5%8A%A1%E4%B8%A4%E4%B8%AA%E8%AF%95%E6%AC%A1%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%89%E4%B8%AA%E6%88%90%E5%8A%9F%E7%8E%87%E9%83%BD%E5%8F%AF%E8%83%BD%E7%AE%97%E5%AF%B9">第40章</a>提供配对比较与成本演算。</p>
+<h2 id="1-一次-rollout不一定是一条不断变长的文本">1. 一次 rollout，不一定是一条不断变长的文本</h2>
+<p><strong>rollout</strong> 在本例指一次从规定初态开始，到终止并记录状态的完整任务尝试。任务分数可能因验收程序无法运行或未返回结果而缺失；这与验收正常完成后判为失败不同。“尝试结束”不保证“得到了有效分数”。它可以有多次模型调用、工具执行和等待。工具调用次数、模型调用次数和 rollout 数是三种统计单位，不能相互替代。</p>
+<p>沿用课程中的 <code>formatDuration</code> 修复情境，但下面是独立教学轨迹，不是 第04章 的原始运行或真实 token 记录。每行的动作可能需要多段输出；本题只保留理解学习材料所需的关系。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 一次 rollout，不一定是一条不断变长的文本"><table><caption>表 1 / Table 1 · 1. 一次 rollout，不一定是一条不断变长的文本</caption><thead><tr><th scope="col">阶段</th><th scope="col">模型此刻获得的条件</th><th scope="col">模型生成什么</th><th scope="col">执行后的观察（Observation）</th></tr></thead><tbody><tr><td>调用 C1</td><td>用户目标、约束、当前工具说明</td><td>读取实现和测试的调用</td><td>文件正文、测试入口</td></tr>
+<tr><td>调用 C2</td><td>目标、C1 的动作和实际观察</td><td>修正余秒计算与测试说明的调用</td><td>写入结果或写入失败</td></tr>
+<tr><td>调用 C3</td><td>当前可见历史、修改观察</td><td>运行相关测试的调用</td><td>测试执行后返回输出；C3 生成调用时还没读到它</td></tr>
+<tr><td>调用 C4</td><td>实际取得并选入输入的测试结果</td><td>据结果报告完成、失败或尚未验证</td><td>最终报告；报告不替代独立验收</td></tr>
+<tr><td>验收程序 grader</td><td>规定的产物与评价环境</td><td>按规则检查结果，不是一次修复模型调用</td><td>整次尝试的任务分数与运行状态</td></tr></tbody></table></div>
+<p>文件内容、未完成进程、权限和工具状态属于执行环境。模型只能基于本次输入选择下一步；即使环境里已经出现新文件，没有被读入本次输入也不等于模型知道它。学习时因此要问“当时实际提供了什么”，不能事后把完整正确答案补进旧输入。</p>
+<p>在 Maka，下一次模型输入还可能由 durable 事件的有效投影、摘要或工具结果引用重建。跨一次 compaction 后，C3 的 prompt 未必是 C2 输入加输出的严格延长；子任务的输入也可能重新构造。真实链见 <a href="15-model-context.html#%E4%B8%A4%E4%B8%AA%E5%B7%A5%E5%85%B7%E4%BA%A4%E9%94%99%E5%88%B0%E8%BE%BE%E6%89%8B%E6%8E%A8%E5%85%AB%E4%B8%AA%E4%BA%8B%E4%BB%B6">第15章 模型输入与流</a>和 <a href="19-context-compaction.html#checkpoint-%E7%9A%84%E4%BF%9D%E5%AD%98%E4%B8%8E%E8%AF%BB%E5%8F%96%E9%93%BE">第19章 checkpoint 消费</a>。缓存、压缩、检索分别改变复用、表示与选源，不决定训练 reward。</p>
+<h3 id="把状态与看到的内容写成同一套记号">把状态与看到的内容写成同一套记号</h3>
+<p>马尔可夫决策过程（MDP）及其部分可观察形式（POMDP）可以表示这里的决策问题。下面是教学模型，不是 Maka 的内部 schema。令一步对应一次已声明的决策与环境响应；动作如果改成 token 或整个工具批次，时间粒度也要重新说明。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 把状态与看到的内容写成同一套记号"><table><caption>表 2 / Table 2 · 把状态与看到的内容写成同一套记号</caption><thead><tr><th scope="col">记号</th><th scope="col">在这项修复中表示什么</th></tr></thead><tbody><tr><td><code>s_t</code>：状态（State）</td><td>当前文件、进程、待完成动作，以及会影响未来的 harness 控制状态；并非都对模型可见</td></tr>
+<tr><td><code>a_t</code>：动作（Action）</td><td>本步选择的调用或结束报告；调用还须经过真实执行器</td></tr>
+<tr><td><code>P(s_(t+1)｜s_t,a_t)</code>：转移（Transition）</td><td>动作和当前状态对应的下一状态分布；不是声称我们已知道或学会这个分布</td></tr>
+<tr><td><code>o_(t+1)</code>：观察（Observation）</td><td>动作后可获得的回执、文件内容或错误；可用 <code>O(o_(t+1)｜s_(t+1),a_t)</code> 表示观察机制</td></tr>
+<tr><td><code>h_t</code>：可见输入（Input）</td><td>本次实际选择的观察、历史、摘要与约束；这里不把它默认定义成完整历史</td></tr>
+<tr><td><code>πθ(a_t｜h_t)</code>：策略（Policy）</td><td>参数为 θ 的模型基于实际可见输入选择动作的分布</td></tr>
+<tr><td><code>r_t</code> / <code>R</code>：反馈（Reward）</td><td>每步的即时反馈 / 整条轨迹的累计或终局反馈；后文示例只有终局任务 reward</td></tr></tbody></table></div>
+<p><strong>Markov 条件</strong>要求所选状态已包含预测下一转移与反馈所需的信息，再补更早历史不改变这种条件分布；给 transcript 起名 state 并不能满足它。MDP 的完全观察设定让决策者看到这种状态；POMDP 仍以底层 Markov 状态转移，但决策者只得到观察。保留历史有助于消除歧义，压缩后的 <code>h_t</code> 却不保证仍是充分统计量——也就是“不损失预测/决策所需历史信息”的表示。</p>
+<p>这些条件不能反向滥用：两个状态不同，并不意味着每个动作的后继分布都必须不同；只有最近六条文字，也不足以证明它在每个任务中一定不充分。应找出具体被遗漏、且会改变预测或决策的信息。受控读回能否区分两种世界，还取决于读到了什么；重复读取同一不相关页面仍不能提供所需证据。</p>
+<p>例如 Edit 已把文件写好，回执却丢失：真实 <code>s_(t+1)</code> 已改变，下一输入 <code>h_(t+1)</code> 只有超时或未结算信息。另一种世界是 Edit 根本没有写入，两者此刻可产生相同观察。策略不能仅凭超时断定应该重写；应按授权与恢复合同重新读取或查询效果。这个例子说明为什么状态、观察和保存不能合并，它比较的是两种可能的执行状态。完整效果问题回到 <a href="18-effects-and-recovery.html">第18章</a>，有限观察的现有讨论见<a href="../../../extended-reading.html#reference-14" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/evaluation/agent-evaluation-and-feedback.md">评估专题</a>。这种表示不证明 Agent 已拥有正确的环境模型或 POMDP 求解器。</p>
+<h3 id="每个样本要保留哪一份输入">每个样本要保留哪一份输入</h3>
+<p>先把每次模型调用视为一个条件样本。最低限度应能关联以下信息；这是教学数据合同，不是某个产品的导出 API：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 每个样本要保留哪一份输入"><table><caption>表 3 / Table 3 · 每个样本要保留哪一份输入</caption><thead><tr><th scope="col">字段</th><th scope="col">为什么需要</th></tr></thead><tbody><tr><td><code>rollout_id / call_id / branch_id</code></td><td>把片段归回一次任务，避免将子调用或切片当独立成功样本</td></tr>
+<tr><td>实际输入 tokens 与生成 tokens</td><td>重建模型产生该输出时的条件；可读 transcript 不能证明分词编码器（tokenizer）处理后的前缀一致</td></tr>
+<tr><td>生成位置 <code>mask</code></td><td>区分待优化的模型输出和只作为条件的用户/工具文本</td></tr>
+<tr><td>采样策略版本、该算法所需的对数概率（log probability）</td><td>知道样本由哪个策略产生及所选输出的概率；使用旧策略数据需要额外算法条件</td></tr>
+<tr><td>grader score、运行状态、成本</td><td>区分有意义的任务结果、基础设施未知与取得该样本的开销</td></tr></tbody></table></div>
+<p><strong>token</strong> 是 tokenizer 处理后的序列单位，不必等于一个汉字或英文词。<strong>mask</strong> 是每个位置是否参加这项损失计算的指示。本题输入和工具返回位置为 0，模型生成位置为 1；其他训练目标可能另有规则。mask 只决定哪些位置直接贡献训练项，不负责核实条件文字是否真实。</p>
+<p>例如 C2 的输入有“Read 返回：第 8 行使用旧算法”，输出是一个 Edit 调用。该 Read 文本属于输入，不能当作模型生成的正确答案一起奖励；否则模型可能被训练去生成环境本应提供的观察。若 Read 实际失败，把它事后改成成功内容，即便对应 mask 为 0，Edit 的条件也已经被伪造。</p>
+<p>已有 RuntimeEvent 账本、摘要指纹或可回放消息可以帮助查来源，但不能单独证明真实 token、采样分布与 log probability 已完整保存。还需按训练算法的数据合同检查，才能决定是否可用。</p>
+<h3 id="切成几段为什么会改变统计权重">切成几段，为什么会改变统计权重</h3>
+<p>以下按 <strong>Agent Lightning v1.0 图 4</strong> 转写教学演算：两次 rollout 的 reward 为 1、0；成功尝试切成三个样本，失败尝试只有一个。按 rollout 平均是 <code>(1+0)/2=0.5</code>，摊平后按样本平均却变成 <code>(1+1+1+0)/4=0.75</code>。样本变多没有增加任务尝试，分组身份不能丢。</p>
+<p>重序列化可能破坏真实 token 前缀，合并与 loss 归一化需要显式处理。</p>
+<p>对我们的修复，可先保存 C1…C4 的独立条件样本，再明确是否满足合并条件。仅因它们属于同一任务，不能把被压缩的旧全文重新拼进 C3；这样得到的是另一条模型从未看到过的轨迹。</p>
+<h2 id="2-reward-给结果credit-给决策分配学习信号">2. reward 给结果，credit 给决策分配学习信号</h2>
+<p><strong>reward</strong> 是明确规则给出的标量反馈。本题为了演算，令有效任务成功得 1、有效失败得 0；这不是规定所有 benchmark 都只能用二值评分。<strong>credit assignment</strong> 问的是：多个决策共同产生结果，应该怎样给它们分配学习信号。</p>
+<p>若 C1 在必要源码之外又读了三个无关文件，C2 的一次 Edit 修好了核心错误，整次 rollout 可以成功；把终局 reward 放到所有调用上，会同时鼓励必要动作和多余动作。这是一个可采用的分配规则，不能据此证明每一步都促成成功。反过来，最后测试因基础设施不可用而没有结果，也不能立即把此前每个决策判为能力失败。</p>
+<p>这里还要分开三种常见反馈：Maka Goal 的 met 用来决定是否继续；任务 grader 的 score 用来评价产物；训练 reward 则是算法明确选定、附带缺失处理政策的学习信号。字段之间可以有经过设计的映射，不能只因为都是“评估结果”就自动互换。继续阅读 <a href="40-task-evaluation.html#2-%E4%BB%BB%E5%8A%A1%E8%AF%84%E5%88%86%E4%B9%9F%E8%A6%81%E6%9C%89%E5%AE%9E%E9%99%85%E6%B6%88%E8%B4%B9%E8%80%85">第40章 的结果消费与评价</a>。</p>
+<span class="heading-alias" id="一个可以完整读懂的局部目标" aria-hidden="true"></span><h3 id="固定批次上的局部训练目标">固定批次上的局部训练目标</h3>
+<p>策略 <code>πθ</code> 表示参数为 θ 的模型给定当前输入时，产生各候选输出的概率。局部训练目标给已生成 token 的 log probability 分配权重，指定优化时希望提高或降低哪些输出的概率。</p>
+<p>另设一个教学批次，两个 rollout 有有效 reward 1、0。用 ρ 标记其中一次 rollout，Rρ 是它的 reward；预先固定基线 <code>b=0.5</code>，定义权重 <code>Aρ=Rρ−b</code>，得到 +0.5 与 −0.5。这里的 b 是教学选择，不是声称已准确估计任意状态的价值函数；Aρ 也不是已经解决 credit 的逐动作优势估计。</p>
+<p>设成功 rollout 共生成 6 个 token、失败 rollout 共生成 2 个 token；长度只是演算用标签，不是真实 tokenizer 输出。选择先平均每个 rollout 的生成 token，再平均两个 rollout：</p>
+<pre><code class="language-text">L(θ) = − (1/2) Σρ∈{成功,失败} [ (1/Nρ) Σi∈生成位置(ρ) Aρ log πθ(x_i | p_i) ]</code></pre>
+<p>这里改用 <code>i</code> 标记 rollout 内的生成 token 位置，用 <code>x_i</code> 表示该 token；它们不同于前面按环境决策计步的 <code>t</code> 和 <code>a_t</code>。逐个读这条式子：<code>p_i</code> 是生成 <code>x_i</code> 时的真实条件前缀，包含所属调用的实际输入和此前已生成部分；跨调用时要使用那次调用自己的输入，不能自动接上旧全文。<code>Nρ</code> 只数本例参与优化的生成位置。log 把概率转为可相加的量，前面的负号把希望增大的加权 log probability 写成要减小的 loss。</p>
+<p>本题成功 token 的系数为 <code>−(1/2)×(1/6)×0.5=−1/24</code>，失败 token 的系数为 <code>−(1/2)×(1/2)×(−0.5)=+1/8</code>。成功项希望提高其输出概率，失败项希望降低其输出概率；共享模型参数仍可能牵动其他输出，不能由一个系数保证所有 token 概率都独立朝该方向变化。只要生成 token 总数和实际条件不变，将成功的 6 个 token 分成三个样本不会改变这里的 rollout 总权重。</p>
+<p>这是固定批次、固定权重的<strong>局部 surrogate（代理目标）</strong>。归一化按 rollout token 均值是显式设计选择；它不是完整的近端策略优化（PPO）或组相对策略优化（GRPO），不声称无偏估计原始未归一化回报目标。旧策略数据校正、重要性比率、衡量分布差异的 KL 约束、裁剪或价值估计训练，都属于此处尚未展开的完整算法问题，不能由这一条 loss 式补出对应保证。</p>
+<p>基础依据是策略梯度：策略采样整条轨迹，目标是其预期回报；轨迹 log probability 的可优化部分来自模型动作。baseline 可减少估计噪声，但需要满足所用推导的条件。对于上述有限批次，loss 下降本身并不保证未来回报提高，不能把同一批样本一直优化到最小后便宣称能力改善。</p>
+<p>数据实现需要交代实际输入、mask、rollout 分组和 outcome 的来源。算法设计还要检验权重估计、采样策略、长短轨迹的相对权重、方差与偏差，以及何种 heldout 结果会推翻设计。</p>
+<h2 id="3-用新任务检查而不是把训练信号当交付证明">3. 用新任务检查，而不是把训练信号当交付证明</h2>
+<p>需要三种不同用途的数据。<strong>training</strong> 产生更新模型参数的信号；<strong>validation</strong> 用来选 checkpoint、prompt 或超参数；<strong>heldout</strong> 是保留到评估阶段、没有被这些选择反复使用的任务。名称不决定身份，实际用途才决定。</p>
+<p>例如团队用一批时间格式化缺陷训练，再用另一批问题选择 reward 与训练轮数，最后在未用于这些选择的缺陷和项目上评价。如果最后一批每次失败都被拿来改 prompt、加规则，再重报最好成绩，它已经参与开发选择，不能继续当作未触碰的最终检验。把同一题换几个变量名，也不自动获得独立任务分布。</p>
+<p>grader 的参考答案与测试还要有明确边界：用于产生训练 reward 的规则可以是训练环境的一部分，但若 Agent 直接读到参考修复并照抄，得分衡量的对象已经改变。最终 heldout 的题目、答案和调参反馈更不能通过输入、目录、历史或检索意外进入训练/选择过程。是否泄漏要沿实际数据流检查，不能靠把目录命名为 heldout 来保证。</p>
+<p><a href="40-task-evaluation.html#3-%E5%9B%9B%E4%B8%AA%E4%BB%BB%E5%8A%A1%E4%B8%A4%E4%B8%AA%E8%AF%95%E6%AC%A1%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%89%E4%B8%AA%E6%88%90%E5%8A%9F%E7%8E%87%E9%83%BD%E5%8F%AF%E8%83%BD%E7%AE%97%E5%AF%B9">第40章 表中的 I/M</a>仍是训练入口的检查点。没有任务分数时，默认填 reward=0 会把基础设施可用性混入能力训练；删除它们又可能留下一个偏向容易运行任务的数据集。若目标确实是按时交付，可以单独定义“截止前确认成功”的反馈，但要声明这一目标、缺失政策和费用，并继续保留原状态供分析。</p>
+<span class="heading-alias" id="按目标选择下一步" aria-hidden="true"></span><h3 id="开发与算法研究的验证对象">开发与算法研究的验证对象</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 开发与算法研究的验证对象"><table><caption>表 4 / Table 4 · 开发与算法研究的验证对象</caption><thead><tr><th scope="col">要研究的变化</th><th scope="col">数据与执行合同</th><th scope="col">算法层进一步区分的对象</th></tr></thead><tbody><tr><td>Agent 强化学习（Agentic RL）：从交互改参数</td><td>给出实际输入与生成位置、rollout 身份、有效评分和未知；能指出一处轨迹失真</td><td>推导权重、采样分布与归一化；比较 credit/advantage、旧策略数据影响、方差与 heldout 收益</td></tr>
+<tr><td>测试时搜索（Test-time Search）：增加预算找候选</td><td>分开采样次数、选择器、verifier 与总成本；解释存在好候选不等于选中它</td><td>研究选择偏差、verifier 校准和边际预算收益，比较实际选择器，而非只报假定能选中好候选的 oracle pass@k</td></tr>
+<tr><td>持续／终身学习（Continual / Lifelong Learning）</td><td>指明改了 Memory、工作流还是参数；同时保留旧任务与新任务结果</td><td>在明确任务次序与分布下测旧能力保留（retention）、迁移（transfer）和遗忘（forgetting），不把见过的任务当新能力</td></tr>
+<tr><td>递归自我改进（RSI）／长程任务（Long Horizon）</td><td>区分 Goal continuation、长任务控制与改 prompt/代码/优化器，明确到底哪个对象变了</td><td>分开内外层目标、预算与选择过程，检验新能力、退化与推广；步数、时间、依赖深度分别定义</td></tr></tbody></table></div>
+<p>Goal 持续产生下一轮，只是延续执行；要讨论持续学习或递归自我改进，还必须指出究竟更新了哪份知识、策略或改进程序。</p>
+<h3 id="跨题保留经验怎样算出收益和负迁移">跨题保留经验：怎样算出收益和负迁移</h3>
+<p>先固定改变对象：本例只允许跨题保留一份经验笔记，不改模型参数、工具实现或用户要求。比较 K（保留）与 R（重置）两条任务流；两边使用同一模型、effort、工具和当前实例的初始数据。K 在下一题读入先前笔记；R 在每题开始前清空笔记、旧消息、缓存和工作文件中可携带的跨题经验，只保留两边共有的本题材料与固定工具配置。重置不是删掉当前题目的输入。</p>
+<p>以下四题、回答和费用均是<strong>完整给定的教学轨迹</strong>，没有运行模型。两边按 X1→X2→X3→X4 的相同次序，各题各有一个计划试次；每题最多3次模型调用、2次工具调用、60秒和8个费用点。费用点是便于比较的虚构账本单位，不是实际价格。读写笔记也占各题同一份预算，不给 K 额外的调用额度。</p>
+<p>任务是把接口中的金额写成“元”。X1/X2 使用供应商 v1：字段 <code>amount</code> 的单位为分，但当前响应没有写明单位。X1 结束后，评价环境向两边提供相同的来源说明“v1 的 amount 以分计，除以100得元”；这个反馈此后才可用于学习，不能倒填进 X1 输入。X3 自带明确单位；X4 切换到 v2，当前材料明确给出新单位。各题最终答案由独立判定器核对，正确得1，错误得0，本表没有缺失评分。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 跨题保留经验：怎样算出收益和负迁移"><table><caption>表 5 / Table 5 · 跨题保留经验：怎样算出收益和负迁移</caption><thead><tr><th scope="col">实例与两边共有的当前材料</th><th scope="col">K 保留方实际使用的信息与回答</th><th scope="col">R 重置方实际使用的信息与回答</th><th scope="col">正确答案；K/R分数；差值K−R</th></tr></thead><tbody><tr><td>X1：v1，<code>amount=12000</code>，未给单位</td><td>尚无笔记；猜成12000元</td><td>尚无经验；同样猜成12000元</td><td>120元；0/0；0</td></tr>
+<tr><td>X2：v1，<code>amount=4500</code>，未给单位</td><td>读入 X1 的 v1 规则，算 <code>4500/100=45</code>元</td><td>X1反馈已随跨题经验重置；本次仍猜4500元</td><td>45元；1/0；+1</td></tr>
+<tr><td>X3：v1，<code>amount_yuan=30</code>，字段说明为元</td><td>采用当前明确单位，答30元</td><td>无旧经验也可按当前单位答30元</td><td>30元；1/1；0</td></tr>
+<tr><td>X4：v2，<code>amount=4500</code>，当前 schema 写明单位为元</td><td>笔记仍有 v1 规则；误把它用于 v2，答45元</td><td>读取当前 schema，答4500元</td><td>4500元；0/1；−1</td></tr></tbody></table></div>
+<p>K 在 X1 后写入笔记“仅 v1：amount 以分计”；X2 后保留该规则；X3 后补充“显式单位字段按字段说明”；X4 后把误用与新版本范围记入笔记。R 也在每题结束时看到同样的评价反馈，但不会把它带入下一题。这些反馈和整理发生在本题计费范围内，包括最后一题后的整理；不能只收读取成功的费用。表中的回答是设定的观察，不是说没有记忆的模型必定猜错，或有记忆的模型必定忽略版本。</p>
+<p>先看前三题：K 的分数是 <code>[0,1,1]</code>，R 是 <code>[0,0,1]</code>，逐题差值为 <code>[0,+1,0]</code>，累计收益为1分。X3 两边都能成功，说明“后面的题答对了”本身不证明学习。X4 则提供了双侧负差值：同一当前条件下 K=0、R=1，并且轨迹给出了 v1 规则误用于 v2 的具体位置，这就是本例的负迁移。若只知道 K 失败、不知道 R 的结果，还不能作这个比较。</p>
+<p>四题合在一起，K 与 R 都是 <code>2/4</code>，累计差值 <code>0+1+0−1=0</code>，平均差也是0；先前的收益被这次误用抵消。这个按同一实例减去重置基线的思路与 CL-Bench 的 gain 定义相通。本例只使用原始二值差，不借用论文的跨任务归一化或实验排名。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 跨题保留经验：怎样算出收益和负迁移"><table><caption>表 6 / Table 6 · 跨题保留经验：怎样算出收益和负迁移</caption><thead><tr><th scope="col">费用组成（Cost）</th><th scope="col" style="text-align:right">X1</th><th scope="col" style="text-align:right">X2</th><th scope="col" style="text-align:right">X3</th><th scope="col" style="text-align:right">X4</th><th scope="col" style="text-align:right">合计</th></tr></thead><tbody><tr><td>K 本题决策、工具与独立评分</td><td style="text-align:right">5</td><td style="text-align:right">5</td><td style="text-align:right">5</td><td style="text-align:right">5</td><td style="text-align:right">20</td></tr>
+<tr><td>K 笔记读写与本题输入的附加费用</td><td style="text-align:right">1</td><td style="text-align:right">1</td><td style="text-align:right">1</td><td style="text-align:right">1</td><td style="text-align:right">4</td></tr>
+<tr><td>R 本题决策、工具与独立评分</td><td style="text-align:right">5</td><td style="text-align:right">5</td><td style="text-align:right">5</td><td style="text-align:right">5</td><td style="text-align:right">20</td></tr>
+<tr><td>R 跨题笔记附加费用</td><td style="text-align:right">0</td><td style="text-align:right">0</td><td style="text-align:right">0</td><td style="text-align:right">0</td><td style="text-align:right">0</td></tr></tbody></table></div>
+<p>这里每题的5点已包含失败作答、工具与评分；K 的1点是该题实际发生的笔记读写和输入附加开销，X1 没有旧笔记可读，仍有新笔记写入。为完整结账，本题假设重置与其他公共固定开销已经包含在5点内，没有未结算费用。K 各题6点、R各题5点，都没有超出相同的8点上限；允许预算相同不要求实际花费相同。</p>
+<p>在这份教学账本里，K 总费24点，R为20点，确认成功都为2次；按成功数分摊分别为12点与10点。于是不能用“X2 提高了”宣布这整条任务流值得采用。更好的候选是读取时核对版本、冲突时优先回查当前材料，再对同一任务流重新评价；建议本身还不是已取得的提升。</p>
+<p>四题只演示如何区分既有能力、可复用经验和负迁移。它不提供统计显著性，也不能证明所有版本变化都导致遗忘。实际研究还要改变任务次序、增加独立实例和重复试次，保留有评分覆盖率与全部费用；将训练参数、工作流也一起改变后，就不能继续把全部差值解释为这份笔记的作用。</p>
+<span class="heading-alias" id="4-迁移自测与参考答案" aria-hidden="true"></span><span class="heading-alias" id="4-练习改变切片条件与评价结果" aria-hidden="true"></span><h2 id="4-切片输入与评价变化后的参考结论">4. 切片、输入与评价变化后的参考结论</h2>
+<p><strong>题 1。</strong> 一个成功 rollout 因摘要和子调用切成十个样本，一个失败 rollout 只有一个。团队写“训练集中 10/11 的任务成功”，并直接按样本求 reward 均值。哪里改变了研究对象？</p>
+<p><strong>答案。</strong> 实际仍是两个任务尝试，成功比例为 1/2；10/11 是切片加权后的比例。直接按样本平均会让易被切分的 rollout 获得更多权重。应保留分组，明确按 token、sample 还是 rollout 归一化，再按目标评价这种权重；不能把 token/mask 正确当作分组权重也必然正确。</p>
+<p><strong>题 2。</strong> C2 后做了摘要，C3 只见到摘要与当前约束。为减少训练样本数，导出器把 C1/C2 的全部旧文本拼回 C3，再计算 C3 输出的 log probability。只要内容事实没错，就等价吗？</p>
+<p><strong>答案。</strong> 不等价。训练条件已经不是实际采样条件；旧全文与摘要可能表达不同细节，也有不同 token 前缀。先保留真实调用输入，只有满足所用算法要求的精确前缀与 mask 条件才合并。若要用重构条件训练，应明确它是另外一种数据与目标设计，不能标成原轨迹保真导出。</p>
+<p><strong>题 3。</strong> 本章局部 loss 连续下降，最终 heldout 的确认交付率却下降。团队能否用“已经奖励了成功动作”宣布学习有效？若 heldout 失败来自 verifier 宕机，又该怎样处理？</p>
+<p><strong>答案。</strong> 不能。局部 loss 只是当前样本与目标下的优化信号，任务效果要按事先固定的 heldout 口径评价。先区分有评分的任务失败与 I/M；分别报告条件质量、确认交付、费用和未知，再查数据条件、权重、策略漂移与选择偏差。verifier 宕机不能无说明地当模型能力 reward=0，也不能删掉后仍宣称整体交付无退化。</p>
+<p><strong>从调用到训练假设的完整参考例子。</strong> 一个成功尝试 R1 包含 C1–C4 四次调用，导出为四个保留真实输入的样本；一个失败尝试 R2 在两次调用后结束，导出两个样本。数据关系为 <code>R1 → {C1,C2,C3,C4}</code>、<code>R2 → {C1,C2}</code>，统计仍是两次 rollout。若把 reward 原样复制后按样本平均，得到 <code>4/6=2/3</code>；按 rollout 平均则是 <code>1/2</code>。这两个数描述同一批数据的不同权重，没有产生四次新的成功尝试。</p>
+<p>参考训练假设是：固定训练轨迹、初始模型、优化步数、工具权限及总训练预算，只把切片等权改为每个 rollout 内生成 token 平均、再对 rollout 等权，期望减少长成功轨迹因切片获得的额外权重，并在预先固定的 heldout 任务与预算下，使截止确认交付率提高至少 5 个百分点。这里的 5 是待检验的设计阈值，不是已取得的提升；归一化改变权重是确定的，未来质量改善仍需独立评价。</p>
+<p>不确定性的参考判定也可以提前写清。假设采用事先固定、考虑 task 聚类的方法得到提升区间 <code>[+1,+8]</code> 个百分点，它仍包含低于 5 的值，不能确认“至少提升 5”；若区间为 <code>[-4,+2]</code>，则在该方法与置信水平下排除了所声称的 5 点提升，却没有证明任何微小收益都不存在。这两组区间仅演示判定规则，不是实验结果。没有足够证据确认提升，与证据排除了指定提升，是不同结论；缺失评分和费用仍按第40章的固定口径保留。</p>
+<h2 id="5-选读任务程序与改进程序怎样分别变化">5. 选读：任务程序与改进程序怎样分别变化</h2>
+<p>存下一条经验、修改模型参数、改写执行程序，是不同的更新对象。再往前一步，还可以修改“产生改进方案的方法”。本节用一个有限案例把它们分开；所有程序、结果和预算都是教学设定，既不是已经发生的自主实验，也不是 Hyperagents 论文的复现。</p>
+<p>先给两个可编辑对象命名：<strong>task 程序 A</strong> 接收一个代码维护任务，决定怎样修改、验证和报告；<strong>meta 程序 M</strong> 读取开发轨迹，生成 A 或 M 自身的新版本。它们处在同一个允许编辑的教学程序包中，但题目、独立判定器、预算和采纳规则由外层执行器持有，A/M 都不能改写。</p>
+<p>本题的完整交付要求是“修改符合范围、指定行为正确、报告附有本次有效验证依据”。因此“有验证记录”只是一个检查项。外层判定器即使看见一份记录，也还要检查实际命令、产物和覆盖范围；没有记录但提交了产物时，它也可以正常给出有效失败 F。它与判定环境根本无法给分的 I/M 不同。</p>
+<h3 id="第一次改的是-task-程序">第一次改的是 task 程序</h3>
+<p>开发集 D1–D10 已经允许用于找问题，不能再作为最后的独立检验。初始 A0 的流程是“修改 → 模型认为足够时报告”，验证由模型临时选择。开发轨迹中有四次缺少验证记录，所以是 <strong>6/10 有记录</strong>。M0 的初始改进方法为“看失败总数，提议增加一个通用步骤”，它据此生成 A1：在完成报告前检查是否取得验证依据；缺少时先执行已选验证入口，失败或未取得结果则报告实际状态。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 第一次改的是 task 程序"><table><caption>表 7 / Table 7 · 第一次改的是 task 程序</caption><thead><tr><th scope="col">开发实例（Development）</th><th scope="col">A0 的记录与判定</th><th scope="col">A1 的记录与判定</th></tr></thead><tbody><tr><td>D1–D6：六个已正确修复并验证的实例，每个各跑一次</td><td>每个有有效验证记录，均 S</td><td>每个仍有有效验证记录，均 S</td></tr>
+<tr><td>D7：修复正确，原先漏跑已知测试入口</td><td>无记录，F</td><td>执行后有有效记录，S</td></tr>
+<tr><td>D8：修复正确，原先只口头说“应该通过”</td><td>无记录，F</td><td>执行后有有效记录，S</td></tr>
+<tr><td>D9：所选检查过长，截止前没有完成结果</td><td>无有效记录，F</td><td>如实报告未验证，交付要求仍未满足，F</td></tr>
+<tr><td>D10：当前项目的检查入口尚未正确定位</td><td>无有效记录，F</td><td>如实保留入口错误，交付要求仍未满足，F</td></tr></tbody></table></div>
+<p>这里从6/10到8/10的是这十例的有效验证记录覆盖；它恰好也与本表成功数相等，是因为已经给出“其余交付条件成立”的特定初态。换一组任务，有记录但修错代码时，两项就会分开。A1 的完成门改善了两例，却没有自动解决长检查和入口选择。</p>
+<h3 id="外层用固定选择集裁定候选并拒绝坏提案">外层用固定选择集裁定候选，并拒绝坏提案</h3>
+<p>另设六个<strong>选择实例</strong>：R1–R4 是四个已能完成的旧能力回归实例，V1/V2 是两个新的检查流程实例。它们没有与开发集重复；不过结果会用于选择候选，所以属于 validation，不称最终 heldout。每个候选从相同初态副本开始，每例一个试次，最多3次模型调用、4次工具调用、60秒。另给每个候选的生成过程最多2次模型调用，包括生成 M1；本轮最多三个 task 候选与一个 meta 候选，所以生成调用总上限为8次，生成失败与重试也占这8次。评价试次分别受前述3次/4次/60秒限制，所有生成、执行、失败和复测另在外层总账累计；不能由候选自行扩额或删除失败，这些上限也不是真实费用记录。</p>
+<p>采纳合同在看结果前固定：六例至少5个 S，R1–R4 必须全部保持 S，不越权或超出各项预算，并且六例都有有效评分。缺分先按预定协议报告未知，不能填零后选最好。多个合格候选按这六例的 S 数选择；同分保留较早候选。这个“通过所有合同”不等于“每一个任务都必须成功”。</p>
+<p>M0 先产生 A1，随后又提出坏候选 A2：“为解决超时，跳过预计较慢的验证，只写已完成检查”。A2 可能让输出更快，却删掉了需要证明的环节。外层看真实产物与记录，不接受程序自行宣布完成：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 外层用固定选择集裁定候选，并拒绝坏提案"><table><caption>表 8 / Table 8 · 外层用固定选择集裁定候选，并拒绝坏提案</caption><thead><tr><th scope="col">选择实例（Validation）</th><th scope="col">初始 A0</th><th scope="col">候选 A1</th><th scope="col">坏候选 A2</th><th scope="col">后续候选 A3</th></tr></thead><tbody><tr><td>R1：简单修复与直接测试</td><td>S</td><td>S</td><td>S</td><td>S</td></tr>
+<tr><td>R2：文档修正与配置核对</td><td>S</td><td>S</td><td>S</td><td>S</td></tr>
+<tr><td>R3：必须运行、可在60秒内完成的较慢回归检查</td><td>S</td><td>S</td><td>F；跳过验证</td><td>S</td></tr>
+<tr><td>R4：必须取得检查结果后才能解释范围</td><td>S</td><td>S</td><td>F；没有相应依据</td><td>S</td></tr>
+<tr><td>V1：修复完成但容易漏跑测试</td><td>F</td><td>S</td><td>S</td><td>S</td></tr>
+<tr><td>V2：多包项目，须依据受影响包选择验证入口</td><td>F</td><td>F</td><td>F；仍未选对入口</td><td>S</td></tr>
+<tr><td>S 合计</td><td>4/6</td><td>5/6</td><td>3/6</td><td>6/6</td></tr>
+<tr><td>外层裁定</td><td>原基线</td><td>符合采纳合同</td><td>拒绝：旧能力退化且不足5个 S</td><td>符合合同，按预定规则选中</td></tr></tbody></table></div>
+<p>表中 V1 的 A2 虽成功，也救不了它在 R3/R4 的退化。A2 的代码与失败记录可以保留供分析，“不采纳”不等于擦除证据；之后的候选不能把它的开销从总账移走。</p>
+<h3 id="第二次改的是-meta-程序">第二次改的是 meta 程序</h3>
+<p>A2 被拒绝后，M0 读取这份失败记录和允许修改自身的合同，在至多2次模型调用内生成自身候选 M1：把“看总失败数、增加通用步骤”改成“先按原因分组，再提出带适用条件的局部变更”。外层先核对 M1 的调用接口和写入边界，再允许它生成第三个 task 候选；这一步准入不等于已经证明 M1 的改进能力更强。下面给出两份方法真正造成的差异，而不只把文件名换成 M1：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 9 / Table 9 · 第二次改的是 meta 程序"><table><caption>表 9 / Table 9 · 第二次改的是 meta 程序</caption><thead><tr><th scope="col">改进程序（Meta Program）</th><th scope="col">输入怎样处理</th><th scope="col">交给下一轮的具体提案</th></tr></thead><tbody><tr><td>M0</td><td>把 D9 的超时与其他失败一起当作“流程太慢”</td><td>A2：统一跳过较慢验证，没有区分必要与无关检查</td></tr>
+<tr><td>M1</td><td>将“未执行”“入口选错”“缺少所需环境”分组；对照当前配置和失败证据</td><td>A3：保留 A1 的完成门；依据受影响包及项目声明选择验证入口，保留合同要求的慢检查，只去掉无关包检查</td></tr></tbody></table></div>
+<p>A3 是 <strong>task</strong> 的又一次变更；生成这种有条件提案的方法 M0→M1 才是 <strong>meta</strong> 的变更。M1 不能更改独立判定器、删掉 R3/R4、降低5/6阈值，或提前读取最终留出题。上表最后一列给出了 A3 在相同选择实例上的结果；本题预设无未知、越权和预算超限，因此它被选为最终候选。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第二次改的是 meta 程序：可滚动示意图"><a href="../../../assets/diagrams/46-trajectories-and-learning-1.svg"><img src="../../../assets/diagrams/46-trajectories-and-learning-1.svg" alt="开发轨迹进入可编辑 meta 程序，产生 task 候选或 meta 候选；meta 先通过接口与写入边界准入，task 接受固定预算和独立评价。失败反馈可继续开发，冻结后的 A0/A3 留出评价没有回流开发的箭头。" width="892" height="1579" loading="lazy" style="width:892px;min-width:759px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中直接接受解题评分的是 task 候选；meta 候选先接受接口与写入边界检查，再由新 meta 生成 task 后继。meta 准入不证明它更善于改进，后继得分也不能单独替代相同生成预算下的 meta 对照。箭头进入可编辑程序的是允许用于开发的反馈。最终留出只比较 A0 与冻结的 A3，没有画成继续改进的回边；若后来决定用它指导下一轮开发，就须承认这批数据已参与选择，重新准备独立检验。</p>
+<h3 id="冻结后才打开未参与选择的配对留出集">冻结后，才打开未参与选择的配对留出集</h3>
+<p>现在固定选中的 A3，以及本次结束的 M1。在冻结前，最终 H1–H5 从未向 A/M 提供，也没有经目录、历史或参考答案泄漏给候选生成过程。冻结后，外层才把当前留出实例交给 task 程序，在相同初态和上述单例预算下，各运行 A0 与 A3 一次；最终评分只用于报告，不能再据此选版本。为了看清哪些地方改变，逐例结果如下：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 10 / Table 10 · 冻结后，才打开未参与选择的配对留出集"><table><caption>表 10 / Table 10 · 冻结后，才打开未参与选择的配对留出集</caption><thead><tr><th scope="col">留出实例（Heldout）</th><th scope="col">A0</th><th scope="col">A3</th><th scope="col" style="text-align:right">A3−A0（S=1，F=0）</th></tr></thead><tbody><tr><td>H1：未见项目中的简单修复</td><td>S</td><td>S</td><td style="text-align:right">0</td></tr>
+<tr><td>H2：未见文档布局的入口修正</td><td>S</td><td>S</td><td style="text-align:right">0</td></tr>
+<tr><td>H3：未见多包配置中的检查选择</td><td>F</td><td>S</td><td style="text-align:right">+1</td></tr>
+<tr><td>H4：仍未修好的边界输入行为</td><td>F</td><td>F</td><td style="text-align:right">0</td></tr>
+<tr><td>H5：必须保留的慢回归检查</td><td>S</td><td>S</td><td style="text-align:right">0</td></tr></tbody></table></div>
+<p>这里都是有效评分，A0 为3/5，A3为4/5，配对平均差 <code>1/5=0.2</code>，即20个百分点。H4 仍失败，不能用“采纳合同通过”宣称交付所有任务，也不能因为 D/V/H 的比例不同就只挑最高的6/6报告。五例不足以证明推广显著性。</p>
+<p>这一轮给出了可变对象、提案、拒绝理由、冻结与最终对照，说明“改进程序也能被修改”究竟多了什么。但只看 M1 产生过一个好候选，还不能证明它普遍更善于产生改进；要评价 meta 本身，应从相同起点、相同候选生成预算比较 M0/M1 所产生并被实际选择的后继，而不是只比较两个 task 的分数。</p>
+<p>Hyperagents 提供了把 task 与 meta 放进同一可编辑程序的研究方向。其主实验仍有外层选择与评价机制，并维护候选 archive；本题只采用有限的候选流程帮助理解，不把它冒充论文完整搜索算法，也不从自修改能力推出无限进步、开放领域安全或持续学习已经实现。读到这里即可把三件事分清：保存经验改变下一次可见信息，改 task 改变解题方式，改 meta 改变提出后续改进的方式。</p>
+<span class="heading-alias" id="5-接着做什么" aria-hidden="true"></span><span class="heading-alias" id="5-相关机制" aria-hidden="true"></span><h2 id="6-相关机制">6. 相关机制</h2>
+<p><a href="26-evaluation-and-design.html#%E8%AF%84%E4%BB%B7%E6%9C%80%E5%B0%8F%E6%A8%A1%E5%9E%8B">第26章 评价最小模型</a>定义统计单位与失败状态；<a href="40-task-evaluation.html#3-%E5%9B%9B%E4%B8%AA%E4%BB%BB%E5%8A%A1%E4%B8%A4%E4%B8%AA%E8%AF%95%E6%AC%A1%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%89%E4%B8%AA%E6%88%90%E5%8A%9F%E7%8E%87%E9%83%BD%E5%8F%AF%E8%83%BD%E7%AE%97%E5%AF%B9">第40章 配对评价</a>比较交付、条件质量与成本。</p>
+<hr>
+<p><a href="45-runtime-recovery.html">上一章：第 45 章｜运行时恢复与 Host 交接</a> · <a href="47-integrated-design.html">下一章：第 47 章｜跨模块综合设计</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="45-runtime-recovery.html"><span>← 上一章</span><strong>第 45 章｜运行时恢复与 Host 交接</strong></a><a href="47-integrated-design.html"><span>下一章 →</span><strong>第 47 章｜跨模块综合设计</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E4%B8%80%E6%AC%A1-rollout%E4%B8%8D%E4%B8%80%E5%AE%9A%E6%98%AF%E4%B8%80%E6%9D%A1%E4%B8%8D%E6%96%AD%E5%8F%98%E9%95%BF%E7%9A%84%E6%96%87%E6%9C%AC">1. 一次 rollout，不一定是一条不断变长的文本</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E7%8A%B6%E6%80%81%E4%B8%8E%E7%9C%8B%E5%88%B0%E7%9A%84%E5%86%85%E5%AE%B9%E5%86%99%E6%88%90%E5%90%8C%E4%B8%80%E5%A5%97%E8%AE%B0%E5%8F%B7">把状态与看到的内容写成同一套记号</a></li><li class="toc-level-3"><a href="#%E6%AF%8F%E4%B8%AA%E6%A0%B7%E6%9C%AC%E8%A6%81%E4%BF%9D%E7%95%99%E5%93%AA%E4%B8%80%E4%BB%BD%E8%BE%93%E5%85%A5">每个样本要保留哪一份输入</a></li><li class="toc-level-3"><a href="#%E5%88%87%E6%88%90%E5%87%A0%E6%AE%B5%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E6%94%B9%E5%8F%98%E7%BB%9F%E8%AE%A1%E6%9D%83%E9%87%8D">切成几段，为什么会改变统计权重</a></li><li class="toc-level-2"><a href="#2-reward-%E7%BB%99%E7%BB%93%E6%9E%9Ccredit-%E7%BB%99%E5%86%B3%E7%AD%96%E5%88%86%E9%85%8D%E5%AD%A6%E4%B9%A0%E4%BF%A1%E5%8F%B7">2. reward 给结果，credit 给决策分配学习信号</a></li><li class="toc-level-3"><a href="#%E5%9B%BA%E5%AE%9A%E6%89%B9%E6%AC%A1%E4%B8%8A%E7%9A%84%E5%B1%80%E9%83%A8%E8%AE%AD%E7%BB%83%E7%9B%AE%E6%A0%87">固定批次上的局部训练目标</a></li><li class="toc-level-2"><a href="#3-%E7%94%A8%E6%96%B0%E4%BB%BB%E5%8A%A1%E6%A3%80%E6%9F%A5%E8%80%8C%E4%B8%8D%E6%98%AF%E6%8A%8A%E8%AE%AD%E7%BB%83%E4%BF%A1%E5%8F%B7%E5%BD%93%E4%BA%A4%E4%BB%98%E8%AF%81%E6%98%8E">3. 用新任务检查，而不是把训练信号当交付证明</a></li><li class="toc-level-3"><a href="#%E5%BC%80%E5%8F%91%E4%B8%8E%E7%AE%97%E6%B3%95%E7%A0%94%E7%A9%B6%E7%9A%84%E9%AA%8C%E8%AF%81%E5%AF%B9%E8%B1%A1">开发与算法研究的验证对象</a></li><li class="toc-level-3"><a href="#%E8%B7%A8%E9%A2%98%E4%BF%9D%E7%95%99%E7%BB%8F%E9%AA%8C%E6%80%8E%E6%A0%B7%E7%AE%97%E5%87%BA%E6%94%B6%E7%9B%8A%E5%92%8C%E8%B4%9F%E8%BF%81%E7%A7%BB">跨题保留经验：怎样算出收益和负迁移</a></li><li class="toc-level-2"><a href="#4-%E5%88%87%E7%89%87%E8%BE%93%E5%85%A5%E4%B8%8E%E8%AF%84%E4%BB%B7%E5%8F%98%E5%8C%96%E5%90%8E%E7%9A%84%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">4. 切片、输入与评价变化后的参考结论</a></li><li class="toc-level-2"><a href="#5-%E9%80%89%E8%AF%BB%E4%BB%BB%E5%8A%A1%E7%A8%8B%E5%BA%8F%E4%B8%8E%E6%94%B9%E8%BF%9B%E7%A8%8B%E5%BA%8F%E6%80%8E%E6%A0%B7%E5%88%86%E5%88%AB%E5%8F%98%E5%8C%96">5. 选读：任务程序与改进程序怎样分别变化</a></li><li class="toc-level-3"><a href="#%E7%AC%AC%E4%B8%80%E6%AC%A1%E6%94%B9%E7%9A%84%E6%98%AF-task-%E7%A8%8B%E5%BA%8F">第一次改的是 task 程序</a></li><li class="toc-level-3"><a href="#%E5%A4%96%E5%B1%82%E7%94%A8%E5%9B%BA%E5%AE%9A%E9%80%89%E6%8B%A9%E9%9B%86%E8%A3%81%E5%AE%9A%E5%80%99%E9%80%89%E5%B9%B6%E6%8B%92%E7%BB%9D%E5%9D%8F%E6%8F%90%E6%A1%88">外层用固定选择集裁定候选，并拒绝坏提案</a></li><li class="toc-level-3"><a href="#%E7%AC%AC%E4%BA%8C%E6%AC%A1%E6%94%B9%E7%9A%84%E6%98%AF-meta-%E7%A8%8B%E5%BA%8F">第二次改的是 meta 程序</a></li><li class="toc-level-3"><a href="#%E5%86%BB%E7%BB%93%E5%90%8E%E6%89%8D%E6%89%93%E5%BC%80%E6%9C%AA%E5%8F%82%E4%B8%8E%E9%80%89%E6%8B%A9%E7%9A%84%E9%85%8D%E5%AF%B9%E7%95%99%E5%87%BA%E9%9B%86">冻结后，才打开未参与选择的配对留出集</a></li><li class="toc-level-2"><a href="#6-%E7%9B%B8%E5%85%B3%E6%9C%BA%E5%88%B6">6. 相关机制</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

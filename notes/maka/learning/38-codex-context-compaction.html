@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 38 章｜Codex：上下文与压缩 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 38 / 62</div><article id="main-content"><span class="heading-alias" id="codex-深度三上下文压缩与窗口切换" aria-hidden="true"></span><span class="heading-alias" id="cx03codex上下文与压缩" aria-hidden="true"></span><span class="heading-alias" id="第-36-章codex上下文与压缩" aria-hidden="true"></span><h1 id="第-38-章codex上下文与压缩">第 38 章｜Codex：上下文与压缩</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：Codex 窗口不足时，摘要压缩和直接换窗分别保留什么，后续工作怎样继续？</p>
+<p><strong>关键概念</strong>：活跃历史：下一请求的消息基础；local compaction（客户端摘要）：组织模型总结；远程压缩：接收并组合服务输出；TokenBudget（窗口预算分支）：直接安装新窗口；rollout（过程记录）：支持历史重建的持久材料。</p>
+<p><strong>关系主线</strong>：配置与模型服务方条件选择路线，替换历史并保存窗口记录；移出输入的细节是否可取回仍有条件，压缩成功不证明约束与任务状态完整。</p>
+</blockquote>
+<p>所属主题：<a href="36-context-and-memory.html">第36章 上下文与 Memory</a>；同题对照：<a href="30-claude-code-loop-and-context.html">Claude Code 上下文</a>。</p>
+<p>贯穿案例设定为一项持续很久的修复任务：检查器读过大量文档、产生多轮测试输出，用户最近补充了“不要修改 README”。现在剩余窗口不足，但修复还没验收。我们的目标是让任务继续，同时不误用过时约束、不重复已经完成的写入。</p>
+<p>本章的恢复接口与验收表是教学设计；它们帮助判断实现质量，不表示所有分支已经满足这些要求。</p>
+<h2 id="1-把四种容易混淆的信息分开">1. 把四种容易混淆的信息分开</h2>
+<p>想象书桌、档案柜和索引。书桌上放的是当前要处理的材料；档案柜保存过去记录；索引帮助找到相关文件。这三个位置都可能含有同一件事，但它们的读取成本和丢失后果不同。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 把四种容易混淆的信息分开"><table><caption>表 1 / Table 1 · 1. 把四种容易混淆的信息分开</caption><thead><tr><th scope="col">信息层</th><th scope="col">作用</th><th scope="col">例子</th><th scope="col">与压缩的关系</th></tr></thead><tbody><tr><td>当前模型历史（Model history）</td><td>形成下一次采样的主要输入</td><td>最近动作、结果、用户约束、摘要或压缩项</td><td>会被替换或缩减</td></tr>
+<tr><td>宿主持有的保留状态</td><td>表达不随模型窗口任意丢弃的事实与上下文基线</td><td>已记录的保留上下文、宿主提供的环境状态表示（world state）基线</td><td>随新窗口建立适当表示</td></tr>
+<tr><td>Rollout 与相关持久记录</td><td>保存可用于重建的过程事实</td><td>响应项、压缩 checkpoint、上下文元数据</td><td>压缩会增加可用于重建的记录</td></tr>
+<tr><td>后续可读取资料（Retrievable resources）</td><td>必要时再取回较长细节</td><td>历史项、任务笔记、长期记忆材料</td><td>决定被移出窗口的信息是否仍可用</td></tr></tbody></table></div>
+<p>本地上下文管理组件 ContextManager 还分别维护历史版本（history version）与用户消息修订（user-message revision）。前者可随历史重写变化；后者表示用户输入或重置方面的变化。因此，<strong>窗口换了，不一定表示用户又提出了新要求。</strong> 如果把一次压缩算成新用户任务，会影响依赖、重放边界和恢复判断。</p>
+<p>同样，rollout 的存在并不等于每次模型请求都带着完整 rollout。若一边声称已压缩，一边仍把所有原始工具输出重新塞入 prompt，窗口问题根本没有被解决。</p>
+<h2 id="2-先决定选路再讨论压缩算法">2. 先决定选路，再讨论压缩算法</h2>
+<p>手动压缩与自动压缩在本地都有选路。TokenBudget 功能开关是优先分支；没有走它时，模型服务方（provider）的 <code>V2</code> 能力选择流式远程压缩，<code>Unsupported</code> 选择客户端摘要工作流。下面的 replacement history 指将被安装为活跃输入基础的替换历史；三条路线构造它的方式不同。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="先决定选路，再讨论压缩算法：可滚动示意图"><a href="../../../assets/diagrams/38-codex-context-compaction-1.svg"><img src="../../../assets/diagrams/38-codex-context-compaction-1.svg" alt="压缩入口优先检查 TokenBudget，未启用时按 provider 远程能力选择客户端摘要或远程 v2；各路形成替换历史，更新活跃历史与基线并保存相关记录。" width="982" height="1871" loading="lazy" style="width:982px;min-width:835px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图顶端按运行条件分流。具体任务采用哪条路径，取决于宿主、配置、模型与 provider。</p>
+<p>自动触发也不是“token 多就随时打断一切”。主循环会结合是否仍需继续、预算状态以及是否请求新窗口来判断。工具结果、后续采样和输入队列有顺序关系，窗口处理必须嵌入这个生命周期，不能当成一个后台线程任意改写历史。</p>
+<h2 id="3-路径一客户端组织摘要什么被留下">3. 路径一：客户端组织摘要，什么被留下</h2>
+<p>这里的 local compaction 指由客户端组织摘要工作流，仍然会调用模型。它不是“离线压缩”，也不是普通字符串截断。</p>
+<p>沿正常路径走一遍：</p>
+<ol>
+<li>复制当前 history，并加入用于摘要的输入。</li>
+<li>构造摘要请求，让模型产生可继续工作的摘要。</li>
+<li>从原历史中收集用户消息；已有摘要消息不当成新的真实用户要求重复收集。</li>
+<li>在预算内组合保留的用户消息与新摘要。</li>
+<li>根据手动或中途压缩的场景，处理初始上下文的补回位置与基线。</li>
+<li>安装 replacement history，并记录窗口变化与压缩结果。</li>
+</ol>
+<p>这里有两个需要深入理解的选择。第一，用户消息单独参与构造，表示“用户要求”不应该完全依赖一次自由摘要重写。但它仍受到预算约束，所以不能据此声称所有历史用户要求逐字永存。第二，初始上下文有自己的重新注入机制，不能只指望摘要模型记住所有环境与规则。</p>
+<p>对于贯穿案例，理想摘要至少应保留：目标是修复带空格路径；最新约束是不改 README；哪些文件已经修改；哪些测试已经运行；当前失败和下一步验证是什么。大段重复日志可以移出窗口，但测试命令和关键失败位置应可找回。</p>
+<p>“摘要写得很顺”没有证明这些任务信息保留正确。最危险的摘要往往流畅而过度肯定：把“准备运行测试”改写成“测试已通过”，或者把早期的“更新 README”保留下来，却漏掉最新的禁止修改。</p>
+<h2 id="4-路径二远程压缩也要解释保留结构">4. 路径二：远程压缩也要解释保留结构</h2>
+<p>一次远程压缩尝试（attempt）从该步骤的工具路由组件 ToolRouter 取得工具表面，把压缩触发项加入请求。即使后续配置已刷新，这次压缩也需要解释它实际捕获的视图。</p>
+<p>远程 v2 通过模型客户端的流式请求收集压缩输出，再与需要保留的消息组合。保留消息有 token 和图像方面的预算，metadata 也需要跟随适当的消息保留。它不是“服务返回什么就整段替换，客户端不再负责结构”。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 4. 路径二：远程压缩也要解释保留结构"><table><caption>表 2 / Table 2 · 4. 路径二：远程压缩也要解释保留结构</caption><thead><tr><th scope="col">设计问题</th><th scope="col">为什么不能只说“远程会处理”</th></tr></thead><tbody><tr><td>最新用户约束保留在哪</td><td>服务输出与保留消息需要正确组合</td></tr>
+<tr><td>图像是否占用保留预算</td><td>大图也可能让 replacement 超出预期</td></tr>
+<tr><td>消息身份和 metadata 怎样处理</td><td>恢复、引用和后续比较依赖这些关联</td></tr>
+<tr><td>初始上下文何时补回</td><td>provider 返回值未必等价于完整本地环境</td></tr>
+<tr><td>使用哪个请求端点</td><td>provider 与实现分支可能不同，不能由名字推断</td></tr></tbody></table></div>
+<p>provider 与 feature 分流决定请求和安装合同，因此不能用一个 compact API 概括所有路径。</p>
+<h2 id="5-路径三tokenbudget-换窗不强制生成摘要">5. 路径三：TokenBudget 换窗不强制生成摘要</h2>
+<p>本地 TokenBudget 压缩入口仍然经过 compact hooks，也产生 ContextCompaction 生命周期项，但其核心动作是开启新窗口。该函数不发起模型或服务器摘要请求，而是调用新窗口安装逻辑。</p>
+<p>新窗口建立时会推进窗口身份，构建初始上下文与 world state，并在相应 feature 打开时保留经过预算限制的客户端 developer 消息。随后安装这些 context items，记录窗口和基线，并重算 token 使用。这和“用户消息加摘要”不是同一个 replacement 形状。</p>
+<p>为什么敢把大部分旧窗口移走？这条设计将连续性问题的一部分交给窗口外的信息与按需恢复，而不要求每次窗口转换都预先生成一份包罗万象的摘要。本地还存在按条件装配的 history/notes 扩展，客户端提供历史查询和任务笔记读写，并向上下文加入有界提示。</p>
+<p>这里的扩展是有条件装配的客户端能力。客户端配置、工具合同与请求封装不能证明服务端的索引、存储、删除和竞争处理方式；也不能推广成每个 Codex 用户都具有同一能力。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="路径三：TokenBudget 换窗不强制生成摘要：可滚动示意图"><a href="../../../assets/diagrams/38-codex-context-compaction-2.svg"><img src="../../../assets/diagrams/38-codex-context-compaction-2.svg" alt="TokenBudget 通过窗口转换与生命周期钩子安装初始上下文和 world state；条件保留开发者消息，后续请求在工具可用且需要细节时查询历史或笔记，再继续验证。" width="855" height="1203" loading="lazy" style="width:855px;min-width:727px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中旧窗口没有把完整内容直接传入新窗口。窗口外可取回，不等于当前已经取回。系统接下来能否继续正确行动，取决于它知道缺少什么、能否检索到正确材料、是否把有用结果放进请求。</p>
+<p>TokenBudget 换窗不等于这组恢复能力必定可用。工具不可用、查询失败或没有取回关键约束时，应重新获取可靠材料或报告缺口，不能仅因存在可选扩展就宣称连续性已经保证。</p>
+<p>这条路线的取舍很具体：换窗减少一次强制全历史摘要的成本；同时把部分成本推迟到后续恢复，并承担选错查询、遗漏旧约束、索引延迟等风险。任务笔记写得好也不能免除验证；写得太泛，会变成另一份无法指导行动的长摘要。</p>
+<h2 id="6-token-预算不仅是一个百分比">6. Token 预算不仅是一个百分比</h2>
+<p>本地 token budget 配置可以来自用户设置或模型提供的默认值，并经过验证与 feature 条件处理。它包含提醒阈值、提醒模板、fallback 提示等。运行时会根据剩余基本窗口预算，在适当条件下记录提醒；是否已经发过提醒或 fallback 由状态中的 claim 处理，避免每一步重复注入。</p>
+<p>这体现了一种渐进处理：在资源用尽前提醒模型整理可继续的信息；到了必须换窗的点，由 host 执行转换。提醒是引导，host 的窗口管理是运行边界。不要因为模型收到“即将换窗”的文字，就认为它必然完成了正确整理。</p>
+<p>用教学数字举例：如果当前还有 8,000 token，并不意味着可以再读取 8,000 token 日志。还要为模型输出、工具返回、系统上下文和恢复余量保留空间。具体额度随模型与配置变化。</p>
+<h2 id="7-安装与持久记录先更新了哪里崩溃会影响什么">7. 安装与持久记录：先更新了哪里，崩溃会影响什么</h2>
+<p><code>replace_compacted_history</code> 的职责超出赋值。它会补齐响应项身份，准备压缩记录，协调设置持久化，更新内存中的活跃历史与保留上下文，再保存压缩、world state、上下文和相关设置事件。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 7. 安装与持久记录：先更新了哪里，崩溃会影响什么"><table><caption>表 3 / Table 3 · 7. 安装与持久记录：先更新了哪里，崩溃会影响什么</caption><thead><tr><th scope="col">状态（State）</th><th scope="col">在压缩中的作用</th><th scope="col">对恢复结果的要求</th></tr></thead><tbody><tr><td>替换历史（Replacement history）</td><td>下次模型主要输入的基础</td><td>是否包含继续任务所需信息</td></tr>
+<tr><td>参考上下文（Reference context）</td><td>判断下次补完整上下文还是增量变化</td><td>压缩后是否仍有有效基线</td></tr>
+<tr><td>环境状态基线（World state baseline）</td><td>表达新窗口环境状态</td><td>是否遗漏已变化的工具或环境</td></tr>
+<tr><td>窗口身份（Window identity）</td><td>区分前后上下文窗口</td><td>历史查询能否定位正确窗口</td></tr>
+<tr><td>过程记录检查点与尾部（Rollout checkpoint / Tail）</td><td>支撑之后的历史重建</td><td>是否与幸存的工作片段一致</td></tr></tbody></table></div>
+<p>本地重建代码会选择幸存的 replacement checkpoint 和对应尾部，再正向重放；rollback 还会影响哪些用户 Turn 与元数据应保留。不能只寻找“最后一条摘要字符串”就完成恢复。</p>
+<p>内存更新与后续持久化调用不自动构成跨存储事务；中途崩溃可能留下不同步的状态。例如 replacement 已进入活跃内存、对应记录尚未落盘时，当前进程与重启进程可用的历史不同。恢复结论必须依据幸存 checkpoint 与尾部重建，不能由某个文件存在推断四类状态都一致。这是故障点推演，不是本章新增的崩溃运行结果。</p>
+<span class="heading-alias" id="8-压缩失败与质量退化应分别测" aria-hidden="true"></span><h2 id="8-压缩失败与质量退化的不同结果">8. 压缩失败与质量退化的不同结果</h2>
+<p>Local 摘要请求本身也可能超窗。客户端摘要实现会在输入还可减少时移除最旧项后重试；无法继续减少则报错。普通连接错误有重试限制，取消和预算错误又有不同处理。</p>
+<p>这说明技术成功率和任务保真度是两条轴：请求终于成功了，但被移掉的最旧项可能包含关键约束；摘要长度符合上限，也可能把“未验证”写成“已验证”。另一边，摘要内容正确，却可能因 provider 响应或持久化问题无法安装。</p>
+<p>贯穿案例的参考验收合同如下：</p>
+<pre><code class="language-typescript">type ContinuationCheck = {
+  latestConstraint: &quot;do_not_edit_readme&quot;;
+  modifiedFiles: string[];
+  verifiedTests: string[];
+  unverifiedClaims: string[];
+  nextAction: string;
+};
+
+// 教学算法：比较换窗前后的后续决策，而非只比较摘要字数。
+async function checkContinuation(before: Scenario, after: ModelInput) {
+  assertLatestConstraint(after, before.latestConstraint);
+  assertNoInventedTestSuccess(after, before.observedTestResults);
+  assertCanLocateNeededDetails(after, before.requiredArtifacts);
+  return evaluateNextAction(after, before.acceptanceCriteria);
+}</code></pre>
+<p>本例给定的恢复状态为：最新约束是“不改 README”；<code>scan.py</code> 已修改；测试已经运行但仍失败；尚未证明修复通过。可用下列对象表达参考结果，字段与路径是教学设定：</p>
+<pre><code class="language-typescript">const expected: ContinuationCheck = {
+  latestConstraint: &quot;do_not_edit_readme&quot;,
+  modifiedFiles: [&quot;scan.py&quot;],
+  verifiedTests: [], // 此字段只列已观察到通过的测试；本例没有。
+  unverifiedClaims: [&quot;带空格路径已修好&quot;],
+  nextAction: &quot;回读失败断言和当前实现，确定原因后在许可范围内继续&quot;,
+};</code></pre>
+<p>若换窗后的输入声称“测试通过”，它与给定失败观察冲突；若重新安排修改 README，它违反最新范围；若只缺日志详情，但能通过正确引用回读，仍可继续定位。这里给出的是参考判定，没有生成一次模型的实测得分。</p>
+<p>这里 <code>assertCanLocateNeededDetails</code> 不要求把所有原文保留在 prompt。它要求需要时能可靠找到正确细节；对检索恢复路线，这一点和摘要保真同等重要。所有比较还要固定任务输入与验证标准，否则减少了 token 却改了任务难度，结论没有可比性。</p>
+<span class="heading-alias" id="9-自测与参考答案" aria-hidden="true"></span><h2 id="9-常见场景与参考结论">9. 常见场景与参考结论</h2>
+<p><strong>题一：Codex 的 compaction 一定生成摘要吗？</strong></p>
+<p>参考答案：不是所有压缩路径都如此。Local 与远程路径处理摘要或压缩输出；TokenBudget 分支的 compact 动作直接安装新上下文窗口，不在该函数里请求摘要。实际采用哪条要看配置和 provider。</p>
+<p><strong>题二：为什么换窗后“历史仍在”不等于“模型仍然知道”？</strong></p>
+<p>参考答案：存储中的历史、模型当前输入和按需查询工具是不同层。这些历史内容需要进入本次请求，才能作为当前采样的直接材料；调用工具还要等返回结果被纳入后续请求。模型可能从别的线索推测出相同结论，但那不能证明它取回了这份历史。</p>
+<p><strong>题三：压缩成功但 Agent 又改了 README，先检查什么？</strong></p>
+<p>参考答案：检查最新禁止修改的约束是否进入 replacement 或被后续正确取回，再检查与旧要求的时间关系、规则补回，以及模型实际行动。不能只看压缩接口返回成功。</p>
+<p><strong>题四：为什么保留用户消息仍不足以证明无信息损失？</strong></p>
+<p>参考答案：保留受预算、消息类型与具体分支影响，工具结果和任务状态也可能丢失。新旧要求还需要正确解释，单纯保存文字不等于语义处理正确。</p>
+<p><strong>题五：怎样比较摘要和检索恢复两种设计？</strong></p>
+<p>参考答案：固定同一任务，测转换成本、后续恢复成本、关键约束保留、重复动作、下一步正确性及最终验收。摘要有预先压缩损失，按需恢复有检索遗漏与额外延迟，不能只比窗口变短多少。</p>
+<p>按产品连续复盘时可读：<a href="41-codex-memory-and-collaboration.html">第41章｜Codex：记忆、Skills 与协作</a>。压缩系统的完整设计场景见 <a href="54-context-compaction.html">第54章</a>。</p>
+<hr>
+<p><a href="37-code-retrieval.html">上一章：第 37 章｜代码检索与仓库图</a> · <a href="39-orchestration-and-continuation.html">下一章：第 39 章｜持续工作与协作</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="37-code-retrieval.html"><span>← 上一章</span><strong>第 37 章｜代码检索与仓库图</strong></a><a href="39-orchestration-and-continuation.html"><span>下一章 →</span><strong>第 39 章｜持续工作与协作</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E6%8A%8A%E5%9B%9B%E7%A7%8D%E5%AE%B9%E6%98%93%E6%B7%B7%E6%B7%86%E7%9A%84%E4%BF%A1%E6%81%AF%E5%88%86%E5%BC%80">1. 把四种容易混淆的信息分开</a></li><li class="toc-level-2"><a href="#2-%E5%85%88%E5%86%B3%E5%AE%9A%E9%80%89%E8%B7%AF%E5%86%8D%E8%AE%A8%E8%AE%BA%E5%8E%8B%E7%BC%A9%E7%AE%97%E6%B3%95">2. 先决定选路，再讨论压缩算法</a></li><li class="toc-level-2"><a href="#3-%E8%B7%AF%E5%BE%84%E4%B8%80%E5%AE%A2%E6%88%B7%E7%AB%AF%E7%BB%84%E7%BB%87%E6%91%98%E8%A6%81%E4%BB%80%E4%B9%88%E8%A2%AB%E7%95%99%E4%B8%8B">3. 路径一：客户端组织摘要，什么被留下</a></li><li class="toc-level-2"><a href="#4-%E8%B7%AF%E5%BE%84%E4%BA%8C%E8%BF%9C%E7%A8%8B%E5%8E%8B%E7%BC%A9%E4%B9%9F%E8%A6%81%E8%A7%A3%E9%87%8A%E4%BF%9D%E7%95%99%E7%BB%93%E6%9E%84">4. 路径二：远程压缩也要解释保留结构</a></li><li class="toc-level-2"><a href="#5-%E8%B7%AF%E5%BE%84%E4%B8%89tokenbudget-%E6%8D%A2%E7%AA%97%E4%B8%8D%E5%BC%BA%E5%88%B6%E7%94%9F%E6%88%90%E6%91%98%E8%A6%81">5. 路径三：TokenBudget 换窗不强制生成摘要</a></li><li class="toc-level-2"><a href="#6-token-%E9%A2%84%E7%AE%97%E4%B8%8D%E4%BB%85%E6%98%AF%E4%B8%80%E4%B8%AA%E7%99%BE%E5%88%86%E6%AF%94">6. Token 预算不仅是一个百分比</a></li><li class="toc-level-2"><a href="#7-%E5%AE%89%E8%A3%85%E4%B8%8E%E6%8C%81%E4%B9%85%E8%AE%B0%E5%BD%95%E5%85%88%E6%9B%B4%E6%96%B0%E4%BA%86%E5%93%AA%E9%87%8C%E5%B4%A9%E6%BA%83%E4%BC%9A%E5%BD%B1%E5%93%8D%E4%BB%80%E4%B9%88">7. 安装与持久记录：先更新了哪里，崩溃会影响什么</a></li><li class="toc-level-2"><a href="#8-%E5%8E%8B%E7%BC%A9%E5%A4%B1%E8%B4%A5%E4%B8%8E%E8%B4%A8%E9%87%8F%E9%80%80%E5%8C%96%E7%9A%84%E4%B8%8D%E5%90%8C%E7%BB%93%E6%9E%9C">8. 压缩失败与质量退化的不同结果</a></li><li class="toc-level-2"><a href="#9-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">9. 常见场景与参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

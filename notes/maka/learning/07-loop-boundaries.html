@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 07 章｜最小循环的能力边界 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 07 / 62</div><article id="main-content"><span class="heading-alias" id="b00最小循环还没有解决什么" aria-hidden="true"></span><span class="heading-alias" id="b00最小循环的能力边界" aria-hidden="true"></span><h1 id="第-07-章最小循环的能力边界">第 07 章｜最小循环的能力边界</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：最小循环能够完成正常修复，却还缺哪些安全继续工作的条件？</p>
+<p><strong>关键概念</strong>：effect（效果）改变外部状态；observation（观察）向循环提供反馈；保存保留过程；identity（身份）区分原工作与新尝试；owner（负责者）决定状态变化。</p>
+<p><strong>关系主线</strong>：效果、观察和保存有先后间隔，恢复不能只重放旧消息。工作身份、权威记录、执行权限与输入选择分别补足不同缺口；一次本地故障案例不证明通用恢复能力。</p>
+</blockquote>
+<p>本章的文件、轨迹与退出结果来自 <a href="06-crash-window.html">第06章</a> 的固定故障窗口。</p>
+<h2 id="1-正常情况下三件事紧挨着发生">1. 正常情况下，三件事紧挨着发生</h2>
+<p>mini 的正常执行顺序是：</p>
+<pre><code class="language-text">Model 提出修改 README 的 action
+    ↓
+Environment 执行，文件实际改变
+    ↓
+output 形成 observation，追加 messages
+    ↓
+这一轮 finally 保存 trajectory
+    ↓
+下一次 Model.query 读取当前 messages</code></pre>
+<p>文件改变叫 <strong>effect</strong>；执行结果进入 Agent 的信息叫 <strong>observation</strong>；把当前对象写到磁盘是<strong>保存</strong>。平时它们挨得很近，看起来像一件事，但并不是一个不可分割的操作。</p>
+<p>Maka 是本课程持续研究的 TypeScript Agent Harness 实现。mini 用于看清最小循环，Maka 用于继续追踪状态、权限、恢复等较完整的运行职责。</p>
+<p>真实模型也能完成这条正常链：<a href="22-agent-cases.html">第22章</a>中，mini 和 Maka 都修正了 README 命令与时间格式化函数，并通过测试。第06章 则在预定时点终止进程，让“效果已发生、结果还没保存”的窗口可被重复检查。两类实验分别回答正常修复和记录窗口的问题。</p>
+<span class="heading-alias" id="2-看-l01-已经留下的两份证据" aria-hidden="true"></span><span class="heading-alias" id="2-l01-的文件轨迹与退出记录" aria-hidden="true"></span><h2 id="2-第06章-的文件轨迹与退出记录">2. 第06章 的文件、轨迹与退出记录</h2>
+<p><a href="06-crash-window.html">第06章</a> 使用真实 DefaultAgent 与 LocalEnvironment：第一步读 README 并保存；第二步写 README 后，定点终止子 Agent，来不及返回 observation。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 2. 第06章 的文件、轨迹与退出记录"><table><caption>表 1 / Table 1 · 2. 第06章 的文件、轨迹与退出记录</caption><thead><tr><th scope="col">证据（Evidence）</th><th scope="col">实际看到什么</th><th scope="col">它能回答什么</th></tr></thead><tbody><tr><td>文件系统中的 README</td><td>已从 <code>npm run check</code> 改成 <code>npm test</code></td><td>读回时，目标文件确实已经改变</td></tr>
+<tr><td>trajectory.messages</td><td>仍只有第一步读取旧 README 的消息</td><td>最近一次保存的消息停在哪里</td></tr>
+<tr><td>控制进程记录的退出结果</td><td>子 Agent 被定点硬终止</td><td>这次运行没有走到正常退出</td></tr></tbody></table></div>
+<p>第二步 action、result 与 exit 都尚未保存进磁盘 trajectory 的 messages 快照。退出原因来自实验控制进程的记录，不能因为能在实验报告里看到它，就假设 Agent trajectory 里也有同一条事实。</p>
+<p>所以同一句“Agent 失败了”过于粗略。更准确地说：进程被终止，循环没有正常完成；README 的修改已经发生；已保存历史还不知道这次修改结果。</p>
+<p>此处缺席的不只是成功 observation，第二步 action 也尚未落入磁盘 messages 快照；它可以已经加入进程内的消息列表，两者处于不同保存时点。确定性模型配置里预先保存的脚本不算已经执行的历史。</p>
+<h2 id="3-下一步应该做什么">3. 下一步应该做什么</h2>
+<p>如果只拿旧 trajectory 继续，会面临三种看似合理的选择：</p>
+<ul>
+<li>再执行一次：若动作是追加内容，可能重复写入。</li>
+<li>直接宣布成功：若原操作只完成一部分，会报告不完整结果。</li>
+<li>直接宣布失败：这次 README 明明已经改过，又会遗漏现实中的变化。</li>
+</ul>
+<p>对这个可以直接读回的小文件，先检查 README 和 diff，确认目标状态，再继续测试。如果目标替换已完成，就接着验证；如果只改了一部分，再确定剩余修改。读回文件解决的是“当前状态是什么”，它未必能重建所有中间步骤。</p>
+<p>对无法直接查询的外部操作，答案可能仍是“尚未确认”。这不是第四种猜测；它承认当前证据不足。后面的恢复机制要做的是缩小这种不确定性，并为仍不确定的情况安排处理办法。</p>
+<p><strong>没有 observation，不能推导出没有 effect。</strong></p>
+<span class="heading-alias" id="4-只带三个问题进入-maka" aria-hidden="true"></span><h2 id="4-身份记录与负责者">4. 身份、记录与负责者</h2>
+<p>安全地继续工作，需要明确三个对象：</p>
+<ol>
+<li><strong>这是谁的工作？</strong> 用户重发请求时，是继续原来的意图，还是新建一次尝试？需要区分一份长期工作空间、一次用户请求与一次实际执行。</li>
+<li><strong>哪些记录代表已经发生？</strong> 模型准备修改的文本、工具结果、磁盘中的目标文件，是不同证据；模型下一次看到的输入也不必等于全部历史。</li>
+<li><strong>谁决定接下来做什么？</strong> 界面显示“正在运行”、模型说“完成”、后台进程正在退出，可能不同步。需要知道谁负责保存和裁决相应状态。</li>
+</ol>
+<p>后面进入 Maka 时，会用 Session（会话归属）、Turn（用户可观察的一项工作）、Run（一次具体执行）区分这些身份，用 Owner 表示有权管理状态的负责者。记录本身与由记录整理出的视图则分别称为事实和投影。第08章先建立对应关系，第13、14章再展开定义与实现。</p>
+<span class="heading-alias" id="自测" aria-hidden="true"></span><h2 id="问题解析">问题解析</h2>
+<span class="heading-alias" id="基础自测" aria-hidden="true"></span><h3 id="写入窗口">写入窗口</h3>
+<p><strong>问题 1。</strong> 第06章 的文件已改而轨迹停在读取，是矛盾吗？</p>
+<p><strong>解释。</strong> 不是。effect、observation 和保存有先后顺序，强制退出发生在它们之间。</p>
+<p><strong>问题 2。</strong> 为什么下一步应该检查 README，而不是只重复原命令？</p>
+<p><strong>解释。</strong> 先读回目标状态并检查 diff，才能决定还需做什么；比如追加文本重复执行会多写一行。读回结果也不一定重建出全部执行历史。</p>
+<p><strong>问题 3。</strong> 当前实验是否已经证明自动恢复、所有副作用可去重？</p>
+<p><strong>解释。</strong> 没有。它只证明一个固定本地写入窗口，未实现通用恢复，也未验证外部系统的去重能力。</p>
+<span class="heading-alias" id="5-第二遍遇到新压力再解锁下一层" aria-hidden="true"></span><h2 id="5-权限输入与跨进程工作">5. 权限、输入与跨进程工作</h2>
+<span class="heading-alias" id="执行更多动作再讨论权限与恢复" aria-hidden="true"></span><h3 id="执行权限与效果恢复">执行权限与效果恢复</h3>
+<p>在第04章中，npm test 可以启动 package.json 声明的脚本。若采用第05章的交互确认模式，即使用户确认了这条命令，也不等于操作系统已经限制脚本能读哪些文件、能访问哪些网络。<a href="17-permissions-and-sandbox.html">第17章</a>分别解释策略允许范围与执行时的强制限制。</p>
+<p>第06章 的结果缺席会引向 <a href="18-effects-and-recovery.html">第18章</a>：执行前后留下哪些记录，何时能查证，何时不能重放。那一章把执行前和结果结算时的两次持久提交简称为 T1/T2，本章只先提出“效果与记录可能不同步”的问题。</p>
+<span class="heading-alias" id="测试日志变长再讨论模型输入与长期信息" aria-hidden="true"></span><h3 id="长日志与长期信息">长日志与长期信息</h3>
+<p>如果修复要进行很多轮，日志会越来越多。原始输出值得保留，但下一次模型未必需要全部重读。<a href="19-context-compaction.html">第19章</a>解释历史输入的压缩；<a href="20-memory.html">第20章</a>解释信息怎样跨任务保存和召回。</p>
+<span class="heading-alias" id="工作跨进程或跨组件再讨论委派与所有权" aria-hidden="true"></span><h3 id="跨进程工作与所有权">跨进程工作与所有权</h3>
+<p>再设想一个正常场景：README 已修改，测试也结束并保存了结果，用户还没提出下一问。聊天记录和项目文件需要留下，但执行进程是否必须一直占着内存？先问哪些内容必须保存、哪些运行现场可以重建、谁有权开始下一次工作，再讨论何时可以释放当前计算。这个问题接到 <a href="13-session-turn-run.html#%E6%8C%81%E4%B9%85%E8%BA%AB%E4%BB%BD%E4%B8%8E%E8%BF%9B%E7%A8%8B%E5%AF%BF%E5%91%BD%E5%88%86%E5%88%AB%E8%AE%B0%E5%BD%95">第13章 的身份与进程</a>和 <a href="25-host-and-client.html#%E9%95%BF%E6%9C%9F%E8%B4%A3%E4%BB%BB%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%BD%BD%E4%BD%93%E8%83%BD%E5%90%A6%E5%88%86%E5%BC%80">第25章 的执行载体</a>；第06章 并没有验证这种自动释放能力。</p>
+<p>委派、持续推进和断线后的观察还会增加新的责任，<a href="08-mini-to-maka.html">第08章</a>将把这些问题放回共同的机制地图。</p>
+<span class="heading-alias" id="第二遍" aria-hidden="true"></span><span class="heading-alias" id="练习授权与输入选择" aria-hidden="true"></span><h3 id="授权与输入选择问答">授权与输入选择问答</h3>
+<p><strong>问题 1。</strong> “用户允许执行 npm test”还没有回答什么执行边界问题？</p>
+<p><strong>解释。</strong> 尚未说明底层能否强制限制脚本访问的文件、网络和子进程；确认与隔离需要分别解释。</p>
+<p><strong>问题 2。</strong> 为什么保存完整日志与下一轮把完整日志交给模型，是两个决定？</p>
+<p><strong>解释。</strong> 保存服务于留存、核对等需求，模型输入服务于本次判断并受窗口限制；两者可由不同视图承担。</p>
+<p>相关章节：<a href="08-mini-to-maka.html#%E7%AC%AC-08-%E7%AB%A0%E4%BB%8E-mini-%E5%88%B0-maka-%E7%9A%84%E6%9C%BA%E5%88%B6%E5%AF%B9%E5%BA%94">第08章｜身份、记录与控制责任</a>。</p>
+<hr>
+<p><a href="06-crash-window.html">上一章：第 06 章｜写入与轨迹保存的崩溃窗口</a> · <a href="08-mini-to-maka.html">下一章：第 08 章｜从 mini 到 Maka 的机制对应</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="06-crash-window.html"><span>← 上一章</span><strong>第 06 章｜写入与轨迹保存的崩溃窗口</strong></a><a href="08-mini-to-maka.html"><span>下一章 →</span><strong>第 08 章｜从 mini 到 Maka 的机制对应</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E6%AD%A3%E5%B8%B8%E6%83%85%E5%86%B5%E4%B8%8B%E4%B8%89%E4%BB%B6%E4%BA%8B%E7%B4%A7%E6%8C%A8%E7%9D%80%E5%8F%91%E7%94%9F">1. 正常情况下，三件事紧挨着发生</a></li><li class="toc-level-2"><a href="#2-%E7%AC%AC06%E7%AB%A0-%E7%9A%84%E6%96%87%E4%BB%B6%E8%BD%A8%E8%BF%B9%E4%B8%8E%E9%80%80%E5%87%BA%E8%AE%B0%E5%BD%95">2. 第06章 的文件、轨迹与退出记录</a></li><li class="toc-level-2"><a href="#3-%E4%B8%8B%E4%B8%80%E6%AD%A5%E5%BA%94%E8%AF%A5%E5%81%9A%E4%BB%80%E4%B9%88">3. 下一步应该做什么</a></li><li class="toc-level-2"><a href="#4-%E8%BA%AB%E4%BB%BD%E8%AE%B0%E5%BD%95%E4%B8%8E%E8%B4%9F%E8%B4%A3%E8%80%85">4. 身份、记录与负责者</a></li><li class="toc-level-2"><a href="#%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">问题解析</a></li><li class="toc-level-3"><a href="#%E5%86%99%E5%85%A5%E7%AA%97%E5%8F%A3">写入窗口</a></li><li class="toc-level-2"><a href="#5-%E6%9D%83%E9%99%90%E8%BE%93%E5%85%A5%E4%B8%8E%E8%B7%A8%E8%BF%9B%E7%A8%8B%E5%B7%A5%E4%BD%9C">5. 权限、输入与跨进程工作</a></li><li class="toc-level-3"><a href="#%E6%89%A7%E8%A1%8C%E6%9D%83%E9%99%90%E4%B8%8E%E6%95%88%E6%9E%9C%E6%81%A2%E5%A4%8D">执行权限与效果恢复</a></li><li class="toc-level-3"><a href="#%E9%95%BF%E6%97%A5%E5%BF%97%E4%B8%8E%E9%95%BF%E6%9C%9F%E4%BF%A1%E6%81%AF">长日志与长期信息</a></li><li class="toc-level-3"><a href="#%E8%B7%A8%E8%BF%9B%E7%A8%8B%E5%B7%A5%E4%BD%9C%E4%B8%8E%E6%89%80%E6%9C%89%E6%9D%83">跨进程工作与所有权</a></li><li class="toc-level-3"><a href="#%E6%8E%88%E6%9D%83%E4%B8%8E%E8%BE%93%E5%85%A5%E9%80%89%E6%8B%A9%E9%97%AE%E7%AD%94">授权与输入选择问答</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

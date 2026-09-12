@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 51 章｜设计 Read、Edit 与 Bash · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 51 / 62</div><article id="main-content"><span class="heading-alias" id="i03实现-readedit-与-bash把文件和进程当成真实资源" aria-hidden="true"></span><span class="heading-alias" id="i03设计-readedit-与-bash" aria-hidden="true"></span><span class="heading-alias" id="第-48-章设计-readedit-与-bash" aria-hidden="true"></span><span class="heading-alias" id="第-50-章设计-readedit-与-bash" aria-hidden="true"></span><h1 id="第-51-章设计-readedit-与-bash">第 51 章｜设计 Read、Edit 与 Bash</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：Read、Edit 和 Bash 怎样在大文件、并发修改与长输出中保持可解释的操作结果？</p>
+<p><strong>关键概念</strong>：一致观察：内容与版本来自同一读取；Cursor（游标）：有界续读的位置；纯变换：先计算候选文本；条件提交：检查版本并完成写入；进程生命周期：启动、排空输出、取消与退出；结果截断：限制展示并保留读取线索。</p>
+<p><strong>关系主线</strong>：读取为编辑提供前提，资源负责者检查后提交，命令执行持续收集输出直至终态；文件原子替换不自动防覆盖，进程结束也不证明修复有效。</p>
+</blockquote>
+<p>前置：<a href="50-tool-contracts.html">第50章 Tool 合同</a> 与 <a href="16-tools-and-execution.html">第16章</a>。本章的参考接口、版本与状态属于教学设计；涉及 Maka 实际行为时单独说明。</p>
+<h2 id="1-原题约束与最小起点">1. 原题、约束与最小起点</h2>
+<blockquote><p>给你一个工作区，让模型能读取文件、编辑函数、运行测试。你会怎样实现 Read、Edit、Bash？如果文件被用户改过，或者测试一直输出日志，怎么办？</p>
+</blockquote>
+<p>文件大小、编码、工作区边界、并发写入者及 Shell 的子进程和网络能力决定实现条件。本题选择：只处理工作区中的文本文件；Read 有范围和输出上限；Edit 默认单文件单片段；Bash 在指定 cwd 和执行边界下运行。</p>
+<p>贯穿输入是 <code>src/duration.js</code> 中 <code>seconds % 100</code> 应改为 <code>seconds % 60</code>，以及 README 测试入口修正。最小实现不需要按抽象语法树（AST）定位代码结构的编辑器；但必须拒绝歧义，不能用一条全局 replace 掩盖目标不清楚。</p>
+<span class="heading-alias" id="2-两分钟完整主答" aria-hidden="true"></span><h2 id="2-完整参考方案">2. 完整参考方案</h2>
+<blockquote><p>我会先给三个工具建立共同的工作区身份、权限检查、取消和结果合同，再实现各自的资源语义。</p>
+<p>Read 要返回实际读到的片段、范围、是否截断和观察版本。路径要解析到允许的真实目标；大文件不能默认全部塞进模型。版本和内容必须来自同一份一致观察，否则后续 Edit 的条件没有意义。</p>
+<p>Edit 接受旧片段、新片段和观察版本。先做纯匹配，默认只接受唯一目标；真正提交时，由资源 owner 原子比较当前版本和目标身份，再接受新内容。如果使用锁，检查和写入必须在覆盖全部竞争写入者的锁内，不能检查完放锁再写。原子 rename 只解决可见写入的一个问题，不会自动防止覆盖别人刚写入的文件。</p>
+<p>Bash 要管理整个进程生命周期：固定 cwd、受限环境、启动、持续排空 stdout 和 stderr、超时或取消、等待退出、接受最终结果。输出边读取边保存并限制给模型的部分；退出码、信号和截断信息不能丢失。测试退出非零应保留失败断言，不能只返回一句失败。</p>
+<p>我会用并发编辑、目标歧义、路径替换、海量日志和取消子进程来验证。取消表示尝试停止后续工作，已经写出的文件或远端请求不会自动回滚；进程结束也只证明进程状态，任务还要看测试和 diff。</p>
+</blockquote>
+<h2 id="3-read让下一步建立在一致的观察上">3. Read：让下一步建立在一致的观察上</h2>
+<p>教学请求与结果：</p>
+<pre><code class="language-ts">type ReadArgs =
+  | { path: string; startLine?: number; lineCount?: number }
+  | { continuationCursor: string }
+type ReadResult = {
+  path: string
+  observedVersion: string
+  startLine: number
+  endLine: number
+  text: string
+  truncated: boolean
+  continuationCursor?: string
+}</code></pre>
+<p>本题 <code>startLine</code> 从 1 计数，<code>lineCount</code> 必须是正整数；省略范围表示从头读取，但仍受输出预算约束。</p>
+<p>实现顺序是“参数与预算检查 → 路径和对象身份确认 → 取得一致内容与版本 → 按范围选择 → 返回有界观察”。行数限制还要配合字节上限，因为一行也可能很大。若字节上限在行内截断，必须停在完整字符的有效编码边界；<code>startLine/endLine</code> 只表示片段涉及的行，不承诺首尾行完整。编码无法可靠解释或文件是二进制时，返回明确结果，让调用者选择适当工具。</p>
+<p><code>continuationCursor</code> 是 owner 返回的不可自行解释的续读标记，绑定目标身份、<code>observedVersion</code>、本次请求的范围与下一个未返回字节的位置；该位置允许在行内，但必须处于有效编码边界。续读只传 cursor，由 owner 校验当前权限并继续同一份观察，不能同时给一个新路径或起始行。如果对应快照已释放，或只有当前文件而版本已变，返回 <code>stale_observation</code>，要求重新读取，不能把新旧内容拼成一份文件。对超长单行，这样才能避免用 <code>nextStartLine</code> 跳过该行剩余部分。</p>
+<p>这里的一致版本可以来自资源 owner 的快照读取。若只能直接读普通文件系统，需要选择并说明保证：例如与协作写入者共同加锁读取，或检测读取期间变化并要求重新观察。只先 <code>stat</code> 再普通 <code>read</code>，不能保证两次操作之间文件没变；一次普通读取也不能自动成为并发写下的不可变快照。</p>
+<p>Read 成功后如果返回第 10–30 行，就不能让模型误以为看到了整份文件。<code>truncated</code> 表示请求范围尚有内容未返回，此时须返回可用的 cursor，或明确续读不可用的错误；用户本来只请求一个片段，并不等于整个文件被截断。应验证长单行 UTF-8 文本分块重组后无字节遗漏或重复，以及文件变化后旧 cursor 被拒绝。路径范围检查还要防止别名与 symlink 指向不同目标；“字符串以 workspace 开头”不足以证明授权对象。</p>
+<span class="heading-alias" id="4-白板一edit-的纯变换与条件提交" aria-hidden="true"></span><h2 id="4-edit-的纯变换与条件提交">4. Edit 的纯变换与条件提交</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Edit 的纯变换与条件提交：可滚动示意图"><a href="../../../assets/diagrams/51-file-and-shell-tools-1.svg"><img src="../../../assets/diagrams/51-file-and-shell-tools-1.svg" alt="Read 的一致内容和观察版本支持编辑参数；资源 owner 在受保护提交中核对身份、版本和唯一目标，冲突或歧义拒绝本次写入，成功返回新版本与 diff，随后仍需行为验证。" width="720" height="2019" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中版本检查与唯一匹配是两个条件。“取得当前目标”到“接受新内容”必须属于同一受保护操作：<strong>owner 原子条件提交，或锁覆盖检查与写入。</strong></p>
+<p>关键箭头有两种含义：从版本冲突到拒绝表示本次条件写入没有接受；从提交到结果表示已知的实际效果。不要把“计算出新字符串”画成“文件已修改”。第52章 会补写入以后回执丢失的 unknown 分支。</p>
+<h3 id="条件提交的最小实现骨架">条件提交的最小实现骨架</h3>
+<p>下面沿用第50章的 <code>EditArgs</code>，并为 <code>ToolContext</code> 增加 <code>owner</code> 字段，表示实际管理文件版本与提交的资源服务。它的 <code>mutateIfVersion</code> 是教学接口，不是 Node.js 文件 API：必须原子地核对目标身份与版本、调用纯变换并提交；不能拿“读文件 → 比版本 → 普通 rename”实现同名函数后声称满足合同。</p>
+<pre><code class="language-ts">async function edit(args: EditArgs, ctx: ToolContext) {
+  validateEditArgs(args)
+  const target = await ctx.owner.resolveAuthorizedTarget(args.path, ctx.boundary)
+  return ctx.owner.mutateIfVersion({
+    target,
+    expectedVersion: args.observedVersion,
+    operationId: ctx.callId,
+    transform(currentText) { // 纯函数，无 I/O，无第二次工具调用
+      const count = countExactMatches(currentText, args.oldText)
+      if (count === 0) throw noEffect(&quot;target_missing&quot;)
+      if (count !== 1) throw noEffect(&quot;target_ambiguous&quot;)
+      const nextText = replaceOnce(currentText, args.oldText, args.newText)
+      return { nextText, diff: makeDiff(currentText, nextText) }
+    }
+  })
+}</code></pre>
+<p>一种可行实现是所有写入经同一资源服务，由它在事务或受控版本存储中做比较和提交。另一种是锁住规范化资源身份，在锁内重读、比较、计算、写入，并要求竞争写入者遵守同一锁。后者对不协作的外部编辑器没有完整保证；这时要使用隔离工作副本、支持条件写入的 owner，或明确保留竞争风险。</p>
+<p><strong>原子 rename 只提供特定的文件系统语义。</strong> 同文件系统的 rename 可以提供路径替换的原子可见性，但不等于“只有版本仍是 v17 才替换”，也不等于掉电后的完整持久性；还要分别处理内容同步、目录同步和错误分类。不能把这些语义合成一个“原子写”标签。</p>
+<h2 id="5-edit-正常与失败走读">5. Edit 正常与失败走读</h2>
+<p>正常路径：Read 得到 <code>v7</code>，完整目标行包含 <code>seconds % 100</code>。owner 当前仍是 v7，匹配一处，提交成 v8；结果给出 diff 引用。模型读差异并运行测试，确认输入 60 输出 <code>1:00</code>、125 输出 <code>2:05</code>，再检查未修改测试断言。数字是教学状态，不是实测结果。</p>
+<p>失败路径：模型准备修改期间，用户在函数中新增参数检查，owner 已变成 v8。即使旧片段仍然唯一出现，也应根据本题的版本合同拒绝 v7 条件提交。模型重读后保留参数检查，再提出 v8 上的新编辑。若用户已经把 <code>% 100</code> 修成 <code>% 60</code>，下一步可以直接验证，不必为了完成旧调用再次编辑。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 5. Edit 正常与失败走读"><table><caption>表 1 / Table 1 · 5. Edit 正常与失败走读</caption><thead><tr><th scope="col">当前内容</th><th scope="col">默认精确唯一方案</th><th scope="col">需要的新观察（Observation）</th></tr></thead><tbody><tr><td>旧片段一处，版本一致</td><td>接受一次替换</td><td>diff 与行为结果</td></tr>
+<tr><td>旧片段零处</td><td>明确缺失，未提交</td><td>当前实现与最新目标</td></tr>
+<tr><td>旧片段两处</td><td>明确歧义，未提交</td><td>足以唯一定位的上下文</td></tr>
+<tr><td>旧片段一处，版本已变</td><td>明确陈旧，未提交</td><td>并发变化与是否仍需修改</td></tr>
+<tr><td>提交回执丢失</td><td>unknown</td><td>owner 回执或当前资源对账</td></tr></tbody></table></div>
+<p>若采用有限 fuzzy（容错）匹配，必须定义启用条件、候选范围、唯一性和新文本是否迁移缩进。<a href="16-tools-and-execution.html#maka-edit-%E6%80%8E%E6%A0%B7%E5%AE%9A%E4%BD%8D%E6%97%A7%E7%89%87%E6%AE%B5">第16章的 Maka Edit</a>提供了一个实际对照：精确零匹配且通过保护条件后，才尝试有限候选搜索；精确多匹配直接拒绝，<code>new_string</code> 原样替换。它没有本题的观察版本字段，片段匹配不能证明上一次 Read 后整份文件未变。</p>
+<span class="heading-alias" id="6-白板二bash-从启动到终态" aria-hidden="true"></span><h2 id="6-bash-从启动到终态">6. Bash 从启动到终态</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Bash 从启动到终态：可滚动示意图"><a href="../../../assets/diagrams/51-file-and-shell-tools-2.svg"><img src="../../../assets/diagrams/51-file-and-shell-tools-2.svg" alt="Bash 从校验、启动进入运行，启动失败与准入拒绝独立结束；运行中可因超时或取消进入停止，观察退出或无法确认后结算为成功、已知失败或未知，停止不等于回滚。" width="720" height="1111" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>正常进程依次经过 <code>Starting → Running → Settling</code>，超时和取消另走停止分支。<code>Stopping</code> 不直接连到“已回滚”；需要观测进程是否真的退出，以及哪些外部效果仍无法确定。结果结算包含排空已接收输出与保存可靠结果，流式 UI 显示 done 不构成最终接受。</p>
+<p>教学接口应表达命令生命周期的最少信息：</p>
+<pre><code class="language-ts">type BashRequest = {
+  command: string
+  timeoutMs: number
+}
+type BashObservation = {
+  operationId: string
+  process: &quot;not_started&quot; | &quot;exited&quot; | &quot;status_unknown&quot;
+  exitCode?: number
+  signal?: string
+  stdoutExcerpt: string
+  stderrExcerpt: string
+  outputTruncated: boolean
+  outputRef?: string
+  effects: &quot;none&quot; | &quot;known&quot; | &quot;unknown&quot;
+}</code></pre>
+<p><code>timeoutMs</code> 只是调用者请求的等待上限，实际值还要受可信工具上限和任务剩余时间约束，不能扩大授权。<code>cwd</code>、允许的环境变量、网络和文件边界从可信执行上下文获得；不能因为命令名是 <code>npm test</code> 就静态认为没有副作用。进程启动以后，工具要并行排空 stdout/stderr，避免管道写满阻塞；保存输出也要有磁盘预算和清理策略，不能用“归档”把无界问题转移到存储。</p>
+<p>超时或取消先发停止请求，再按平台能力处理进程组和子进程、等待有限的收敛时间。如果后台进程可脱离控制，必须明确能力缺口，不能因为父进程退出就宣布全部工作停止。对状态未知返回查询入口；对已知非零退出保留退出码与关键诊断。</p>
+<h2 id="7-bash-正常与失败走读">7. Bash 正常与失败走读</h2>
+<p>正常路径：从 package scripts 确认 <code>npm test</code>，启动进程并收集输出；进程退出 0，返回四个用例的观察和日志引用。这里的成功是选定检查执行完成，不自动证明所有输入行为，也不证明 README 改动范围正确。</p>
+<p>失败路径 A：运行 <code>npm run check</code> 得到 missing script、exit 1。命令已经执行，缺口是错误入口；先读 package，不能因为看到失败就修改函数或扩大权限。</p>
+<p>失败路径 B：测试输出持续增长，模型只收到前几行和尾部错误、截断标识及日志引用；不能删掉尾部唯一的失败断言。到超时时工具请求停止并确认退出，同时返回已捕获结果。如果测试此前已经写出报告文件，取消不会删除它；若还触发了远端 job，则需要远端查询合同。</p>
+<h2 id="8-递进追问与参考答案">8. 递进追问与参考答案</h2>
+<p><strong>追问一：两个 Agent 同时编辑同一文件，给每个进程一把锁够吗？</strong></p>
+<p>不够，锁要共享资源身份并覆盖真正的所有竞争写入者。各自的进程内 mutex 互不认识。可以使用统一 owner 的条件提交，或者独立工作副本分别产出 patch，再在明确 base 上合并和验证。后者还要解决冲突，不能称为自动无冲突。</p>
+<p><strong>追问二：Read 返回了内容 hash，Edit 再算一次 hash，然后写，是否已经安全？</strong></p>
+<p>如果比较与写之间还有竞争窗口，就不安全。hash 能表示内容条件，但必须在 owner 的原子比较提交或可靠锁内发挥作用。它也不自动代表文件身份、元数据或跨文件事务。</p>
+<p><strong>追问三：只保留日志最后 100 行可以吗？</strong></p>
+<p>可作为初始投影，但失败可能出现在中间，最后只有退出汇总。优先保留结构化失败项、退出状态、首尾片段和回读入口，并用“关键断言被截断”的样例验证。截断策略不能声称已完整理解日志。</p>
+<p><strong>追问四：Bash 命令退出 0 就是 succeeded 吗？</strong></p>
+<p>要区分进程合同与业务合同。工具可记录进程正常退出，但脚本可能吞掉子命令错误，或者测试未真正运行。Agent 还需查看明确测试计数、命令选择和预期产物；高价值领域可增加专用结果解析。</p>
+<p><strong>追问五：取消后可否自动重跑？</strong></p>
+<p>先确认是否启动、哪些效果已发生、原进程是否仍运行。对已知安全的读取或确定已停止且可重跑的检查，可能重跑；对编辑、发布、远端提交不能单凭取消就假定无效果。</p>
+<h2 id="9-方案取舍与验证">9. 方案取舍与验证</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 9. 方案取舍与验证"><table><caption>表 2 / Table 2 · 9. 方案取舍与验证</caption><thead><tr><th scope="col">决策</th><th scope="col">方案 A</th><th scope="col">方案 B</th><th scope="col">如何验证选择</th></tr></thead><tbody><tr><td>修改表达（Edit Representation）</td><td>精确片段替换，接口简单且易定位失败</td><td>AST 编辑，表达语法对象但需语言与格式支持</td><td>同一组目标歧义、格式变化、跨语言任务</td></tr>
+<tr><td>并发保护（Concurrency）</td><td>owner 条件提交，拒绝陈旧 base</td><td>独立工作副本，最后合并</td><td>两写入者竞争、冲突保留、最终 diff</td></tr>
+<tr><td>大输出（Large Output）</td><td>完整短结果直接返回</td><td>有界投影与归档回读</td><td>诊断准确率、回读可用性、预算与延迟</td></tr>
+<tr><td>测试触发（Test Trigger）</td><td>模型按任务选检查</td><td>配置固定检查阶段</td><td>漏测、错入口、重复开销与修改范围</td></tr></tbody></table></div>
+<p>代表性验证覆盖：零/一/多匹配；用户在 Read 后改同一文件；路径目标在等待期间被替换；日志超过预算且错误在中间；取消有子进程的命令；写入成功后回执丢失。资源状态和工具结果分别记录，最终回答只负责解释这些观察。例如路径被替换应拒绝旧目标，回执丢失则保留 unknown，不能将二者都写成“没有修改”。</p>
+<span class="heading-alias" id="10-评分自测与回读" aria-hidden="true"></span><h2 id="10-超大单行-json-的读取与修改方案">10. 超大单行 JSON 的读取与修改方案</h2>
+<p>假设一个 40 MB 的 UTF-8 JSON 文件只有一行，目标是修改根对象的 <code>timeout</code> 字段。<code>lineCount=1</code> 无法限制返回量；前 8 KB 也未必包含该字段。读取器应按字节预算返回完整字符边界内的片段，用绑定文件版本和下一字节位置的 cursor 继续；不能将下一起始行设为 2，否则会跳过同一行的剩余内容。</p>
+<p>修改可以由有界流式 JSON 解析器定位根字段，或由隔离执行器在资源预算内完整解析。若任务中有多个同名 <code>timeout</code>，应以结构路径区分；全局文本替换不能保证修改的是根对象。解析失败或目标歧义时返回明确的无写入错误。</p>
+<p>提交仍基于同一观察版本：读时为 v7，提交前 owner 已为 v8，就拒绝旧修改并重新观察。成功后返回新版本、目标字段前后值与有界 diff，再检查 JSON 可解析及相关程序行为。格式化整份文件可能扩大 diff，因此保留原格式与重新序列化也是需要明确选择的合同。</p>
+<p>Maka 的本地/worker 文件路径有按规范化路径协调的写锁与目标 identity 检查，但这不覆盖任意 Bash 或远端 executor 的统一资源事务；其 <code>managed_mutation_v1</code> 更强协议也不能当作默认 Write/Edit 保证。</p>
+<p>相关机制：<a href="52-permissions-and-recovery.html">第52章 权限与恢复</a>。</p>
+<hr>
+<p><a href="50-tool-contracts.html">上一章：第 50 章｜设计工具契约</a> · <a href="52-permissions-and-recovery.html">下一章：第 52 章｜设计权限与效果恢复</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="50-tool-contracts.html"><span>← 上一章</span><strong>第 50 章｜设计工具契约</strong></a><a href="52-permissions-and-recovery.html"><span>下一章 →</span><strong>第 52 章｜设计权限与效果恢复</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E7%BA%A6%E6%9D%9F%E4%B8%8E%E6%9C%80%E5%B0%8F%E8%B5%B7%E7%82%B9">1. 原题、约束与最小起点</a></li><li class="toc-level-2"><a href="#2-%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 完整参考方案</a></li><li class="toc-level-2"><a href="#3-read%E8%AE%A9%E4%B8%8B%E4%B8%80%E6%AD%A5%E5%BB%BA%E7%AB%8B%E5%9C%A8%E4%B8%80%E8%87%B4%E7%9A%84%E8%A7%82%E5%AF%9F%E4%B8%8A">3. Read：让下一步建立在一致的观察上</a></li><li class="toc-level-2"><a href="#4-edit-%E7%9A%84%E7%BA%AF%E5%8F%98%E6%8D%A2%E4%B8%8E%E6%9D%A1%E4%BB%B6%E6%8F%90%E4%BA%A4">4. Edit 的纯变换与条件提交</a></li><li class="toc-level-3"><a href="#%E6%9D%A1%E4%BB%B6%E6%8F%90%E4%BA%A4%E7%9A%84%E6%9C%80%E5%B0%8F%E5%AE%9E%E7%8E%B0%E9%AA%A8%E6%9E%B6">条件提交的最小实现骨架</a></li><li class="toc-level-2"><a href="#5-edit-%E6%AD%A3%E5%B8%B8%E4%B8%8E%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB">5. Edit 正常与失败走读</a></li><li class="toc-level-2"><a href="#6-bash-%E4%BB%8E%E5%90%AF%E5%8A%A8%E5%88%B0%E7%BB%88%E6%80%81">6. Bash 从启动到终态</a></li><li class="toc-level-2"><a href="#7-bash-%E6%AD%A3%E5%B8%B8%E4%B8%8E%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB">7. Bash 正常与失败走读</a></li><li class="toc-level-2"><a href="#8-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE%E4%B8%8E%E5%8F%82%E8%80%83%E7%AD%94%E6%A1%88">8. 递进追问与参考答案</a></li><li class="toc-level-2"><a href="#9-%E6%96%B9%E6%A1%88%E5%8F%96%E8%88%8D%E4%B8%8E%E9%AA%8C%E8%AF%81">9. 方案取舍与验证</a></li><li class="toc-level-2"><a href="#10-%E8%B6%85%E5%A4%A7%E5%8D%95%E8%A1%8C-json-%E7%9A%84%E8%AF%BB%E5%8F%96%E4%B8%8E%E4%BF%AE%E6%94%B9%E6%96%B9%E6%A1%88">10. 超大单行 JSON 的读取与修改方案</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

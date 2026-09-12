@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>设计问题与完整案例目录 · Agent 工程课程</title><link rel="stylesheet" href="../../../../assets/site.css"><link rel="stylesheet" href="../../../../assets/course-visual-style.css"><script defer src="../../../../assets/site.js"></script></head><body data-course-root="../../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../../index.html">全部章节</a><a href="../README.html">学习路线</a><a href="../glossary.html">术语表</a><a class="back-link" data-course-back href="../../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">查阅入口</div><article id="main-content"><span class="heading-alias" id="面试设计训练把机制讲清楚画出来写成接口" aria-hidden="true"></span><span class="heading-alias" id="设计与面试练习目录" aria-hidden="true"></span><h1 id="设计问题与完整案例目录">设计问题与完整案例目录</h1>
+<p>第48–62章将前面的机制整理为设计问题、参考接口、结构图和完整案例。第48章解释方案如何展开，第49–61章逐项讲解核心模块和产品设计，第62章组合为三组完整方案。</p>
+<span class="heading-alias" id="先选一条练习路线" aria-hidden="true"></span><h2 id="设计主题">设计主题</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 设计主题"><table><caption>表 1 / Table 1 · 设计主题</caption><thead><tr><th scope="col">主题</th><th scope="col">章节</th><th scope="col">参考方案</th></tr></thead><tbody><tr><td>核心模块设计（Core Components）</td><td>第48章 → 第49章 → 第50章 → 第51章 → 第52章 → 第53章 → 第54章 → 第55章</td><td>整体架构、工具合同、安全恢复、请求组装、压缩与 Memory 图</td></tr>
+<tr><td>回答产品机制比较</td><td><a href="../advanced/README.html">工程主题内的产品对照</a> → 第60章 / 第61章</td><td>在同一个问题上解释产品方案、取舍与适用范围</td></tr>
+<tr><td>协作与系统设计（Collaboration &amp; System Design）</td><td>第56章 → 第57章 → 第58章 → 第59章 → 第62章 综合案例</td><td>调度、委派、文件交付、重连与评估方案</td></tr></tbody></table></div>
+<p>Tool 合同对应 第50章，Context 压缩对应 第54章，Memory 整理与读取对应 第55章；权限、写入竞争和结果未知对应 第51章/第52章。</p>
+<p>机制详解见 <a href="../31-tool-contracts.html">第31章 工具与执行</a>、<a href="../36-context-and-memory.html">第36章 Context 与 Memory</a>、<a href="../39-orchestration-and-continuation.html">第39章协作</a>与<a href="../40-task-evaluation.html">第40章评价</a>。<a href="../47-integrated-design.html">第47章</a>呈现跨模块设计，第62章进一步展示不同任务约束下的完整方案。</p>
+<span class="heading-alias" id="听到问题回到哪篇" aria-hidden="true"></span><h2 id="问题与对应章节">问题与对应章节</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 问题与对应章节"><table><caption>表 2 / Table 2 · 问题与对应章节</caption><thead><tr><th scope="col">编号</th><th scope="col">设计问题</th><th scope="col">图解与实现重点</th><th scope="col">原课程</th></tr></thead><tbody><tr><td><a href="../48-design-answers.html">第48章</a></td><td>怎样组织完整设计解释？</td><td>需求→边界→数据→状态→失败→验证</td><td>第26章</td></tr>
+<tr><td><a href="../49-agent-architecture.html">第49章</a></td><td>从零设计一个 Code Agent</td><td>组件与反馈循环、完成证据</td><td>第11–14章</td></tr>
+<tr><td><a href="../50-tool-contracts.html">第50章</a></td><td>Tool 的接口、粒度和错误怎么设计？</td><td>声明与执行、结果联合类型</td><td>第16章</td></tr>
+<tr><td><a href="../51-file-and-shell-tools.html">第51章</a></td><td>Read/Edit/Bash 怎么实现？</td><td>有界读取、条件修改、进程生命周期</td><td>第16章</td></tr>
+<tr><td><a href="../52-permissions-and-recovery.html">第52章</a></td><td>权限怎么落地，崩溃后能否重做？</td><td>信任边界 Trust Boundary、T1/effect/T2、恢复 Recovery</td><td>第17–18章</td></tr>
+<tr><td><a href="../53-context-composition.html">第53章</a></td><td>下一次模型请求带哪些内容？</td><td>来源 Sources 与预算 Budget、协议单元</td><td>第14–15章</td></tr>
+<tr><td><a href="../54-context-compaction.html">第54章</a></td><td>长上下文怎样压缩与回读？</td><td>prefix/tail、checkpoint、overflow</td><td>第19章</td></tr>
+<tr><td><a href="../55-memory.html">第55章</a></td><td>如何跨会话记住并正确使用？</td><td>写读双链、scope、更新与撤回</td><td>第20章</td></tr>
+<tr><td><a href="../56-tool-scheduling.html">第56章</a></td><td>工具很多或并发调用时怎么调度？</td><td>发现、激活、依赖和冲突</td><td>第16章 深化</td></tr>
+<tr><td><a href="../57-skills-and-subagents.html">第57章</a></td><td>Skill 与子 Agent 怎么选？</td><td>委派 Delegation、上下文/文件隔离 Isolation、产物交回</td><td>第23章</td></tr>
+<tr><td><a href="../58-orchestration-and-continuity.html">第58章</a></td><td>谁触发下一轮，断线后怎样继续？</td><td>控制域、接纳、重连时序</td><td>第24–25章</td></tr>
+<tr><td><a href="../59-evaluation-and-progress.html">第59章</a></td><td>怎样证明改进，怎么检测没进展？</td><td>分层评估、合法重复与停止</td><td>第26章、第39章、第40章</td></tr>
+<tr><td><a href="../60-codex.html">第60章</a></td><td>Codex 的工具、压缩、Memory 怎样做？</td><td>本地源码范围的机制图</td><td>相关设计题 + Codex 深度课</td></tr>
+<tr><td><a href="../61-claude-code.html">第61章</a></td><td>Claude Code 的公开工作方式怎样讲？</td><td>产品能力图、记忆/压缩/委派</td><td>相关设计题 + Claude Code 深度课</td></tr>
+<tr><td><a href="../62-complete-design-cases.html">第62章</a></td><td>不同约束下如何形成完整系统方案？</td><td>三组完整案例、接口与故障推演</td><td>按题组前置</td></tr></tbody></table></div>
+<p><a href="diagram-index.html">设计图解索引</a>可直接定位各题图示。</p>
+<span class="heading-alias" id="每题怎样练" aria-hidden="true"></span><h2 id="参考方案的展开方式">参考方案的展开方式</h2>
+<p>每个设计问题紧接完整参考解答。结构图说明职责与数据流，接口和伪代码说明实现方式，走读表展示具体输入怎样改变状态，追问进一步解释约束变化后的处理。</p>
+<span class="heading-alias" id="怎样表达自己的把握程度" aria-hidden="true"></span><h2 id="方案实现与运行结果">方案、实现与运行结果</h2>
+<p>这一阶段帮助读者理解需求怎样变成接口、状态和失败处理，并比较参考设计的取舍。独立工程实践还涉及编程、部署、故障定位与持续维护；阅读完整答案本身不证明这些能力已经形成。各题直接给出过程和参考方案，可以按主题回查前置机制。</p>
+<p>参考方案是满足题设的一种设计；产品机制以对应公开行为或源码路径为限；运行结果只证明其记录的场景。这三种内容分别标明，避免把教学接口当作产品 API，或把单次结果推广为全部任务的保证。</p>
+<p><a href="../62-complete-design-cases.html">第62章</a>以三组完整案例连接需求、实现与失败处理。</p>
+</article></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E8%AE%BE%E8%AE%A1%E4%B8%BB%E9%A2%98">设计主题</a></li><li class="toc-level-2"><a href="#%E9%97%AE%E9%A2%98%E4%B8%8E%E5%AF%B9%E5%BA%94%E7%AB%A0%E8%8A%82">问题与对应章节</a></li><li class="toc-level-2"><a href="#%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88%E7%9A%84%E5%B1%95%E5%BC%80%E6%96%B9%E5%BC%8F">参考方案的展开方式</a></li><li class="toc-level-2"><a href="#%E6%96%B9%E6%A1%88%E5%AE%9E%E7%8E%B0%E4%B8%8E%E8%BF%90%E8%A1%8C%E7%BB%93%E6%9E%9C">方案、实现与运行结果</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../../index.html">返回课程目录</a><a href="../../../../extended-reading.html">扩展资料说明</a></footer></body></html>

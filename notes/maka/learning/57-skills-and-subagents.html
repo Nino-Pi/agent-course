@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 57 章｜选择 Skills 与子 Agent · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第四部分：设计问题与完整案例 · 57 / 62</div><article id="main-content"><span class="heading-alias" id="i09什么时候用-skill什么时候派子-agent" aria-hidden="true"></span><span class="heading-alias" id="i09选择-skills-与子-agent" aria-hidden="true"></span><span class="heading-alias" id="第-54-章选择-skills-与子-agent" aria-hidden="true"></span><span class="heading-alias" id="第-56-章选择-skills-与子-agent" aria-hidden="true"></span><h1 id="第-57-章选择-skills-与子-agent">第 57 章｜选择 Skills 与子 Agent</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：复用项目方法、独立调查和并行修改，分别应该增加哪一种能力？</p>
+<p><strong>关键概念</strong>：Skill（技能说明）：供当前 Agent 使用的方法；子 Agent：有独立身份与生命周期的执行者；委派合同：明确输入、权限与交付；Worktree（工作副本）：分隔文件修改；采纳：父任务检查并合入产物。</p>
+<p><strong>关系主线</strong>：方法装载改变当前输入，委派另起执行，文件隔离另有合同；子任务结束后仍需定位产物、检查基线和冲突、完成采纳与复测，不能因父文件未变就重做子任务。</p>
+</blockquote>
+<p>前置：<a href="23-skills-and-subagents.html">第23章</a>、<a href="50-tool-contracts.html">第50章</a>、<a href="52-permissions-and-recovery.html">第52章</a>。</p>
+<h2 id="1-原题与约束">1. 原题与约束</h2>
+<blockquote><p>一个任务既要遵守项目规范，又需要独立检查，还可能让两个 Agent 同时改代码。你会怎么设计？</p>
+</blockquote>
+<p>“独立”可以指判断、上下文（Context）、权限（Permissions）或文件隔离（Workspace Isolation），四者不是同一状态。角色扮演提示只改变模型输入，不会自动创建可单独停止和查询的执行者。</p>
+<p>本题父任务负责修复，子任务先只读核对配置与 README；如果升级为并行代码修改，要给子任务明确文件边界和产物验收方式。</p>
+<span class="heading-alias" id="2-两分钟主答" aria-hidden="true"></span><h2 id="2-参考方案">2. 参考方案</h2>
+<blockquote><p>我会先把方法复用和执行委派分开。固定检查步骤适合做成可发现、按需加载的 Skill，加载正文后仍由当前 Agent 使用原有工具执行。需要独立上下文、独立结果或可以并行交付的工作才创建子 Agent。委派时固定目标、输入、权限和输出合同，给它独立身份、生命周期和停止入口。只读检查可以共享同一工作区；并行修改则还要考虑文件隔离，例如独立 worktree。子任务完成只代表交付了结果，父任务仍要核对来源、采纳修改、运行验证。失败时区分执行失败、产物发布失败和父任务未采纳，不能因为父任务没收到消息就重新执行整个修改。最后用单 Agent、并行工具和子 Agent 三种方案比较总成本与交付质量。</p>
+</blockquote>
+<h2 id="3-第一张图两种增强方式">3. 第一张图：两种增强方式</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第一张图：两种增强方式：可滚动示意图"><a href="../../../assets/diagrams/57-skills-and-subagents-1.svg"><img src="../../../assets/diagrams/57-skills-and-subagents-1.svg" alt="父任务按新增需求选择方法复用或独立交付：加载 Skill 改变当前上下文，委派则经过 Host 合同检查产生子任务；子结果返回父任务核对后继续。" width="808" height="1266" loading="lazy" style="width:808px;min-width:687px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>父任务可以复用方法，也可以交出独立工作。Skill 的发现信息、正文装入和实际遵循是三步；子任务的创建、完成、被父任务采纳也是三步。</p>
+<p>本图为职责教学图。各产品 Skill 能否配置子上下文和工具预批准，要看产品合同，不能把教学上的“方法内容”推成所有产品均相同的权限行为。</p>
+<h2 id="4-第二张图修改如何交回">4. 第二张图：修改如何交回</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第二张图：修改如何交回：可滚动示意图"><a href="../../../assets/diagrams/57-skills-and-subagents-2.svg"><img src="../../../assets/diagrams/57-skills-and-subagents-2.svg" alt="父任务提交有界委派，调度器建立子任务身份与工作副本；子任务完成局部修改验证并保存产物后，父任务读取结果、核对基线、采纳修改，并在父工作区集成验证。" width="1078" height="797" loading="lazy" style="width:1078px;min-width:917px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>传输/存储与文件工作区承担不同责任。终态、产物可读、父区应用、验收通过是四个不同里程碑。</p>
+<h2 id="5-最小委派合同">5. 最小委派合同</h2>
+<p>教学结构，非 Maka <code>Task</code> API：</p>
+<pre><code class="language-python">delegation = {
+    &quot;objective&quot;: &quot;核对测试脚本与 README 描述是否一致&quot;,
+    &quot;inputs&quot;: [&quot;package.json&quot;, &quot;README.md&quot;],
+    &quot;allowed_effects&quot;: &quot;read_only&quot;,  # 还必须落实到执行边界
+    &quot;context&quot;: {&quot;mode&quot;: &quot;selected&quot;, &quot;required_constraints&quot;: [&quot;不改文件&quot;]},
+    &quot;workspace&quot;: {&quot;mode&quot;: &quot;shared_read_only&quot;},
+    &quot;result_contract&quot;: [&quot;发现&quot;, &quot;原文位置&quot;, &quot;建议&quot;, &quot;未核对范围&quot;],
+    &quot;limits&quot;: {&quot;deadline&quot;: task_deadline, &quot;max_children&quot;: 0}
+}</code></pre>
+<p>输入要自足，不能只说“你知道刚才的事”。上下文采用选定材料还是完整继承都可以，但必须明确成本、遗漏风险和权限过滤；不同产品和模式可能不同。</p>
+<p>修改型任务把 <code>workspace.mode</code> 改为隔离副本还不够：必须约定它从什么基线开始，如何标识父区已变化，返回 patch、文件还是提交引用，以及父任务怎样处理冲突。这些由真实资源与 Git 工作流保证，不靠字段名字自动实现。</p>
+<h2 id="6-正常与失败走读">6. 正常与失败走读</h2>
+<p>正常：父任务加载文档规范；子任务只读检查返回 <code>npm run check</code> 不存在、真实入口是 <code>npm test</code>，附配置位置；父任务重新核对当前 README 后修改并测试。</p>
+<p>过期观察：父任务在子任务检查期间已改过 README，子任务返回旧文本。该结果能说明观察时状态，不能直接作为现在的编辑基线；父任务应重新读当前文件。</p>
+<p>产物发布失败：子任务修改和局部测试完成，但产物引用无法读取。状态应保留“执行完成、交付未确认”，尝试恢复交付或查询工作副本；不能先把子任务重新跑一遍。</p>
+<p>取消竞争：父任务发出停止时，子任务可能已写文件或已提交结果。取消要求停止后续工作与回收资源，但不自动回滚既有修改。保留已发生效果和最终结算，再决定是否采纳。</p>
+<h2 id="7-递进追问">7. 递进追问</h2>
+<p><strong>两个 Agent 同时改一个文件，用两个 worktree 就不会冲突了吗？</strong></p>
+<p>隔离了执行期间的工作文件，不保证合并结果正确。父任务仍需处理冲突、语义冲突和集成测试。两个补丁都能单独通过测试，也可能组合后失败。</p>
+<p><strong>子任务拿到了父任务全部工具，是否更方便？</strong></p>
+<p>可能减少缺能力问题，也扩大效果范围。根据目标给最小足够能力，并由执行器落实上限；工具名出现在 prompt 不等于限制已执行。上下文共享也不能代替权限授权。</p>
+<p><strong>为什么不用并行工具？</strong></p>
+<p>两个独立 Read 通常不需要新增 Agent。子 Agent 适合独立多步探索、单独评估或避免大量中间信息进入父输入；收益要扣除新上下文、调度、等待与交接成本。</p>
+<p><strong>子任务返回“没问题”可以直接信吗？</strong></p>
+<p>先看检查范围、来源位置、命令与输出。父任务对最终结果负责，不能把子任务文本当超出证据的保证。若任务要求独立验证，要避免子任务只复述父任务结论。</p>
+<h2 id="8-取舍与验证">8. 取舍与验证</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 8. 取舍与验证"><table><caption>表 1 / Table 1 · 8. 取舍与验证</caption><thead><tr><th scope="col">方案</th><th scope="col">适合的问题</th><th scope="col">应测代价</th></tr></thead><tbody><tr><td>技能与单 Agent（Skill）</td><td>方法稳定，工作紧密相关</td><td>是否实际加载并遵循、额外输入</td></tr>
+<tr><td>并行工具（Parallel Tools）</td><td>独立短调用</td><td>失败传播、结果关联、延迟</td></tr>
+<tr><td>子 Agent（Subagent）</td><td>可独立完成的多步任务</td><td>交付质量、父任务整合成本</td></tr>
+<tr><td>子 Agent 与工作副本（Subagent · Worktree）</td><td>并行修改需隔离</td><td>冲突处理、产物可读性、集成验证</td></tr></tbody></table></div>
+<p>四类代表场景是：并行只读、重叠修改、发布中断、父取消与子完成竞争。记录每个身份、有效范围、产物状态和最终采纳结果。整体耗时要包括父任务等待和整合，不能只比较子任务各自运行时间。</p>
+<span class="heading-alias" id="9-自测与回读" aria-hidden="true"></span><h2 id="9-子任务完成但父任务尚未采纳">9. 子任务完成但父任务尚未采纳</h2>
+<p>设 child <code>c7</code> 基于父工作区 v10 创建隔离副本，完成局部修改和测试，保存 completed 终态与产物引用 p7；父工作区已被用户改为 v11。此时能够确认的是 c7 的执行结果，不能确认父区已经包含补丁。</p>
+<p>父任务首先读取 p7。若引用不可用，保留“child 已完成、产物暂不可读”，恢复交付或查询原副本；不新建一个 child 重做。若产物可读，则比较 v10 基线、p7 补丁与当前 v11，保留用户变化后决定是否能合并。存在冲突时停止自动应用，给出具体冲突；不能把旧 patch 直接覆盖当前文件。</p>
+<p>补丁应用成功只是第三个状态，之后还需要父工作区上的集成测试与 diff 检查。child 局部测试通过无法证明合并结果正确。最终交付分别说明 child 终态、产物读取、父区应用和集成验证四项结果。</p>
+<p>相关机制：<a href="23-skills-and-subagents.html">第23章 Skills 与子 Agent</a>。</p>
+<hr>
+<p><a href="56-tool-scheduling.html">上一章：第 56 章｜设计工具发现与调度</a> · <a href="58-orchestration-and-continuity.html">下一章：第 58 章｜设计编排与连续执行</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="56-tool-scheduling.html"><span>← 上一章</span><strong>第 56 章｜设计工具发现与调度</strong></a><a href="58-orchestration-and-continuity.html"><span>下一章 →</span><strong>第 58 章｜设计编排与连续执行</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%8E%9F%E9%A2%98%E4%B8%8E%E7%BA%A6%E6%9D%9F">1. 原题与约束</a></li><li class="toc-level-2"><a href="#2-%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">2. 参考方案</a></li><li class="toc-level-2"><a href="#3-%E7%AC%AC%E4%B8%80%E5%BC%A0%E5%9B%BE%E4%B8%A4%E7%A7%8D%E5%A2%9E%E5%BC%BA%E6%96%B9%E5%BC%8F">3. 第一张图：两种增强方式</a></li><li class="toc-level-2"><a href="#4-%E7%AC%AC%E4%BA%8C%E5%BC%A0%E5%9B%BE%E4%BF%AE%E6%94%B9%E5%A6%82%E4%BD%95%E4%BA%A4%E5%9B%9E">4. 第二张图：修改如何交回</a></li><li class="toc-level-2"><a href="#5-%E6%9C%80%E5%B0%8F%E5%A7%94%E6%B4%BE%E5%90%88%E5%90%8C">5. 最小委派合同</a></li><li class="toc-level-2"><a href="#6-%E6%AD%A3%E5%B8%B8%E4%B8%8E%E5%A4%B1%E8%B4%A5%E8%B5%B0%E8%AF%BB">6. 正常与失败走读</a></li><li class="toc-level-2"><a href="#7-%E9%80%92%E8%BF%9B%E8%BF%BD%E9%97%AE">7. 递进追问</a></li><li class="toc-level-2"><a href="#8-%E5%8F%96%E8%88%8D%E4%B8%8E%E9%AA%8C%E8%AF%81">8. 取舍与验证</a></li><li class="toc-level-2"><a href="#9-%E5%AD%90%E4%BB%BB%E5%8A%A1%E5%AE%8C%E6%88%90%E4%BD%86%E7%88%B6%E4%BB%BB%E5%8A%A1%E5%B0%9A%E6%9C%AA%E9%87%87%E7%BA%B3">9. 子任务完成但父任务尚未采纳</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

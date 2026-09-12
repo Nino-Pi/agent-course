@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 43 章｜Claude Code：子任务、隔离与恢复 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 43 / 62</div><article id="main-content"><span class="heading-alias" id="claude-code-深度课四子任务回收与恢复并行之后谁对结果负责" aria-hidden="true"></span><span class="heading-alias" id="cc04claude-code子任务隔离与恢复" aria-hidden="true"></span><span class="heading-alias" id="第-40-章claude-code子任务隔离与恢复" aria-hidden="true"></span><span class="heading-alias" id="第-42-章claude-code子任务隔离与恢复" aria-hidden="true"></span><h1 id="第-43-章claude-code子任务隔离与恢复">第 43 章｜Claude Code：子任务、隔离与恢复</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：Claude Code 委派调查或实施后，怎样核对背景、工作副本和返回结果，并处理取消与恢复？</p>
+<p><strong>关键概念</strong>：brief（任务说明）：自足的目标与限制；对话分叉：继承选定父背景；worktree（工作副本）：分离文件修改；部分结果：已完成范围与剩余缺口；checkpoint（检查点）：恢复可追踪状态；对账：确认外部效果。</p>
+<p><strong>关系主线</strong>：输入模式与文件隔离分别选择，子任务返回后由父任务采纳并验收；取消不回滚效果，代码恢复、对话恢复和远端补救各走自己的合同。</p>
+</blockquote>
+<p>所属主题：<a href="39-orchestration-and-continuation.html">第39章 协作与恢复</a>；同题对照：<a href="41-codex-memory-and-collaboration.html">Codex 子任务机制</a>；综合设计：<a href="47-integrated-design.html">第47章</a>。</p>
+<p>前置：<a href="42-claude-code-memory-and-skills.html">第42章</a>、<a href="18-effects-and-recovery.html">第18章 恢复</a>、<a href="23-skills-and-subagents.html">第23章 委派</a>。</p>
+<h2 id="1-从-maka-带过来的问题委派不是任务完成">1. 从 Maka 带过来的问题：委派不是任务完成</h2>
+<p>本章另设一轮扫描器扩展任务：检查三个目录的不同文档规范，同时修正参数处理。用户允许父任务修改实现、必要测试与 README，要求保留已有配置改动并禁止上传；子任务只做调查。这里使用这份新任务范围，不继承第38章“不改 README”的情境。适合独立调查的工作变多，但实现文件仍是一份。主任务可以同时安排“找测试入口”“读文档规范”“分析参数流”，自己保留修改和集成测试的责任。</p>
+<p>如果只把目标拆成三个动词，就容易出现三种问题。子任务不知道用户禁止上传；两个子任务都改 <code>scan.py</code>；三个结果都说“完成”，却没人验证组合后的行为。它们分别对应输入缺失、文件冲突、验收缺位。</p>
+<p>因此一次委派应该至少说清对象、必要背景、读写范围、产物和停止条件。使用哪个模型是后续选择；模型能力再强，也不能保证猜中未交代的写入边界；必要范围要在委派和执行能力中明确。</p>
+<h2 id="2-先认清三种输入方式">2. 先认清三种输入方式</h2>
+<p>当前官方文档区分从定义与 brief 开始的 non-fork subagent，以及继承父对话的 conversation fork；Skill 的 <code>context: fork</code> 则由 Skill 内容驱动独立任务。Explore/Plan 有更精简的初始化，省略 CLAUDE.md 与父会话 git 状态；关键规则需要写入委派。对话分叉的可用性受运行方式、版本和配置影响。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 2. 先认清三种输入方式"><table><caption>表 1 / Table 1 · 2. 先认清三种输入方式</caption><thead><tr><th scope="col">选择</th><th scope="col">子任务输入（Input）</th><th scope="col">适用任务</th><th scope="col">最容易遗漏什么</th></tr></thead><tbody><tr><td>非分叉子任务（Non-fork Subagent）</td><td>任务 brief 加自身定义及相应初始化材料</td><td>找一个测试入口、独立阅读模块</td><td>父任务早先的约束和已读内容</td></tr>
+<tr><td>对话分叉（Conversation Fork）</td><td>从创建时的父对话背景分出工作</td><td>检查多轮讨论后的设计一致性</td><td>背景里仍有噪声和过时假设</td></tr>
+<tr><td>技能独立上下文（Skill Context）</td><td>方法正文与调用参数成为任务</td><td>一套重复使用的调查流程</td><td>把它误当完整父历史副本</td></tr></tbody></table></div>
+<p>这张表只解释输入的区别，不规定模型必须按一棵固定决策树选择。任务是否足够自足，是我们可以设计并验证的质量标准。</p>
+<h2 id="3-第一张图上下文和工作区是两条独立轴">3. 第一张图：上下文和工作区是两条独立轴</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第一张图：上下文和工作区是两条独立轴：可滚动示意图"><a href="../../../assets/diagrams/43-claude-code-subagents-and-recovery-1.svg"><img src="../../../assets/diagrams/43-claude-code-subagents-and-recovery-1.svg" alt="父任务先选择自足任务说明或对话分叉作为子任务输入，再独立选择共享目录或 worktree；两种文件方案都将结果交给父任务检查与集成。" width="720" height="1825" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图的上半部选择输入，下半部选择文件工作区。“独立上下文”只确定前一项，不能证明文件不会相互覆盖。官方提供 <code>isolation: worktree</code> 的文件隔离选项，但是否使用它是另一项决定；工作副本的创建、保留和清理仍要按所选模式处理。</p>
+<p>即使两份 worktree 文件分开，它们也可能访问同一个数据库、同一个远端报告系统、同一个机器本地长期背景目录。工作区隔离减少代码写冲突，不等于所有状态都复制出一份。</p>
+<h2 id="4-正常案例父任务保留哪项责任">4. 正常案例：父任务保留哪项责任</h2>
+<p>本课将任务拆成三个只读调查，加一个主任务实施。这是教学方案，不是 Claude Code 默认编排。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 4. 正常案例：父任务保留哪项责任"><table><caption>表 2 / Table 2 · 4. 正常案例：父任务保留哪项责任</caption><thead><tr><th scope="col">工作</th><th scope="col">输入与范围（Input · Scope）</th><th scope="col">输出合同（Output Contract）</th><th scope="col">父任务怎样使用</th></tr></thead><tbody><tr><td>调查 A：测试入口</td><td>测试配置与扫描器测试文件</td><td>入口、实际覆盖、未覆盖用例</td><td>决定执行哪些检查</td></tr>
+<tr><td>调查 B：文档规范</td><td>三个目录的规则与 README</td><td>目录差异、冲突项、适用范围</td><td>选择正确报告和文档内容</td></tr>
+<tr><td>调查 C：参数流</td><td><code>scan.py</code> 及调用者</td><td>参数从入口到下游的变化、可疑步骤</td><td>形成可检验的修复假设</td></tr>
+<tr><td>主任务实施</td><td>三份结果与最新文件</td><td>实现、测试、README 的统一修改</td><td>最终测试、diff 与交付</td></tr></tbody></table></div>
+<p>委派之前，主任务已经确认这些调查互不依赖。调查 A 不需要等待实现改完；但最终功能检查必须等实施结束。并行优化的是独立阅读时间，不能打破实际的数据依赖。</p>
+<p>调查结果到达时，主任务先核对是否对应当前文件和题设。例如调查 C 说“按空格切分造成错误”，主任务应能追到具体数据流；如果结论只是一句可能性，就仍然是假设。调查 A 的测试命令还要在当前环境执行，子任务找到命令不等于检查通过。</p>
+<p>最后进行整体集成验收：普通路径、含空格路径、文档示例与报告输出一致；用户已有配置改动没有被覆盖；禁止上传约束没有失效。父任务应对这项整体验收负责，而不是把三份报告拼起来即交付。</p>
+<span class="heading-alias" id="5-一份可供白板讨论的委派合同" aria-hidden="true"></span><h2 id="5-委派与返回结果的参考合同">5. 委派与返回结果的参考合同</h2>
+<p>下面是<strong>自拟教学类型</strong>，不是 Claude Code Agent 工具 schema。</p>
+<pre><code class="language-ts">type DelegationBrief = {
+  taskId: string;
+  objective: string;
+  requiredContext: string[];
+  readScope: string[];
+  writeScope: string[];
+  deliverables: string[];
+  stopWhen: string[];
+};
+
+type ReturnedWork = {
+  taskId: string;
+  status: &quot;complete&quot; | &quot;partial&quot; | &quot;blocked&quot; | &quot;stopped&quot;;
+  findings: { claim: string; support: string }[];
+  changedFiles: string[];
+  checks: { name: string; outcome: &quot;pass&quot; | &quot;fail&quot; | &quot;not-run&quot; }[];
+  unresolved: string[];
+};</code></pre>
+<p><code>status</code> 表示这项子工作到了哪一步，不代表父目标状态；<code>checks</code> 区分“发现检查入口”和“执行检查”；<code>changedFiles</code> 让只读任务发生意外修改时不能藏在摘要里。即使所有字段存在，仍需要执行器落实权限，并由父任务核实产物。</p>
+<p>对于真实的自定义子任务定义，可以用下面的<strong>公开格式教学例子</strong>理解范围配置：</p>
+<pre><code class="language-markdown">---
+name: scan-inspector
+description: 只读分析扫描器的参数流与相关测试
+tools: Read, Glob, Grep
+maxTurns: 12
+---
+
+围绕委派中的问题读取必要文件。
+说明参数在哪一步变化，并给出当前代码支持的理由。
+不要把尚未运行的测试写成通过。
+无法定位目标时，返回已查范围与缺少的信息。</code></pre>
+<p>选择 Read、Glob、Grep 是为了使本例不承担修改或执行测试的任务。若需要运行检查，必须调整任务与实际能力，而不能要求子任务靠缺失的工具完成。<code>maxTurns</code> 给了有限调查边界，触及上限时应接受部分结果并决定后续，而不是自动认为失败等于无价值。</p>
+<h2 id="6-第二张图从返回消息到接受工作">6. 第二张图：从“返回消息”到“接受工作”</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第二张图：从“返回消息”到“接受工作”：可滚动示意图"><a href="../../../assets/diagrams/43-claude-code-subagents-and-recovery-2.svg"><img src="../../../assets/diagrams/43-claude-code-subagents-and-recovery-2.svg" alt="子任务返回完整或部分结果后，父任务核对范围与证据；缺信息或冲突返回调查，满足子合同后还须整体检查，总目标满足才交付。" width="1021" height="1326" loading="lazy" style="width:1021px;min-width:868px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图里的检查与接受属于本课设计。公开产品可以提供子任务结果回传，但“得到一条完成消息”和“验收通过”是两件事。</p>
+<p>输入不完整时，追加 brief 的目的应是补上具体缺口。例如“排除 vendor 目录，只检查课程样例”，优于“再仔细一点”。发生冲突时，应指出哪条新事实推翻旧假设，避免两个 Agent 反复重复同一结论。</p>
+<p>一个可恢复的子任务还可以继续先前上下文；公开文档同时存在一次性类型与可恢复类型，不能把任意子任务都当成能无限继续的工作进程。使用恢复入口前，需要先确认它保留什么身份和材料，而不是重新启动同名任务就当成同一个实例。</p>
+<h2 id="7-并发冲突与取消的三个推演">7. 并发、冲突与取消的三个推演</h2>
+<p><strong>推演一：两个子任务都改了同一行。</strong> 如果共享目录，后一个操作可能建立在过时观察上。应停止继续叠加修改，读取现态与各方意图，由一个明确责任方整合；如果分开 worktree，则冲突转移到集成阶段，仍需要解决语义一致性。worktree 降低相互覆盖，却不保证两种方案相容。</p>
+<p><strong>推演二：父任务收到用户新约束，子任务还在执行旧 brief。</strong> 新要求不会因存在父上下文就自动证明已送达每个执行中的任务。教学方案是明确传达新范围；必要时停止相关子任务，再检查它已经做了什么。只在父会话里改一行计划，不是传播完成的证明。</p>
+<p><strong>推演三：子任务因预算结束，只完成两个目录。</strong> 返回应是 partial，列清覆盖与未覆盖。父任务可以接受已核实的两部分，再安排第三部分，或报告限制。把所有结果丢弃浪费已得信息；把 partial 直接改成 complete 则误报覆盖。</p>
+<p>三个推演都要求一个稳定概念：<strong>停止控制下一步能否继续，效果检查回答此前发生了什么。</strong> 无论产品界面是否能停止任务，都不能据此推断远端效果撤销或本地文件恢复。</p>
+<h2 id="8-checkpoint-的恢复对象必须讲具体">8. Checkpoint 的恢复对象必须讲具体</h2>
+<p>Claude Code 的 checkpoint 提供会话层面的文件撤回选择，<code>/rewind</code> 可选择恢复代码、恢复对话或整理部分对话。覆盖有明确边界：直接文件编辑、Bash 修改、其他子任务和外部修改不具有相同追踪保证；前台运行的 forked Skill 有特定例外，其他子任务编辑通常不被主会话 rewind 恢复。链接文件及快照保留也有限制。</p>
+<p>恢复涉及两个独立坐标：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 8. Checkpoint 的恢复对象必须讲具体"><table><caption>表 3 / Table 3 · 8. Checkpoint 的恢复对象必须讲具体</caption><thead><tr><th scope="col">选择</th><th scope="col">对话状态（Conversation State）</th><th scope="col">文件状态（File State）</th><th scope="col">恢复检查（Recovery）</th></tr></thead><tbody><tr><td>只恢复对话（Conversation Recovery）</td><td>回到较早讨论点</td><td>保留当前文件</td><td>旧叙述与现有代码是否冲突</td></tr>
+<tr><td>只恢复代码（Code Recovery）</td><td>保留后续讨论</td><td>在支持范围内恢复</td><td>历史里的“已修”是否已失效</td></tr>
+<tr><td>同时恢复（Combined Recovery）</td><td>两者都尝试回到选定点</td><td>仅覆盖可追踪的文件</td><td>外部效果和未追踪修改仍需查</td></tr>
+<tr><td>整理对话（Compaction）</td><td>用较短材料继续</td><td>文件不因摘要而恢复</td><td>关键任务状态是否仍可理解</td></tr></tbody></table></div>
+<p>当只恢复代码时，会话里可能还保留“空格路径测试通过”的旧结果，而当前代码已经回退。那条测试证据仍属于当时被测试的内容，不能直接证明当前文件。反过来，只恢复对话时，模型可能再次提出已经实施过的修改，因此必须先重读文件。</p>
+<h2 id="9-第三张图恢复后重新建立可信起点">9. 第三张图：恢复后重新建立可信起点</h2>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="第三张图：恢复后重新建立可信起点：可滚动示意图"><a href="../../../assets/diagrams/43-claude-code-subagents-and-recovery-3.svg"><img src="../../../assets/diagrams/43-claude-code-subagents-and-recovery-3.svg" alt="错误修改或停止要求先阻止新动作，再核对文件和外部效果；代码、会话和外部补救各有恢复路径，汇合后重读状态、更新任务并验证。" width="876" height="1520" loading="lazy" style="width:876px;min-width:745px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这是一份参考恢复流程，不是声称 Claude Code 内部采用这套持久状态机。尤其不能从“会话可以恢复”推导日志、工具效果和远端请求之间有原子事务。</p>
+<p>对于扫描器，若误改文件来自主会话直接编辑，可按产品支持范围考虑 rewind，然后看 diff；若子任务通过 Bash 删除了文件，则需要其他恢复来源；若远端报告已发布，需要远端查询和撤回能力。三者不能共享一条“点击撤销 → 世界回到原状”的箭头。</p>
+<span class="heading-alias" id="10-若由我实现怎样闭合远端效果未知" aria-hidden="true"></span><h2 id="10-远端效果未知的完整参考处理">10. 远端效果未知的完整参考处理</h2>
+<p>假设任务变成“检查后创建远端工单”。发送请求后超时，父任务不知道是否创建成功。文件 checkpoint 对这个问题没有帮助。</p>
+<p>课程方案是给业务动作稳定身份，记录已发出与结果已知的区别；恢复时先查询远端是否存在对应对象，再决定重试。远端若支持幂等键，应把同一逻辑动作绑定同一键；若不支持，就承认查询与重试之间仍可能有竞争窗口，必要时交由人工核对。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="远端效果未知的完整参考处理：可滚动示意图"><a href="../../../assets/diagrams/43-claude-code-subagents-and-recovery-4.svg"><img src="../../../assets/diagrams/43-claude-code-subagents-and-recovery-4.svg" alt="远端请求发出后可能得到已知或未知结果；未知时围绕原操作查询，找到对象则接受既有结果，证实未发生才在合同允许时重试，无法判断仍报告未知。" width="891" height="961" loading="lazy" style="width:891px;min-width:758px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>这是一份针对远端效果未知的设计方案，不是 Claude Code 内部恢复实现的描述。</p>
+<h2 id="11-什么时候值得委派">11. 什么时候值得委派</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 11. 什么时候值得委派"><table><caption>表 4 / Table 4 · 11. 什么时候值得委派</caption><thead><tr><th scope="col">情况</th><th scope="col">更合适的起点</th><th scope="col">原因</th><th scope="col">要评价的成本</th></tr></thead><tbody><tr><td>很短的单文件修改</td><td>主任务直接完成</td><td>交接可能比工作本身更重</td><td>调用与解释开销</td></tr>
+<tr><td>独立、大量只读调查</td><td>自足 brief 子任务</td><td>可隔离观察噪声并行阅读</td><td>漏背景与摘要损失</td></tr>
+<tr><td>依赖长讨论的一致性检查</td><td>在可用条件下考虑对话分叉</td><td>减少手工重述重要背景</td><td>复制噪声、继承旧假设</td></tr>
+<tr><td>并行尝试互斥实现</td><td>分开文件工作区</td><td>减少直接覆盖</td><td>集成与合并成本</td></tr>
+<tr><td>多步骤外部写入</td><td>先建立动作和恢复合同</td><td>分工不能替代效果管理</td><td>对账、重试、取消和补救</td></tr></tbody></table></div>
+<p>评价时看整项任务的正确性、总时间、总成本和整合错误。主上下文变小只是一个局部指标；如果父任务要花更多轮纠正遗漏，委派可能得不偿失。</p>
+<span class="heading-alias" id="12-自测与完整参考答案" aria-hidden="true"></span><h2 id="12-常见场景与完整参考方案">12. 常见场景与完整参考方案</h2>
+<p><strong>题一：有独立上下文，为什么仍可能互相覆盖代码？</strong></p>
+<p>参考答案：上下文决定模型看到什么，工作区决定操作哪份文件。两个独立上下文仍可共享目录。必须明确只读范围、分工或选择独立 worktree，并在集成时处理语义冲突。</p>
+<p><strong>题二：Explore 子任务漏掉项目规则，最先检查什么？</strong></p>
+<p>参考答案：检查它实际的初始化和委派内容，而不是假设父任务所有材料都继承。对于必须约束调查的规则，把它写进 brief；最终父任务仍在完整任务背景下验收结果。</p>
+<p><strong>题三：三个子任务都返回 complete，父任务能直接宣布完成吗？</strong></p>
+<p>参考答案：先检查各子任务合同、实际覆盖和未运行检查，再进行组合后的整体验收。子任务 complete 只代表其自身声明的结束状态，不能代替总目标判断。</p>
+<p><strong>题四：用户取消后如何交付状态？</strong></p>
+<p>参考答案：说明已停止或仍待确认的执行，列出已发生修改、已获得结果和未知效果。不继续旧目标下的相关动作；是否恢复文件或补救远端操作要看用户意图与可用能力。取消不能自动证明没有副作用。</p>
+<p><strong>题五：只恢复代码后，之前的测试通过还能用吗？</strong></p>
+<p>参考答案：它仅证明当时被测状态。恢复改变了文件，要检查是否仍是相同代码和运行条件；若不是，重新运行相关检查。会话里出现通过记录，不足以证明当前文件正确。</p>
+<p><strong>题六：哪些内部问题本课不能替 Claude Code 回答？</strong></p>
+<p>参考答案：工具效果与日志的原子顺序、远端动作的 exactly-once 保证、完整取消传播协议、压缩选择器以及所有子任务组合的恢复语义。可以提出自己的设计，但不能将设计名词写成已公开产品事实。</p>
+<p><strong>可恢复的并行扫描器：完整参考结果。</strong></p>
+<p>输入为三个目录的规范、测试配置和当前 <code>scan.py</code>；约束是禁止上传、子任务只读、父任务负责修改。A/B/C 分别调查测试、目录规则和参数流，工具为 Read/Glob/Grep，返回位置、判断依据、覆盖缺口与检查状态。父任务确认三份结果对应当前文件后，统一实施，再检查普通路径、含空格路径、文档和输出的一致性。</p>
+<p>给定 B 到达预算时只查完两个目录，它返回 <code>partial</code>，保留两个目录的结论并列出第三目录未查；没有执行测试的 A/C 把相应检查列为 <code>not-run</code>。若父任务实际运行测试得到失败，则记录该检查 <code>fail</code>，不能因三份调查已结束就宣告修复通过。这里是给定条件下的参考交付，不是一次产品运行报告。</p>
+<p>若用户此时取消，父任务停止接纳新的相关动作并传播停止要求，保留已写文件及仍待确认的执行状态；本地追踪文件按支持范围考虑恢复，远端工单则按原业务身份查询。无法确认的远端结果仍为未知。若改用并行实施，独立 worktree 只能把文件冲突推迟到整合，父任务仍需检查语义冲突并复测。</p>
+<p>更多完整场景见 <a href="61-claude-code.html">第61章 Claude Code 机制设计</a>与<a href="62-complete-design-cases.html">第62章 综合案例</a>。其中分别标明产品公开支持的操作和为更强恢复要求增加的参考设计。</p>
+<hr>
+<p><a href="42-claude-code-memory-and-skills.html">上一章：第 42 章｜Claude Code：记忆、规则与 Skills</a> · <a href="44-checkpoints-and-replay.html">下一章：第 44 章｜检查点、重放与工作流恢复</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="42-claude-code-memory-and-skills.html"><span>← 上一章</span><strong>第 42 章｜Claude Code：记忆、规则与 Skills</strong></a><a href="44-checkpoints-and-replay.html"><span>下一章 →</span><strong>第 44 章｜检查点、重放与工作流恢复</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E4%BB%8E-maka-%E5%B8%A6%E8%BF%87%E6%9D%A5%E7%9A%84%E9%97%AE%E9%A2%98%E5%A7%94%E6%B4%BE%E4%B8%8D%E6%98%AF%E4%BB%BB%E5%8A%A1%E5%AE%8C%E6%88%90">1. 从 Maka 带过来的问题：委派不是任务完成</a></li><li class="toc-level-2"><a href="#2-%E5%85%88%E8%AE%A4%E6%B8%85%E4%B8%89%E7%A7%8D%E8%BE%93%E5%85%A5%E6%96%B9%E5%BC%8F">2. 先认清三种输入方式</a></li><li class="toc-level-2"><a href="#3-%E7%AC%AC%E4%B8%80%E5%BC%A0%E5%9B%BE%E4%B8%8A%E4%B8%8B%E6%96%87%E5%92%8C%E5%B7%A5%E4%BD%9C%E5%8C%BA%E6%98%AF%E4%B8%A4%E6%9D%A1%E7%8B%AC%E7%AB%8B%E8%BD%B4">3. 第一张图：上下文和工作区是两条独立轴</a></li><li class="toc-level-2"><a href="#4-%E6%AD%A3%E5%B8%B8%E6%A1%88%E4%BE%8B%E7%88%B6%E4%BB%BB%E5%8A%A1%E4%BF%9D%E7%95%99%E5%93%AA%E9%A1%B9%E8%B4%A3%E4%BB%BB">4. 正常案例：父任务保留哪项责任</a></li><li class="toc-level-2"><a href="#5-%E5%A7%94%E6%B4%BE%E4%B8%8E%E8%BF%94%E5%9B%9E%E7%BB%93%E6%9E%9C%E7%9A%84%E5%8F%82%E8%80%83%E5%90%88%E5%90%8C">5. 委派与返回结果的参考合同</a></li><li class="toc-level-2"><a href="#6-%E7%AC%AC%E4%BA%8C%E5%BC%A0%E5%9B%BE%E4%BB%8E%E8%BF%94%E5%9B%9E%E6%B6%88%E6%81%AF%E5%88%B0%E6%8E%A5%E5%8F%97%E5%B7%A5%E4%BD%9C">6. 第二张图：从“返回消息”到“接受工作”</a></li><li class="toc-level-2"><a href="#7-%E5%B9%B6%E5%8F%91%E5%86%B2%E7%AA%81%E4%B8%8E%E5%8F%96%E6%B6%88%E7%9A%84%E4%B8%89%E4%B8%AA%E6%8E%A8%E6%BC%94">7. 并发、冲突与取消的三个推演</a></li><li class="toc-level-2"><a href="#8-checkpoint-%E7%9A%84%E6%81%A2%E5%A4%8D%E5%AF%B9%E8%B1%A1%E5%BF%85%E9%A1%BB%E8%AE%B2%E5%85%B7%E4%BD%93">8. Checkpoint 的恢复对象必须讲具体</a></li><li class="toc-level-2"><a href="#9-%E7%AC%AC%E4%B8%89%E5%BC%A0%E5%9B%BE%E6%81%A2%E5%A4%8D%E5%90%8E%E9%87%8D%E6%96%B0%E5%BB%BA%E7%AB%8B%E5%8F%AF%E4%BF%A1%E8%B5%B7%E7%82%B9">9. 第三张图：恢复后重新建立可信起点</a></li><li class="toc-level-2"><a href="#10-%E8%BF%9C%E7%AB%AF%E6%95%88%E6%9E%9C%E6%9C%AA%E7%9F%A5%E7%9A%84%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E5%A4%84%E7%90%86">10. 远端效果未知的完整参考处理</a></li><li class="toc-level-2"><a href="#11-%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E5%80%BC%E5%BE%97%E5%A7%94%E6%B4%BE">11. 什么时候值得委派</a></li><li class="toc-level-2"><a href="#12-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8F%82%E8%80%83%E6%96%B9%E6%A1%88">12. 常见场景与完整参考方案</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

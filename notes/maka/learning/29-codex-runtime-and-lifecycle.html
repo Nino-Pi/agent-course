@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 29 章｜Codex：运行时与任务生命周期 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第三部分：工程设计、代表实现与综合 · 29 / 62</div><article id="main-content"><span class="heading-alias" id="codex-深度一一次任务怎样开始推进被打断并继续" aria-hidden="true"></span><span class="heading-alias" id="cx01codex运行时与任务生命周期" aria-hidden="true"></span><span class="heading-alias" id="第-27-章codex运行时与任务生命周期" aria-hidden="true"></span><h1 id="第-29-章codex运行时与任务生命周期">第 29 章｜Codex：运行时与任务生命周期</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：用户中途改要求、停止工作或关闭连接时，Codex 的输入与执行怎样分别变化？</p>
+<p><strong>关键概念</strong>：Thread（会话）：持续工作的上下文容器；请求接纳：确认输入去向；步骤快照：本步固定的配置与工具视图；steering（中途输入）：在允许边界进入后续决策；取消：传递停止请求并收束执行；连接资源：按连接管理的命令进程。</p>
+<p><strong>关系主线</strong>：应用服务层将请求交给执行内核，接纳后的输入按步骤消费；终态、效果结算与连接资源清理各有边界，不能由关闭窗口互相推断。</p>
+</blockquote>
+<p>所属主题：<a href="28-system-design.html">第28章 架构与生命周期</a>；同题对照：<a href="30-claude-code-loop-and-context.html">Claude Code 循环</a>。</p>
+<p>贯穿案例是修复一个 Python 文档检查器。用户最初要求“修复带空格的路径处理，更新 README，并运行相关测试”；模型读取代码期间，用户补充“仅修改检查器，暂时不要改 README”；测试还没结束，用户又要求停止。我们逐步推导这三句话怎样影响运行。</p>
+<p>本章讲的是本地源码中经 app-server 进入 core 的一条路径。其他宿主可以复用 core，也可能采用不同的接线。这里的接口片段是教学模型，不是可复制调用的产品 API。</p>
+<p>与 <a href="25-host-and-client.html#%E4%B8%80%E6%AC%A1-turnstart%E8%AF%B7%E6%B1%82%E8%BF%94%E5%9B%9E%E5%90%8E%E8%B0%81%E7%BB%A7%E7%BB%AD%E6%B6%88%E8%B4%B9%E5%B7%A5%E4%BD%9C">第25章 Host</a>的连接问题对照时，需要区分三项机制：请求接纳、<a href="#%E5%90%8C%E4%B8%80%E6%96%AD%E7%BA%BF%E9%97%AE%E9%A2%98thread-%E4%B8%8E%E8%BF%9E%E6%8E%A5%E6%8B%A5%E6%9C%89%E7%9A%84%E8%BF%9B%E7%A8%8B%E5%90%84%E8%87%AA%E6%80%8E%E6%A0%B7%E6%94%B6%E5%B0%BE">连接资源的 owner</a>与<a href="#desktop-%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%89%AF%E6%9C%AC%E4%B8%8E-web-%E7%9A%84%E6%89%98%E7%AE%A1%E8%BF%9B%E7%A8%8B%E9%83%A8%E7%BD%B2%E6%9D%A1%E4%BB%B6%E4%B9%9F%E5%B1%9E%E4%BA%8E%E9%A2%98%E7%9B%AE">部署条件</a>。</p>
+<h2 id="1-先拆开工作身份执行状态和显示内容">1. 先拆开工作身份、执行状态和显示内容</h2>
+<p>一个客户端很容易写出这样的代码：收到用户输入就启动模型，收到 token 就追加到聊天框，遇到工具调用就在前端执行。如果用户永远只开一个窗口、一次只发一个要求，而且程序永不退出，这个方案能够演示基本循环。复杂性从“同一个任务还有别的观察者和控制者”开始。</p>
+<p>Codex 的 app-server 协议用 Thread、Turn、Item 描述工作。Thread 标识一段可继续的对话；Turn 是一次工作过程；Item 是过程中的消息、命令、文件变化或其他可观察单元。执行内核中的 Session 则持有活跃任务、输入队列和历史等运行状态。它们分别回答不同问题。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 1. 先拆开工作身份、执行状态和显示内容"><table><caption>表 1 / Table 1 · 1. 先拆开工作身份、执行状态和显示内容</caption><thead><tr><th scope="col">对象</th><th scope="col">它回答的问题</th><th scope="col">贯穿案例中的内容</th><th scope="col">不能从它推出什么</th></tr></thead><tbody><tr><td>会话（Thread）</td><td>后续输入属于哪段对话？</td><td>检查器修复对话</td><td>这个对话此刻一定正在运行</td></tr>
+<tr><td>工作轮（Turn）</td><td>哪一轮工作接纳了输入？</td><td>修复路径处理这一轮</td><td>只调用过一次模型</td></tr>
+<tr><td>过程项（Item）</td><td>本轮发生了什么可观察步骤？</td><td>读文件、执行测试、输出结论</td><td>每个 Item 都是独立用户任务</td></tr>
+<tr><td>运行会话（Session）</td><td>此刻谁管理输入和活跃执行？</td><td>运行中的 core 会话</td><td>内存状态已经全部持久化</td></tr>
+<tr><td>步骤上下文快照（Step snapshot）</td><td>这次模型请求使用什么环境和能力？</td><td>当前工具、权限、世界状态</td><td>后续请求永远沿用同一配置</td></tr></tbody></table></div>
+<p>Maka 的 Session/Turn/Run 强调执行生命周期；Codex 的 Thread/Turn/Item 同时承担产品观察协议。迁移时应该对照责任，而不是把名称直接替换。例如 Codex 的一次 Turn 可以包含多次模型请求、多次工具执行和一次中途压缩，不能机械地把它当成 Maka 的某一次模型调用。</p>
+<h2 id="2-从协议到内核请求被接纳与工作完成有两次确认">2. 从协议到内核：请求被接纳与工作完成有两次确认</h2>
+<p>下图区分请求接纳与后续执行。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从协议到内核：请求被接纳与工作完成有两次确认：可滚动示意图"><a href="../../../assets/diagrams/29-codex-runtime-and-lifecycle-1.svg"><img src="../../../assets/diagrams/29-codex-runtime-and-lifecycle-1.svg" alt="客户端经 app-server 将输入交给 core Session；输入队列和本步快照共同构造模型请求，工具观察回到历史，执行记录与进度终态分别保存和发布。" width="867" height="1691" loading="lazy" style="width:867px;min-width:737px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>客户端先初始化协议，再创建或恢复 Thread，然后提交工作。请求的即时响应解决“服务器是否接纳这次提交”；之后的进度与终态通知解决“这轮工作实际怎样发展”。如果把二者合并，客户端就容易在请求返回时显示“完成”，但测试可能尚未开始。</p>
+<p>以最初的修复任务为例：</p>
+<ol>
+<li>客户端提交输入和目标 Thread。服务端检查输入与线程状态，并把工作交给 core。</li>
+<li>core 判断可以开始新 Turn，还是应该把输入加入已运行的 Turn，或当前状态不允许提交。</li>
+<li>新工作启动后，core 准备当轮状态，接纳输入并经过输入相关 hooks。</li>
+<li>本步确定执行环境、工具表面和权限，组装模型请求。</li>
+<li>模型输出读取文件的动作，runtime 执行并写回观察。</li>
+<li>执行状态、预算等继续条件允许时，根据模型延续需求或已接纳输入进入后续步骤。</li>
+<li>工作结束或被打断后，客户端收到该 Turn 的最终状态。</li>
+</ol>
+<p>接纳结果分为 <strong>Started、Steered、NotSubmitted</strong>：Started 表示开始新 Turn，Steered 表示输入交给已运行的 Turn；NotSubmitted 表示没有记录或排队接纳该输入，调用者不能将它视为等待模型回复；明确这一区别，才能判断是否重新提交。</p>
+<h2 id="3-为什么每一步要抓取同一份上下文快照">3. 为什么每一步要抓取同一份上下文快照</h2>
+<p>假设 UI 刚把写权限收窄，同时一个 MCP 工具发生变化。若工具声明来自时刻 A、执行 registry 来自时刻 B、权限读取又来自时刻 C，模型看到的合同与实际执行环境可能不一致。</p>
+<p>本地 Codex 主循环在一个 step 中抓取上下文，让上下文、模型可见工具和工具调用共享本次请求视图。随后把 world state（本步环境与配置背景）的变化记录到历史，投影适合模型输入模态的 history，再执行采样。<code>StepContext</code> 明确持有当次解析后的设置、MCP binding 和 ToolRouter；后续设置刷新不会追溯改写已发请求的解释。这种快照不是把整个进程冻结，而是给本次请求一个清楚的解释边界。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 3. 为什么每一步要抓取同一份上下文快照"><table><caption>表 2 / Table 2 · 3. 为什么每一步要抓取同一份上下文快照</caption><thead><tr><th scope="col">时点</th><th scope="col">输入（Input）</th><th scope="col">本步动作（Action）</th><th scope="col">产生的结果</th></tr></thead><tbody><tr><td>采样前</td><td>已接纳的用户输入、当前环境</td><td>处理输入与 hooks，抓取 step 上下文</td><td>本步配置与能力视图</td></tr>
+<tr><td>请求构造</td><td>当前 history、world state、工具计划</td><td>更新上下文片段，生成请求</td><td>模型真正收到的输入</td></tr>
+<tr><td>采样中</td><td>模型输出流</td><td>展示增量、识别工具调用</td><td>文本进度或待执行调用</td></tr>
+<tr><td>执行后</td><td>工具结果与 pending input</td><td>判断是否需要后续采样</td><td>下一步或收尾</td></tr>
+<tr><td>窗口不足</td><td>预算状态、继续需求</td><td>进入适用的上下文处理分支</td><td>新窗口中的继续工作</td></tr></tbody></table></div>
+<p>这里的权衡是：逐步抓取能够在步骤之间吸收更新；本步一致性又避免声明与执行随意错配。它不表示用户刚点权限按钮，已经发到外部系统的请求就会自动撤回。对在途动作仍需要独立的取消和效果判断。</p>
+<h2 id="4-用户补充要求steering-是排队输入不是改写已经执行的过去">4. 用户补充要求：steering 是排队输入，不是改写已经执行的过去</h2>
+<p>现在用户在读文件时补充：“仅修改检查器，暂时不要改 README。”这不是一个新项目，也不一定需要关闭当前工作重新开始。steering 表示把新输入交给正在进行的正常 Turn。</p>
+<p>本地循环会在允许的步骤边界读取 pending input，经过输入处理后写入历史，再生成后续模型请求。它有两个明确的排序考虑：新 Turn 的原始输入先被采样；中途压缩后，如果模型或工具的延续需要先恢复，steering 可能暂缓到之后读取。因此“接纳了补充要求”与“当前在途采样已看到补充要求”有时间差。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="用户补充要求：steering 是排队输入，不是改写已经执行的过去：可滚动示意图"><a href="../../../assets/diagrams/29-codex-runtime-and-lifecycle-2.svg"><img src="../../../assets/diagrams/29-codex-runtime-and-lifecycle-2.svg" alt="初始要求以 Started 开新 Turn，中途约束以 Steered 入队；当前步骤结果返回后，允许的步骤边界才取新输入，后续请求按新约束工作。" width="1332" height="1015" loading="lazy" style="width:1332px;min-width:1133px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>补充约束在图示边界进入后续请求。如果 README 已经在补充输入到达前修改，正确后续可能是识别已有改动、说明情况并按最新意图处理；不能把历史伪装成从未修改。</p>
+<p>显式 steer 还携带预期的活跃 Turn 身份。如果用户界面显示的是旧 Turn，但服务端已经完成旧工作、开始另一轮，带身份的检查可以拒绝误投。这样的接口避免“检查当前忙不忙，再另发输入”的时间竞争。</p>
+<p>教学上可以写成：</p>
+<pre><code class="language-typescript">type SubmitResult =
+  | { kind: &quot;started&quot;; turnId: string }
+  | { kind: &quot;steered&quot;; turnId: string }
+  | { kind: &quot;not_submitted&quot;; reason: string };
+
+type InputIntent =
+  | { mode: &quot;start_or_steer&quot;; text: string }
+  | { mode: &quot;steer&quot;; expectedTurnId: string; text: string };
+
+// 教学接口：状态判断与接纳应位于同一个负责执行权的组件。
+async function submit(intent: InputIntent): Promise&lt;SubmitResult&gt; {
+  return owner.acceptInput(intent);
+}</code></pre>
+<p>这段代码刻意不让客户端先 <code>isRunning()</code> 再决定调用哪个底层函数。两个请求之间状态可以改变，把选择交给 owner 才能给出有意义的接纳结果。</p>
+<h2 id="5-取消停止继续推进需要按执行阶段判断已经发生的效果">5. 取消：停止继续推进，需要按执行阶段判断已经发生的效果</h2>
+<p>用户点击停止时，协议请求的是取消指定 Turn。内核向任务传播 cancellation token，并进入任务中止与清理流程。相关代码还注意一个顺序：让任务先观察取消，再清除等待中的批准，避免原本是用户打断，却被误投影为模型收到了一次权限拒绝。</p>
+<p>但取消不等于事务回滚。它至少涉及四种不同情况。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 5. 取消：停止继续推进，需要按执行阶段判断已经发生的效果"><table><caption>表 3 / Table 3 · 5. 取消：停止继续推进，需要按执行阶段判断已经发生的效果</caption><thead><tr><th scope="col">取消发生的位置</th><th scope="col">可合理期待的行为</th><th scope="col">仍要单独检查的事实</th></tr></thead><tbody><tr><td>等模型响应</td><td>停止等待或继续采样</td><td>外部服务是否已计算、是否已计费</td></tr>
+<tr><td>等用户批准</td><td>结束在途等待，输出正确的中止语义</td><td>等待结果是否被误当作拒绝</td></tr>
+<tr><td>文件修改后</td><td>停止后续工作，保留已发生事实</td><td>文件内容、是否需要按用户意图恢复</td></tr>
+<tr><td>后台终端运行中</td><td>结束该 Turn 的推进</td><td>终端进程是否仍存活</td></tr></tbody></table></div>
+<p>app-server 协议明确将 Turn 中断与后台终端清理区分开。由此可见，UI 上“已停止”必须说明停止的是哪一种活动。对应的状态模型把 <code>cancel_requested</code>、执行已结束、外部效果状态分开保存；单个 UI 布尔值无法表达这些组合。</p>
+<p>同样，客户端收到取消请求的即时成功响应后，应继续观察终态通知，以确认该 Turn 的中断流程已经结束。否则用户可能立即发起第二个具有冲突副作用的任务，而第一轮尚未完全停止。</p>
+<h2 id="6-继续对话恢复历史迁移执行权是三个动作">6. 继续对话、恢复历史、迁移执行权，是三个动作</h2>
+<p>继续对话通常需要恢复已存的 Thread 和历史，再开始后续工作。它不意味着把程序栈、socket 和每一个等待对象原样搬回来。Codex 的历史重建代码会寻找仍然有效的压缩 checkpoint，再按顺序重放幸存的尾部记录，同时恢复上下文基线与窗口等元数据。</p>
+<p>本地还存在只在空闲时恢复原 Turn 身份的入口，以及为执行权转交准备的 suspend/shutdown 路径。后者强调执行停止、历史 flush 和 writer 关闭后，才算满足转交前提；对于排队输入、批准等等待对象，不能据此宣称强保证。这是一个比“断线后重新连接”更严格的问题。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 6. 继续对话、恢复历史、迁移执行权，是三个动作"><table><caption>表 4 / Table 4 · 6. 继续对话、恢复历史、迁移执行权，是三个动作</caption><thead><tr><th scope="col">动作</th><th scope="col">目标</th><th scope="col">要恢复或确认什么</th></tr></thead><tbody><tr><td>客户端重新订阅</td><td>重新看到工作</td><td>当前运行状态与可读取记录</td></tr>
+<tr><td>恢复 Thread</td><td>继续已有对话</td><td>history、上下文基线与配置等</td></tr>
+<tr><td>恢复未完成 Turn</td><td>延续原工作身份</td><td>原 Turn 的存储事实与可接纳条件</td></tr>
+<tr><td>转交执行 owner</td><td>让另一个 worker 接手</td><td>原执行已停止、写入已收束、接管点明确</td></tr></tbody></table></div>
+<p>恢复历史与恢复执行权需要不同机制。历史文件存在，不证明后台作业都可冷恢复；各执行入口的寿命和清理条件仍需分别判断。</p>
+<h3 id="同一断线问题thread-与连接拥有的进程各自怎样收尾">同一断线问题：Thread 与连接拥有的进程各自怎样收尾</h3>
+<p>把贯穿案例的最后一个条件改为“测试尚在运行，客户端连接关闭”，先不额外发送取消。下面按 app-server 的资源管理路径推演。仅说“命令在后台”信息不足：它可能是 core Turn 中的一次工具调用，也可能是客户端通过 <code>command/exec</code> 或 <code>process/*</code> 单独建立的资源。相同命令文字不赋予相同寿命。</p>
+<p>这里 active 按源码跟踪的 <code>ThreadStatus::Active</code> 判断，是执行状态，不是“有人订阅”的别名。连接清理由 <code>connection_closed</code> 进入：先关闭这条连接的 RPC 接纳门，等待有界收束，再分别清理输出、文件系统、命令/进程与 Thread 观察关系。<strong>这里按资源 owner 清理，没有一个把所有活动同时改成 cancelled 的通用动作。</strong></p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 同一断线问题：Thread 与连接拥有的进程各自怎样收尾"><table><caption>表 5 / Table 5 · 同一断线问题：Thread 与连接拥有的进程各自怎样收尾</caption><thead><tr><th scope="col">资源与所读 owner</th><th scope="col">连接关闭时实际走的分支</th><th scope="col">对当前测试能说到哪里</th></tr></thead><tbody><tr><td>普通 Thread 的连接/订阅关系</td><td><code>remove_connection</code> 删除反向索引、更新是否仍有连接；Thread 的 <code>connection_closed</code> 处理不普遍取消活跃 Turn</td><td>少了观察者不等于 Turn 已结束；工具进程仍需按对应 core 工具合同判断</td></tr>
+<tr><td>没有订阅者且非 active 的 Thread</td><td><code>UnloadingState</code> 才安排延迟卸载；卸载前处理无法再回答的 callbacks、等待 shutdown，再核对 runtime identity 才移除</td><td>空闲回收可释放内存；不能把活跃任务仅因无人观察就归入同一卸载条件，也不能让迟到卸载删掉新 runtime</td></tr>
+<tr><td>连接拥有的 <code>command/exec</code></td><td>按 connectionId 移除 handle，向 active session 发送 Terminate</td><td>该连接断开会触发终止控制；不是“所有后台命令自动继续”，发出终止请求也不等于已确认进程退出</td></tr>
+<tr><td>连接拥有的 <code>process/*</code></td><td><code>ProcessExecManager::connection_closed</code> 对所属 process 发送 Kill</td><td>应进一步确认进程结果与已发生文件变化；发 Kill 不回滚已有副作用</td></tr></tbody></table></div>
+<p>因此这个问题要拆成两次查询：<strong>执行对象是否仍 active，以及具体进程由谁拥有、是否已接受终止控制或报告结果。</strong> 保存了 Thread history 能帮助恢复观察，不证明一个连接拥有的命令也被接回。反过来，某个 command/exec 被终止，也不能推导所有 Thread 都被取消。</p>
+<p>与 第25章 的 H/W/V/E 对照：一个观察连接可以消失，W 仍由执行 owner 管理；但当 E 本来属于该连接，连接释放会主动改变 E。这样设计能避免失去调用者的进程无限占用资源，代价是客户端不能把连接断开当作无影响事件。需要跨连接持续任务时，应选择具有明确持久身份、查询和接手合同的执行入口，而不是只把命令放到“后台”。</p>
+<h3 id="desktop-的工作副本与-web-的托管进程部署条件也属于题目">Desktop 的工作副本与 Web 的托管进程：部署条件也属于题目</h3>
+<p>官方介绍的 App Server 架构包含两种部署：本地 App/IDE 通常启动一个长期子 App Server，用 stdio 交互；Web 则由 worker 在容器内启动 App Server，浏览器通过后端接收事件，状态保存在服务端。后者解释了为什么关闭标签页可以只丢观察。它是<strong>发布时披露的设计</strong>，不能推出退出任何本地桌面应用也有相同行为。</p>
+<p>官方 App 设计说明按 Thread 组织任务，并支持 worktree，让并行工作使用不同代码副本。这解决文件改动的隔离；worktree 不保存进程内存、socket 或远端操作结果。这是工作副本的设计作用，不代表所有 Desktop 入口都会自动创建独立副本。</p>
+<p>回到“测试中断后另一个客户端接手”：若只需审阅补丁，可检查工作副本与持久结果；若要继续活跃执行，还须确认 App Server、进程与执行 owner 仍可用。把本地子进程的管理者退出、网络断开、Web 标签关闭和切换 worktree 混成一个“关窗口”，就丢掉了判断所需的部署前提。</p>
+<span class="heading-alias" id="7-怎样把这些选择用于自己的-agent" aria-hidden="true"></span><h2 id="7-中途修订取消与断线的参考状态">7. 中途修订、取消与断线的参考状态</h2>
+<p>如果只是课程中的单进程脚本，保留清晰循环和可检查日志就足够起步。产品化时，优先加三类边界：明确的工作身份，统一的输入接纳，带状态的进度与终态。用户开始在运行中频繁纠正任务后，再加入 steering；需要多宿主接手时，再研究执行权转交。</p>
+<p>按前述调用链，三个相互独立的条件变化得到以下参考结果；这是源码语义推演，没有新增产品运行。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 7. 中途修订、取消与断线的参考状态"><table><caption>表 6 / Table 6 · 7. 中途修订、取消与断线的参考状态</caption><thead><tr><th scope="col">条件变化</th><th scope="col">接纳与输入</th><th scope="col">执行和结果</th></tr></thead><tbody><tr><td>读取文件时补充“不改 README”</td><td>若接纳为 Steered，消息等待允许的后续步骤，再进入请求</td><td>不能改写在途输入，也不能撤销此前已经发生的编辑</td></tr>
+<tr><td>等待批准时取消指定 Turn</td><td>cancellation 先传给任务，再清除批准等待，避免把取消伪装成拒绝</td><td>即时响应仍需由 Turn 终态确认中止完成；已发生的文件效果保留</td></tr>
+<tr><td>command/exec 启动测试后所属连接关闭</td><td>连接清理移除 handle，不是把命令加入重连队列</td><td>向 active session 发 Terminate；实际退出及已有文件变化仍由进程结果和文件状态确认</td></tr></tbody></table></div>
+<p>其中“命令启动后断开”必须注明执行入口和部署：普通 Turn 工具、connection-owned command/exec、process API 的资源合同不同。比较方案时，需要固定执行入口及其资源边界。</p>
+<span class="heading-alias" id="8-自测与参考答案" aria-hidden="true"></span><h2 id="8-常见场景与参考结论">8. 常见场景与参考结论</h2>
+<p><strong>题一：<code>turn/start</code> 返回了对象，是否可以显示任务成功？</strong></p>
+<p>参考答案：只能据相应合同显示接纳或初始状态，后续仍要观察工作进度和 Turn 终态。任务成功还需要领域验证，例如相关测试通过和实际 diff 符合约束。</p>
+<p><strong>题二：用户追加“不改 README”，为什么不能保证所有已发出的动作都遵守它？</strong></p>
+<p>参考答案：steering 在接纳后经队列进入允许的后续步骤，在途模型请求或已发生效果无法被一句新输入倒转。系统应在后续请求中体现约束，并检查已发生的变化。</p>
+<p><strong>题三：为什么使用 <code>expectedTurnId</code>？</strong></p>
+<p>参考答案：它让执行 owner 判断补充输入是否仍属于用户看到的那轮工作，避免 UI 状态滞后导致误投。只做一次客户端 <code>isRunning</code> 检查无法消除竞争。</p>
+<p><strong>题四：关闭 UI、取消 Turn、停止后台终端分别意味着什么？</strong></p>
+<p>参考答案：关闭 UI 影响观察连接；取消 Turn 影响活跃工作的继续推进；停止终端影响一个具体进程。三者是否互相触发由实现决定，不能凭名称混为一谈。</p>
+<p><strong>题五：比较 Codex 与 Maka 的架构，需要固定哪些条件？</strong></p>
+<p>参考答案：选择同一场景，例如中途输入和取消，逐项比较工作身份、接纳结果、输入生效点、进度协议和恢复边界。先陈述具体调用路径，再讨论不同需求下的取舍，避免按术语数量或模块数量排名。</p>
+<p><strong>同一命令换 owner 的参考分析。</strong> 客户端失联时，普通 Thread 仍 active；另一条相同的测试命令经该连接的 command/exec 启动。两条命令能否都写成“重连继续”？再把窗口改成官方文章中的 Web 标签，或把代码复制到新 worktree，哪一项事实发生了变化？</p>
+<p><strong>参考结论</strong></p>
+<p>不能统一归类。这里的 Thread 连接清理不普遍取消活跃 Turn，应查询它和具体工具的状态；command/exec 的连接清理向所属活动会话发 Terminate，不能直接承诺重连即继续。两者已经产生的文件效果都不因此撤销。Web 发布设计把 App Server 与状态放在服务端，所以标签消失不等于其进程退出；本地应用子进程关系需另核。新 worktree 改变代码副本位置，不证明 W 的执行状态、E 的进程或外部效果已迁移。需要的是资源身份、实际状态及接手合同，而不是相同的命令文本。</p>
+<p>工具执行机制见<a href="32-codex-tools-and-permissions.html">第32章</a>，同类设计场景见<a href="60-codex.html">第60章</a>。</p>
+<hr>
+<p><a href="28-system-design.html">上一章：第 28 章｜Agent 系统的设计方法</a> · <a href="30-claude-code-loop-and-context.html">下一章：第 30 章｜Claude Code：循环与上下文</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="28-system-design.html"><span>← 上一章</span><strong>第 28 章｜Agent 系统的设计方法</strong></a><a href="30-claude-code-loop-and-context.html"><span>下一章 →</span><strong>第 30 章｜Claude Code：循环与上下文</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#1-%E5%85%88%E6%8B%86%E5%BC%80%E5%B7%A5%E4%BD%9C%E8%BA%AB%E4%BB%BD%E6%89%A7%E8%A1%8C%E7%8A%B6%E6%80%81%E5%92%8C%E6%98%BE%E7%A4%BA%E5%86%85%E5%AE%B9">1. 先拆开工作身份、执行状态和显示内容</a></li><li class="toc-level-2"><a href="#2-%E4%BB%8E%E5%8D%8F%E8%AE%AE%E5%88%B0%E5%86%85%E6%A0%B8%E8%AF%B7%E6%B1%82%E8%A2%AB%E6%8E%A5%E7%BA%B3%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%AE%8C%E6%88%90%E6%9C%89%E4%B8%A4%E6%AC%A1%E7%A1%AE%E8%AE%A4">2. 从协议到内核：请求被接纳与工作完成有两次确认</a></li><li class="toc-level-2"><a href="#3-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%AF%8F%E4%B8%80%E6%AD%A5%E8%A6%81%E6%8A%93%E5%8F%96%E5%90%8C%E4%B8%80%E4%BB%BD%E4%B8%8A%E4%B8%8B%E6%96%87%E5%BF%AB%E7%85%A7">3. 为什么每一步要抓取同一份上下文快照</a></li><li class="toc-level-2"><a href="#4-%E7%94%A8%E6%88%B7%E8%A1%A5%E5%85%85%E8%A6%81%E6%B1%82steering-%E6%98%AF%E6%8E%92%E9%98%9F%E8%BE%93%E5%85%A5%E4%B8%8D%E6%98%AF%E6%94%B9%E5%86%99%E5%B7%B2%E7%BB%8F%E6%89%A7%E8%A1%8C%E7%9A%84%E8%BF%87%E5%8E%BB">4. 用户补充要求：steering 是排队输入，不是改写已经执行的过去</a></li><li class="toc-level-2"><a href="#5-%E5%8F%96%E6%B6%88%E5%81%9C%E6%AD%A2%E7%BB%A7%E7%BB%AD%E6%8E%A8%E8%BF%9B%E9%9C%80%E8%A6%81%E6%8C%89%E6%89%A7%E8%A1%8C%E9%98%B6%E6%AE%B5%E5%88%A4%E6%96%AD%E5%B7%B2%E7%BB%8F%E5%8F%91%E7%94%9F%E7%9A%84%E6%95%88%E6%9E%9C">5. 取消：停止继续推进，需要按执行阶段判断已经发生的效果</a></li><li class="toc-level-2"><a href="#6-%E7%BB%A7%E7%BB%AD%E5%AF%B9%E8%AF%9D%E6%81%A2%E5%A4%8D%E5%8E%86%E5%8F%B2%E8%BF%81%E7%A7%BB%E6%89%A7%E8%A1%8C%E6%9D%83%E6%98%AF%E4%B8%89%E4%B8%AA%E5%8A%A8%E4%BD%9C">6. 继续对话、恢复历史、迁移执行权，是三个动作</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E6%96%AD%E7%BA%BF%E9%97%AE%E9%A2%98thread-%E4%B8%8E%E8%BF%9E%E6%8E%A5%E6%8B%A5%E6%9C%89%E7%9A%84%E8%BF%9B%E7%A8%8B%E5%90%84%E8%87%AA%E6%80%8E%E6%A0%B7%E6%94%B6%E5%B0%BE">同一断线问题：Thread 与连接拥有的进程各自怎样收尾</a></li><li class="toc-level-3"><a href="#desktop-%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%89%AF%E6%9C%AC%E4%B8%8E-web-%E7%9A%84%E6%89%98%E7%AE%A1%E8%BF%9B%E7%A8%8B%E9%83%A8%E7%BD%B2%E6%9D%A1%E4%BB%B6%E4%B9%9F%E5%B1%9E%E4%BA%8E%E9%A2%98%E7%9B%AE">Desktop 的工作副本与 Web 的托管进程：部署条件也属于题目</a></li><li class="toc-level-2"><a href="#7-%E4%B8%AD%E9%80%94%E4%BF%AE%E8%AE%A2%E5%8F%96%E6%B6%88%E4%B8%8E%E6%96%AD%E7%BA%BF%E7%9A%84%E5%8F%82%E8%80%83%E7%8A%B6%E6%80%81">7. 中途修订、取消与断线的参考状态</a></li><li class="toc-level-2"><a href="#8-%E5%B8%B8%E8%A7%81%E5%9C%BA%E6%99%AF%E4%B8%8E%E5%8F%82%E8%80%83%E7%BB%93%E8%AE%BA">8. 常见场景与参考结论</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

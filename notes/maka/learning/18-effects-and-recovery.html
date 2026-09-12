@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 18 章｜持久效果与故障恢复 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 18 / 62</div><article id="main-content"><span class="heading-alias" id="07durable-effect-与-recovery崩溃以后为什么不能再跑一次" aria-hidden="true"></span><span class="heading-alias" id="m07持久效果与故障恢复" aria-hidden="true"></span><span class="heading-alias" id="第-17-章持久效果与故障恢复" aria-hidden="true"></span><h1 id="第-18-章持久效果与故障恢复">第 18 章｜持久效果与故障恢复</h1>
+<blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
+<p><strong>核心问题</strong>：工具效果可能已经发生却没有成功回执时，恢复系统怎样避免盲目重做？</p>
+<p><strong>关键概念</strong>：side effect（副作用）改变外部世界；durable（持久）表示提交后仍可读取；T1 标记准备执行；T2 保存结果结算；reconcile（对账）核对记录与资源状态。</p>
+<p><strong>关系主线</strong>：已接入持久存储的普通工具路径在效果前后分别提交记录。缺少 T2 时需回查，T2 也可能明确记录效果未知；安全重试还取决于工具的幂等与对账合同。</p>
+</blockquote>
+<h2 id="核心阅读">核心阅读</h2>
+<h3 id="问题readme-已经改了但系统还没来得及说成功">问题：README 已经改了，但系统还没来得及说“成功”</h3>
+<p>仍以 README 的测试命令从 <code>npm run check</code> 改为 <code>npm test</code> 为例。下面的 <code>patch</code> 表示这项修改，<code>editFile</code> 与 <code>saveToolResult</code> 是教学接口，分别表示改文件和保存结果，不是 Maka 的实际 API。两行异步代码之间就可能出现这个窗口：</p>
+<pre><code class="language-ts">const result = await editFile(&quot;README.md&quot;, patch)
+await saveToolResult({ ok: true, result })</code></pre>
+<p>如果进程恰好在两行之间崩溃：</p>
+<pre><code class="language-text">editFile 已返回，README 已改变
+                 ↓
+              进程崩溃
+                 ↓
+saveToolResult 从未执行</code></pre>
+<p>故事已经告诉我们效果发生在崩溃前；恢复程序却读不到这份旁白，只看到数据库中没有成功结果。单凭这份记录，它不能区分下面两种执行过程：</p>
+<pre><code class="language-text">情况 A：编辑根本没开始
+情况 B：编辑已经完成，只是结果没保存</code></pre>
+<p>若 Recovery 看到“没有结果”就自动重做：</p>
+<ul>
+<li>对精确替换，第二次可能报“旧文本不存在”；</li>
+<li>对追加写入，内容可能重复两次；</li>
+<li>对发邮件，用户可能收到两封；</li>
+<li>对扣费 API，费用可能发生两次；</li>
+<li>对创建 issue，远端可能出现两个副本。</li>
+</ul>
+<p>这就是 <a href="glossary.html#side-effect%E5%A4%96%E9%83%A8%E5%89%AF%E4%BD%9C%E7%94%A8">side effect（副作用）</a> 的核心：操作改变了 Runtime 之外的世界，而且改变未必能自动撤销。</p>
+<h4 id="函数返回不是-durable-事实">“函数返回”不是 durable 事实</h4>
+<p>程序内存里的 <code>result</code> 只在当前进程活着时存在。要称为 <a href="glossary.html#durable%E6%8C%81%E4%B9%85%E5%B4%A9%E6%BA%83%E5%90%8E%E4%BB%8D%E5%8F%AF%E8%AF%BB">durable（持久）</a>，它必须先写入重启后可读取的存储，并满足相应的提交规则。</p>
+<p>因此以下时刻不同：</p>
+<pre><code class="language-text">工具实现完成
+工具结果写入内存
+工具结果提交到 durable store
+模型在下一 step 看到结果
+UI 显示完成
+Run 形成 terminal fact</code></pre>
+<p>需要跨进程恢复的 Agent，必须说明这些时刻中自己实际保证了哪几个，不能只用一个模糊的“done”代替。</p>
+<span class="heading-alias" id="误区二缺少-success-记录说明工具没执行" aria-hidden="true"></span><h4 id="没有成功记录不等于没有执行">“没有成功记录”不等于“没有执行”</h4>
+<p>记录缺失支持的判断只有：</p>
+<pre><code class="language-text">没有看到已保存的执行结果
+只能说明：当前记录没有证明结果已提交
+不能推出：真实效果没有发生</code></pre>
+<p>Recovery 要先确定安全的继续条件，避免为了补一条结果记录而制造第二次不可逆效果。</p>
+<span class="heading-alias" id="误区四t2-保证外部-exactly-once" aria-hidden="true"></span><h3 id="一种具体做法在副作用前后各留下一个持久边界">一种具体做法：在副作用前后各留下一个持久边界</h3>
+<p>为缩小重启后的不确定范围，Maka 在已接入持久存储的普通工具路径中采用“先记准备，再做操作，再记结果”的协议。图中实线表示正常提交顺序，虚线表示故障窗口。一条待查分支尚未确认 T2，另一条已有 T2 却记录了效果未知；两者都不能直接要求工具再执行一次。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="一种具体做法：在副作用前后各留下一个持久边界：可滚动示意图"><a href="../../../assets/diagrams/18-effects-and-recovery-1.svg"><img src="../../../assets/diagrams/18-effects-and-recovery-1.svg" alt="普通持久工具先提交 T1，再执行并提交 T2；T1 后中断或回执丢失须回查结算，T2 也可能保存效果未知。由有权处理者核对记录与现实，再依据证据判断下一行动。" width="720" height="1440" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p><strong>没有 T2 不等于没有效果；有 error T2 也可能只是保存了“效果未知”。</strong> 崩溃或没收到提交回执时，还不能先断定“只有 T1”：T2 可能已保存，应先回查，再按结果内容判断；不能确认时继续保留未知。图中的“核对记录与现实”是恢复处理方向，不表示当前每个工具都有自动查询或自动对账实现。只有取得可用证据、当前授权和继续条件后，才能决定后续动作；停止或重启不会撤销已经写入的字节。更详细的普通 Edit 分叉见<a href="#%E6%8A%8A%E5%90%8C%E4%B8%80%E6%AC%A1-edit-%E4%BB%8E%E5%87%86%E5%85%A5%E8%BF%BD%E5%88%B0%E5%90%8E%E7%BD%AE%E8%AF%81%E6%8D%AE">同一次 Edit 的推演</a>。</p>
+<p>这里的 <strong>T1/T2 是一次工具调用的两次提交边界</strong>，不是 Session 中“第 1/2 个 Turn”的编号。沿用案例的 <code>T7</code> 仍指用户的那一轮工作；其中每次普通工具调用各自跨过自己的 T1/T2：</p>
+<ul>
+<li><strong>T1</strong>：从这里起，工具实现<strong>可能已经开始</strong>；</li>
+<li><strong>T2</strong>：Runtime 已经持久接受了这次调用的结果；这个结果可以是成功、业务错误，或明确记录“效果未知”。</li>
+</ul>
+<p>T1 不是“效果一定成功”；T2 不是“业务一定成功”，也不保证外部世界的 <a href="glossary.html#exactly-once%E6%81%B0%E5%A5%BD%E6%89%A7%E8%A1%8C%E4%B8%80%E6%AC%A1">exactly-once</a>（效果恰好发生一次）。它们让重启后的系统区分“结果尚未可靠结算”与“已有可读取的结算结果”，再根据结果内容作决定。</p>
+<span class="heading-alias" id="误区三t1-表示副作用成功" aria-hidden="true"></span><h4 id="为什么-t1-必须在效果之前">为什么 T1 必须在效果之前</h4>
+<p>如果先调用工具，再写 T1，崩溃可能留下一个已经发生却完全没有 dispatch 痕迹的效果。Recovery 会把它误判成“肯定没有执行”。</p>
+<pre><code class="language-text">错误顺序：effect → crash → T1 未写
+正确顺序：T1 → effect → T2</code></pre>
+<h4 id="为什么-t2-必须在结果回到模型之前">为什么 T2 必须在结果回到模型之前</h4>
+<p>假设模型先看到了“README 已修改”，于是继续运行测试；随后 Runtime 在持久化编辑结果之前崩溃。重启后，账本只留下测试的后续事实，却没有模型赖以作决定的编辑结果，会破坏可重放性。</p>
+<p>所以应当：</p>
+<pre><code class="language-text">工具结果 → durable T2 → 下一模型 step</code></pre>
+<p>而不是：</p>
+<pre><code class="language-text">工具结果 → 下一模型 step → 有空再落盘</code></pre>
+<span class="heading-alias" id="误区五所有读操作都可以无脑重试" aria-hidden="true"></span><h4 id="idempotency-不等于随便重试">Idempotency 不等于“随便重试”</h4>
+<p><a href="glossary.html#idempotency%E5%B9%82%E7%AD%89%E6%80%A7">idempotent（幂等）</a> 通常指同一个操作重复执行，最终状态与执行一次相同。例如“把状态设置为 closed”可能幂等；“余额减 10”通常不幂等。</p>
+<p>但仅凭工具名字叫 <code>set_status</code> 还不够。真实系统还要确认：</p>
+<ul>
+<li>两次调用使用同一个 idempotency key（关联同一逻辑操作的去重键）吗？</li>
+<li>远端服务真的承诺按 key 去重吗？</li>
+<li>参数完全相同吗？</li>
+<li>第一次调用是否可能只完成了一半？</li>
+<li>本地结果是否能从远端查询回来？</li>
+</ul>
+<p>因此“工具自称幂等”只是一项恢复契约，不是 Recovery 可以无条件重放的许可证。读取也可能计费、消耗一次性 token、改变游标或触发远端审计；能否安全重复取决于工具合同，而非工具名字。</p>
+<h4 id="reconcile-是查清现实不是再做一遍">Reconcile 是“查清现实”，不是“再做一遍”</h4>
+<p><a href="glossary.html#reconcile%E5%AF%B9%E8%B4%A6--%E6%94%B6%E6%95%9B">reconciliation（对账）</a> 会使用稳定身份检查外部世界：</p>
+<pre><code class="language-text">文件当前是否已经包含目标修改？
+远端是否存在 operationId 对应的 issue？
+支付服务是否记录了同一个 idempotency key？
+后台任务是否仍在运行，可以重新 attach？</code></pre>
+<p>专用对账可以得到四类判断；它们不是所有工具共用的一组 API 返回值：</p>
+<ul>
+<li><strong>有证据确认效果</strong>：按该恢复合同补记或复用结果；仅看到目标文本还不一定能证明是哪次调用造成；</li>
+<li><strong>有证据确认未开始</strong>：再核当前授权、参数与重试条件；</li>
+<li><strong>证据不足</strong>：保留现场，停放任务，交给有权处理者或专用恢复逻辑；</li>
+<li><strong>记录冲突</strong>：停止自动恢复，先处理数据不一致。</li>
+</ul>
+<p>Maka 的恢复分类器（resolver）读取操作记录并判断恢复状态。它的 <code>completed</code> 分类表示记录已经结算，也可能结算的是“效果未知”。这项记录状态与上面的“有证据确认效果”不同。</p>
+<h3 id="案例先并排查看文件与保存轨迹">案例：先并排查看文件与保存轨迹</h3>
+<p>在 <a href="06-crash-window.html">第06章 崩溃窗口实验</a>中，固定脚本让真实 mini 本地执行环境写入 README，然后在新动作和结果保存到 trajectory 之前终止子进程。实验没有为 mini 添加 Maka 的 T1/T2，文件和轨迹因此能直接显示效果与记录之间的缺口。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 案例：先并排查看文件与保存轨迹"><table><caption>表 1 / Table 1 · 案例：先并排查看文件与保存轨迹</caption><thead><tr><th scope="col">检查对象</th><th scope="col">实验中留下的观察</th><th scope="col">它能支持什么结论</th></tr></thead><tbody><tr><td>当前 README（File State）</td><td>测试说明已改变</td><td>当前文件确实有这项修改</td></tr>
+<tr><td>已存轨迹（Saved Trajectory）</td><td>仍停在早先读取</td><td>保存记录没有覆盖后来的动作与结果</td></tr>
+<tr><td>子进程退出信息</td><td>被定点中断，没有正常完成</td><td>这次运行未完成正常收尾</td></tr></tbody></table></div>
+<p>在这个受控实验里，固定脚本、停止点和文件共同支持“写入发生在保存之前”。在真实多人工作区，只看到目标文本存在，还不能单独证明它由某次调用造成；文件也可能由另一个人修改。</p>
+<h4 id="先判断当前状态再决定下一次动作">先判断当前状态，再决定下一次动作</h4>
+<pre><code class="language-text">发现缺少成功记录
+  → 先读取当前文件、确认工作区身份、检查差异
+  → 已达到目标：保留现状，不重复追加
+  → 还需修改且证据充分：根据当前内容建立新调用
+  → 身份或效果仍无法确认：保留未知，等待进一步核对</code></pre>
+<p>新调用仍要遵守用户授权。不要为得到干净 diff 覆盖他人的段落；也不要因为工具名叫 Bash，就假设测试重复运行必然无副作用。</p>
+<h4 id="用三个位置理解-maka-的记录方式">用三个位置理解 Maka 的记录方式</h4>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 用三个位置理解 Maka 的记录方式"><table><caption>表 2 / Table 2 · 用三个位置理解 Maka 的记录方式</caption><thead><tr><th scope="col">保存轨迹</th><th scope="col">可以据此判断什么</th><th scope="col">下一步依据</th></tr></thead><tbody><tr><td>准备记录之前已明确拒绝</td><td>在遵守该协议的普通路径中，实现没有开始</td><td>阅读拒绝原因，修正请求</td></tr>
+<tr><td>准备已提交（T1），尚无结果提交（T2）</td><td>无法排除效果已发生，也无法证明完成</td><td>对账；证据不足就保留未知</td></tr>
+<tr><td>结果已提交（T2）</td><td>Runtime 接受的结果已保存</td><td>读结果内容；成功、业务错误和效果未知需要不同处理</td></tr></tbody></table></div>
+<p>例如，T2 中保存“测试退出码 1”支持分析测试失败；保存“远端效果未知，不能安全重试”仍不支持重做远端操作。结算解决的是记录状态，结算内容决定业务上知道了多少。</p>
+<p>这是记录协议给出的证据界限；“T1 后文件其实还没打开”和“文件已写但 T2 没提交”在账本里可能一样。因此恢复不能拿自己猜测的崩溃时刻冒充事实。</p>
+<h4 id="最终总结只能写当前证据支持的内容">最终总结只能写当前证据支持的内容</h4>
+<p>确认文件和测试结果后，才写“修改完成，测试通过”。若效果未知，应说明“运行中断，当前记录不足以确定结果，尚未重复执行”。这不是文字风格，而是让下一位操作者知道哪些判断仍然开放。</p>
+<h4 id="从不确定性回到一个新的可验证的任务">从不确定性回到一个新的、可验证的任务</h4>
+<p>延续 第16章 的 retarget（根据新观察重新定位）：如果中断后 README 同时出现新测试命令与别人新增的段落，先读取当前文件并查看 diff。若仍需修订，用当前内容构造<strong>新的调用</strong>，保留他人段落；不能改变旧调用的参数后继续冒用同一次操作的身份。<a href="#operation-identity">稳定操作身份与参数摘要</a>用于检测这种冲突。</p>
+<p>第06章 展示的是缺口，不证明 Maka 当前 generic recovery 自动完成文件对账。</p>
+<p>若继续<a href="04-code-repair.html">代码修复实验</a>中的 <code>formatDuration</code> 任务，重新读取函数和测试后，应分别记录：余秒现在是否为 <code>% 60</code>、README 是否使用 <code>npm test</code>、测试是否真的重跑、diff 是否只含授权改动。只有这些当前证据支持的部分才能写进最终总结。是否允许重跑测试还取决于测试脚本实际副作用；实验的离线小 fixture 不能替未知项目作保证。</p>
+<span class="heading-alias" id="核心区的常见误区" aria-hidden="true"></span><span class="heading-alias" id="基础完成条件能解释未知从哪里来" aria-hidden="true"></span><span class="heading-alias" id="基础自测能否区分现实效果和已保存结果" aria-hidden="true"></span><h4 id="现实效果与保存结果问答">现实效果与保存结果问答</h4>
+<p><strong>问题 1。</strong> README 已写入但成功记录还没保存，为什么不能盲目重跑 Edit？</p>
+<p><strong>解释。</strong> 效果可能已经发生，重复调用可能叠加效果、发生冲突或覆盖并行修改。</p>
+<p><strong>问题 2。</strong> T1 与 T2 的直觉分别是什么？T2 保存了“效果未知”时，业务结果已经确定了吗？</p>
+<p><strong>解释。</strong> T1 标记从这里起执行可能开始；T2 表示 Runtime 已持久接受一份结果。结果若是“效果未知”，未知仍然成立；记录已结算不等于业务成功，也不保证任意外部 exactly-once。</p>
+<p><strong>问题 3。</strong> Reconcile 与 retry 有什么区别？</p>
+<p><strong>解释。</strong> 对账先查现实及身份来缩小不确定性；重试是再执行一次，可能产生新效果。</p>
+<p><strong>问题 4。</strong> 文件现在符合目标，能否据此断言“一定是刚才那次调用改的”？</p>
+<p><strong>解释。</strong> 不能；这只能支持当前状态判断，内容可能由别的调用或人形成。</p>
+<p><strong>问题 5。</strong> 中断后看到别人新增的段落，重新定位应怎样处理？</p>
+<p><strong>解释。</strong> 读取当前文件和 diff，保留他人内容；如仍需修改，用新观察构造新调用，不盲套旧 patch。</p>
+<h2 id="实现深化">实现深化</h2>
+<h3 id="失败崩溃窗口不止一个">失败：崩溃窗口不止一个</h3>
+<p>把工具路径展开，可以看到多个不同窗口：</p>
+<pre><code class="language-text">模型提出 call
+  │
+  ├─ A. preflight 前后
+  │
+  ├─ T1 durable commit
+  │
+  ├─ B. T1 后、实现调用前
+  │
+  ├─ C. 实现执行过程中
+  │
+  ├─ D. 实现完成后、T2 前
+  │
+  ├─ T2 durable commit
+  │
+  ├─ E. T2 后、模型下一 step 前
+  │
+  └─ 下一模型 step</code></pre>
+<h4 id="a执行前拒绝">A：执行前拒绝</h4>
+<p>这里限定实际到达 ToolRuntime 的调用：它因参数 schema、工具未激活或循环闸门而在 T1 前被拒绝，实现没有运行。为了让模型理解，系统可以保存一对“call + synthetic error response”，但不能写一个假的 dispatch marker。</p>
+<p>重启后这类记录可以证明：工具被拒绝，现实效果没有由该调用产生。</p>
+<p><strong>回到代码修复案例：</strong></p>
+<p>假设缺少必填 <code>new_string</code> 的原 Edit 调用未经改写到达 ToolRuntime，并被其 validator 拒绝；或者 Edit 在当前冻结 step 中尚未 active。ToolRuntime 写入 call 和 synthetic error response，但没有 dispatch。若此前 SDK repair 已将调用改为内部 <code>invalid</code> 工具，则要追踪新调用自己的边界，不能套用本段，见 <a href="15-model-context.html#%E5%9D%8F%E5%8F%82%E6%95%B0%E6%9C%80%E5%90%8E%E4%BA%A4%E7%BB%99%E8%B0%81%E5%A4%84%E7%90%86">第15章 坏参数分叉</a>。</p>
+<p>重启后可证明：这次 Edit 的实现没有运行。模型可以基于已结算错误选择重新读取 README，再提出新的编辑；不需要对账文件副作用。</p>
+<p>不要把“Edit 匹配流程最终未找到可接受目标”放进这一类。<a href="16-tools-and-execution.html#maka-edit-%E6%80%8E%E6%A0%B7%E5%AE%9A%E4%BD%8D%E6%97%A7%E7%89%87%E6%AE%B5">第16章</a>已说明，精确零匹配还可能进入有限容错；这里限定这些检查最终在写入前拒绝。检查发生在 Edit 实现内部，已经越过 T1；实现返回错误并尝试保存 error T2。只有错误结果成功保存后，才属于“已 dispatch、错误已结算”，而不是 pre-T1/no-dispatch。</p>
+<h4 id="bt1-已提交但实现可能尚未真正开始">B：T1 已提交，但实现可能尚未真正开始</h4>
+<p>在 Maka 的普通路径中，T1 后还要读取 live <code>ExecutionBoundary</code>，然后才进入实现。如果进程在 T1 与 boundary read 之间崩溃，现实上也许没有任何效果。</p>
+<p>但 ledger 没有更细的 durable marker 来证明崩溃发生在实现前。因此 Recovery 必须保守地把“T1 无 T2”视为 indeterminate。<strong>知道内部代码大概率还没执行，和拥有可证明的 durable 事实，不是同一件事。</strong></p>
+<h4 id="c实现执行到一半">C：实现执行到一半</h4>
+<p>写文件、解压目录或调用远端工作流可能部分完成。此时既不能宣称成功，也不能假设回滚。Recovery 需要工具专用的状态检查或人工处理。</p>
+<p><strong>回到代码修复案例：</strong></p>
+<p>不要假设测试永远只读。测试脚本可能创建数据库、启动服务器、上传 coverage 或访问网络。若 T1 存在、T2 缺失，generic recovery 同样不能仅凭工具名 <code>Bash</code> 自动重跑。</p>
+<p>若有 background task identity，可以尝试 reattach；若没有可证明的状态，就 park（暂停自动推进）或要求用户确认。</p>
+<h4 id="d效果完成但-t2-未提交">D：效果完成，但 T2 未提交</h4>
+<p>这是最典型的重复副作用风险。README 已经修改，数据库却没有最终 response。盲目重试可能重复追加或遇到前置条件已变化。</p>
+<p><strong>回到代码修复案例：</strong></p>
+<p>文件内容可能已经是目标状态。Recovery 不应把同一个 patch 直接再执行一次。更好的专用 reconcile 可以：</p>
+<ol>
+<li>核对 workspace 和目标文件身份；</li>
+<li>检查目标新文本是否存在；</li>
+<li>检查旧文本是否仍存在；</li>
+<li>判断是否能唯一证明“这次预期修改已完成”；</li>
+<li>证据不足时 park，并请求有权作出决定的人核对。</li>
+</ol>
+<p>文本恰好符合目标，只能证明当前内容符合目标，不能唯一证明是哪次调用造成的。<code>git diff</code> 还可能包含其他人的并行修改，不能把它全部归到自己的调用名下。</p>
+<p>当前普通 generic recovery 不应被描述成自动完成了这套专用对账。</p>
+<span class="heading-alias" id="误区一重启后看到-running就继续原函数" aria-hidden="true"></span><h4 id="et2-已提交下一模型-step-尚未开始">E：T2 已提交，下一模型 step 尚未开始</h4>
+<p>这是相对清晰的情况。Runtime 可以从已提交 T2 重建有效历史，让新进程中的模型看到相同结果；不需要再次执行工具。</p>
+<p><strong>回到代码修复案例：</strong></p>
+<p>重启后可以从 durable outcome 重建模型历史，无需再次编辑。若所有 continuation guard 都满足，新的执行可以从“编辑结果已经结算”这个事实继续考虑测试。</p>
+<p>“继续”也不是恢复旧 JavaScript 调用栈，而是依据 durable facts 建立新的安全执行边界。</p>
+<p>这些恢复操作分别作用于不同状态。Edit 的 T2 表示 Runtime 接受了工具结果，不包含整个编辑进程的内存、后台测试服务或打开的连接；新的执行仍需取得正确的项目文件、按当前规则重建输入并通过接手条件。<a href="19-context-compaction.html#%E6%9C%BA%E5%88%B6%E6%97%A7%E5%89%8D%E7%BC%80%E7%94%A8%E4%B9%A6%E7%AD%BE%E8%BF%91%E6%9C%9F%E5%8E%9F%E6%96%87%E7%BB%A7%E7%BB%AD%E4%BF%9D%E7%95%99">第19章 的 Context checkpoint</a>保存旧历史的摘要或兼容状态，数据库 WAL 服务于数据库的提交与恢复。它们都不是虚拟机的进程与内存快照，不能据此承诺交互式解释器变量或任意外部连接会回来。</p>
+<h4 id="t2-写入失败不能降级成普通工具错误">T2 写入失败不能降级成普通工具错误</h4>
+<p>工具本身失败，例如测试退出码为 1，可以形成 error T2，让模型分析失败原因。但若工具完成后 <strong>T2 的 durable commit 自己失败</strong>，系统不能把它包装成“普通测试失败”继续循环。</p>
+<p>原因是：模型一旦继续，就会基于一个未可靠保存的结果作出新决定。durability boundary 失败必须击穿普通 Agent loop，交给更高层恢复。</p>
+<h4 id="client-断线不等于-run-失败">Client 断线不等于 Run 失败</h4>
+<p>Client 只是提交和展示界面。若 Host 已经 admission <code>R7</code>，关闭 UI 或网络断开不应让 Client 自行决定重跑。重连恢复的是 transport 与 projection；业务执行是否完成，要看 Host 和 durable ledger。</p>
+<h4 id="provider-内部执行的工具更难判断">Provider 内部执行的工具更难判断</h4>
+<p>若 <code>providerExecuted=true</code>，工具效果发生在模型提供商的物理请求内部，没有普通 Maka ToolRuntime 的本地 T1/T2。Maka 可以保存观察到的 call/result，并在看到活动后禁止不安全地整次重发请求，但跨进程 crash 的 generic resolver 尚没有等价的完整判定边界。</p>
+<p>因此不能因为“本地没有 dispatch marker”就断言 provider-side effect 没发生。</p>
+<h3 id="maka普通生产工具的-durable-effect-协议">Maka：普通生产工具的 durable effect 协议</h3>
+<p>以下说明只针对 production Runtime Host 已注入 SQLite-backed <code>runtimeCommitSink</code> 的普通 Runtime-executed 工具。可嵌入的 <code>ToolRuntime</code> 允许不注入 sink；那种接法不能继承同样的 durable 保证。</p>
+<h4 id="operation-identity">Operation identity</h4>
+<p>Maka 为普通工具操作构造稳定 identity。下面 <code>invocationId</code> 标识所属执行，<code>providerToolCallId</code> 标识模型服务返回的这次工具调用；<code>toolName</code> 是工具名，<code>normalizedPersistedArgs</code> 是规范化后保存的参数，<code>hash</code> 表示计算摘要。核心关系可以简化为：</p>
+<pre><code class="language-text">operationId = hash(invocationId, providerToolCallId)
+argsHash    = hash(toolName, normalizedPersistedArgs)</code></pre>
+<p>新 AgentRun 通常令 <code>invocationId = runId</code>。<a href="glossary.html#invocationid%E6%89%A7%E8%A1%8C%E4%BA%8B%E5%AE%9E%E5%85%B3%E8%81%94%E5%9D%90%E6%A0%87">invocationId</a> 关联这次执行的事实；<code>operationId</code> 由 <code>invocationId</code> 与 provider tool-call ID 组合得到，用于标识其中一次工具操作。这不需要另建一层独立生命周期。</p>
+<h4 id="每次调用需要稳定身份">每次调用需要稳定身份</h4>
+<p>Recovery 还要知道 T1 和 T2 是否属于同一次调用。可以为操作建立稳定的 <code>operationId</code>，并记录：</p>
+<ul>
+<li>所属 Session、Turn、Run；</li>
+<li>provider tool-call ID；</li>
+<li>工具名；</li>
+<li>规范化参数的 hash；</li>
+<li>恢复策略；</li>
+<li>最终结果或错误。</li>
+</ul>
+<p>参数 hash 能阻止危险的“身份相同、参数却漂移”：如果重启后的代码用同一个 operationId 改了另一个文件，系统应视为冲突，而不是覆盖旧记录。</p>
+<h4 id="t1-原子保存什么">T1 原子保存什么</h4>
+<p>通过所有 pre-T1 guards 后，Maka 在一个 SQLite transaction 中保存：</p>
+<ul>
+<li>provider-visible 的 function call；</li>
+<li>model-hidden 的 dispatch fact；</li>
+<li><code>TOOL_BOUNDARY_PROTOCOL_V1</code> / <code>t1_after_preflight_v1</code> 协议标记；</li>
+<li>operationId、工具名、provider call ID；</li>
+<li>canonical args hash；</li>
+<li>recovery mode；</li>
+<li>prepared operation journal。</li>
+</ul>
+<p>只有 T1 成功后才继续。若发现已有 claim、identity 冲突或 hash 漂移，当前调用不能偷偷改参数后执行。</p>
+<h4 id="t1-后才读取-live-boundary-并调用实现">T1 后才读取 live boundary 并调用实现</h4>
+<p>普通路径的准确顺序是：</p>
+<pre><code class="language-text">pre-T1 guards
+  → commitToolPrepared (T1)
+  → read live ExecutionBoundary
+  → tool.impl / executor / adapter</code></pre>
+<p>这保证每次实现调用读取当前 revision，而不是 Run 开始时的过时权限。代价是：boundary read 失败也已经越过 T1，需要形成 error T2；如果在两者之间崩溃，ledger 仍只能保守判为 indeterminate。</p>
+<h4 id="t2-原子保存什么">T2 原子保存什么</h4>
+<p>工具返回或抛出业务错误后，Maka 规范化结果，并在 T2 保存：</p>
+<ul>
+<li>matching function response；</li>
+<li>Runtime 接受的 canonical result；</li>
+<li>provider-neutral model projection；</li>
+<li>outcome journal；</li>
+<li>operation 从 prepared 到 outcome committed 的状态转换。</li>
+</ul>
+<p>只有 T2 提交成功，结果才允许进入下一次模型 step。业务错误也可以是已结算结果；“结果为错误”和“结果没能 durable 保存”必须分开。</p>
+<h4 id="recovery-看-ledger-形状不按工具名字猜">Recovery 看 ledger 形状，不按工具名字猜</h4>
+<p>对于带上述协议标记的普通本地 ToolRuntime 调用，核心分类是：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · Recovery 看 ledger 形状，不按工具名字猜"><table><caption>表 3 / Table 3 · Recovery 看 ledger 形状，不按工具名字猜</caption><thead><tr><th scope="col">账本形状（Ledger Shape）</th><th scope="col">Maka 可证明的结论</th></tr></thead><tbody><tr><td>function call，无 dispatch</td><td><code>definitely_not_dispatched</code></td></tr>
+<tr><td>call + synthetic response，无 dispatch</td><td>pre-T1 refusal 已结算，实现未运行</td></tr>
+<tr><td>dispatch，无 matching response</td><td><code>indeterminate</code>，需要 reconcile/park</td></tr>
+<tr><td>dispatch + matching response</td><td>Runtime outcome 已结算</td></tr>
+<tr><td>旧 call，没有上述协议标记</td><td><code>legacy_dispatch_unknown</code></td></tr>
+<tr><td>orphan、重复、identity/hash/order 冲突</td><td><code>corruption</code></td></tr></tbody></table></div>
+<p>这张表不能套给 <a href="glossary.html#provider-executed-tool%E7%94%B1%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E4%BB%A3%E6%89%A7%E8%A1%8C%E7%9A%84%E5%B7%A5%E5%85%B7">provider-executed 子通道</a>，也不能仅凭有 T2 就宣称任意远端系统实现了 exactly-once。</p>
+<h4 id="recovery-mode-是契约不是自动重试按钮">Recovery mode 是契约，不是自动重试按钮</h4>
+<p>工具可以声明类似：</p>
+<pre><code class="language-text">replay_safe
+idempotent
+reconcile
+reattach
+outcome_unknown
+never_auto_retry</code></pre>
+<p>默认是保守的 <code>never_auto_retry</code>。generic resolver 不会只看标签就盲重放；安全继续还要验证 ledger 可读、没有未决 interaction/background/tool state、workspace identity、checkpoint、冻结工具面和 provider boundary 等条件。任何关键事实不清楚，就应 park。</p>
+<h4 id="client-的已结算错误仍可能表示效果未知">Client 的“已结算错误”仍可能表示效果未知</h4>
+<p>Client Capability 使用 <code>outcome_unknown</code> recovery mode。Host 重启恢复时可以给遗留调用写入明确的 error outcome，表示 Client 效果可能已发生，且 <code>retrySafe=false</code>。这让 ledger 不再悬着，但它没有把业务事实变成“没有发生”或“已经成功”。provider-executed 则连这套普通本地 T1/T2 都没有，generic resolver 目前未建立等价分支，不能套用上表。</p>
+<h4 id="stop-也要等待可以结算的工具">Stop 也要等待可以结算的工具</h4>
+<p>假设 R7 的 Edit 已写入 README，T2 正在结算，此时用户按下 Stop。取消想阻止的是后续执行，却不能让已经写入的文件自动回到原状。下面是当前 Host 默认 AiSdk 路径的<strong>源码推演</strong>：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · Stop 也要等待可以结算的工具"><table><caption>表 4 / Table 4 · Stop 也要等待可以结算的工具</caption><thead><tr><th scope="col">阶段</th><th scope="col">已知发生了什么</th><th scope="col">还不能声称什么</th></tr></thead><tbody><tr><td>用户提交 Stop</td><td>Host 核对 S1/T7/R7，建立停止意图</td><td>不是外部效果已停止的证明</td></tr>
+<tr><td>Runtime 处理 stop claim 并通知执行器</td><td>关闭未决交互，AiSdkTurn 发出 abort signal</td><td>signal 不会回滚已完成的 Edit；等待用户的工具还需被关闭、唤醒</td></tr>
+<tr><td>等待 active tool settlements</td><td>工具把可结算结果保存为 T2；结果可能是成功，也可能是错误</td><td>不能先写 cancelled 再让 T2 跑到终态之后</td></tr>
+<tr><td>terminal owner 收束本次执行</td><td>若 Stop 赢得尚未决定的终态，形成取消事实；已先接受的 terminal 不被晚 Stop 覆盖</td><td>Run 取消不等于这次 Edit 从未发生；仍未知的效果也不能伪装成无效果</td></tr>
+<tr><td>Host 等待资源 settled</td><td>stream drain、清理与 owner 释放收敛</td><td>单独一条取消信号或 UI 提示不能代替这个承诺</td></tr></tbody></table></div>
+<p>因此这个例子允许的事实顺序是：</p>
+<pre><code class="language-text">Edit 已发生 → Stop 请求 → Edit 的可结算 T2 → Run cancelled → resources settled</code></pre>
+<p>如果工具正在等待 permission/question，Stop 还要关闭等待中的交互；只设置一个 abort 布尔值，未必能唤醒挂起的 promise。若 T2 提交自己失败，或远端效果仍无法判断，就沿相应失败/恢复边界处理，不能为了让按钮立即变灰而制造一个干净结局。</p>
+<p>上述工具等待只覆盖普通 ToolRuntime 能管理的 active settlements。provider-executed 工具发生在 provider 请求内部，不拥有这套本地 T1/T2；取消该请求也不能证明 provider 副作用已撤销。内部 backend 还支持 <code>after_step</code>，它请求在当前 step 后停止继续；public Stop 默认走 immediate，并不公开 mode。这个区别是控制语义，不是任意外部程序能在某个固定毫秒数内停止的承诺。</p>
+<p>实际 owner 也要核对：没有 Host interaction authority 的嵌入式 Runtime 可以直接结算 Stop terminal；hosted 路径需保留 Host 对终态和 provider-indeterminate 的 authority。不能拿底层测试中 <code>settleStopTerminal</code> 的一次调用代表所有生产入口。</p>
+<h4 id="managed-mutation-是更强基础但尚非默认-edit-保证">Managed mutation 是更强基础，但尚非默认 Edit 保证</h4>
+<p>Maka 的 <code>managed_mutation_v1</code> 协议可以把 workspace base/path/version 与 mutation reservation 更紧密地绑定。</p>
+<p>但 production Host 尚未为普通内建 Write/Edit 注入相应 admission，工具也未默认声明该 execution profile。因此 <code>R7</code> 中的普通 <code>Edit README.md</code> 仍应按一般 T1 → filesystem impl → T2 理解，不能写成“每次编辑都获得 workspace successor 的 exactly-once 保证”。</p>
+<h3 id="把同一次-edit-从准入追到后置证据">把同一次 Edit 从准入追到后置证据</h3>
+<p>普通 Edit 的动作、权限检查和结果记录可以放在同一条时间线上。任务仍是把 README 的错误测试入口 <code>npm run check</code> 改为 <code>npm test</code>。限定为 Host 注入 durable sink、managed 文件 worker 可用、目标已获准的普通 Edit；不套用 provider-executed 或更强 managed mutation 协议。下面按这条实现链作教学推演，不是实测轨迹。C17/O17 只是本次调用及其 operation 的示例标签，不是另一个待调用的 API。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 把同一次 Edit 从准入追到后置证据"><table><caption>表 5 / Table 5 · 把同一次 Edit 从准入追到后置证据</caption><thead><tr><th scope="col">时点</th><th scope="col">文件与执行发生了什么</th><th scope="col">Runtime 此时知道什么</th></tr></thead><tbody><tr><td>先前 Read</td><td>模型看过 README 中的旧命令</td><td>拥有一次旧观察；普通 Edit 未携带这次 Read 的完整内容版本</td></tr>
+<tr><td>C17 通过准入</td><td>schema、工具可用性等检查通过</td><td>可以尝试 dispatch；尚不能报告文件已改</td></tr>
+<tr><td>T1 提交</td><td>O17 保存为 prepared，随后才读 live boundary</td><td>从此实现可能开始；T1 不是写文件成功回执</td></tr>
+<tr><td>文件执行准备</td><td>路径规范化，排队等写锁前采样 dev/ino，再交受限 worker</td><td>该文件层 T0 位于 Runtime T1 之后，只检查本次接受的对象身份</td></tr>
+<tr><td>本例的故障发生</td><td>教学假设文件已写入新命令，worker 回复却丢失或损坏</td><td>Host 无法确认这次结果；它不能从错误推导没有写入</td></tr>
+<tr><td>error T2 提交</td><td>ToolRuntime 保存 <code>outcome_unknown</code> 与 <code>retrySafe=false</code></td><td>已有 matching response，resolver 可判 <code>completed</code>；含义是未知结果已结算，业务效果仍待核对</td></tr>
+<tr><td>后续新 Read</td><td>在允许继续执行的条件下，重新读当前文件</td><td>新观察可支持后置条件，不能自动证明原 O17 的唯一因果贡献</td></tr></tbody></table></div>
+<p>T0 和 T1 看起来像同一计时表，其实是两个局部协议的命名。T1 属于 Runtime 持久调用；文件层 T0 是本次编辑排队等写锁前的身份采样。dev/ino 可以帮助发现路径被换成另一文件，却不是上一轮 Read 的内容 hash。</p>
+<p>表中的 matching response 指与本次 operation 身份和参数记录相匹配、已保存的结果。<code>responseIsError</code> 表示结果被标为错误，<code>retrySafe=false</code> 表示不能据此自动安全重试；它们都不是任务是否成功的评分。</p>
+<p>同样返回错误，发生位置不同，能说明的效果也不同。下面后两行都限定错误结果已经成功保存；<code>durableAttempt</code> 是 Runtime 跨过 T1 后持有的本次持久调用对象。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 把同一次 Edit 从准入追到后置证据"><table><caption>表 6 / Table 6 · 把同一次 Edit 从准入追到后置证据</caption><thead><tr><th scope="col">发生位置</th><th scope="col">本次工具记录形状</th><th scope="col">对文件效果的已知结论</th></tr></thead><tbody><tr><td>原 Edit 调用进入 ToolRuntime，参数校验拒绝</td><td>未过 T1、无 durableAttempt；合成 call/response 解释拒绝，没有 durable dispatch</td><td>原 Edit 实现没有运行，不存在由它产生的本次写入</td></tr>
+<tr><td>T1 后，Edit 匹配流程仍未找到可接受的唯一目标，在写入前拒绝</td><td>已有 durable dispatch，错误结果保存为 error T2</td><td>这条受限 Edit 链在截断或写入文件前停止，没有应用本次替换</td></tr>
+<tr><td>worker 已启动，但效果回包失联，Runtime 无法确定是否已写</td><td>已有 durable dispatch，保存 <code>outcome_unknown</code> 的 error T2，并标 <code>retrySafe=false</code></td><td>文件可能已改变；错误已结算不等于已证明无效果，应先核对再决定下一行动</td></tr></tbody></table></div>
+<p><strong>带 durableAttempt 表示已跨过持久 dispatch 边界，不表示文件效果已发生。</strong> 相同的 synthetic 错误辅助函数可以服务不同边界，不能只凭函数名或 error 标签判断是否写入。</p>
+<p>若参数此前已被 SDK repair 转成内部 <code>invalid</code> 工具，应检查那份新调用自身的 T1/error T2，不能套用原调用的 preflight 结论；两条分叉见<a href="15-model-context.html#%E5%9D%8F%E5%8F%82%E6%95%B0%E6%9C%80%E5%90%8E%E4%BA%A4%E7%BB%99%E8%B0%81%E5%A4%84%E7%90%86">第15章</a>。若 T2 本身保存失败，则不满足表中后两行的“错误已结算”条件，应回到持久化失败与恢复路径判断。</p>
+<p>下一步不应直接原样重发 Edit。先用新的读取判断当前 README：新入口是否存在、旧入口是否仍在、其他段落是否保留；再检查 diff 与实际测试结果。如果文件已经满足要求，可以避免再次写入，继续验证任务。这说明当前状态支持下一步，不等于旧操作已被证明 exactly-once；diff 中还可能有他人的修改。若读取的是有界片段，结论也只能覆盖已读范围。</p>
+<p>若用户此时按 Stop，取消信号不会撤销已写字节。普通工具仍需完成可以结算的 T2；运行终态与工具效果分别解释，见前面的 <a href="#stop-%E4%B9%9F%E8%A6%81%E7%AD%89%E5%BE%85%E5%8F%AF%E4%BB%A5%E7%BB%93%E7%AE%97%E7%9A%84%E5%B7%A5%E5%85%B7">Stop 到结算</a>。若 T2 自己失败或 Host 已退出，就先处理对应恢复边界，不能假定原模型步骤还能继续做这次 Read。</p>
+<h4 id="改变两个条件再判断下一步">改变两个条件，再判断下一步</h4>
+<p><strong>问题一：同样假设 README 已写入，但 Host 在保存 unknown 的 error T2 之前退出。重启后还能判 completed 吗？新的 Read 已看到 <code>npm test</code>，能否直接宣布 O17 成功？</strong></p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不能沿用上表的 completed。此时持久记录只有 dispatch、没有 matching response，resolver 判 <code>indeterminate / dispatch_without_response</code>。文件现态与上表可能完全相同，系统已保存的知识却不同。</p>
+<p>新的 Read 可以证明当前可见文本包含目标入口；若其他要求也满足，可避免重复编辑。它不能唯一证明由 O17 完成，也不会自动补成 O17 的成功 T2。当前普通 generic recovery 没有自动完成这一整套文件对账；应保留未知，并按有权处理恢复的入口继续任务。</p>
+<p><strong>问题二：前一次 Read 后，另一位编辑者原地修改了 README 的介绍，inode 没变，旧测试命令仍唯一存在。能否认为文件层 T0 CAS 必然拒绝本次 Edit，保护了上一轮 Read 的完整版本？</strong></p>
+<p class="answer-label"><strong>参考答案</strong></p>
+<p>不能。普通 Edit 没有 <code>observedVersion</code> 参数；文件层比较 dev/ino，不比较上一轮 Read 的全部内容。若外部修改在 worker 读取前已完成且旧命令仍可唯一匹配，Edit 可以基于当前内容继续替换。不能把“同一对象”当成“同一版本”。</p>
+<p>这也不保证执行期间任意外部写者都被排除：工具的路径锁只协调参与该锁的调用。更强的设计需要在负责提交的资源层检查观察版本，并定义检查与写入的原子边界。对当前工具，涉及并发变化时应重新读取、保留他人改动并核对后置状态；该增强方案不是默认 Edit 已有的保证。</p>
+<h3 id="真实源码短读为什么要等-t2-提交完">真实源码短读：为什么要等 T2 提交完</h3>
+<p>普通工具产生规范化结果后，必须等待注入的 durable sink 完成结算，才能发布结果。可嵌入 ToolRuntime 不注入 sink 时，不具备这里的持久保证。</p>
+<p><code>ToolRuntime.prepareDurableToolAttempt</code> 返回的 <code>commitOutcome</code> 用 <code>await</code> 等待持久提交：</p>
+<pre><code class="language-ts">        try {
+          await sink.commitToolOutcome({
+            operationId,
+            journalEventId: `${operationId}_outcome`,
+            runtimeEvent: responseEvent,
+            committedAt: responseEvent.ts,
+          });</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 真实源码短读：为什么要等 T2 提交完"><table><caption>表 7 / Table 7 · 真实源码短读：为什么要等 T2 提交完</caption><thead><tr><th scope="col">时刻</th><th scope="col">内存与持久状态（Memory / Persistence）</th><th scope="col">后续可以做什么</th></tr></thead><tbody><tr><td>进入这段之前</td><td><code>responseEvent</code> 已在内存组成；可能已有外部效果，结果尚未由本次 T2 接受</td><td>不能仅凭内存结果宣称可恢复</td></tr>
+<tr><td>等待 <code>commitToolOutcome</code></td><td>sink 按同一个 operation identity 提交 response 与 outcome journal</td><td>当前调用等待提交，不把“发起写入”当完成</td></tr>
+<tr><td><code>await</code> 正常返回</td><td>存储已接受该 outcome；后文设置 <code>committedOutcome</code></td><td>把已结算结果交回调用路径，后续模型才能基于它继续</td></tr>
+<tr><td>提交抛错</td><td>无法据此证明本次 T2 已提交；实际外部效果不能因此判为未发生</td><td>catch 最终抛 <code>RuntimeCommitBoundaryError(&#39;T2&#39;, error)</code>，停止普通结果路径</td></tr></tbody></table></div>
+<p><code>await</code> 的含义是等待异步提交完成或抛错，不是冻结整个进程。如果删掉它，代码可能在提交失败前就沿成功路径继续；如果吞掉提交错误，模型可能基于重启后无法还原的结果作下一步决策。若把 T2 移到真实效果之前，则又会记录一项尚未观察到的结果。三种改法各破坏一条不同的因果关系。</p>
+<p>同一 <code>commitOutcome</code> 内紧邻的 <code>catch</code> 允许尽力补偿，但补偿不能覆盖 T2 原始失败；成功后才设置内存中的 <code>committedOutcome</code>。调用侧 <code>executeTool</code> 通过 <code>durableAttempt?.commitOutcome(...)</code> 先等待提交，再构造 <code>resultMsg</code> 并发布结果。<code>?.</code> 表示只在该对象存在时调用，因此这条持久保证以“production 已注入 sink”为前提。</p>
+<p>这个源码片段依赖调用侧和 sink，不能独立运行；它固定了“效果已发生 → 等待结果提交 → 发布结果”中的后两步顺序。</p>
+<h3 id="更深一层的常见误区">更深一层的常见误区</h3>
+<h4 id="误区六用户点击-stop-后立刻写-terminal-最安全">误区六：用户点击 Stop 后立刻写 terminal 最安全</h4>
+<p>如果 active tool 仍在结算，这会让 terminal 排在工具结果之前。应先 abort，再等待可结算 outcome。</p>
+<h4 id="误区七client-重连就是恢复业务执行">误区七：Client 重连就是恢复业务执行</h4>
+<p>重连只恢复连接和视图。Run、工具、Goal 等业务由各自 Host owner 根据 durable store 恢复。</p>
+<span class="heading-alias" id="深化自测能否限定恢复协议的适用范围" aria-hidden="true"></span><h4 id="恢复协议的适用范围问答">恢复协议的适用范围问答</h4>
+<p><strong>问题 1。</strong> 带当前协议标记的普通 call + synthetic response、没有 dispatch，说明什么？<code>old_string</code> 未找到也一定属于这种形状吗？</p>
+<p><strong>解释。</strong> 前者是 pre-T1 refusal，实现未运行；旧片段是否最终可匹配，要在 Edit 实现内检查；若在写入前拒绝且错误保存成功，是 dispatch 后的 error T2，不能混同。</p>
+<p><strong>问题 2。</strong> T2 写入失败为何不能变成普通“请重试”的工具错误？</p>
+<p><strong>解释。</strong> 否则模型可能基于不存在的 durable history 继续或重复副作用；提交边界错误需要传播并进入恢复处理。</p>
+<p><strong>问题 3。</strong> <code>idempotent</code> 标签为什么不等于无条件安全重试？</p>
+<p><strong>解释。</strong> 还要核对同一意图身份、参数、服务端去重作用域/期限和部分执行合同，标签不是实现。</p>
+<p><strong>问题 4。</strong> Client recovery 写入 <code>retrySafe=false</code> 的 error outcome，业务效果已确定了吗？</p>
+<p><strong>解释。</strong> 没有。Runtime 结算的是“效果未知、不能安全重试”，不是远端业务成功或无效果。</p>
+<p><strong>问题 5。</strong> provider-executed 缺本地 dispatch marker，能否证明没执行？</p>
+<p><strong>解释。</strong> 不能；该 lane 在 provider 内执行，不适用普通本地 ledger 推断，generic crash recovery 仍有缺口。</p>
+<p><strong>问题 6。</strong> 当前每次内建 Edit 都会提交 managed workspace successor 吗？</p>
+<p><strong>解释。</strong> 不是。managed mutation 基础协议存在，但普通 builtin profile 与 Host admission 默认接线仍 dormant。</p>
+<p><strong>问题 7。</strong> Edit 已经写入后按 Stop，为什么取消终态之前仍可能出现这次 Edit 的成功 T2？</p>
+<p><strong>解释。</strong> Stop 不回滚已发生效果；普通工具仍需把可结算结果持久保存，保持 T2 早于 terminal。成功 T2 只报告这次编辑的 outcome，取消终态表示后续 Run 被停止，两者不矛盾。</p>
+<p><a href="../../../extended-reading.html#reference-9" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../comparisons/execution-recovery-methods.md#2-恢复需要的事实取决于效果由谁拥有">恢复方法</a>比较了本地 ledger、远端幂等 key 与资源版本提交各自由谁承担保证。</p>
+<span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h2 id="相关章节">相关章节</h2>
+<ul>
+<li>相关章节：<a href="17-permissions-and-sandbox.html#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">第17章｜权限控制与沙箱隔离</a></li>
+<li>相关章节：<a href="19-context-compaction.html#%E6%A0%B8%E5%BF%83%E8%B7%AF%E5%BE%84%E7%BB%99%E6%9C%89%E9%99%90%E5%B7%A5%E4%BD%9C%E5%8F%B0%E6%95%B4%E7%90%86%E6%9D%90%E6%96%99">第19章｜长上下文与压缩</a></li>
+<li>总导航：<a href="README.html">从零学习 Maka Agent</a></li>
+</ul>
+<h2 id="延伸阅读">延伸阅读</h2>
+<p><a href="../../../extended-reading.html#reference-8" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../systems/tool-system.md">Tool 系统的持久效果与恢复</a>提供各类工具执行边界和恢复分类的完整说明。</p>
+<hr>
+<p><a href="17-permissions-and-sandbox.html">上一章：第 17 章｜权限控制与沙箱隔离</a> · <a href="19-context-compaction.html">下一章：第 19 章｜长上下文与压缩</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="17-permissions-and-sandbox.html"><span>← 上一章</span><strong>第 17 章｜权限控制与沙箱隔离</strong></a><a href="19-context-compaction.html"><span>下一章 →</span><strong>第 19 章｜长上下文与压缩</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E9%98%85%E8%AF%BB">核心阅读</a></li><li class="toc-level-3"><a href="#%E9%97%AE%E9%A2%98readme-%E5%B7%B2%E7%BB%8F%E6%94%B9%E4%BA%86%E4%BD%86%E7%B3%BB%E7%BB%9F%E8%BF%98%E6%B2%A1%E6%9D%A5%E5%BE%97%E5%8F%8A%E8%AF%B4%E6%88%90%E5%8A%9F">问题：README 已经改了，但系统还没来得及说“成功”</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E7%A7%8D%E5%85%B7%E4%BD%93%E5%81%9A%E6%B3%95%E5%9C%A8%E5%89%AF%E4%BD%9C%E7%94%A8%E5%89%8D%E5%90%8E%E5%90%84%E7%95%99%E4%B8%8B%E4%B8%80%E4%B8%AA%E6%8C%81%E4%B9%85%E8%BE%B9%E7%95%8C">一种具体做法：在副作用前后各留下一个持久边界</a></li><li class="toc-level-3"><a href="#%E6%A1%88%E4%BE%8B%E5%85%88%E5%B9%B6%E6%8E%92%E6%9F%A5%E7%9C%8B%E6%96%87%E4%BB%B6%E4%B8%8E%E4%BF%9D%E5%AD%98%E8%BD%A8%E8%BF%B9">案例：先并排查看文件与保存轨迹</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E5%A4%B1%E8%B4%A5%E5%B4%A9%E6%BA%83%E7%AA%97%E5%8F%A3%E4%B8%8D%E6%AD%A2%E4%B8%80%E4%B8%AA">失败：崩溃窗口不止一个</a></li><li class="toc-level-3"><a href="#maka%E6%99%AE%E9%80%9A%E7%94%9F%E4%BA%A7%E5%B7%A5%E5%85%B7%E7%9A%84-durable-effect-%E5%8D%8F%E8%AE%AE">Maka：普通生产工具的 durable effect 协议</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E5%90%8C%E4%B8%80%E6%AC%A1-edit-%E4%BB%8E%E5%87%86%E5%85%A5%E8%BF%BD%E5%88%B0%E5%90%8E%E7%BD%AE%E8%AF%81%E6%8D%AE">把同一次 Edit 从准入追到后置证据</a></li><li class="toc-level-3"><a href="#%E7%9C%9F%E5%AE%9E%E6%BA%90%E7%A0%81%E7%9F%AD%E8%AF%BB%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%AD%89-t2-%E6%8F%90%E4%BA%A4%E5%AE%8C">真实源码短读：为什么要等 T2 提交完</a></li><li class="toc-level-3"><a href="#%E6%9B%B4%E6%B7%B1%E4%B8%80%E5%B1%82%E7%9A%84%E5%B8%B8%E8%A7%81%E8%AF%AF%E5%8C%BA">更深一层的常见误区</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-2"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
