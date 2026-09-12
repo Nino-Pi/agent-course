@@ -57,7 +57,7 @@ export function isRuntimeEventRole(value: unknown): value is RuntimeEventRole {
 <tr><td><code>estimatedTokensBefore</code>、<code>estimatedTokensAfter</code></td><td>比较被覆盖前缀（Prefix）与检查点（Checkpoint）表示的估算词元（Token）数量；不等于包含全部后缀（Tail）的真实请求账单</td></tr></tbody></table></div>
 <p>最后一组尤其要按计算范围理解：名字里的 <code>Before</code>、<code>After</code> 不是“整个系统之前与之后”的承诺。词元（Token）在这里是模型文本计量所用单位，源码得到的是估算值；是否覆盖全部请求、是否为服务端实际计费，都要另找依据。</p>
 <p>通过 <code>decision</code> 判断后，检查器会进行类型收窄（Type Narrowing）：进入 <code>compacted</code> 分支，才可以按这个类型安全地读取 <code>checkpoint</code>。反过来，尚未判断就访问该字段，等于把“某一分支拥有”错当成“两种结果都拥有”。用类型断言（Type Assertion）压掉报错，只会隐藏这个推理缺口。</p>
-<p>还要再跨过一层边界：<strong>候选结果存在，不等于副作用（Side Effect）完成。</strong> 这个类型来自规划函数；保存、验证（Validation）和应用还在调用链（Call Chain）后面。第19章的<a href="19-context-compaction.html#%E6%BA%90%E7%A0%81%E8%B5%B0%E8%AF%BB%E4%B8%80%E4%BB%BD%E5%8F%AF%E7%94%A8%E6%91%98%E8%A6%81%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%98%E4%B8%8D%E8%83%BD%E7%AB%8B%E5%8D%B3%E7%94%9F%E6%95%88">源码走读</a>会继续解释，一份可用摘要为什么不能立即替换当前模型输入（Model Input）。</p>
+<p>还要再跨过一层边界：<strong>候选结果存在，不等于副作用（Side Effect）完成。</strong> 这个类型来自规划函数；保存、验证（Validation）和应用还在调用链（Call Chain）后面。第19章的<a href="19-context-compaction.html#%E6%BA%90%E7%A0%81%E8%B5%B0%E8%AF%BB%E5%80%99%E9%80%89%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%98%E4%B8%8D%E8%83%BD%E7%AB%8B%E5%8D%B3%E7%94%9F%E6%95%88">源码走读</a>会继续解释，一份可用摘要为什么不能立即替换当前模型输入（Model Input）。</p>
 <p><strong>问题。</strong> 看到 <code>decision === &#39;compacted&#39;</code>，能否报告“检查点（Checkpoint）已保存，恢复时可读”？</p>
 <p><strong>参考答案。</strong> 不能。这里确认的是候选规划分支，不是持久化（Persistence）终态。还需找到保存调用、成功条件、失败处理和后续读取路径；类型标签不能代替这些步骤。</p>
 <span class="heading-alias" id="短卡三promise-是一个待结算结果事件流是一连串交接" aria-hidden="true"></span><span class="heading-alias" id="promise-与事件流的控制顺序" aria-hidden="true"></span><h2 id="异步结果promise与等待await下一句何时执行">异步结果（Promise）与等待（await）：下一句何时执行？</h2>
@@ -119,7 +119,7 @@ import { stableStringify } from &#39;./request-shape.js&#39;;</code></pre>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 导入（Import）之后，还要找到实际负责者（Owner）"><table><caption>表 4 / Table 4 · 导入（Import）之后，还要找到实际负责者（Owner）</caption><thead><tr><th scope="col">接下来寻找什么</th><th scope="col">要回答的问题</th></tr></thead><tbody><tr><td>类型与数据定义</td><td>它包含哪些字段，怎样表达来源与覆盖范围？</td></tr>
 <tr><td>使用这些数据的调用链（Call Chain）</td><td>谁验证候选、等待保存调用，再决定采用哪个投影（Projection）？</td></tr>
 <tr><td>真实接线与写入</td><td>谁提供保存函数，写到哪种账本（Ledger），失败怎样处理，之后由谁读取？</td></tr></tbody></table></div>
-<p>类型归属（Type Ownership）、状态归属（State Ownership）与执行负责者（Owner）不是同一件事。类型放在Core包中，不说明Core包会自行启动压缩或保存记录。第19章的<a href="19-context-compaction.html#checkpoint-%E7%9A%84%E4%BF%9D%E5%AD%98%E4%B8%8E%E8%AF%BB%E5%8F%96%E9%93%BE">检查点（Checkpoint）保存与读取链</a>将继续追到实际消费者（Consumer），而不是停在接口（Interface）名称上。</p>
+<p>类型归属（Type Ownership）、状态归属（State Ownership）与执行负责者（Owner）不是同一件事。类型放在Core包中，不说明Core包会自行启动压缩或保存记录。第19章的<a href="19-context-compaction.html#%E6%A3%80%E6%9F%A5%E7%82%B9checkpoint%E7%9A%84%E4%BF%9D%E5%AD%98%E4%B8%8E%E8%AF%BB%E5%8F%96%E9%93%BE">检查点（Checkpoint）保存与读取链</a>将继续追到实际消费者（Consumer），而不是停在接口（Interface）名称上。</p>
 <p><strong>问题。</strong> 找到了 <code>RuntimeEvent</code> 的接口（Interface），是否就可以断言这份运行时事件（Runtime Event）已经保存？</p>
 <p><strong>参考答案。</strong> 不能。类型定义没有存储副作用（Side Effect）。需要继续查创建、调用、实际写入和失败处理；导入（Import）关系只提供了追踪入口。</p>
 <span class="heading-alias" id="回到原来的问题" aria-hidden="true"></span><span class="heading-alias" id="相关机制" aria-hidden="true"></span><h2 id="把三种读法带回后续机制">把三种读法带回后续机制</h2>

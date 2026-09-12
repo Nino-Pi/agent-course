@@ -84,7 +84,7 @@ workspaces/A.md         正文：A 的解释用英文；来源是用户 T20</cod
 <p>若某次 A 的当前用户消息明确要求英文，该次任务应按当前有效要求处理，不等于后台必须把全局默认永久改成英文。短期要求和长期写入意图要分开确认。</p>
 <p>比较时固定这一组操作，查看不同设计在哪个中间状态出现冲突，而不是只看最终回答是否碰巧一致。</p>
 <h3 id="同一命令变更用知识记录区分提交成功和仍然有效">同一命令变更：用知识记录区分“提交成功”和“仍然有效”</h3>
-<p>接续 <a href="20-memory.html#%E8%BF%9E%E7%BB%AD%E6%8E%A8%E6%BC%94%E4%BB%8E-pytest-%E6%94%B9%E6%88%90-make-check%E5%93%AA%E4%B8%80%E6%AD%A5%E6%89%8D%E7%AE%97%E6%94%B9%E5%A5%BD%E4%BA%86">第20章</a>：用户将 A 的测试入口从 <code>pytest</code> 改为 <code>make check</code>，B 仍用 <code>pytest</code>。先把需要判断的内容写成一个<strong>教学模型</strong>：</p>
+<p>接续 <a href="20-memory.html#%E8%BF%9E%E7%BB%AD%E6%8E%A8%E6%BC%94a%E4%BB%8E-pytest%E6%94%B9%E4%B8%BA-make-check">第20章</a>：用户将 A 的测试入口从 <code>pytest</code> 改为 <code>make check</code>，B 仍用 <code>pytest</code>。先把需要判断的内容写成一个<strong>教学模型</strong>：</p>
 <pre><code class="language-text">m = (scope, key, value, validity, source, status)
     适用范围、信息类别、内容、有效条件、来源、当前状态</code></pre>
 <p>这里不是 Maka/Codex 的实际 schema。<code>scope</code> 可以在设计中表达项目 A；<code>key=test-command</code> 让不同措辞的规则仍可被当作同一问题；<code>validity</code> 描述何时或在哪种环境下成立；<code>source</code> 指向用户明确声明或独立核验的观察；<code>status</code> 表示 active、撤回或待解决冲突。把字段列出来只暴露问题，不会自动实现解析、时效检查或可信性判断。</p>

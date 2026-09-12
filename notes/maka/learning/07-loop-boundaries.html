@@ -36,9 +36,9 @@
 <span class="heading-alias" id="4-只带三个问题进入-maka" aria-hidden="true"></span><span class="heading-alias" id="4-身份记录与负责者" aria-hidden="true"></span><h2 id="4-身份identity记录与负责者owner">4. 身份（Identity）、记录与负责者（Owner）</h2>
 <p>继续工作还需要回答三类问题。可以把它们理解为“关联谁、相信什么、由谁决定”，每类都补一个不同缺口。</p>
 <ol>
-<li>**关联谁：**用户重发同一句要求，是继续原工作还是创建新尝试？需要身份（Identity）把长期归属、用户可观察的一项工作和具体执行区分开。</li>
-<li>**相信什么：**准备执行的文本、返回的工具结果（Tool Result）、磁盘中的文件分别说明不同事情。用于判断的事实（Fact）要与从记录整理出的投影（Projection）区分；一个界面视图不自动拥有裁决权。</li>
-<li>**由谁决定：**界面仍显示运行、模型（Model）宣称完成、后台进程正在退出，可以同时出现。负责者（Owner）表示有权管理某一状态（State）的组件，不能仅由谁显示信息来判断。</li>
+<li><strong>关联谁</strong>：用户重发同一句要求，是继续原工作还是创建新尝试？需要身份（Identity）把长期归属、用户可观察的一项工作和具体执行区分开。</li>
+<li><strong>相信什么</strong>：准备执行的文本、返回的工具结果（Tool Result）、磁盘中的文件分别说明不同事情。用于判断的事实（Fact）要与从记录整理出的投影（Projection）区分；一个界面视图不自动拥有裁决权。</li>
+<li><strong>由谁决定</strong>：界面仍显示运行、模型（Model）宣称完成、后台进程正在退出，可以同时出现。负责者（Owner）表示有权管理某一状态（State）的组件，不能仅由谁显示信息来判断。</li>
 </ol>
 <p>后面会用会话（Session）关联一组交互，用工作轮次（Turn）表示用户可观察的一项工作，用执行（Run）标识一次具体运行；这些是 Maka 的语境，不能仅按同名词把别的项目对象强行对应。第08章先给问题地图，第13、14章再展开各自的记录和实现。</p>
 <span class="heading-alias" id="自测" aria-hidden="true"></span><h2 id="问题解析">问题解析</h2>
@@ -57,7 +57,7 @@
 <p>一次任务可能积累很多输出。历史（History）值得保存，却不必全部进入下一次模型输入（Model Input）；有限的上下文窗口（Context Window）还要求选择与组织。<a href="19-context-compaction.html">第19章</a>讲上下文压缩（Context Compaction），<a href="20-memory.html">第20章</a>讲记忆（Memory）怎样跨任务保存和召回（Recall）。它们分别回答“这一次看什么”和“以后怎样再次使用”，不能用一个保存动作代替。</p>
 <span class="heading-alias" id="工作跨进程或跨组件再讨论委派与所有权" aria-hidden="true"></span><span class="heading-alias" id="跨进程工作与所有权" aria-hidden="true"></span><h3 id="跨进程工作与所有权ownership">跨进程工作与所有权（Ownership）</h3>
 <p>再换一个正常场景：README 已修改，测试结束且结果已经保存，用户尚未提出下一问。文件与聊天记录仍需留下，但计算进程是否必须常驻？判断之前应先列出必须保留的状态（State）、可以重建的运行现场，以及谁有权开始下一次执行（Run）。释放计算资源与遗忘工作身份（Identity）是不同选择。</p>
-<p>这会连接到<a href="13-session-turn-run.html#%E6%8C%81%E4%B9%85%E8%BA%AB%E4%BB%BD%E4%B8%8E%E8%BF%9B%E7%A8%8B%E5%AF%BF%E5%91%BD%E5%88%86%E5%88%AB%E8%AE%B0%E5%BD%95">第13章的身份与进程</a>及<a href="25-host-and-client.html#%E9%95%BF%E6%9C%9F%E8%B4%A3%E4%BB%BB%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%BD%BD%E4%BD%93%E8%83%BD%E5%90%A6%E5%88%86%E5%BC%80">第25章的执行载体</a>。第06章没有测试自动释放，也没有测试跨进程恢复（Recovery）。委派（Delegation）、持续推进与断线观察会继续增加责任，第08章将它们放回共同地图。</p>
+<p>这会连接到<a href="13-session-turn-run.html#%E6%8C%81%E4%B9%85%E8%BA%AB%E4%BB%BDidentity%E4%B8%8E%E8%BF%9B%E7%A8%8B%E5%AF%BF%E5%91%BD">第13章的身份与进程</a>及<a href="25-host-and-client.html#%E9%95%BF%E6%9C%9F%E8%B4%A3%E4%BB%BB%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%BD%BD%E4%BD%93%E8%83%BD%E5%90%A6%E5%88%86%E5%BC%80">第25章的执行载体</a>。第06章没有测试自动释放，也没有测试跨进程恢复（Recovery）。委派（Delegation）、持续推进与断线观察会继续增加责任，第08章将它们放回共同地图。</p>
 <span class="heading-alias" id="第二遍" aria-hidden="true"></span><span class="heading-alias" id="练习授权与输入选择" aria-hidden="true"></span><span class="heading-alias" id="授权与输入选择问答" aria-hidden="true"></span><h3 id="授权authorization与输入选择问答">授权（Authorization）与输入选择问答</h3>
 <p><strong>问题1。</strong> “用户允许执行 <code>npm test</code>”还没有回答什么边界问题？</p>
 <p><strong>参考答案。</strong> 没有说明底层能否强制限制脚本访问的文件、网络和子进程。交互确认（Confirmation）与隔离（Isolation）需要分别验证。</p>

@@ -110,7 +110,7 @@ H_next = Record(H_t, a_t, o_next)</code></pre>
 <li><strong>适配器编码请求。</strong> <code>convertResponsesMessages</code> 在内部调用 <code>transformMessages</code> 做消息兼容整理，再编码为 OpenAI Responses 的请求项。这与第1步的 Agent 通用消息转换属于不同层，也不代表所有 provider 都走这两个函数。</li>
 <li><strong>响应回到等待中的循环。</strong> <code>processResponsesStream</code> 按输出槽归并增量参数和响应状态；<code>streamAssistantResponse</code> 消费适配器的事件流，取得最终消息后返回。<code>runLoop</code> 再判断停止还是进入工具处理；它不是由响应解析器新调用起来的。</li>
 </ol>
-<p><a href="15-model-context.html#%E4%B8%A4%E4%B8%AA%E5%B7%A5%E5%85%B7%E4%BA%A4%E9%94%99%E5%88%B0%E8%BE%BE%E6%89%8B%E6%8E%A8%E5%85%AB%E4%B8%AA%E4%BA%8B%E4%BB%B6">第15章的八事件例</a>把“参数已可解析”与“响应已完整结束”分开；因此完整的参数对象也不能绕过终止政策直接执行。<a href="../../../extended-reading.html#reference-4" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/model-runtime/model-adapters-and-streaming.md">模型适配与流式执行</a>继续展开这些转换及其执行闸门。</p>
+<p><a href="15-model-context.html#%E4%B8%A4%E4%B8%AA%E5%B7%A5%E5%85%B7tool%E4%BA%A4%E9%94%99%E5%88%B0%E8%BE%BE%E6%89%8B%E6%8E%A8%E5%85%AB%E4%B8%AA%E4%BA%8B%E4%BB%B6">第15章的八事件例</a>把“参数已可解析”与“响应已完整结束”分开；因此完整的参数对象也不能绕过终止政策直接执行。<a href="../../../extended-reading.html#reference-4" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../../deep-dives/model-runtime/model-adapters-and-streaming.md">模型适配与流式执行</a>继续展开这些转换及其执行闸门。</p>
 <p>这些阶段可与编译器 IR、增量解析、队列背压和 vLLM 前缀缓存设计对照。跨模型时，签名思考可能是仅对原模型或协议有效的不透明状态，适配器不能把它当通用历史原样重放；合成缺失 toolResult 只补消息关系，没有执行文件回滚；sessionId 只是关联或提示信息，不能证明实际请求满足前缀复用条件，缓存命中仍需服务端观测。这些转换取决于模型协议，不能据一条 adapter 路径推广到所有模型。</p>
 <hr>
 <p><a href="27-task-continuity.html">上一章：第 27 章｜跨会话任务推进与工作交接</a> · <a href="29-codex-runtime-and-lifecycle.html">下一章：第 29 章｜Codex：运行时与任务生命周期</a></p>

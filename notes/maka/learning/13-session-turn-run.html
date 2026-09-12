@@ -1,270 +1,151 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 13 章｜Session、Turn、Run 与 Owner · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 13 / 62</div><article id="main-content"><span class="heading-alias" id="02sessionturnrun-与-owner先弄清谁的哪一次工作" aria-hidden="true"></span><span class="heading-alias" id="m02sessionturnrun-与-owner" aria-hidden="true"></span><span class="heading-alias" id="第-12-章sessionturnrun-与-owner" aria-hidden="true"></span><h1 id="第-13-章sessionturnrun-与-owner">第 13 章｜Session、Turn、Run 与 Owner</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 13 章｜工作身份（Work Identity）与负责者（Owner） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script><link rel="stylesheet" href="../../../assets/katex/katex.min.css"><link rel="stylesheet" href="../../../assets/course-math.css"></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 13 / 62</div><article id="main-content"><span class="heading-alias" id="02sessionturnrun-与-owner先弄清谁的哪一次工作" aria-hidden="true"></span><span class="heading-alias" id="m02sessionturnrun-与-owner" aria-hidden="true"></span><span class="heading-alias" id="第-12-章sessionturnrun-与-owner" aria-hidden="true"></span><span class="heading-alias" id="第-13-章sessionturnrun-与-owner" aria-hidden="true"></span><h1 id="第-13-章工作身份work-identity与负责者owner">第 13 章｜工作身份（Work Identity）与负责者（Owner）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：同一会话中的多项工作、多次模型调用和重试，怎样归到正确的身份与负责者？</p>
-<p><strong>关键概念</strong>：Session（会话）标识长期归属；Turn（轮次）标识一项顶层工作；Run（运行）标识具体执行；Owner（所有者）拥有相应状态的决定权。</p>
-<p><strong>关系主线</strong>：会话容纳不同工作，一次执行又可包含多个模型和工具步骤。身份说明“是哪一份”，owner 说明“谁能决定”；进程、数据库写入能力和界面显示不能代替这两种关系。</p>
+<p><strong>核心问题</strong>：同一聊天里出现新任务、模型（Model）重试或进程重启时，怎样认出是哪项工作，并找到有权改变它的部件？</p>
+<p><strong>关键概念</strong>：会话（Session）表示长期归属；工作轮次（Turn）表示一项顶层工作；执行（Run）表示落实它的一次具体运行。身份（Identity）区分对象，状态归属（State Ownership）明确谁负责维护，裁决权（Authority）限定谁能接受状态（State）变化。</p>
+<p><strong>关系主线</strong>：先分清工作与内部步骤，再沿准入（Admission）、执行（Run）和读取寻找负责者（Owner）。同一身份（Identity）可以经历状态（State）变化；重试需要核对原内容，读回旧记录也不等于继续旧进程。</p>
 </blockquote>
-<p>沿用 <a href="12-request-lifecycle.html">第12章</a> 的一次完整请求，下面把 S1、T7、R7 与模型调用分别定位。</p>
+<h2 id="前情回顾同一项工作怎样跨过多个部件">前情回顾：同一项工作怎样跨过多个部件</h2>
+<p><a href="12-request-lifecycle.html">第12章</a>沿一项README修复说明了接纳、执行（Run）和展示：宿主（Host）先保存准入（Admission）依据，运行时（Runtime）组织模型（Model）与工具（Tool），客户端（Client）再读取结果。本章沿用会话（Session）S1、工作轮次（Turn）T7、执行（Run）R7，进一步解释这些编号为什么不能合并。</p>
+<p>任务仍是读取配置与README、更新测试（Test）入口、运行检查、核对差异（Diff）并用中文总结，还提出“以后也请记住我希望使用中文解释”。函数已经正确，四个既有测试（Test）原本通过；README却写 <code>npm run check</code>，配置实际提供 <code>&quot;test&quot;: &quot;node --test&quot;</code>，所以只应把说明改为 <code>npm test</code>，保留函数、测试（Test）与配置。它与第04章仍含 <code>% 100</code> 缺陷的初态不同。</p>
+<p>S1/T7/R7及四个模型步骤（Model Step）是教学记号。本章把测试（Test）与差异（Diff）核对安排在第三步，不固定该步内部的工具调用（Tool Call）总数；一项检查不能因为未单列编号就被省略。后面另引第22章的历史七次模型调用（Model Query），不会把两组数字拼成一次运行。</p>
 <h2 id="核心路线">核心路线</h2>
-<span class="heading-alias" id="本章要回答什么" aria-hidden="true"></span><h3 id="正在运行需要哪些身份">“正在运行”需要哪些身份</h3>
-<p>Agent 系统里很容易出现一句含糊的话：</p>
-<blockquote><p>“这个任务正在运行。”</p>
-</blockquote>
-<p>但工程上必须继续追问：</p>
-<ul>
-<li>是哪个长期会话里的任务？</li>
-<li>用户提出的是哪一项工作？</li>
-<li>系统具体执行的是哪一次 Run？</li>
-<li>谁有资格决定它能否开始、是否结束？</li>
-<li>一次 Run 里的第几个模型请求出了问题？</li>
-</ul>
-<p>只更新 README 的例子用 S1 / T7 / R7 分别标识会话、工作和执行，<a href="glossary.html#%E8%B4%9F%E8%B4%A3%E8%80%85owner">所有者（Owner）</a>则标识谁负责决定状态变化。完整 <code>formatDuration</code> 修复的工具步骤更多，但区分身份的方法相同。</p>
-<span class="heading-alias" id="先看结论" aria-hidden="true"></span><h3 id="工作归属顶层意图与具体执行">工作归属、顶层意图与具体执行</h3>
-<p>三个身份分别标识不同时间尺度。先把它们放进同一项 README 任务，后面再看重发请求时哪些身份应该保持：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 工作归属、顶层意图与具体执行"><table><caption>表 1 / Table 1 · 工作归属、顶层意图与具体执行</caption><thead><tr><th scope="col">身份</th><th scope="col">回答的问题</th><th scope="col">本例中的对象</th></tr></thead><tbody><tr><td>Session（会话）S1</td><td>这些前后相关的工作归到哪里？</td><td>同一项目的长期会话，还可容纳后来的新任务</td></tr>
-<tr><td>Turn（顶层工作）T7</td><td>用户这次要求完成什么？</td><td>读配置和 README、修改测试说明、跑测试、中文总结</td></tr>
-<tr><td>Run（具体执行）R7</td><td>哪次执行在落实这项工作？</td><td>驱动模型与工具，并保存本次执行身份、过程和结果</td></tr></tbody></table></div>
-<p>Owner 回答的是<strong>谁有资格为某种状态作最终决定</strong>。身份把事实归到正确对象，owner 再决定这个对象能否进入下一状态。</p>
-<p>例如，Storage 可以帮忙写入 Run 状态，但不因为“它会写数据库”就有资格自行决定新工作应该开始。机制和决定权不是一回事。</p>
-<h3 id="为什么不能只用一个-taskid">为什么不能只用一个 <code>taskId</code></h3>
-<p>初学项目常常会设计一个万能 <code>taskId</code>，既表示聊天，又表示用户消息，又表示一次模型调用。Demo 阶段很方便，进入真实生命周期后就会出现歧义。</p>
-<p>设想下面过程：</p>
-<ol>
-<li>用户在同一个聊天房间里先问“项目怎样运行？”；</li>
-<li>接着发起 T7，让 Agent 修改 README 并测试；</li>
-<li>R7 内部连续调用模型四次；</li>
-<li>网络断开，Client 重发同一个 T7；</li>
-<li>稍后用户又在同一房间提出另一项工作 T8。</li>
-</ol>
-<p>如果只有一个 <code>taskId</code>，很难同时回答：</p>
-<ul>
-<li>哪些历史属于同一个长期房间？</li>
-<li>重发的是同一用户意图还是一项新任务？</li>
-<li>哪组模型和工具事件属于同一次执行？</li>
-<li>哪次重新请求模型只是 R7 内部的重试，而不是新 Run？</li>
-</ul>
-<p>Session、Turn、Run 是把不同时间尺度分开的三把尺子。</p>
-<h3 id="session长期存在的工作房间">Session：长期存在的工作房间</h3>
-<p><a href="glossary.html#session%E4%BC%9A%E8%AF%9D">会话（Session）</a>保留长期对话及关联的项目背景，身份是 <code>sessionId</code>。这里的“工作房间”是逻辑归属，不是磁盘上的目录。</p>
-<p>可以把 S1 想成一间项目工作室：项目与会话设置、以前完成的 Turn、当前工作状态和未来的新 Turn 都归到这间工作室。某次工作结束，房间仍可继续使用。</p>
-<h4 id="session-解决什么问题">Session 解决什么问题</h4>
-<p>Session 把多项前后相关的工作放进同一长期边界。关闭 Client 再打开，S1 仍可以从持久存储中被识别；它不是某个 React 组件或某条 WebSocket 连接的寿命。</p>
-<h4 id="session-不是什么">Session 不是什么</h4>
-<ul>
-<li>不是一次模型 API 请求；</li>
-<li>不是一条用户消息；</li>
-<li>不是一段只存在内存中的聊天数组；</li>
-<li>不是“当前正在执行的函数调用栈”；</li>
-<li>也不天然等于一个 Git 仓库。</li>
-</ul>
-<h4 id="统一案例中的-s1">统一案例中的 S1</h4>
-<p>T7 开始前，S1 可能已有历史。T7 完成后，用户还可以在 S1 中提出 T8，例如“再把测试步骤翻译成英文”。S1 负责长期归属，但不把所有工作混成一次 Run。</p>
-<h3 id="turn用户能够指认的一项顶层工作">Turn：用户能够指认的一项顶层工作</h3>
-<p><a href="glossary.html#turn%E8%BD%AE%E6%AC%A1--%E7%94%A8%E6%88%B7%E5%8F%AF%E8%A7%82%E5%AF%9F%E5%B7%A5%E4%BD%9C%E8%BE%B9%E7%95%8C">轮次（Turn）</a>是 Session 中的一项顶层工作，身份是 <code>turnId</code>。</p>
-<p>T7 对应的用户意图是：</p>
-<blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，更新 README 的测试步骤，运行测试，最后用中文总结；以后也请记住我希望使用中文解释。</p>
-</blockquote>
-<h4 id="为什么-turn-不等于一条网络请求">为什么 Turn 不等于一条网络请求</h4>
-<p>Client 可能因为超时把相同 T7 发送两次。网络请求有两次，但用户意图仍应被识别为同一个 Turn。反过来，一个 Turn 也可能通过订阅、重连和多条协议消息持续向 Client 发布进展。</p>
-<h4 id="为什么-turn-不等于一次模型调用">为什么 Turn 不等于一次模型调用</h4>
-<p>T7 内部可能有：</p>
-<pre><code class="language-text">模型 step 1：请求两个并行 Read
-模型 step 2：请求 Edit
-模型 step 3：请求 Bash
-模型 step 4：生成总结</code></pre>
-<p>四次模型交互仍服务于同一项用户工作 T7。</p>
-<h3 id="run执行工作的持久运行封套">Run：执行工作的持久运行封套</h3>
-<p><a href="glossary.html#run--agentrun%E8%BF%90%E8%A1%8C--%E6%89%A7%E8%A1%8C%E5%B0%81%E5%A5%97">运行（Run）</a>包含这项工作的一次具体执行，以及随执行保存的身份、状态与记录，身份是 <code>runId</code>。教学案例使用 R7。“持久运行封套”（durable execution envelope）只是强调：同一次执行的记录放在一起，进程退出后还能读取。能读回记录，不表示已经恢复原来正在运行的函数；恢复未完成工作需要 第18章 的额外判断。</p>
-<p>“封套”意味着 R7 把同一次执行产生的事实包在一起：固定的 S1 / T7 归属、执行组成信息、多个模型 step、Read / Edit / Bash 的调用与结果，以及使用量、运行事件和最终的 completed / failed / cancelled 状态。后面的嵌套图把这些归属放在同一视野里。</p>
-<h4 id="run-的典型生命周期">Run 的典型生命周期</h4>
-<p>下面的教学状态图表示一次执行可能经过的阶段，不列出产品的完整状态枚举：</p>
-<pre><code class="language-text">created
-  → running
-  → waiting_for_user（某些交互场景）
-  → completed | failed | cancelled</code></pre>
-<p>不同路径不一定经过每个中间状态，但最终应该有一个不可含糊的<a href="glossary.html#terminal-state--terminal-fact%E7%BB%88%E6%80%81--%E7%BB%88%E6%80%81%E4%BA%8B%E5%AE%9E">终态</a>。</p>
-<h3 id="三种身份怎样嵌套">三种身份怎样嵌套</h3>
-<p>同一 Session 中的多项工作可以表示为：</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="三种身份怎样嵌套：可滚动示意图"><a href="../../../assets/diagrams/13-session-turn-run-1.svg"><img src="../../../assets/diagrams/13-session-turn-run-1.svg" alt="外框表示身份归属：长期 Session S1 包含以前 T6、当前 T7 与将来 T8；本例 T7 的 Run R7 包含模型步骤、工具调用及执行记录和终态。归属关系不代表所有恢复路径的固定数量，也不替代 Owner 的裁决责任。" width="859" height="1080" loading="lazy" style="width:859px;min-width:731px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>外框表示归属，内部卡片列出执行内容与记录，并不把存储记录当成下一执行步骤。图帮助区分长期归属、用户工作与具体执行，不是对所有恢复路径的数量关系作承诺；Owner（负责者）另行说明谁有权决定这些状态。</p>
-<h3 id="owner谁有资格拍板">Owner：谁有资格拍板</h3>
-<p><a href="glossary.html#%E8%B4%9F%E8%B4%A3%E8%80%85owner">所有者（Owner）</a>不是“代码文件归谁维护”，而是某种状态或决定的权威负责者。</p>
-<p>最简单的判断题是：</p>
-<blockquote><p>当不同部件意见不一致时，谁的记录或决定算数？</p>
-</blockquote>
-<h4 id="用饭店类比">用饭店类比</h4>
-<ul>
-<li>顾客提出点菜请求，类似 Client 提交 Turn；</li>
-<li>前台确认是否接单，类似 Host 做 admission；</li>
-<li>厨房真正烹饪，类似 Runtime 执行；</li>
-<li>收银系统记录订单，类似 Storage 持久化；</li>
-<li>屏幕显示“制作中”，类似 UI projection。</li>
-</ul>
-<p>收银系统能写订单，但它不会凭自己看到一张空表就决定“再炒一份”；屏幕也不能因为动画播放完就宣布菜已经交付。</p>
-<p>回到 README 修复：Client 提交意图，Host 判断是否接纳，Runtime 驱动执行并确定执行结果，Storage 提供保存机制，Client 再展示结果。若 Client 仍显示“运行中”，负责执行状态的持久记录却已结束，应更新显示；不能让界面要求文件再改一次。这样就把“谁会存、谁会画”与“谁有权决定”区分开了。</p>
-<h3 id="把身份放回一次真实工作">把身份放回一次真实工作</h3>
-<p><a href="22-agent-cases.html#2-maka%E5%90%8C%E4%B8%80%E4%BB%B6%E5%B7%A5%E4%BD%9C%E6%8D%A2%E4%B8%80%E7%A7%8D%E5%B7%A5%E5%85%B7%E8%A1%A8%E8%BE%BE">第22章 的 Maka 修复</a>是一项用户任务，记录为一个 Session 中的一个 Turn 和一个 Run；内部却有 7 次模型请求与多次 Read/Edit/Bash。因此每问模型一次，不等于新建一个 Turn 或 Run。这组记录中的 7 次请求计算的是模型交互次数，用户工作仍只有一项。</p>
+<span class="heading-alias" id="本章要回答什么" aria-hidden="true"></span><span class="heading-alias" id="先看结论" aria-hidden="true"></span><span class="heading-alias" id="正在运行需要哪些身份" aria-hidden="true"></span><span class="heading-alias" id="工作归属顶层意图与具体执行" aria-hidden="true"></span><h3 id="先区分哪项工作与现在怎样">先区分“哪项工作”与“现在怎样”</h3>
+<p>“这个任务正在运行”只给出了一个阶段，还缺少对象和负责范围。需要先定位它属于哪个会话（Session）、哪项工作轮次（Turn）、哪次执行（Run），再判断哪个负责者（Owner）的记录能回答当前问题。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 先区分“哪项工作”与“现在怎样”"><table><caption>表 1 / Table 1 · 先区分“哪项工作”与“现在怎样”</caption><thead><tr><th scope="col">身份（Identity）</th><th scope="col">回答的问题</th><th scope="col">README案例中的含义</th></tr></thead><tbody><tr><td>会话（Session），<code>sessionId = S1</code></td><td>前后相关的工作归到哪里？</td><td>项目的长期工作空间，可以容纳以前和以后的任务</td></tr>
+<tr><td>工作轮次（Turn），<code>turnId = T7</code></td><td>这次发起的是哪一项顶层工作？</td><td>更新说明、检查结果并总结这一整项要求</td></tr>
+<tr><td>执行（Run），<code>runId = R7</code></td><td>哪次具体运行正在落实要求？</td><td>本次模型（Model）与工具（Tool）过程及其结束记录</td></tr></tbody></table></div>
+<p>身份（Identity）回答“是哪一份”，状态（State）回答“目前处于什么阶段”。例如R7开始时尚未结束，后来保存了合法结束记录；改变的是R7的状态（State），并不因此把它改名为R8。相反，用户另提一项T8，就不能只把旧R7重新显示为运行中来冒充新工作。</p>
+<span class="heading-alias" id="为什么不能只用一个-taskid" aria-hidden="true"></span><h4 id="为什么一个-taskid-不够">为什么一个 <code>taskId</code> 不够</h4>
+<p>考虑同一房间里发生的五件事：先询问项目怎样运行；接着提出T7；R7内多次询问模型（Model）；连接超时后重发T7；稍后再提出新的T8。它们同时包含长期归属、用户意图、具体执行（Run）和内部请求四种关系。</p>
+<p>只用一个 <code>taskId</code>，就难以区分“重发同一意图”和“发起新任务”，也难以判断两次模型（Model）服务请求是否只是内部重试。拆开身份（Identity）不是为了多加编号，而是为了让不同操作拥有不同的判定条件。</p>
+<span class="heading-alias" id="session长期存在的工作房间" aria-hidden="true"></span><span class="heading-alias" id="session-解决什么问题" aria-hidden="true"></span><span class="heading-alias" id="session-不是什么" aria-hidden="true"></span><span class="heading-alias" id="统一案例中的-s1" aria-hidden="true"></span><h3 id="会话session长期归属可以跨过连接与进程">会话（Session）：长期归属可以跨过连接与进程</h3>
+<p><a href="glossary.html#session%E4%BC%9A%E8%AF%9D">会话（Session）</a>是长期的逻辑归属。S1可以关联项目设置、历史对话、以前的工作轮次（Turn）和当前工作，也可继续接纳未来的新要求；它不等于磁盘目录或某个代码仓库。</p>
+<p>客户端（Client）关闭再打开，不必新建S1。某个进程结束后，新进程也可以从持久记录识别它。这说明会话（Session）的寿命不依赖一条连接或一个界面组件，尚不能证明旧程序能从原暂停点继续。</p>
+<p>同样，一份聊天消息（Message）列表只是可读材料的一部分。会话（Session）还关联权限（Permission）、工作身份（Work Identity）及其他业务状态（State）；一条模型（Model）服务请求、一个用户消息（Message）或一段函数调用栈都不能单独代表它。</p>
+<span class="heading-alias" id="turn用户能够指认的一项顶层工作" aria-hidden="true"></span><span class="heading-alias" id="为什么-turn-不等于一条网络请求" aria-hidden="true"></span><span class="heading-alias" id="为什么-turn-不等于一次模型调用" aria-hidden="true"></span><h3 id="工作轮次turn用户能够指认的一项要求">工作轮次（Turn）：用户能够指认的一项要求</h3>
+<p><a href="glossary.html#turn%E8%BD%AE%E6%AC%A1--%E7%94%A8%E6%88%B7%E5%8F%AF%E8%A7%82%E5%AF%9F%E5%B7%A5%E4%BD%9C%E8%BE%B9%E7%95%8C">工作轮次（Turn）</a>是会话（Session）里的一项顶层工作。T7包含完整的README要求，而不是其中某一次读取。</p>
+<p>网络超时后，客户端（Client）可能发送两次相同T7。发送次数是两次，原意图仍可以是一项工作轮次（Turn）；反过来，订阅、重连和多条进展消息（Message）也可以共同服务T7。能否按原请求重试，还要核对已接受内容，不能只看编号。</p>
+<p>这项工作可以经过四个模型步骤（Model Step）：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 工作轮次（Turn）：用户能够指认的一项要求"><table><caption>表 2 / Table 2 · 工作轮次（Turn）：用户能够指认的一项要求</caption><thead><tr><th scope="col">教学步骤</th><th scope="col">本次模型（Model）要决定什么</th><th scope="col">工具（Tool）返回后增加什么材料</th></tr></thead><tbody><tr><td>1</td><td>请求读取配置和README</td><td>实际测试（Test）入口、当前说明与保留内容</td></tr>
+<tr><td>2</td><td>根据旧内容请求局部编辑</td><td>编辑是否成功及修改报告</td></tr>
+<tr><td>3</td><td>请求测试（Test）和差异（Diff）核对</td><td>通过/失败材料与改动范围</td></tr>
+<tr><td>4</td><td>根据已有结果生成中文总结</td><td>本次最终回答；仍需保存结束记录</td></tr></tbody></table></div>
+<p>第一步可同时提出两个 <code>Read</code>，仍只占一个模型步骤（Model Step）。一项工作轮次（Turn）既不等于一个模型调用（Model Query），也不等于一个工具调用（Tool Call）。</p>
+<span class="heading-alias" id="run执行工作的持久运行封套" aria-hidden="true"></span><h3 id="执行run把同一次运行的记录放在一起">执行（Run）：把同一次运行的记录放在一起</h3>
+<p><a href="glossary.html#run--agentrun%E8%BF%90%E8%A1%8C--%E6%89%A7%E8%A1%8C%E5%B0%81%E5%A5%97">执行（Run）</a>把本次过程的身份（Identity）、状态（State）和记录关联起来。R7可以包含多个模型步骤（Model Step）、工具调用（Tool Call）、工具结果（Tool Result）、使用量和最终结果。</p>
+<p>“持久执行封套（Durable Execution Envelope）”是帮助阅读的说法：这些记录保存后还能读回。它不是原函数调用栈的快照（Snapshot），也不意味着进程退出后一定自动续跑。</p>
+<span class="heading-alias" id="run-的典型生命周期" aria-hidden="true"></span><h4 id="状态state变化不需要换身份identity">状态（State）变化不需要换身份（Identity）</h4>
+<p>为了理解阶段，可以把本例概括为准备、进行中、必要时等待交互、最后结束。这是教学顺序，不是统一的产品枚举。读源码还要区分模型（Model）结束原因、运行时事件（Runtime Event）的状态（State）字段、宿主（Host）工作视图与资源清理是否结束。</p>
+<p>例如默认流的 <code>user_stop</code> 会映射为 <code>aborted</code>，其他接口可能使用 <code>cancelled</code>；<code>end_turn</code>也不能越过先前失败分类的判断。第12章已给出映射条件，第14章会继续从终态（Terminal State）的保存与读取解释它们。不要把同一组字符串套在所有层。</p>
+<span class="heading-alias" id="三种身份怎样嵌套" aria-hidden="true"></span><h3 id="三种身份identity的归属图">三种身份（Identity）的归属图</h3>
+<p>下图限定普通教学路径中的S1/T7/R7。边界表示归属，不表示程序调用顺序；也不承诺任何恢复（Recovery）情形下都永远是一项工作配一次执行（Run）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="会话、工作轮次与执行的归属 · Session, Turn and Run：可滚动示意图"><a href="../../../assets/diagrams/13-session-turn-run-1.svg"><img src="../../../assets/diagrams/13-session-turn-run-1.svg" alt="外框表示身份归属（Identity Scope）：长期会话（Session）S1包含以前、当前与将来的工作轮次（Turn）；本例T7的执行（Run）R7包含模型步骤（Model Step）、工具调用（Tool Call）、执行记录（Execution Record）与终态（Terminal State）。归属关系不代表所有恢复路径的固定数量，也不替代负责者（Owner）的裁决责任。" width="860" height="1137" loading="lazy" style="width:860px;min-width:731px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>保存记录的卡片没有指向下一动作，因为存储（Storage）本身不会主动推进工作。负责者（Owner）及其裁决权（Authority）是另一层关系，需要沿实际控制链寻找。后面的协作交接（Cooperative Handoff）会说明，同一逻辑工作怎样保留归属而更换物理执行（Physical Invocation）。</p>
+<span class="heading-alias" id="owner谁有资格拍板" aria-hidden="true"></span><span class="heading-alias" id="用饭店类比" aria-hidden="true"></span><span class="heading-alias" id="maka-中的责任分配" aria-hidden="true"></span><h3 id="负责者owner谁能决定谁负责落实">负责者（Owner）：谁能决定，谁负责落实</h3>
+<p><a href="glossary.html#%E8%B4%9F%E8%B4%A3%E8%80%85owner">负责者（Owner）</a>指负责某项状态（State）或决定的部件，不是源文件的维护人。状态归属（State Ownership）说明哪一方维护规则和生命周期（Lifecycle）；<a href="glossary.html#authority%E8%A3%81%E5%86%B3%E6%9D%83--%E6%9D%83%E5%A8%81%E8%BE%B9%E7%95%8C">裁决权（Authority）</a>说明发生冲突时，哪一方有资格接受或拒绝变化。</p>
+<p>先回到README任务：客户端（Client）提出T7，宿主（Host）决定能否接纳，运行时（Runtime）组织R7，存储（Storage）执行相应写入，客户端（Client）读取并展示结果。每一方参与了流程，参与本身不代表拥有全部决定权。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 负责者（Owner）：谁能决定，谁负责落实"><table><caption>表 3 / Table 3 · 负责者（Owner）：谁能决定，谁负责落实</caption><thead><tr><th scope="col">当前问题</th><th scope="col">负责者（Owner）与判定依据</th><th scope="col">其他部件的作用</th></tr></thead><tbody><tr><td>T7能否开始</td><td>宿主（Host）的顶层准入（Root Admission）与已接受记录</td><td>客户端（Client）提交；存储（Storage）落实原子写入</td></tr>
+<tr><td>R7还能否继续模型（Model）与工具（Tool）循环</td><td>运行时（Runtime）中的 <code>RuntimeKernel</code>、<code>AgentRun</code>及当前控制条件</td><td>执行后端（Agent Backend）、工具执行链（Tool Execution）落实操作</td></tr>
+<tr><td>R7如何结束</td><td>终态认领（Terminal Claim）、提交屏障（Commit Barrier）与持久终态事实（Terminal Fact）</td><td>宿主（Host）读取发布，客户端（Client）展示</td></tr>
+<tr><td>中文偏好是否保存</td><td>对应长期记忆（Long-Term Memory）的协调器（Coordinator）、存储（Storage）与策略</td><td>模型（Model）可以提出，用户策略可以限制</td></tr>
+<tr><td>界面显示什么</td><td>客户端（Client）的展示逻辑与已接纳的快照（Snapshot）</td><td>展示不能反向裁定执行（Run）结果</td></tr></tbody></table></div>
+<p>如果界面仍显示运行中，而R7的合法持久终态（Terminal State）已经存在，应更新界面，不能因此再修改一次文件。读写数据库的能力，也不能授权存储（Storage）自己决定“再接一单”。</p>
+<span class="heading-alias" id="authority-与-mechanism决定权和实现手段要分开" aria-hidden="true"></span><h4 id="裁决权authority与机制mechanism">裁决权（Authority）与机制（Mechanism）</h4>
+<p>机制（Mechanism）是实现决定的手段。例如 <code>RootTurnCoordinator</code> 组织T7准入（Admission），底层存储（Storage）提供原子追加与比较后写入（Compare-And-Swap，CAS）：先检查预期状态（State）仍匹配，再接受更新。</p>
+<p>比较后写入（Compare-And-Swap，CAS）帮助拒绝过时写入，却不会自动判断T7究竟是用户要求还是定时任务（Scheduled Task）、是否符合重试条件、是否应等待另一项工作，以及遇到不确定结果时是否应停止推进。这些都是相应负责者（Owner）的规则。</p>
+<p><strong>问题。</strong> 最后执行数据库写入的函数，是否就是这项业务的负责者（Owner）？</p>
+<p><strong>参考答案。</strong> 不能这样判断。沿调用链（Call Chain）找到谁检查准入（Admission）、固定内容并处理冲突；实际写入者可能只是执行该决定。界面最后显示结果，也不因此取得终态（Terminal State）的裁决权（Authority）。</p>
+<span class="heading-alias" id="把身份放回一次真实工作" aria-hidden="true"></span><h3 id="把身份identity放回一份历史运行">把身份（Identity）放回一份历史运行</h3>
+<p><a href="22-agent-cases.html#2-maka%E5%90%8C%E4%B8%80%E4%BB%B6%E5%B7%A5%E4%BD%9C%E6%8D%A2%E4%B8%80%E7%A7%8D%E5%B7%A5%E5%85%B7%E8%A1%A8%E8%BE%BE">第22章的Maka修复</a>记录了一项完整函数与文档修复：一个会话（Session）中的一项工作轮次（Turn）、一次执行（Run），内部有7次模型调用（Model Query）及多次 <code>Read/Edit/Bash</code>。这里沿用该历史记录，没有把本章只改README的四步教学过程当成它的实际轨迹（Trajectory）。</p>
+<p>这组7次统计的是模型（Model）交互次数，不是7项用户工作。它也不能单独说明每次失败请求背后的物理请求尝试（Physical Attempt）总数；统计单位必须随证据一起说明。</p>
 <span class="heading-alias" id="核心出口自测与答案" aria-hidden="true"></span><h3 id="核心问题解析">核心问题解析</h3>
-<p><strong>问题 1。</strong> 在 S1 中完成 T7 后又开始 T8，哪些身份不变，哪些代表新工作？</p>
-<p><strong>解释。</strong> Session S1 保持长期归属；T8 表示新的顶层工作，具体执行拥有对应 Run。不要把连接重建当成创建新 Session。</p>
-<p><strong>问题 2。</strong> T7 内模型连续请求 Read、Edit、Bash，是否意味着创建了三个 Turn？</p>
-<p><strong>解释。</strong> 不是。多个模型 step 和工具调用可以共同服务一个 Turn / Run。这里的编号用于区分层次，不能用网络请求次数代替工作次数。</p>
-<p><strong>问题 3。</strong> Storage 能写入接单记录，为什么不表示它独自决定接单？</p>
-<p><strong>解释。</strong> 写入是机制，是否允许工作开始由相应业务 owner 判断。需要核对调用者、准入规则与已保存事实，而不是由能写数据库推导决定权。</p>
+<p><strong>问题1。</strong> S1中完成T7后发起T8，哪些对象保持，哪些发生变化？</p>
+<p><strong>参考答案。</strong> 会话（Session）S1保持长期归属；新的工作轮次（Turn）T8拥有相应执行（Run）。一次重连不自动创建新会话（Session），一个旧状态（State）变化也不自动创建新工作。</p>
+<p><strong>问题2。</strong> 两个 <code>Read</code>、一个 <code>Edit</code>和后续检查，为什么不按工具（Tool）数创建工作轮次（Turn）？</p>
+<p><strong>参考答案。</strong> 它们共同服务同一意图。工具调用（Tool Call）是执行（Run）内部动作，一个模型步骤（Model Step）也可以提出多个动作；不同层次必须分别计数。</p>
 <h2 id="实现深化">实现深化</h2>
-<h3 id="root-executionhost-当前接纳的顶层执行">Root execution：Host 当前接纳的顶层执行</h3>
-<p><a href="glossary.html#root-execution%E9%A1%B6%E5%B1%82%E6%89%A7%E8%A1%8C">Root execution</a>描述 Host 的准入范围：这是某个 Session 当前被接纳的顶层工作。</p>
-<p>对 T7：</p>
-<pre><code class="language-text">root execution identity = { S1, T7, R7 }</code></pre>
-<p>Maka 由 Host 接纳顶层工作时，要维护一个重要约束：同一个 Session 同时最多有一个待执行或活跃的顶层工作（pending/active root execution）。这可以防止下列冲突：</p>
-<pre><code class="language-text">用户消息 T7 正在修改 README
-+ 定时任务同时启动另一项顶层修改
-+ 持续目标控制器同时开始下一轮</code></pre>
-<p>它们若未经协调共同写同一 Session 的顶层状态，Client 很难得到一致顺序，恢复也会变得含糊。</p>
-<h4 id="这条约束不表示什么">这条约束不表示什么</h4>
-<ul>
-<li>不表示整个 Maka 只能串行执行一个任务；</li>
-<li>不表示不同 Session 之间不能并行；</li>
-<li>不表示 Runtime 内所有可能执行都被简化成单值；</li>
-<li>不表示关联子代理（linked subagent）与父任务共享一个无边界的 Run。</li>
-</ul>
-<p>Maka 用带父子关联信息（lineage）的子会话（child Session）承载这种子代理。它有自己的组合、历史和生命周期；第23章将展开委派与结果交付，本节只用它说明父子任务的身份边界。</p>
-<span class="heading-alias" id="turn-不一定来自一条手动用户消息" aria-hidden="true"></span><h3 id="系统发起的-turn-与普通用户-turn">系统发起的 Turn 与普通用户 Turn</h3>
-<p>Maka 的顶层工作也可以由持续目标（Goal）、定时任务（ScheduledTask）或依赖图的唤醒机制（Agent Graph wake）发起。它们分别依据目标进度、到期时间或依赖状态提出新工作，第24章再展开各自控制逻辑。无论来源如何，都应走统一的 hosted root execution authority，而不是每种功能各自偷偷实现第二套 Agent loop。</p>
-<span class="heading-alias" id="run-也不等于一次模型调用" aria-hidden="true"></span><h3 id="run-内的逻辑调用与物理-attempt">Run 内的逻辑调用与物理 attempt</h3>
-<p>R7 可以包含多个逻辑模型调用，也就是循环中不同步骤的模型请求；其中某一步在受控重试时，又可能发出多个物理 attempt，即实际向模型服务发送的请求尝试。</p>
-<pre><code class="language-text">Run R7
-  ├─ logical model call C1
-  │    └─ physical attempt A1
-  ├─ logical model call C2
-  │    ├─ physical attempt A2a
-  │    └─ physical attempt A2b（只有规则允许时）
-  └─ ...</code></pre>
-<p>所以看到 provider 发出两次请求，不能立刻推断系统建立了两个 Turn 或两个 Run。</p>
-<h3 id="预算限制的是哪一个单位">预算限制的是哪一个单位？</h3>
-<p>区分身份之后，再问“最多还能运行几次”才有明确含义。当前默认 AiSdkTurn 的几种限制作用在不同单位上：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 预算限制的是哪一个单位？"><table><caption>表 2 / Table 2 · 预算限制的是哪一个单位？</caption><thead><tr><th scope="col">限制</th><th scope="col">计算什么</th><th scope="col">不应推导什么</th></tr></thead><tbody><tr><td><code>maxSteps</code></td><td>一次 send 中已完成的模型 step；本次输入可覆盖 backend 配置</td><td>一个 step 只有一个工具，或它是所有网络请求的次数上限</td></tr>
-<tr><td>provider attempt 限制与恢复条件</td><td>同一步中能否再发一个物理请求</td><td>有剩余 attempt 就必定安全；还需检查输出/效果、错误类型与剩余 step budget</td></tr>
-<tr><td>Context window / 输入容量</td><td>一次模型请求能否容纳当前输入</td><td>还有输入空间就允许无限循环，或压缩成功等于得到更多执行步骤</td></tr></tbody></table></div>
-<p>这些限制各自解决一个问题，也都不直接等于金额预算。此处没有假定产品默认固定为三步；下面是<strong>调用者提供 <code>maxSteps=3</code> 的源码推演</strong>，不是实际执行记录：</p>
-<pre><code class="language-text">R7，maxSteps = 3
-  step 1：请求两个 Read → 两个结果已结算        已完成 step = 1
-  step 2：请求 Edit → 编辑结果已结算           已完成 step = 2
-  step 3：请求 Bash → 测试结果已结算           已完成 step = 3
-  第 4 步总结需要再次调用模型                  没有剩余 step</code></pre>
-<p>在没有另一个优先交接控制权（handoff）的原因、最后以 tool-calls 结束的这个分支里，Runtime 不再请求总结，而是以 <code>step_limit</code> 结束，映射为 failed。测试可能已经通过，但“四步旅程”还没全部完成；系统不能编造未产生的模型总结。反过来，若最后允许的 step 已正常给出最终回答，不应只因数字达到上限就判它失败。</p>
-<p>再假设 step 2 的第一次 physical attempt 在形成任何可观察输出前断开：若错误和恢复额度允许，可仍在 R7 内发下一 attempt。这种不完整流没有形成已完成的 step，不会仅因建立过一次连接就消耗一个 step；但它可能已经产生 provider 请求或成本，不能把“未计为完整 step”写成“没有调用模型”。一旦出现工具活动或回答文本，判断又不同，不能只数次数决定重试。</p>
-<p><code>AiSdkTurn</code> 用 <code>runtimeSteps</code> 计数、<code>mayTakeAnotherStep</code> 判断能否继续，再由 provider retry guard 判断失败请求可否重发。这三处分别回答“已完成多少”“还能否继续”“失败请求可否重发”，不能共用一个计数推断。</p>
-<h3 id="身份简图的适用范围">身份简图的适用范围</h3>
-<p>这是一张教学简图，不应被推广为“任何 Turn 在所有情况下永远只能有一个可能的执行记录”。在当前普通 hosted root 主路中，durable admission 会固定 exact <code>{sessionId, turnId, runId}</code>；协作式 Host 交接提供了一个具体例外：原物理执行（invocation）在持久边界封存，后继物理执行继续同一逻辑 Turn，顶层准入仍拥有决定权。这里先区分逻辑工作与物理执行，交接与持续工作将在第24章展开。它不等于第二项用户任务或重新执行已完成的工具。</p>
-<h4 id="持久身份与进程寿命分别记录">持久身份与进程寿命分别记录</h4>
-<p>假设进程 P1 已完成并保存 S1/T7/R7，随后退出。以后 P2 读取 S1 的记录，在用户新请求 T8 被准入后执行 R8。S1 的身份持续存在，P1 的调用栈没有回来，R7 的终态也没有重新打开。这个教学例子说明长期身份与进程寿命可以分开；它没有证明未完成的 R7 能在任意机器接着跑。</p>
-<p>读历史、接纳新工作、恢复未完成的执行，是三个不同操作。后者还需要核对执行接手、实际文件、权限与结果未知的边界，见 <a href="18-effects-and-recovery.html#et2-%E5%B7%B2%E6%8F%90%E4%BA%A4%E4%B8%8B%E4%B8%80%E6%A8%A1%E5%9E%8B-step-%E5%B0%9A%E6%9C%AA%E5%BC%80%E5%A7%8B">第18章</a>。一份持久记录不能自动带来休眠、跨机器迁移或原进程恢复；这些能力还需要各自的执行合同。</p>
-<p>再改变一个条件：P1 留下了 R7 的回答文字，却没保存 terminal 就退出。S1/T7/R7 的身份仍可找到，但它只帮助恢复程序定位该查哪份记录，并不证明 R7 成功。当前普通恢复路径若没有续接认领（continuation claim，即已有控制者声明负责后续推进）或执行交接（handoff），会把这种开放执行收束为 <code>failed / app_restarted</code>；如果原 terminal 已经存在，则保留原结果。新进程先读事实，再由相应 owner 决定接下来做什么，不能因为重新找到 R7 就重放全部动作。</p>
-<p>这里的“恢复成功”可能只表示正确记录了中断。恢复观察读取已有结果，重建输入准备后续请求，收束中断保存失败终态，继续执行则需要相应 owner 的准入决定。<a href="14-events-and-projections.html#%E5%90%8C%E4%B8%80%E4%BB%BD%E5%9B%9E%E7%AD%94%E6%80%8E%E6%A0%B7%E4%BB%8E-running-%E5%8F%98%E6%88%90%E4%B8%AD%E6%96%AD%E8%AE%B0%E5%BD%95">一份回答和四条持久记录</a>展示了这些操作怎样分开。</p>
-<h3 id="maka-中的责任分配">Maka 中的责任分配</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · Maka 中的责任分配"><table><caption>表 3 / Table 3 · Maka 中的责任分配</caption><thead><tr><th scope="col">问题</th><th scope="col">主要负责者 / 裁决权（Owner / Authority）</th><th scope="col">其他部件能做什么</th></tr></thead><tbody><tr><td>S1 的 root 工作能否开始</td><td>Host 侧 root admission / execution authority</td><td>Client 提交请求；Storage 原子写入</td></tr>
-<tr><td>R7 的活跃模型—工具循环</td><td>RuntimeKernel / AgentRun</td><td>Backend、Tool Runtime 参与执行</td></tr>
-<tr><td>R7 的 canonical terminal</td><td>Run 的终态认领与提交屏障（terminal claim/barrier）及持久 RuntimeEvent 事实</td><td>Host/Client 读取并发布、展示</td></tr>
-<tr><td>数据怎样可靠写入 SQLite</td><td>Storage mechanism</td><td>上层 owner 决定写什么业务事实</td></tr>
-<tr><td>UI 显示什么</td><td>Client presentation state</td><td>从 Host snapshot / durable facts 构造</td></tr>
-<tr><td>长期 Memory 是否写入</td><td>对应 Memory coordinator / store owner</td><td>模型可以提出，用户策略可以限制</td></tr></tbody></table></div>
-<p>这里的终态认领与屏障用于协调竞争的结束信号、确认结果提交，下一章再拆解。不同业务域（domain）的协调器（coordinator）各自维护规则，账本保存相应事实。一个部件能够读写记录，并不因此获得表中其他决定权。</p>
-<h3 id="authority-与-mechanism决定权和实现手段要分开">Authority 与 mechanism：决定权和实现手段要分开</h3>
-<p><a href="glossary.html#authority%E8%A3%81%E5%86%B3%E6%9D%83--%E6%9D%83%E5%A8%81%E8%BE%B9%E7%95%8C">Authority</a>可以翻成“最终裁决权”。<a href="glossary.html#mechanism%E6%9C%BA%E5%88%B6">Mechanism</a>是实现这种决定的手段。</p>
-<p>例如：</p>
-<pre><code class="language-text">RootTurnCoordinator 决定并组织 T7 的准入
-Storage 提供原子追加（append）和比较后更新（CAS）等写入机制</code></pre>
-<p>这里的 CAS 指先核对预期状态，仍匹配才接受更新；它帮助拒绝过时写入，不替业务层判断用户意图。Storage 当然很重要，但仅有这些通用写入机制，还不能自行决定：</p>
-<ul>
-<li>T7 是用户消息还是 ScheduledTask；</li>
-<li>是否符合业务层 exact retry 规则；</li>
-<li>是否应该等待另一项 root execution；</li>
-<li>发生歧义时产品应该停止操作（fail closed）还是继续。</li>
-</ul>
-<p>因此：</p>
-<pre><code class="language-text">谁把数据写进去  ≠  谁拥有这项业务状态</code></pre>
-<p>同样：</p>
-<pre><code class="language-text">谁把状态画出来  ≠  谁拥有这项事实</code></pre>
-<h3 id="invocationid从-opening-到-terminal-的执行事实坐标"><code>invocationId</code>：从 opening 到 terminal 的执行事实坐标</h3>
-<p>Maka 的 RuntimeEvent 等记录还会携带 <a href="glossary.html#invocationid%E6%89%A7%E8%A1%8C%E4%BA%8B%E5%AE%9E%E5%85%B3%E8%81%94%E5%9D%90%E6%A0%87"><code>invocationId</code>（执行事实关联坐标）</a>。对普通 production Run，当前实现通常让它绑定为 <code>runId</code>，所以 R7 的事件往往有 <code>invocationId = R7</code>。</p>
-<p>opening 指执行开始记录，terminal 指执行结束记录。这个坐标把执行事件、工具恢复或后续续接中的相关事实关联起来，而不新增独立的调度层：</p>
-<pre><code class="language-text">Session / Turn / Run  是主要生命周期身份
-invocationId          是 opening / events / terminal 的执行事实坐标</code></pre>
-<p>“当前值相等”也不表示两个概念的语义永远完全相同。当前 <code>RuntimeInvocationRecord</code> 已从 opening + events + terminal 重建这次执行；历史 codec 与 continuation 也依赖该关联。它有明确数据结构，但不新增独立调度器。</p>
-<h3 id="身份必须在哪些地方保持一致">身份必须在哪些地方保持一致</h3>
-<p>从 T7 准入到 R7 完成，至少要跨越下面边界：</p>
-<pre><code class="language-text">Client request
-  → Host admission
-  → Runtime start
-  → invocation_opened（执行事实）
-  → RuntimeEvents
-  → Tool journal
-  → terminal snapshot
-  → Client projection</code></pre>
-<p>每一层都不能随手换一个新的 <code>runId</code>。例如 Host 已把 T7 准入为 R7，而 Runtime 回报它启动的是 R9，这不是“小差异”，而是身份不变量被破坏。系统无法再可靠回答哪些事件属于已准入工作。</p>
-<h3 id="为什么同一个-id-重试也要检查内容">为什么“同一个 ID 重试”也要检查内容</h3>
-<p>假设第一次提交：</p>
-<pre><code class="language-text">T7 = “只读取 package.json”</code></pre>
-<p>网络超时后，第二次却提交：</p>
-<pre><code class="language-text">T7 = “删除整个项目”</code></pre>
-<p>如果 Host 只检查 <code>turnId</code> 相同，就可能把完全不同的意图伪装成同一个重试。Maka 因此要求 exact retry（原请求的精确重试）匹配已经固定的 payload 和 descriptor：payload 是提交的任务内容，descriptor 是本次执行的描述。这里先抓住共同作用——身份相同时，内容也必须与已经接受的那一份匹配；内容漂移应被拒绝。</p>
-<p>这条规则同时保护：</p>
-<ul>
-<li>幂等重试；</li>
-<li>审计可解释性；</li>
-<li>权限决策的一致输入；</li>
-<li>恢复时对原始意图的判断。</li>
-</ul>
-<h3 id="正常例子和失败例子">正常例子和失败例子</h3>
-<h4 id="正常例子t7-只被执行一次">正常例子：T7 只被执行一次</h4>
-<pre><code class="language-text">Client 提交 S1/T7
-→ Host 准入并固定 R7
-→ Runtime 明确启动 R7
-→ 所有执行事件携带一致身份
-→ R7 写入 completed terminal
-→ Client 显示 T7 已完成</code></pre>
-<p>即使 Client 中途断线再连接，身份仍能闭合。</p>
-<h4 id="失败例子一重复提交相同-t7">失败例子一：重复提交相同 T7</h4>
-<p>如果内容完全一致，Host 可以识别已有 admission，而不是偷偷创建另一个会产生重复副作用的 Run。具体返回和恢复方式取决于当前事实状态。</p>
-<h4 id="失败例子二同一-t7-的-payload-漂移">失败例子二：同一 T7 的 payload 漂移</h4>
-<p>Host 应拒绝把新内容塞入旧身份。用户若真想发起不同工作，应使用新的 Turn identity。</p>
-<h4 id="失败例子三ui-显示-running但-r7-已-terminal">失败例子三：UI 显示 running，但 R7 已 terminal</h4>
-<p>这可能只是 Client 断线或投影未更新。恢复时应从 canonical facts 重建，而不是要求 Runtime 再执行一次。</p>
-<h3 id="容易混淆的相邻概念">容易混淆的相邻概念</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 容易混淆的相邻概念"><table><caption>表 4 / Table 4 · 容易混淆的相邻概念</caption><thead><tr><th scope="col">概念</th><th scope="col">不等于</th><th scope="col">原因</th></tr></thead><tbody><tr><td>会话（Session）</td><td>Client 连接</td><td>连接会断开，Session 可长期存在</td></tr>
-<tr><td>轮次（Turn）</td><td>HTTP / IPC 请求</td><td>网络层可能重试同一 Turn</td></tr>
-<tr><td>轮次（Turn）</td><td>模型 step</td><td>一个 Turn 可以有多个 step</td></tr>
-<tr><td>运行（Run）</td><td>provider attempt</td><td>一个 Run 可有多个逻辑调用与物理 attempt</td></tr>
-<tr><td>顶层执行（Root Execution）</td><td>整个系统唯一任务</td><td>它是单个 Session 的 Host admission scope</td></tr>
-<tr><td>负责者（Owner）</td><td>调用链上最后一个函数</td><td>Owner 由业务 authority 决定，不由栈位置决定</td></tr>
-<tr><td>存储写入者（Storage Writer）</td><td>所有业务状态的 owner</td><td>Storage 提供机制，不自行制定业务语义</td></tr>
-<tr><td>客户端（Client）</td><td>terminal authority</td><td>Client 观察和展示，不定义执行终态</td></tr></tbody></table></div>
-<h3 id="常见误解">常见误解</h3>
-<h4 id="误解一session-就是一串-messages">误解一：“Session 就是一串 messages”</h4>
-<p>Messages 只是可展示内容的一部分。Session 还关联执行、权限、continuity 和其他 domain 状态。</p>
-<h4 id="误解二一次用户消息只会有一个模型响应">误解二：“一次用户消息只会有一个模型响应”</h4>
-<p>Agent Turn 通常通过多个模型—工具 step 才得到最终回答。</p>
-<h4 id="误解三数据库是唯一-owner">误解三：“数据库是唯一 Owner”</h4>
-<p>数据库可以是 durable authority 的承载机制，但具体业务 owner 仍由 coordinator/runtime contract 定义。Maka 也不是所有事实都塞在一张表里。</p>
-<h4 id="误解四同一-session-同时最多一个-root所以不能有-subagent">误解四：“同一 Session 同时最多一个 root，所以不能有 Subagent”</h4>
-<p>linked subagent 使用 child Session；不同 Session 和不同作用域可以并行。约束的是同一 Session 中未经协调的顶层准入。</p>
-<span class="heading-alias" id="深化自测" aria-hidden="true"></span><h3 id="机制问题解析">机制问题解析</h3>
-<p><strong>问题 1。</strong> provider retry 为什么通常不需要创建新 Turn？</p>
-<p><strong>解释。</strong> 它可以仍是同一执行中一次逻辑调用的物理 attempt；能否重试还受已发生效果与 lane 契约约束。</p>
-<p><strong>问题 2。</strong> 同一个 T7 携带不同内容重发，为什么应拒绝？</p>
-<p><strong>解释。</strong> 同一身份必须对应固定的意图和执行描述，内容漂移破坏幂等和权限判断的输入。</p>
-<p><strong>问题 3。</strong> 同一 Session 最多一个 pending/active root，为什么不等于整个系统不能并行？</p>
-<p><strong>解释。</strong> 这是单个 Session 的 Host 顶层准入范围；不同 Session、child Session 以及 Runtime 内特定作用域需分别判断。</p>
-<p><strong>问题 4。</strong> 假设 R7 只有三个模型 step 的额度，两个 Read、Edit、Bash 都已返回，是否保证还能生成最终总结？step 中一次安全请求重试会变成新 Turn 吗？</p>
-<p><strong>解释。</strong> 不保证。两个 Read 可属于同一个 step，随后 Edit、Bash 分别再用一步；没有下一模型 step 的额度就不能假造总结。允许的 physical retry 仍可在同一 Run 内；它的次数与已完成 step 数不同。</p>
-<span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h3 id="相关章节">相关章节</h3>
-<ul>
-<li>相关章节：<a href="12-request-lifecycle.html">第12章｜一次请求的完整生命周期</a></li>
-<li>相关章节：<a href="14-events-and-projections.html">第14章｜事实、事件与投影视图</a></li>
-</ul>
-<h3 id="延伸阅读">延伸阅读</h3>
-<p><a href="../../../extended-reading.html#reference-1" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/system-map.md">系统地图中的身份与裁决权</a>可用于核对各类状态由谁创建、持有和恢复。</p>
+<span class="heading-alias" id="root-executionhost-当前接纳的顶层执行" aria-hidden="true"></span><span class="heading-alias" id="这条约束不表示什么" aria-hidden="true"></span><h3 id="顶层执行root-execution同一会话session的准入admission范围">顶层执行（Root Execution）：同一会话（Session）的准入（Admission）范围</h3>
+<p>顶层执行（Root Execution）描述宿主（Host）当前接纳的整项工作。普通路径会固定精确的 <code>{sessionId, turnId, runId}</code>，本例就是 <code>{S1, T7, R7}</code>。同一会话（Session）同时最多有一个待执行或活跃的顶层执行（Root Execution），以协调用户消息（Message）、定时任务（Scheduled Task）和持续目标（Goal）提出的工作。</p>
+<p>这个约束限定的是宿主（Host）准入（Admission）范围，不是整个系统只能串行工作。不同会话（Session）可以并行；运行时（Runtime）内部能表示多次活跃执行（Run），也不代表产品允许未经协调的多个顶层写操作。</p>
+<p>关联子代理（Linked Subagent）使用带父子关联信息（Lineage）的子会话（Child Session），拥有自己的组成、历史和生命周期（Lifecycle）。它不会无边界地共用父任务的R7。<a href="23-skills-and-subagents.html">第23章</a>再展开委派；这里先保留父子身份（Identity）的区别。</p>
+<span class="heading-alias" id="turn-不一定来自一条手动用户消息" aria-hidden="true"></span><span class="heading-alias" id="系统发起的-turn-与普通用户-turn" aria-hidden="true"></span><h4 id="系统发起的工作轮次turn">系统发起的工作轮次（Turn）</h4>
+<p>持续目标（Goal）、定时任务（Scheduled Task）或依赖图唤醒（Agent Graph Wake）也可以提出新工作，分别依据进度、时间或依赖条件。它们仍应经过宿主（Host）的顶层准入（Root Admission），不能各自另启一套未经协调的代理循环（Agent Loop）。第24章继续解释相应控制规则。</p>
+<span class="heading-alias" id="run-也不等于一次模型调用" aria-hidden="true"></span><span class="heading-alias" id="run-内的逻辑调用与物理-attempt" aria-hidden="true"></span><h3 id="模型步骤model-step与物理请求尝试physical-attempt">模型步骤（Model Step）与物理请求尝试（Physical Attempt）</h3>
+<p>R7内的模型调用（Model Query）表示循环中的一次逻辑请求工作；受控重试可能使它包含多次实际发往模型服务提供方（Provider）的物理请求尝试（Physical Attempt）。下列编号只是层次示意：</p>
+<pre><code class="language-text">执行 Run R7
+  ├─ 模型调用 Model Query C1
+  │    └─ 物理请求尝试 Physical Attempt A1
+  └─ 模型调用 Model Query C2
+       ├─ 物理请求尝试 Physical Attempt A2a
+       └─ 物理请求尝试 Physical Attempt A2b（规则允许才重发）</code></pre>
+<p>A2a与A2b不自动成为两项工作轮次（Turn），也不要求建立两个执行（Run）。但它们确实可能产生两次服务请求与费用，不能因为逻辑归属相同就把第二次当作没有发生。</p>
+<span class="heading-alias" id="预算限制的是哪一个单位" aria-hidden="true"></span><h3 id="预算budget限制的是哪一个单位">预算（Budget）限制的是哪一个单位？</h3>
+<p>当前默认 <code>AiSdkTurn</code> 分别判断步骤、尝试和输入容量：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 预算（Budget）限制的是哪一个单位？"><table><caption>表 4 / Table 4 · 预算（Budget）限制的是哪一个单位？</caption><thead><tr><th scope="col">限制</th><th scope="col">计算单位与适用条件</th><th scope="col">不能推出什么</th></tr></thead><tbody><tr><td><code>maxSteps</code></td><td>一次 <code>send</code> 中已完成的模型步骤（Model Step）；输入可以覆盖后端配置</td><td>一个步骤只有一个工具（Tool），或它等于全部网络请求数</td></tr>
+<tr><td>物理请求尝试（Physical Attempt）上限与恢复（Recovery）规则</td><td>同一步还能否重发物理请求尝试（Physical Attempt）</td><td>只要次数未满就安全；还要检查输出、效果（Effect）、错误和剩余步骤</td></tr>
+<tr><td>上下文窗口（Context Window）</td><td>本次请求是否容纳当前模型输入（Model Input）</td><td>输入装得下就能无限循环，或压缩自动增加步骤额度</td></tr></tbody></table></div>
+<p>三者都不直接等于金额预算（Budget）。为了把计数落到前面的四步流程，下面显式设定调用者提供 <code>maxSteps=3</code>；它不是产品默认值，也不是实测轨迹（Trajectory）。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 预算（Budget）限制的是哪一个单位？"><table><caption>表 5 / Table 5 · 预算（Budget）限制的是哪一个单位？</caption><thead><tr><th scope="col">教学进度</th><th scope="col" style="text-align:right">已完成模型步骤（Model Step）数</th><th scope="col">还缺什么</th></tr></thead><tbody><tr><td>第一步两个 <code>Read</code> 返回并结算</td><td style="text-align:right">1</td><td>编辑、检查与总结</td></tr>
+<tr><td>第二步 <code>Edit</code> 返回并结算</td><td style="text-align:right">2</td><td>检查与总结</td></tr>
+<tr><td>第三步测试（Test）与差异（Diff）核对结算</td><td style="text-align:right">3</td><td>第四次模型调用（Model Query）才能生成的总结</td></tr></tbody></table></div>
+<p>设步骤上限为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi></mrow><annotation encoding="application/x-tex">N</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span></span></span></span></span>，已完成数为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>k</mi></mrow><annotation encoding="application/x-tex">k</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.0315em;">k</span></span></span></span></span>。对这里有效的有限额度，剩余额度可记为：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>R</mi><mo>=</mo><mi>max</mi><mo>⁡</mo><mo stretchy="false">(</mo><mn>0</mn><mo separator="true">,</mo><mi>N</mi><mo>−</mo><mi>k</mi><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">R = \max(0, N-k).</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop">max</span><span class="mopen">(</span><span class="mord">0</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0315em;">k</span><span class="mclose">)</span><span class="mord">.</span></span></span></span></span></div>
+<p>其中 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi></mrow><annotation encoding="application/x-tex">R</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0077em;">R</span></span></span></span></span> 是剩余模型步骤（Model Step）数，不是剩余工具（Tool）数或物理请求尝试（Physical Attempt）数。<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">N=3</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.109em;">N</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">3</span></span></span></span></span>、<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>k</mi><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">k=3</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.0315em;">k</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">3</span></span></span></span></span>时，<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">R=0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span></span>；即使测试（Test）已通过，也没有第四步的额度。</p>
+<p>源码还要处理停止和交接（Handoff），不能只算减法。下面是 <code>AiSdkTurn</code> 的真实片段（Apache-2.0）：先判断上限，再处理沙箱边界（Sandbox Boundary）的专用收束条件，最后决定能否继续。</p>
+<pre><code class="language-ts">          const stepLimitReached = maxSteps !== undefined &amp;&amp; runtimeSteps &gt;= maxSteps;
+          if (
+            sandboxBoundaryFinalizationStep ||
+            (stepLimitReached &amp;&amp;
+              (toolRuntime.shouldFinalizeSandboxBoundary() ||
+                toolRuntime.hasSandboxBoundaryDenial()))
+          ) {
+            this.loopStopReason = &#39;permission_handoff&#39;;
+            this.loopStopRequested = true;
+          }
+          const mayTakeAnotherStep = !stepLimitReached &amp;&amp; !this.loopStopRequested &amp;&amp; !this.aborted;</code></pre>
+<p><code>runtimeSteps</code>记录已完成模型步骤（Model Step），<code>maxSteps</code>是本次适用上限；<code>loopStopRequested</code>与<code>aborted</code>分别表达已请求停止和中断条件。<code>sandboxBoundaryFinalizationStep</code>及两个工具（Tool）边界判断用于专用交接（Handoff），这里完整保留，避免误读为“达到上限就只有一种结束原因”。</p>
+<p>在本例没有优先交接（Handoff）或其他停止原因、最后模型（Model）以 <code>tool-calls</code> 结束的分支里，后续结束原因是 <code>step_limit</code>，映射为 <code>failed</code>。反过来，若最后允许的一步已正常给出最终回答，不应只因达到数字上限就判失败；其他已记录失败仍须按第12章的条件处理。</p>
+<p>再改变一个条件：第二步第一次请求在形成可观察输出前断开。只有错误、恢复（Recovery）额度与剩余步骤均允许，才可在R7内重发。这类未完成流没有形成已完成步骤，不能仅因连接建立过就增加 <code>runtimeSteps</code>；已有请求与可能费用仍应如实保留。出现回答文字或工具（Tool）活动后，不能继续套用无输出重试；只有思考输出（Thinking Output）的符合条件分支另有专用封存与恢复（Recovery）规则，不能推广到全部未完成输出。</p>
+<p>本章涉及的三组数字至此可以分清：4是教学流程所需模型步骤（Model Step），3是显式设定上限，7是另一项历史真实修复的模型调用（Model Query）数。源代码用 <code>runtimeSteps</code> 计数、<code>mayTakeAnotherStep</code>判断继续，再由物理请求尝试（Physical Attempt）的守卫判断重发，它们没有共用一个计数。</p>
+<span class="heading-alias" id="身份简图的适用范围" aria-hidden="true"></span><h3 id="身份identity简图的例外协作交接cooperative-handoff">身份（Identity）简图的例外：协作交接（Cooperative Handoff）</h3>
+<p>普通顶层准入（Root Admission）固定本次身份（Identity）关系；协作交接（Cooperative Handoff）则允许原物理执行（Physical Invocation）在已证明的持久边界封存，后继继续同一逻辑工作轮次（Turn）。原准入（Admission）仍拥有裁决权（Authority），后继必须遵守已固定的关联与剩余步骤。</p>
+<p>它改变了物理执行（Physical Invocation），不会把同一工作变成新的用户任务，也不重放（Replay）已经完成的工具效果（Effect），更不恢复旧JavaScript调用栈。图中的一对一关系因此只适合普通教学路径；具体交接（Handoff）条件见第24章。</p>
+<span class="heading-alias" id="持久身份与进程寿命分别记录" aria-hidden="true"></span><h3 id="持久身份identity与进程寿命">持久身份（Identity）与进程寿命</h3>
+<p>假设进程P1已保存R7的合法终态（Terminal State）后退出，进程P2后来读取S1；只有新的T8被准入（Admission）后，才执行R8。S1持续存在，R7没有重新打开，P1的调用栈也没有回来。</p>
+<p>再改成P1留下回答文字、尚无终态（Terminal State）就退出。身份（Identity）帮助恢复（Recovery）程序找到该查的记录，却不证明成功。对记录可读、无续接认领（Continuation Claim）、无交接（Handoff）及其他专用恢复（Recovery）条件的普通例子，系统把开放执行（Run）收束为 <code>failed / app_restarted</code>；已有合法终态（Terminal State）则保留原结果。</p>
+<p>实际恢复（Recovery）还要检查导入、工具（Tool）欠缺结算、沙箱边界（Sandbox Boundary）重启归因与损坏记录等条件。严格读取失败时应报错；不能把读不到当成不存在，也不能把所有失败分类都改成 <code>app_restarted</code>。第14章用完整的四条记录推演这个限定例子。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 持久身份（Identity）与进程寿命"><table><caption>表 6 / Table 6 · 持久身份（Identity）与进程寿命</caption><thead><tr><th scope="col">所说的恢复（Recovery）</th><th scope="col">实际要完成什么</th><th scope="col">不能混同什么</th></tr></thead><tbody><tr><td>恢复观察（Observation Recovery）</td><td>重新读取已保存结果并更新展示</td><td>再做一次文件操作</td></tr>
+<tr><td>重建输入</td><td>按规则构造后续模型输入（Model Input）</td><td>恢复原函数调用栈</td></tr>
+<tr><td>收束中断</td><td>记录尚未结束的执行（Run）为何中断</td><td>认定原任务成功</td></tr>
+<tr><td>继续执行（Execution Continuation）</td><td>由相应负责者（Owner）核准后续推进</td><td>找到旧编号就自动续跑</td></tr></tbody></table></div>
+<span class="heading-alias" id="invocationid从-opening-到-terminal-的执行事实坐标" aria-hidden="true"></span><h3 id="invocationid执行事实execution-fact的关联坐标"><code>invocationId</code>：执行事实（Execution Fact）的关联坐标</h3>
+<p>运行时事件（Runtime Event）还携带 <code>invocationId</code>，把开始记录（Opening Event）、过程与终态事实（Terminal Fact）关联起来。在普通生产路径中，它通常绑定为 <code>runId</code>，所以R7的相关记录常见 <code>invocationId = R7</code>；当前值相同不表示语义永远相同。</p>
+<p><code>RuntimeInvocationRecord</code> 从开始记录（Opening Event）、过程和终态事实（Terminal Fact）重建一次执行（Run）的历史结构。它已有明确数据类型，历史解码与续接也使用该关联，但没有因此增加第四套独立调度器。</p>
+<span class="heading-alias" id="身份必须在哪些地方保持一致" aria-hidden="true"></span><h4 id="身份identity怎样跨边界保持">身份（Identity）怎样跨边界保持</h4>
+<p>从客户端（Client）请求到宿主（Host）准入（Admission），再到运行时（Runtime）启动、<code>invocation_opened</code>、工具（Tool）日志与最终展示，每个消费者（Consumer）都要核对相应身份（Identity）。宿主（Host）固定T7→R7，运行时（Runtime）却报告R9，不能被当作无关字段不同；那会使后续记录无法归属于已经接纳的工作。</p>
+<span class="heading-alias" id="为什么同一个-id-重试也要检查内容" aria-hidden="true"></span><span class="heading-alias" id="正常例子和失败例子" aria-hidden="true"></span><span class="heading-alias" id="正常例子t7-只被执行一次" aria-hidden="true"></span><span class="heading-alias" id="失败例子一重复提交相同-t7" aria-hidden="true"></span><span class="heading-alias" id="失败例子二同一-t7-的-payload-漂移" aria-hidden="true"></span><span class="heading-alias" id="失败例子三ui-显示-running但-r7-已-terminal" aria-hidden="true"></span><h3 id="精确重试exact-retry编号相同内容也要相同">精确重试（Exact Retry）：编号相同，内容也要相同</h3>
+<p>第一次提交“只读取 <code>package.json</code>”，超时后却用同一T7提交“删除整个项目”，显然不是同一个意图。精确重试（Exact Retry）因此核对已经固定的请求内容（Payload）与执行描述（Descriptor），而不只比较 <code>turnId</code>。</p>
+<p>这里的请求内容（Payload）是提交的任务材料，执行描述（Descriptor）包含已固定的执行（Run）安排；实际匹配还经过对应规范化规则，不等于对任意两段原始文字作简单字符串比较。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 精确重试（Exact Retry）：编号相同，内容也要相同"><table><caption>表 7 / Table 7 · 精确重试（Exact Retry）：编号相同，内容也要相同</caption><thead><tr><th scope="col">收到的输入</th><th scope="col">接受或拒绝的依据</th><th scope="col">正确后续</th></tr></thead><tbody><tr><td>S1/T7及已接受内容都匹配</td><td>可识别已有准入（Admission）</td><td>按当前事实（Fact）返回或恢复观察（Observation Recovery），不偷偷另开重复执行（Run）</td></tr>
+<tr><td>同一T7带来不同内容或执行描述（Descriptor）</td><td>已固定意图发生漂移</td><td>拒绝冒充原重试；新要求应有新的工作轮次（Turn）</td></tr>
+<tr><td>界面仍运行中，R7已存在合法终态（Terminal State）</td><td>事实（Fact）与旧展示不一致</td><td>更新投影（Projection），保留原执行（Run）结果</td></tr></tbody></table></div>
+<p>精确重试（Exact Retry）维护幂等性（Idempotency）、审计可解释性与权限（Permission）判断的输入一致性；它没有证明任意外部操作重复执行都安全。正常路径只落实已接纳的T7，不能因为连接失败就再改一遍README。</p>
+<span class="heading-alias" id="深化自测" aria-hidden="true"></span><span class="heading-alias" id="容易混淆的相邻概念" aria-hidden="true"></span><span class="heading-alias" id="常见误解" aria-hidden="true"></span><span class="heading-alias" id="误解一session-就是一串-messages" aria-hidden="true"></span><span class="heading-alias" id="误解二一次用户消息只会有一个模型响应" aria-hidden="true"></span><span class="heading-alias" id="误解三数据库是唯一-owner" aria-hidden="true"></span><span class="heading-alias" id="误解四同一-session-同时最多一个-root所以不能有-subagent" aria-hidden="true"></span><span class="heading-alias" id="机制问题解析" aria-hidden="true"></span><h3 id="相邻概念与直接答案">相邻概念与直接答案</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 相邻概念与直接答案"><table><caption>表 8 / Table 8 · 相邻概念与直接答案</caption><thead><tr><th scope="col">容易混淆的对象</th><th scope="col">关键区别</th></tr></thead><tbody><tr><td>会话（Session）与连接</td><td>连接可反复建立，长期归属仍可保持</td></tr>
+<tr><td>工作轮次（Turn）与网络请求</td><td>相同工作可能重发，也可能产生多条进展消息（Message）</td></tr>
+<tr><td>执行（Run）与物理请求尝试（Physical Attempt）</td><td>一次具体运行可包含多个模型调用（Model Query）及内部重发</td></tr>
+<tr><td>负责者（Owner）与存储写入者（Storage Writer）</td><td>业务规则与写入机制（Mechanism）分别核对</td></tr>
+<tr><td>顶层执行（Root Execution）限制与系统并行</td><td>限定单一会话（Session）的准入（Admission），不排除子会话（Child Session）等独立范围</td></tr></tbody></table></div>
+<p><strong>问题1。</strong> 第三步检查全部返回，<code>maxSteps=3</code>是否保证还有总结？</p>
+<p><strong>参考答案。</strong> 不保证。两个 <code>Read</code>共同使用第一步，编辑使用第二步，检查使用第三步；总结需要新的模型步骤（Model Step）。没有剩余额度就不能编造回答；如果最后允许的一步已经给出回答，则应按实际结束原因与既有失败判断。</p>
+<p><strong>问题2。</strong> 内部服务重试会自动建立新的工作轮次（Turn）吗？</p>
+<p><strong>参考答案。</strong> 不会。它可以仍是同一模型调用（Model Query）内的物理请求尝试（Physical Attempt）；能否重发取决于输出、效果（Effect）、错误与额度，不由编号数量决定。</p>
+<p><strong>问题3。</strong> 数据库保存全部相关记录，就能成为所有状态（State）的负责者（Owner）吗？</p>
+<p><strong>参考答案。</strong> 不能。存储（Storage）承载已接受事实（Fact），不同协调器（Coordinator）和运行时（Runtime）合同仍分别决定准入（Admission）、执行（Run）、权限（Permission）与长期记忆（Long-Term Memory）。也不是所有事实（Fact）都放在同一张表。</p>
+<p><strong>问题4。</strong> 一份旧回答恢复出来，是否说明原R7已经成功续跑？</p>
+<p><strong>参考答案。</strong> 只说明相应内容可读。还要查看合法终态（Terminal State）及负责者（Owner）的处理决定；收束中断也可能是正确恢复（Recovery）的结果。<a href="14-events-and-projections.html">第14章</a>继续把记录、读取与展示分开。</p>
+<span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><span class="heading-alias" id="相关章节" aria-hidden="true"></span><span class="heading-alias" id="延伸阅读" aria-hidden="true"></span><h3 id="相关章节与延伸阅读">相关章节与延伸阅读</h3>
+<p><a href="12-request-lifecycle.html">第12章</a>串起完整请求，<a href="14-events-and-projections.html">第14章</a>说明终态（Terminal State）与视图，<a href="../../../extended-reading.html#reference-1" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/system-map.md">系统地图</a>可继续核对身份（Identity）和裁决权（Authority）。</p>
 <hr>
-<p><a href="12-request-lifecycle.html">上一章：第 12 章｜一次请求的完整生命周期</a> · <a href="14-events-and-projections.html">下一章：第 14 章｜事实、事件与投影视图</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="12-request-lifecycle.html"><span>← 上一章</span><strong>第 12 章｜一次请求的生命周期（Request Lifecycle）</strong></a><a href="14-events-and-projections.html"><span>下一章 →</span><strong>第 14 章｜事实、事件与投影视图</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%9C%A8%E8%BF%90%E8%A1%8C%E9%9C%80%E8%A6%81%E5%93%AA%E4%BA%9B%E8%BA%AB%E4%BB%BD">“正在运行”需要哪些身份</a></li><li class="toc-level-3"><a href="#%E5%B7%A5%E4%BD%9C%E5%BD%92%E5%B1%9E%E9%A1%B6%E5%B1%82%E6%84%8F%E5%9B%BE%E4%B8%8E%E5%85%B7%E4%BD%93%E6%89%A7%E8%A1%8C">工作归属、顶层意图与具体执行</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E8%83%BD%E5%8F%AA%E7%94%A8%E4%B8%80%E4%B8%AA-taskid">为什么不能只用一个 taskId</a></li><li class="toc-level-3"><a href="#session%E9%95%BF%E6%9C%9F%E5%AD%98%E5%9C%A8%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%88%BF%E9%97%B4">Session：长期存在的工作房间</a></li><li class="toc-level-3"><a href="#turn%E7%94%A8%E6%88%B7%E8%83%BD%E5%A4%9F%E6%8C%87%E8%AE%A4%E7%9A%84%E4%B8%80%E9%A1%B9%E9%A1%B6%E5%B1%82%E5%B7%A5%E4%BD%9C">Turn：用户能够指认的一项顶层工作</a></li><li class="toc-level-3"><a href="#run%E6%89%A7%E8%A1%8C%E5%B7%A5%E4%BD%9C%E7%9A%84%E6%8C%81%E4%B9%85%E8%BF%90%E8%A1%8C%E5%B0%81%E5%A5%97">Run：执行工作的持久运行封套</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E8%BA%AB%E4%BB%BD%E6%80%8E%E6%A0%B7%E5%B5%8C%E5%A5%97">三种身份怎样嵌套</a></li><li class="toc-level-3"><a href="#owner%E8%B0%81%E6%9C%89%E8%B5%84%E6%A0%BC%E6%8B%8D%E6%9D%BF">Owner：谁有资格拍板</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E8%BA%AB%E4%BB%BD%E6%94%BE%E5%9B%9E%E4%B8%80%E6%AC%A1%E7%9C%9F%E5%AE%9E%E5%B7%A5%E4%BD%9C">把身份放回一次真实工作</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#root-executionhost-%E5%BD%93%E5%89%8D%E6%8E%A5%E7%BA%B3%E7%9A%84%E9%A1%B6%E5%B1%82%E6%89%A7%E8%A1%8C">Root execution：Host 当前接纳的顶层执行</a></li><li class="toc-level-3"><a href="#%E7%B3%BB%E7%BB%9F%E5%8F%91%E8%B5%B7%E7%9A%84-turn-%E4%B8%8E%E6%99%AE%E9%80%9A%E7%94%A8%E6%88%B7-turn">系统发起的 Turn 与普通用户 Turn</a></li><li class="toc-level-3"><a href="#run-%E5%86%85%E7%9A%84%E9%80%BB%E8%BE%91%E8%B0%83%E7%94%A8%E4%B8%8E%E7%89%A9%E7%90%86-attempt">Run 内的逻辑调用与物理 attempt</a></li><li class="toc-level-3"><a href="#%E9%A2%84%E7%AE%97%E9%99%90%E5%88%B6%E7%9A%84%E6%98%AF%E5%93%AA%E4%B8%80%E4%B8%AA%E5%8D%95%E4%BD%8D">预算限制的是哪一个单位？</a></li><li class="toc-level-3"><a href="#%E8%BA%AB%E4%BB%BD%E7%AE%80%E5%9B%BE%E7%9A%84%E9%80%82%E7%94%A8%E8%8C%83%E5%9B%B4">身份简图的适用范围</a></li><li class="toc-level-3"><a href="#maka-%E4%B8%AD%E7%9A%84%E8%B4%A3%E4%BB%BB%E5%88%86%E9%85%8D">Maka 中的责任分配</a></li><li class="toc-level-3"><a href="#authority-%E4%B8%8E-mechanism%E5%86%B3%E5%AE%9A%E6%9D%83%E5%92%8C%E5%AE%9E%E7%8E%B0%E6%89%8B%E6%AE%B5%E8%A6%81%E5%88%86%E5%BC%80">Authority 与 mechanism：决定权和实现手段要分开</a></li><li class="toc-level-3"><a href="#invocationid%E4%BB%8E-opening-%E5%88%B0-terminal-%E7%9A%84%E6%89%A7%E8%A1%8C%E4%BA%8B%E5%AE%9E%E5%9D%90%E6%A0%87">invocationId：从 opening 到 terminal 的执行事实坐标</a></li><li class="toc-level-3"><a href="#%E8%BA%AB%E4%BB%BD%E5%BF%85%E9%A1%BB%E5%9C%A8%E5%93%AA%E4%BA%9B%E5%9C%B0%E6%96%B9%E4%BF%9D%E6%8C%81%E4%B8%80%E8%87%B4">身份必须在哪些地方保持一致</a></li><li class="toc-level-3"><a href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E5%90%8C%E4%B8%80%E4%B8%AA-id-%E9%87%8D%E8%AF%95%E4%B9%9F%E8%A6%81%E6%A3%80%E6%9F%A5%E5%86%85%E5%AE%B9">为什么“同一个 ID 重试”也要检查内容</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E4%BE%8B%E5%AD%90%E5%92%8C%E5%A4%B1%E8%B4%A5%E4%BE%8B%E5%AD%90">正常例子和失败例子</a></li><li class="toc-level-3"><a href="#%E5%AE%B9%E6%98%93%E6%B7%B7%E6%B7%86%E7%9A%84%E7%9B%B8%E9%82%BB%E6%A6%82%E5%BF%B5">容易混淆的相邻概念</a></li><li class="toc-level-3"><a href="#%E5%B8%B8%E8%A7%81%E8%AF%AF%E8%A7%A3">常见误解</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="12-request-lifecycle.html">上一章：第12章</a> · <a href="14-events-and-projections.html">下一章：第14章</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="12-request-lifecycle.html"><span>← 上一章</span><strong>第 12 章｜一次请求的生命周期（Request Lifecycle）</strong></a><a href="14-events-and-projections.html"><span>下一章 →</span><strong>第 14 章｜事实（Fact）、事件（Event）与投影（Projection）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E5%90%8C%E4%B8%80%E9%A1%B9%E5%B7%A5%E4%BD%9C%E6%80%8E%E6%A0%B7%E8%B7%A8%E8%BF%87%E5%A4%9A%E4%B8%AA%E9%83%A8%E4%BB%B6">前情回顾：同一项工作怎样跨过多个部件</a></li><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E5%85%88%E5%8C%BA%E5%88%86%E5%93%AA%E9%A1%B9%E5%B7%A5%E4%BD%9C%E4%B8%8E%E7%8E%B0%E5%9C%A8%E6%80%8E%E6%A0%B7">先区分“哪项工作”与“现在怎样”</a></li><li class="toc-level-3"><a href="#%E4%BC%9A%E8%AF%9Dsession%E9%95%BF%E6%9C%9F%E5%BD%92%E5%B1%9E%E5%8F%AF%E4%BB%A5%E8%B7%A8%E8%BF%87%E8%BF%9E%E6%8E%A5%E4%B8%8E%E8%BF%9B%E7%A8%8B">会话（Session）：长期归属可以跨过连接与进程</a></li><li class="toc-level-3"><a href="#%E5%B7%A5%E4%BD%9C%E8%BD%AE%E6%AC%A1turn%E7%94%A8%E6%88%B7%E8%83%BD%E5%A4%9F%E6%8C%87%E8%AE%A4%E7%9A%84%E4%B8%80%E9%A1%B9%E8%A6%81%E6%B1%82">工作轮次（Turn）：用户能够指认的一项要求</a></li><li class="toc-level-3"><a href="#%E6%89%A7%E8%A1%8Crun%E6%8A%8A%E5%90%8C%E4%B8%80%E6%AC%A1%E8%BF%90%E8%A1%8C%E7%9A%84%E8%AE%B0%E5%BD%95%E6%94%BE%E5%9C%A8%E4%B8%80%E8%B5%B7">执行（Run）：把同一次运行的记录放在一起</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E8%BA%AB%E4%BB%BDidentity%E7%9A%84%E5%BD%92%E5%B1%9E%E5%9B%BE">三种身份（Identity）的归属图</a></li><li class="toc-level-3"><a href="#%E8%B4%9F%E8%B4%A3%E8%80%85owner%E8%B0%81%E8%83%BD%E5%86%B3%E5%AE%9A%E8%B0%81%E8%B4%9F%E8%B4%A3%E8%90%BD%E5%AE%9E">负责者（Owner）：谁能决定，谁负责落实</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E8%BA%AB%E4%BB%BDidentity%E6%94%BE%E5%9B%9E%E4%B8%80%E4%BB%BD%E5%8E%86%E5%8F%B2%E8%BF%90%E8%A1%8C">把身份（Identity）放回一份历史运行</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E9%A1%B6%E5%B1%82%E6%89%A7%E8%A1%8Croot-execution%E5%90%8C%E4%B8%80%E4%BC%9A%E8%AF%9Dsession%E7%9A%84%E5%87%86%E5%85%A5admission%E8%8C%83%E5%9B%B4">顶层执行（Root Execution）：同一会话（Session）的准入（Admission）范围</a></li><li class="toc-level-3"><a href="#%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4model-step%E4%B8%8E%E7%89%A9%E7%90%86%E8%AF%B7%E6%B1%82%E5%B0%9D%E8%AF%95physical-attempt">模型步骤（Model Step）与物理请求尝试（Physical Attempt）</a></li><li class="toc-level-3"><a href="#%E9%A2%84%E7%AE%97budget%E9%99%90%E5%88%B6%E7%9A%84%E6%98%AF%E5%93%AA%E4%B8%80%E4%B8%AA%E5%8D%95%E4%BD%8D">预算（Budget）限制的是哪一个单位？</a></li><li class="toc-level-3"><a href="#%E8%BA%AB%E4%BB%BDidentity%E7%AE%80%E5%9B%BE%E7%9A%84%E4%BE%8B%E5%A4%96%E5%8D%8F%E4%BD%9C%E4%BA%A4%E6%8E%A5cooperative-handoff">身份（Identity）简图的例外：协作交接（Cooperative Handoff）</a></li><li class="toc-level-3"><a href="#%E6%8C%81%E4%B9%85%E8%BA%AB%E4%BB%BDidentity%E4%B8%8E%E8%BF%9B%E7%A8%8B%E5%AF%BF%E5%91%BD">持久身份（Identity）与进程寿命</a></li><li class="toc-level-3"><a href="#invocationid%E6%89%A7%E8%A1%8C%E4%BA%8B%E5%AE%9Eexecution-fact%E7%9A%84%E5%85%B3%E8%81%94%E5%9D%90%E6%A0%87">invocationId：执行事实（Execution Fact）的关联坐标</a></li><li class="toc-level-3"><a href="#%E7%B2%BE%E7%A1%AE%E9%87%8D%E8%AF%95exact-retry%E7%BC%96%E5%8F%B7%E7%9B%B8%E5%90%8C%E5%86%85%E5%AE%B9%E4%B9%9F%E8%A6%81%E7%9B%B8%E5%90%8C">精确重试（Exact Retry）：编号相同，内容也要相同</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E9%82%BB%E6%A6%82%E5%BF%B5%E4%B8%8E%E7%9B%B4%E6%8E%A5%E7%AD%94%E6%A1%88">相邻概念与直接答案</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82%E4%B8%8E%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">相关章节与延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

@@ -1,279 +1,177 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 14 章｜事实、事件与投影视图 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 14 / 62</div><article id="main-content"><span class="heading-alias" id="03事实事件账本与投影视图为什么聊天气泡不能定义真相" aria-hidden="true"></span><span class="heading-alias" id="m03事实事件与投影视图" aria-hidden="true"></span><span class="heading-alias" id="第-13-章事实事件与投影视图" aria-hidden="true"></span><h1 id="第-14-章事实事件与投影视图">第 14 章｜事实、事件与投影视图</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 14 章｜事实（Fact）、事件（Event）与投影（Projection） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script><link rel="stylesheet" href="../../../assets/katex/katex.min.css"><link rel="stylesheet" href="../../../assets/course-math.css"></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 14 / 62</div><article id="main-content"><span class="heading-alias" id="03事实事件账本与投影视图为什么聊天气泡不能定义真相" aria-hidden="true"></span><span class="heading-alias" id="m03事实事件与投影视图" aria-hidden="true"></span><span class="heading-alias" id="第-13-章事实事件与投影视图" aria-hidden="true"></span><span class="heading-alias" id="第-14-章事实事件与投影视图" aria-hidden="true"></span><h1 id="第-14-章事实fact事件event与投影projection">第 14 章｜事实（Fact）、事件（Event）与投影（Projection）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：聊天气泡、模型历史和持久记录不一致时，哪份信息能决定工作是否完成？</p>
-<p><strong>关键概念</strong>：Fact（事实）是负责组件保存的记录；Event（事件）描述发生了什么；Ledger（账本）持久保存一类事实；Projection（投影）生成供特定消费者使用的视图。</p>
-<p><strong>关系主线</strong>：事件按各自通道接纳与保存，读取侧再整理为界面或模型输入。视图可以省略、延迟或重建；保存错误也可能是回执丢失，不能从旧画面或缺少结果推断效果未发生。</p>
+<p><strong>核心问题</strong>：回答文字、界面状态（State）和持久记录不一致时，怎样判断工作已经结束，还是只缺少观察？</p>
+<p><strong>关键概念</strong>：事实（Fact）是负责部件接受并记录的信息；事件（Event）描述发生过程；账本（Ledger）保存一类持久事实（Durable Fact）；投影（Projection）将记录整理成特定消费者（Consumer）可用的视图。终态（Terminal State）记录执行（Run）如何结束，不等于所有资源已经清理。</p>
+<p><strong>关系主线</strong>：记录经过各自规则接纳与保存，读取侧再生成展示或模型输入（Model Input）。视图可以落后，保存报错也可能只是回执丢失；应沿事实（Fact）来源回查，不能凭旧画面重新执行动作。</p>
 </blockquote>
-<p>工作身份的定义见 <a href="13-session-turn-run.html">Session、Turn、Run</a>；本章关注同一工作留下的不同记录与读取视图。</p>
+<h2 id="前情回顾身份identity定位对象记录支持判断">前情回顾：身份（Identity）定位对象，记录支持判断</h2>
+<p><a href="13-session-turn-run.html">第13章</a>已经把会话（Session）S1、工作轮次（Turn）T7和执行（Run）R7分开，并说明负责者（Owner）与实际写入者不是同一概念。身份（Identity）帮助定位“查哪一份”，状态（State）说明“现在怎样”；本章继续追问，哪份记录能支持这个判断，谁会读取它。</p>
+<p>仍沿用第12章只改README的教学条件：函数已经正确，四个测试（Test）原本通过；README把入口写成 <code>npm run check</code>，应依据配置改为 <code>npm test</code>。执行（Run）包括读取、编辑、测试（Test）、差异（Diff）核对与中文总结。这里的S1/T7/R7与后面的E1–E10都不是实际日志编号；第22章的完整函数修复另有历史记录。</p>
+<p>先固定一个断线情境：宿主（Host）仍在运行，普通工具（Tool）已经完成检查，模型（Model）也生成了回答，但客户端（Client）在收到结束通知前断开。此时尚不知道终态（Terminal State）是否已保存。这个未知条件必须通过回读（Read-back）解决，不能从“断线”二字猜答案。</p>
 <h2 id="核心路线">核心路线</h2>
-<span class="heading-alias" id="本章要回答什么" aria-hidden="true"></span><h3 id="断线后哪份记录决定完成状态">断线后，哪份记录决定完成状态</h3>
-<p>假设 R7 已经修改说明、运行完测试，也生成了最终回答，但 Desktop 在收到完成通知前断线。重新打开后，系统应该相信什么？完整 <code>formatDuration</code> 修复还会增加源码编辑和验证记录，判断记录与视图的方法相同。</p>
-<ul>
-<li>Client 内存中最后一个 loading 状态？</li>
-<li>聊天列表最后一条 assistant 文本？</li>
-<li>Runtime 写下的执行事件？</li>
-<li>从执行开始、结束等事件整理出的状态？</li>
-<li>工具自己的执行记录？</li>
-</ul>
-<p>这几种信息分别涉及四个概念：</p>
-<ul>
-<li><a href="glossary.html#fact%E4%BA%8B%E5%AE%9E">事实（Fact）</a>：系统声称已经发生并可供判断的记录；</li>
-<li><a href="glossary.html#event%E4%BA%8B%E4%BB%B6">事件（Event）</a>：描述发生了什么的结构化记录；是否持久保存、按什么顺序接纳，要看对应通道；</li>
-<li><a href="glossary.html#ledger%E8%B4%A6%E6%9C%AC">账本（Ledger）</a>：保存某类事实的持久顺序记录；</li>
-<li><a href="glossary.html#projection--read-model%E6%8A%95%E5%BD%B1--%E8%AF%BB%E5%8F%96%E8%A7%86%E5%9B%BE">投影视图（Projection）</a>：从事实整理出的、可供模型或人阅读的视图。</li>
-</ul>
-<p>判断冲突时，先确定信息属于原始记录、owner 的控制状态还是派生视图，再找到负责该问题的事实来源。</p>
-<span class="heading-alias" id="先看结论" aria-hidden="true"></span><h3 id="从持久事实生成用途视图">从持久事实生成用途视图</h3>
-<p>完整执行事件先经过接纳和持久保存，再按用途生成视图：</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从持久事实生成用途视图：可滚动示意图"><a href="../../../assets/diagrams/14-events-and-projections-1.svg"><img src="../../../assets/diagrams/14-events-and-projections-1.svg" alt="执行事件经过语义映射与接纳，持久写入确认后成为账本事实，再分别生成面向 Client 的展示投影和面向模型的历史投影；写入未确认时回查或保留未知。" width="794" height="1386" loading="lazy" style="width:794px;min-width:675px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图的上半部是写入确认，下半部是两个消费者。UI 折叠工具详情，模型历史保留需要配对的协议内容，两种视图因此可以不同；它们都从已接纳的记录生成。</p>
-<p><strong>边界与失败。</strong> 写入报错时，记录可能已保存而回执丢失，所以图中使用“尚未确认”，没有画成“确定不存在”。读视图落后时应回查对应事实，不能据旧 running 画面否认终态。图只突出执行事件这一类事实；接单、Memory 和投影控制记录仍有各自职责，未完成的流式片段（partial）也有独立的展示用途。实际投影还依赖相应规则与记录，图不是全部 Store 的依赖关系，也不意味着账本能证明测试覆盖正确或撤销文件效果。</p>
-<p>Desktop 的绿色对勾本身不应该成为 R7 完成的唯一证据。它只是供人阅读的视图。</p>
-<p>Maka 由不同部件分别保存接单、执行和长期记忆等记录。查“这项工作是否已结束”和查“中文偏好是否已保存”，需要找到各自负责的记录；不能只查聊天文本。</p>
-<h3 id="什么叫事实">什么叫“事实”</h3>
-<p>日常语言里的事实很宽泛。这里的<a href="glossary.html#fact%E4%BA%8B%E5%AE%9E">事实</a>特指某个系统 owner 以明确格式保存、可供后续读取和判断的信息。</p>
-<p>统一案例可能产生这些事实：</p>
-<pre><code class="language-text">T7 的用户输入是什么
-T7 被准入为 R7
-模型请求了 Read(package.json) 与 Read(README.md)
-两个 Read 分别返回了什么
-模型请求了 Edit(README.md)
-Edit 的执行结果是什么
-Bash 的退出状态是什么
-模型生成了哪段最终文本
-R7 最终是 completed / failed / cancelled 中的哪一种</code></pre>
-<h4 id="事实不是绝对真理的同义词">事实不是“绝对真理”的同义词</h4>
-<p>系统保存“Bash 返回 exit 0”，表示执行器报告了这个结果。它不能自动证明测试覆盖了所有业务要求，也不能证明工具实现永远没有 bug。</p>
-<p>事实的范围由写入者和记录内容决定。例如测试执行器能报告退出状态，测试是否覆盖用户要求仍要核对断言和任务契约。</p>
-<h4 id="canonical-是什么意思"><code>canonical</code> 是什么意思</h4>
-<p><a href="glossary.html#canonical-fact%E8%A7%84%E8%8C%83%E4%BA%8B%E5%AE%9E--%E6%9D%83%E5%A8%81%E4%BA%8B%E5%AE%9E">权威事实（Canonical Fact）</a>表示：当多个表示发生冲突时，系统指定哪一个作为该问题的判定依据。</p>
-<p>例如：</p>
-<pre><code class="language-text">Desktop 仍显示 running
-Runtime 的 canonical terminal fact 显示 completed</code></pre>
-<p>这通常意味着 Desktop 的投影过期，而不是 Run 又从 completed 退回 running。</p>
-<p>Canonical 总要带范围。Maka 用 <code>RuntimeEvent</code> 记录 Agent 执行中的语义事实，例如模型与工具交互、执行终态；它不因此决定长期 Memory 应该保存什么，或 Host 应该接纳哪项新工作。</p>
-<h3 id="什么叫事件">什么叫“事件”</h3>
-<p><a href="glossary.html#event%E4%BA%8B%E4%BB%B6">事件</a>是一条“发生了什么”的记录，通常被追加到已有历史后面。</p>
-<p>可以把 R7 的过程教学化地表示为：</p>
-<pre><code class="language-text">E1  收到/记录本轮用户输入
-E2  模型产生两个 Read 调用意图
-E3/E4  两个 Read 分别返回项目配置和当前说明（并行时先后可以互换）
-E5  模型产生 Edit 调用意图
-E6  Edit 返回结果
-E7  模型产生 Bash 调用意图
-E8  Bash 返回输出与退出状态
-E9  模型生成最终中文文本
-E10 R7 进入 terminal</code></pre>
-<p>这些 <code>E1…E10</code> 是解释顺序的教学编号，不是 Maka 的实际 event type 或字段名。</p>
-<h4 id="为什么事件比最后状态提供更多信息">为什么事件比“最后状态”提供更多信息</h4>
-<p>若数据库只保存：</p>
-<pre><code class="language-text">R7.status = completed</code></pre>
-<p>你无法回答：</p>
-<ul>
-<li>README 到底怎样修改；</li>
-<li>测试是否真的运行；</li>
-<li>工具结果支持了什么结论；</li>
-<li>模型在哪一步失败或重试；</li>
-<li>重建模型上下文时，某个工具结果对应的是哪次调用。</li>
-</ul>
-<p>事件保留过程中的语义边界。</p>
-<h3 id="什么叫账本">什么叫“账本”</h3>
-<p><a href="glossary.html#ledger%E8%B4%A6%E6%9C%AC">账本</a>是保存某一类事实的持久记录。类比财务账本：它不只是一个当前余额，还保留每笔收入和支出的来由。</p>
-<p>对 Agent 来说，账本的价值包括：</p>
-<ul>
-<li>重启后知道已经发生什么；</li>
-<li>为模型重建可见历史；</li>
-<li>为 Client 重建界面；</li>
-<li>判断工具调用是否可能已产生副作用；</li>
-<li>支持恢复、审计和用量计算；</li>
-<li>防止迟到结果覆盖已经确定的终态。</li>
-</ul>
-<p>账本总要说明记录范围。接单记录回答工作是否被接受，执行记录回答过程中发生什么，Memory 保存长期信息；不能因为都持久保存，就把它们当成一张能回答所有问题的表。具体职责见<a href="#%E5%A4%9A%E8%B4%A6%E6%9C%AC%E6%80%8E%E6%A0%B7%E5%88%86%E9%85%8D%E8%81%8C%E8%B4%A3">多账本分工</a>。</p>
-<span class="heading-alias" id="误解四projection-是不可靠的所以没用" aria-hidden="true"></span><h3 id="投影视图把事实整理成人或模型能用的形状">投影视图：把事实整理成人或模型能用的形状</h3>
-<p><a href="glossary.html#projection--read-model%E6%8A%95%E5%BD%B1--%E8%AF%BB%E5%8F%96%E8%A7%86%E5%9B%BE">投影视图</a>是对事实做筛选、排序、组合后得到的阅读形式。这里“给谁看、用来做什么”决定它的形状。</p>
-<p>同一组 R7 事实可以形成多种投影：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 投影视图：把事实整理成人或模型能用的形状"><table><caption>表 1 / Table 1 · 投影视图：把事实整理成人或模型能用的形状</caption><thead><tr><th scope="col">投影（Projection）</th><th scope="col">面向谁</th><th scope="col">可能怎样处理事实</th></tr></thead><tbody><tr><td>对话记录（Chat transcript）</td><td>用户</td><td>把事件整理成连续对话气泡，折叠大段工具输出</td></tr>
-<tr><td>会话状态（Session status）</td><td>客户端（Client）</td><td>汇总为正在执行或已结束</td></tr>
-<tr><td>模型历史（Provider history）</td><td>模型</td><td>选择可见的完整内容，把工具请求和对应结果放在一起，并控制输入长度</td></tr>
-<tr><td>用量视图（Usage view）</td><td>计量界面</td><td>汇总模型请求的用量数据</td></tr>
-<tr><td>恢复视图（Recovery view）</td><td>恢复逻辑</td><td>联合接单、结束和工具执行记录，检查还有什么不确定</td></tr></tbody></table></div>
-<p>它们都来自事实，却服务不同目的，所以不必长得一样。</p>
-<h4 id="投影通常应该可以重建">投影通常应该可以重建</h4>
-<p>如果 Desktop 丢失本地缓存，理想情况是从持久事实重新生成聊天和状态，而不是让用户重新执行 R7。</p>
-<h4 id="投影也可能落后">投影也可能落后</h4>
-<p>网络断开、订阅延迟或 Client 崩溃时，视图可能暂时不是最新。这正是不能让 UI 独自决定执行终态的原因。</p>
-<h3 id="terminal最终状态为什么需要唯一裁决">Terminal：最终状态为什么需要唯一裁决</h3>
-<p><a href="glossary.html#terminal-state--terminal-fact%E7%BB%88%E6%80%81--%E7%BB%88%E6%80%81%E4%BA%8B%E5%AE%9E">终态</a>表示 R7 已经结束，不再是可继续追加普通执行过程的 active Run。常见结果有 completed、failed、cancelled。</p>
-<p>当 UI 仍显示 running、负责执行状态的记录已经是 completed 时，应修复过期视图，不能让 UI 改写执行结果。当完成、取消与迟到错误同时到达时，<a href="#terminal-%E8%A3%81%E5%86%B3%E4%B8%8E-settled-%E7%BB%93%E7%AE%97">终态裁决</a>必须阻止它们反复覆盖同一个结果。</p>
-<h3 id="用-r7-看一次事实到投影的转换">用 R7 看一次事实到投影的转换</h3>
-<h4 id="执行事实教学简化">执行事实（教学简化）</h4>
-<pre><code class="language-text">R7 / Read call: package.json
-R7 / Read result: package.json content
-R7 / Read call: README.md
-R7 / Read result: README.md current content
-R7 / Edit call
-R7 / Edit result: success
-R7 / Bash call
-R7 / Bash result: exit 0, output: 4 pass / 0 fail
-R7 / assistant final: 中文总结
-R7 / terminal: completed</code></pre>
-<h4 id="用户看到的-transcript-projection">用户看到的 transcript projection</h4>
-<pre><code class="language-text">用户：读取配置，更新 README，运行测试……
-助手：已更新 README，并运行测试；4 项通过。</code></pre>
-<p>为了可读性，UI 可能折叠了工具参数和大量输出。</p>
-<h4 id="下一次模型看到的-history-projection">下一次模型看到的 history projection</h4>
-<p>它可能包含用户输入、必要的工具调用与对应结果，以及模型最终文本；有些内容会被过滤、缩短或另行组织，所以不保证与界面逐字相同。<a href="15-model-context.html">第15章</a>展开了从历史投影到一次实际模型请求的转换。</p>
-<p>同一事实源生成了两种不同视图；二者不同不代表其中一个在撒谎。</p>
-<h3 id="对照一次真实-edit-的两种表示">对照一次真实 Edit 的两种表示</h3>
-<p>先摘取将在第22章展开的<a href="22-agent-cases.html#%E7%9C%8B%E8%A7%81%E4%BA%86%E7%BC%96%E8%BE%91%E6%8A%A5%E5%91%8A%E8%BF%98%E6%B2%A1%E7%9C%8B%E8%A7%81%E6%95%B4%E4%B8%AA%E6%9C%80%E7%BB%88%E6%96%87%E4%BB%B6">完整函数与文档修复</a>：同一次 Edit 有原始工具结果，也有送给模型的简短修改报告。之后模型另用 <code>git diff</code> 取得两文件完整差异。文件现态、工具报告与模型输入是三种观察对象。简短编辑报告能描述本次改动，但要核对完整最终文件或 diff，仍需额外读取。</p>
+<span class="heading-alias" id="本章要回答什么" aria-hidden="true"></span><span class="heading-alias" id="断线后哪份记录决定完成状态" aria-hidden="true"></span><h3 id="四个概念怎样组成一条判断链">四个概念怎样组成一条判断链</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 四个概念怎样组成一条判断链"><table><caption>表 1 / Table 1 · 四个概念怎样组成一条判断链</caption><thead><tr><th scope="col">概念</th><th scope="col">在本章中的含义</th><th scope="col">与相邻对象的关系</th></tr></thead><tbody><tr><td>事实（Fact）</td><td>系统负责部件接受并记录的信息</td><td>范围取决于写入者、接纳规则与记录内容，不等于对外部世界的全部认识</td></tr>
+<tr><td>事件（Event）</td><td>描述发生了什么的结构化记录</td><td>是否被保存、怎样排序，要看实际通道；发出回调函数（Callback）不等于已持久提交</td></tr>
+<tr><td>账本（Ledger）</td><td>持久保存某一类事实（Fact）的记录集合</td><td>为后续读取提供依据，不自动拥有其他业务的裁决权（Authority）</td></tr>
+<tr><td>投影（Projection）</td><td>按用途筛选、排序和组合记录，形成可读视图</td><td>面向特定消费者（Consumer），可以省略、延迟或重新构造</td></tr></tbody></table></div>
+<p>回到R7：记录“检查命令返回0”是一项执行事实（Execution Fact）；聊天气泡里的“检查通过”是供人阅读的表达；负责者（Owner）根据合法结束记录判断状态（State）。三者可以互相支持，却不能只凭其中一句文字替代其他条件。</p>
+<p>有些状态（State）是负责者（Owner）的控制依据，有些是派生的展示内容。不能把所有状态（State）都说成投影（Projection），也不能把所有事件（Event）都说成持久事实（Durable Fact）。先认清对象，再选择该问题的事实（Fact）来源。</p>
+<span class="heading-alias" id="先看结论" aria-hidden="true"></span><span class="heading-alias" id="从持久事实生成用途视图" aria-hidden="true"></span><h3 id="从保存到两个实际消费者consumer">从保存到两个实际消费者（Consumer）</h3>
+<p>下图突出已接入持久存储的普通完整运行时事件（Runtime Event）。它省略了专用工具结算（Tool Settlement）和其他业务账本（Ledger），也不把每个流式片段都画成完整记录。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="从持久事实到不同投影 · From Facts to Projections：可滚动示意图"><a href="../../../assets/diagrams/14-events-and-projections-1.svg"><img src="../../../assets/diagrams/14-events-and-projections-1.svg" alt="执行事件（Execution Event）经过语义映射与接纳（Mapping / Admission），持久写入确认后成为账本事实（Ledger Fact），再分别生成客户端（Client）读取的展示投影（Presentation Projection）和模型（Model）读取的历史投影（History Projection）；写入未确认时回读（Read-back）或保留未知（Unknown）。" width="804" height="1499" loading="lazy" style="width:804px;min-width:684px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>上半部回答是否已经确认写入，下半部回答谁读取结果。客户端（Client）可能折叠工具（Tool）细节；模型历史（Model History）则需要保留合法的工具调用（Tool Call）与工具结果（Tool Result）配对。用途不同，因此两份投影（Projection）不必逐字一致。</p>
+<p>写入报错时，数据可能已经落账，只是回执丢失，所以分支是“尚未确认”，不是“确定不存在”。相应回读（Read-back）与提交屏障（Commit Barrier）用于消除这种不确定性；无法消除时就保留未知，不能自动重做任务。</p>
+<p>图也不表示所有模式都有同样持久保证。第10章已经区分部分事件（Partial Event）、非终止错误（Non-Terminal Error）、已由工具协议（Tool Protocol）保存的记录与不同写入策略。这里限定经过相应持久路径接纳的事实（Fact）；其他通道与存储（Storage）条件仍要单独核对。</p>
+<span class="heading-alias" id="什么叫事实" aria-hidden="true"></span><span class="heading-alias" id="事实不是绝对真理的同义词" aria-hidden="true"></span><h3 id="事实fact能证明到哪里">事实（Fact）能证明到哪里</h3>
+<p>“<code>Bash</code>返回退出码（Exit Code）0”说明执行器（Executor）报告了该结果，不自动证明测试（Test）覆盖全部用户要求。要得出后者，还需读取断言（Assertion）、核对实际命令、文件与任务契约（Task Contract）。如果命令只打印“passed”，输出好看也不能代替检查。</p>
+<p>账本（Ledger）能够保留这种报告，帮助后续解释过程、重建输入、统计使用量或判断工具效果（Effect）是否可能发生。它不会因此修复不充分的测试（Test），也不会撤销已经改过的文件。</p>
+<span class="heading-alias" id="canonical-是什么意思" aria-hidden="true"></span><h4 id="权威事实canonical-fact总有负责范围">权威事实（Canonical Fact）总有负责范围</h4>
+<p>权威事实（Canonical Fact）是系统指定用于某个问题裁决的记录。若客户端（Client）仍显示 <code>running</code>，而R7已经有合法且持久的 <code>completed</code> 终态事实（Terminal Fact），应更新展示；不能让旧画面把R7重新打开。</p>
+<p>这里回答的是执行（Run）如何结束。运行时事件（Runtime Event）不因此决定长期记忆（Long-Term Memory）应保存什么，或宿主（Host）应接纳哪项新工作。查询“中文偏好是否保存”和查询“R7是否结束”，需要不同的负责者（Owner）和记录。</p>
+<span class="heading-alias" id="误解四projection-是不可靠的所以没用" aria-hidden="true"></span><span class="heading-alias" id="什么叫事件" aria-hidden="true"></span><span class="heading-alias" id="为什么事件比最后状态提供更多信息" aria-hidden="true"></span><span class="heading-alias" id="投影视图把事实整理成人或模型能用的形状" aria-hidden="true"></span><span class="heading-alias" id="用-r7-看一次事实到投影的转换" aria-hidden="true"></span><span class="heading-alias" id="执行事实教学简化" aria-hidden="true"></span><h3 id="一份教学记录怎样形成两种投影projection">一份教学记录，怎样形成两种投影（Projection）</h3>
+<p>把前面四个模型步骤（Model Step）展开为下面的语义过程。E1–E10只是教学标签，省略了开始记录（Opening Event）、用量等其他事件（Event）；它们不是实际类型名、字段或存储序号，也不要求并行读取按固定顺序返回。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 一份教学记录，怎样形成两种投影（Projection）"><table><caption>表 2 / Table 2 · 一份教学记录，怎样形成两种投影（Projection）</caption><thead><tr><th scope="col">教学标签</th><th scope="col">记录的过程</th><th scope="col">后续判断依赖什么</th></tr></thead><tbody><tr><td>E1</td><td>记录本轮用户输入</td><td>只改README的范围与检查要求</td></tr>
+<tr><td>E2</td><td>提出两个 <code>Read</code></td><td>分别读取配置和当前说明</td></tr>
+<tr><td>E3/E4</td><td>两个读取各自返回</td><td>内容属于哪次请求；并行时先后可互换</td></tr>
+<tr><td>E5</td><td>提出 <code>Edit</code></td><td>依据实际旧文本定位替换</td></tr>
+<tr><td>E6</td><td>编辑返回结果</td><td>本次修改报告及仍需核对的文件现态</td></tr>
+<tr><td>E7</td><td>提出 <code>Bash</code>检查</td><td>本教学路径在此阶段运行测试（Test）并核对差异（Diff）</td></tr>
+<tr><td>E8</td><td>检查返回输出与退出状态（Exit Status）</td><td>给定初态下4项通过、0项失败；改动仍在README范围</td></tr>
+<tr><td>E9</td><td>模型（Model）产生中文回答</td><td>基于已取得的材料说明结果与限制</td></tr>
+<tr><td>E10</td><td>保存合法终态（Terminal State）</td><td>执行（Run）怎样结束，而不是只看回答中有没有“完成”</td></tr></tbody></table></div>
+<p>若只保存 <code>R7.status = completed</code>，上述读取、工具（Tool）失败、重试和材料依据都无从解释。尤其重建模型输入（Model Input）时，不能仅凭最后状态（State）猜出某个结果属于哪次调用。</p>
+<span class="heading-alias" id="用户看到的-transcript-projection" aria-hidden="true"></span><h4 id="用户看到的对话投影transcript-projection">用户看到的对话投影（Transcript Projection）</h4>
+<p>下面是教学展示，不是原始输出，也不是实际桌面界面截图：</p>
+<pre><code class="language-text">用户：读取配置，更新 README，运行测试并检查改动范围……
+助手：已根据配置更新 README 的测试入口，改动限于目标说明。
+      本次检查共 4 项通过；这些结果仍以所检查的范围为限。</code></pre>
+<p>为了可读性，界面可以折叠参数和长输出。用户因此少看到一些细节，不代表原工具结果（Tool Result）已被删除；是否仍可读取原文，要继续找保存位置与读取入口。</p>
+<span class="heading-alias" id="下一次模型看到的-history-projection" aria-hidden="true"></span><h4 id="下一次模型model使用的历史投影history-projection">下一次模型（Model）使用的历史投影（History Projection）</h4>
+<p>下一次模型输入（Model Input）可能包含用户要求、选中的完整回答、工具调用（Tool Call）及对应结果，也可能根据可见性（Visibility）、长度和协议规则过滤或重组。显示给用户的短报告，不能直接拿来充当完整的工具协议（Tool Protocol）历史。</p>
+<p>例如，原结果有两条失败断言（Assertion），摘要（Summary）只保留“2项失败”，模型（Model）就不能仅凭摘要（Summary）复述具体期望值。另一份界面投影（Projection）仍可能展示原文。两种表示的差异由用途解释，正确性则要看它们是否保留了各自承诺的信息。</p>
+<span class="heading-alias" id="对照一次真实-edit-的两种表示" aria-hidden="true"></span><h3 id="对照一项历史真实编辑">对照一项历史真实编辑</h3>
+<p><a href="22-agent-cases.html#%E7%9C%8B%E8%A7%81%E4%BA%86%E7%BC%96%E8%BE%91%E6%8A%A5%E5%91%8A%E8%BF%98%E6%B2%A1%E7%9C%8B%E8%A7%81%E6%95%B4%E4%B8%AA%E6%9C%80%E7%BB%88%E6%96%87%E4%BB%B6">第22章</a>保存了完整函数与文档修复的一次真实 <code>Edit</code>：原始工具结果（Tool Result）与送给模型（Model）的简短修改报告不同，之后模型（Model）另用 <code>git diff</code>取得两文件完整差异（Diff）。这里仅沿用该历史原生宿主（Host）运行与请求捕获，桌面界面未在该例运行，本章也未重跑。</p>
+<p>它说明三个观察对象不能合并：文件现态、工具（Tool）修改报告、模型输入（Model Input）。报告可以准确描述这次局部替换，仍不足以证明整个最终文件没有其他内容；要核对完整差异（Diff），需要额外读取。</p>
+<span class="heading-alias" id="误解五completed-就说明所有后台资源已经清理" aria-hidden="true"></span><span class="heading-alias" id="terminal最终状态为什么需要唯一裁决" aria-hidden="true"></span><span class="heading-alias" id="terminal-裁决与-settled-结算" aria-hidden="true"></span><span class="heading-alias" id="terminal-与-settled-不同" aria-hidden="true"></span><h3 id="终态terminal-state与完成文字">终态（Terminal State）与完成文字</h3>
+<p>终态（Terminal State）记录这次执行（Run）已经怎样结束。合法持久终态（Terminal State）形成后，普通执行（Run）过程不能随意追加并重新裁决；这不等于所有其他类别的业务记录都停止写入。</p>
+<p>完成、停止和迟到错误可能竞争同一结果。终态认领（Terminal Claim）协调由谁负责结束，提交屏障（Commit Barrier）确认结果已经保存；不是最早出现的一段文字或任意回调函数（Callback）天然获胜。已接纳结果不能因为旧界面或迟到信号反复改写。</p>
+<p>还要区分两种完成点，代码中的 <code>settled</code>承诺对应后者：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 终态（Terminal State）与完成文字"><table><caption>表 3 / Table 3 · 终态（Terminal State）与完成文字</caption><thead><tr><th scope="col">概念</th><th scope="col">已经完成什么</th><th scope="col">仍可能继续什么</th></tr></thead><tbody><tr><td>终态（Terminal State）</td><td>已有该执行（Run）的合法持久结果</td><td>后台资源清理可能尚未完成</td></tr>
+<tr><td>资源结算（Settlement）</td><td>对应执行器（Executor）、迭代器（Iterator）、物理请求尝试（Physical Attempt）与临时资源按合同收束</td><td>不因此重新裁定原结果，也不等于任务验收全部通过</td></tr></tbody></table></div>
+<p>用户可以先看到回答文字；危险的是把文字到达当成执行（Run）已经持久结束。反过来，已经发布结果也不能成为省略资源结算（Settlement）的理由。</p>
 <span class="heading-alias" id="核心出口自测与答案" aria-hidden="true"></span><h3 id="核心问题解析">核心问题解析</h3>
-<p><strong>问题 1。</strong> Desktop 显示 running、RuntimeEvent 已有 completed terminal 时，哪一个作为执行状态依据？</p>
-<p><strong>解释。</strong> 以负责该执行状态的持久终态事实为依据，再修复落后的 UI 投影。</p>
-<p><strong>问题 2。</strong> 为什么只保存 R7.status = completed 不足以解释执行过程？</p>
-<p><strong>解释。</strong> status 不能说明读过什么、工具是否失败、最终回答根据什么观察；解释过程还需要事件。</p>
-<p><strong>问题 3。</strong> RuntimeEvent 为什么不能替代 Memory 或 root admission store？</p>
-<p><strong>解释。</strong> canonical 有职责范围。执行语义不自动拥有 Memory 或 admission 的状态与规则。</p>
-<p><strong>问题 4。</strong> 同一组记录给 UI 生成气泡、给模型生成历史输入，二者不同是否意味着其中一个是假的？</p>
-<p><strong>解释。</strong> 不意味着。两种投影服务不同目的，可能筛选、折叠或组织不同内容；关键是保留事实来源与用途边界。</p>
+<p><strong>问题1。</strong> 客户端（Client）仍显示 <code>running</code>，已有合法持久 <code>completed</code>记录，应相信哪一个？</p>
+<p><strong>参考答案。</strong> 按负责该执行（Run）的终态事实（Terminal Fact）判断，再修复落后的投影（Projection）。无需为了界面重新执行任务。</p>
+<p><strong>问题2。</strong> 为什么最终回答不能替代全部事件（Event）？</p>
+<p><strong>参考答案。</strong> 回答是经过组织的内容，可能省略工具（Tool）输入、失败、原始结果与协议配对。过程解释与恢复（Recovery）仍需要相应记录。</p>
+<p><strong>问题3。</strong> 记忆（Memory）保存失败，应把原本合法的R7结束记录改写吗？</p>
+<p><strong>参考答案。</strong> 不能这样推导。各类事实（Fact）有各自裁决权（Authority）与消费者（Consumer）；需要如实报告记忆（Memory）保存问题，不能因此篡改已发生的模型（Model）与工具（Tool）过程。</p>
 <h2 id="实现深化">实现深化</h2>
-<span class="heading-alias" id="账本不等于什么都放进去的一张表" aria-hidden="true"></span><span class="heading-alias" id="常见误解" aria-hidden="true"></span><span class="heading-alias" id="误解二有了-runtimeevent就不需要任何其他-store" aria-hidden="true"></span><h3 id="多账本怎样分配职责">多账本怎样分配职责</h3>
-<p>Maka 采用多个 owner 分别保存各自事实：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 多账本怎样分配职责"><table><caption>表 2 / Table 2 · 多账本怎样分配职责</caption><thead><tr><th scope="col">账本 / 存储类别（Ledger / Store）</th><th scope="col">主要回答什么</th><th scope="col">不能单独证明什么</th></tr></thead><tbody><tr><td>顶层准入（Root Admission）</td><td>T7 是否被 Host 接受，并固定为哪个 R7</td><td>provider 已发送、R7 已终结</td></tr>
-<tr><td>运行事件（RuntimeEvent）</td><td>R7 中模型/工具交互的语义过程与 terminal fact</td><td>Goal、approval、共享授权等全部产品状态</td></tr>
-<tr><td>运行操作账本（AgentRun Operational Ledger）</td><td>R7 的组成、请求 attempt、摘要检查点（checkpoint）与投影变换记录（projection transition，记录历史表示怎样被调整）</td><td>Desktop 当前应画哪种布局</td></tr>
-<tr><td>工具边界日志（Tool Boundary Journal）</td><td>普通工具实现从何时可能开始、怎样结算</td><td>所有 <a href="glossary.html#provider-executed-tool%E7%94%B1%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E4%BB%A3%E6%89%A7%E8%A1%8C%E7%9A%84%E5%B7%A5%E5%85%B7">provider-executed</a> 或 Client capability 都有同样保证</td></tr>
-<tr><td>交互（Interaction）</td><td>sandbox 扩权或用户问题的请求、决定与关闭</td><td>完整模型历史</td></tr>
-<tr><td>长期记忆（Memory）</td><td>长期信息、来源、版本或文件 bundle 状态</td><td>Run 是否完成</td></tr></tbody></table></div>
-<p>分开并不是为了复杂，而是为了让每种状态有清晰 owner。一个 Memory 写入失败不应该重写 R7 已经完成的模型与工具事实；一个 UI 投影也不能自行批准 sandbox boundary expansion。</p>
-<h3 id="terminal-裁决与-settled-结算">Terminal 裁决与 settled 结算</h3>
-<p>真实并发中，多个信号可能几乎同时到达：</p>
-<pre><code class="language-text">provider 正常完成
-+ 用户点击 stop
-+ 超时处理触发
-+ 一个迟到的错误 callback</code></pre>
-<p>如果任何 callback 都能覆盖最终状态，Client 可能先看到 completed，随后又变 failed，再变 cancelled。Maka 用 terminal claim/barrier 约束第一个 canonical terminal，并拒绝迟到信号随意改写它。</p>
-<p>当前 invocation outcome 从 canonical terminal RuntimeEvent 投影；查询状态不能独立于已保存的终态事实另写一份答案。</p>
-<span class="heading-alias" id="误解五completed-就说明所有后台资源已经清理" aria-hidden="true"></span><h4 id="terminal-与-settled-不同">terminal 与 settled 不同</h4>
-<pre><code class="language-text">terminal：用户已经有 canonical 结果
-settled：后台 iterator、provider attempt、临时资源等已完成清理/结算</code></pre>
-<p>两者可能接近，但不是同一含义。用户不必等所有资源清理才看到最终回答；系统也不能因为已经向 UI 发了文本就跳过后续结算。</p>
-<span class="heading-alias" id="误解一event-就是前端按钮点击事件" aria-hidden="true"></span><h3 id="runtimeevent执行语义的黑匣子">RuntimeEvent：执行语义的黑匣子</h3>
-<p>Maka 用 <code>RuntimeEvent</code> 保存 Agent 执行中的语义事实。可以把它理解为飞机黑匣子：它记录飞行过程中关键事件，但机场订票、旅客权限和维修计划仍由其他系统负责。</p>
-<p>RuntimeEvent 需要能够表达的不只是聊天文本，还包括：</p>
-<ul>
-<li>模型输出和可能的 <a href="glossary.html#partial--streaming-event%E6%9C%AA%E5%AE%8C%E6%88%90%E7%9A%84%E6%B5%81%E5%BC%8F%E7%89%87%E6%AE%B5">partial/streaming（未完成流式片段）</a>；</li>
-<li>tool call 与 tool result；</li>
-<li>thinking（思考输出）或特定模型服务重放所需的信息；</li>
-<li><a href="glossary.html#visibility--origin%E5%8F%AF%E8%A7%81%E6%80%A7--%E6%9D%A5%E6%BA%90">visibility / origin（可见性 / 来源）</a>等投影规则；</li>
-<li>usage 与 terminal 语义；</li>
-<li>S1 / T7 / R7 / invocation correlation。</li>
-</ul>
-<p>因此一个普通的 <code>messages = [{role, content}]</code> 数组通常不足以承担完整执行 authority。</p>
-<h4 id="sessionevent-与-runtimeevent-的直觉区别"><code>SessionEvent</code> 与 <code>RuntimeEvent</code> 的直觉区别</h4>
-<p>Backend 在运行过程中会产生较靠近执行循环的事件；Runtime 再把其中可保存的语义映射为 RuntimeEvent，经过 AgentRun 接受并写入持久 store。</p>
-<pre><code class="language-text">Backend/session-side event
-  → 语义映射与身份补全
-  → AgentRun 接受
-  → durable RuntimeEvent</code></pre>
-<p>程序内部 callback 已发生，仍可能在映射、接纳或写入时失败；只有持久提交完成，恢复程序才能从这条链读回对应事实。</p>
-<span class="heading-alias" id="误解三保存了所有事件就应把所有事件都发给模型" aria-hidden="true"></span><h3 id="partial完整事件与模型可见性">Partial、完整事件与模型可见性</h3>
-<p>流式模型输出可能逐字到达 Client：</p>
-<pre><code class="language-text">“已” → “已更” → “已更新” → “已更新 README…”</code></pre>
-<p>这些 <a href="glossary.html#partial--streaming-event%E6%9C%AA%E5%AE%8C%E6%88%90%E7%9A%84%E6%B5%81%E5%BC%8F%E7%89%87%E6%AE%B5">partial 片段</a>对实时 UI 很有用，但重建下一次模型输入时，不能把每个增量都当成独立完整回答重复塞进去。</p>
-<p>Runtime 在构造模型历史时会考虑：</p>
-<ul>
-<li>是否为 partial；</li>
-<li>是否标记为 model-visible；</li>
-<li>tool call 与 result 是否合法配对；</li>
-<li>thinking/tool history 是否与当前 provider 兼容；</li>
-<li>是否已有有效 compaction checkpoint；</li>
-<li>是否存在大型结果的 <a href="glossary.html#projection-transition--effective-fold%E6%8A%95%E5%BD%B1%E5%8F%98%E6%8D%A2--%E6%9C%89%E6%95%88%E6%8A%98%E5%8F%A0">projection transition（持久投影变换）</a>。</li>
-</ul>
-<p>这说明“已经保存的事件”和“下一次全部原样给模型”也不是一回事。事件是事实基础；模型上下文是经过规则构造的投影。</p>
-<h3 id="storedmessage有用但不是正常执行语义的最终-authority">StoredMessage：有用，但不是正常执行语义的最终 authority</h3>
-<p>聊天产品通常需要容易读取的 <code>StoredMessage</code>：用户消息、assistant 文本、某些工具展示内容。它很适合 renderer 和兼容读取。普通 Session 直接从 RuntimeEvents 派生这份消息视图，因此“消息类型叫 StoredMessage”不意味着系统还维护一套独立的普通执行消息真相。旧格式导入与工作协调记录有另外的专用入口，本节不将它们混入普通执行链。</p>
-<p>当前 provider history 只从 RuntimeEvent 构造；StoredMessage 无法承担这条执行语义链，例如它不能完整表达：</p>
-<ul>
-<li>provider-native thinking state；</li>
-<li>精确 tool call/result pairing；</li>
-<li>partial、visibility 和 origin；</li>
-<li>terminal barrier；</li>
-<li>物理请求 attempt。</li>
-</ul>
-<p>没有 RuntimeEvent context 时，backend 不从 StoredMessage 补历史；不支持的 provider-native 项会按能力过滤，text-only 降级也来自 RuntimeEvent。另有 backfill 可在严格条件下修复部分 RuntimeEvent，那是修复过程，不是每次请求的 transcript fallback。</p>
-<h4 id="opening-也是事件operational-ledger-仍有用途">opening 也是事件，operational ledger 仍有用途</h4>
-<p>一次执行的 model、connection、lineage 来自 <code>invocation_opened</code>；<code>RuntimeInvocationRecord</code> 是从事件投影出来的 opening/terminal 视图。历史 reasoning 能否在当前 provider 上重放，需要核对模型服务路由的来源信息（route provenance），不能只看一张旧 header 的 model 字符串。</p>
-<p>同时，checkpoint 与 model-projection transition 仍保存在 operational event ledger。由此得到一个更准确的判断：<strong>opening 归入 RuntimeEvent 脊柱，并不等于所有产品 store 或 operational records 都消失。</strong></p>
-<h3 id="崩溃场景为什么事实边界很重要">崩溃场景：为什么事实边界很重要</h3>
-<h4 id="场景-aclient-在-r7-terminal-前断线">场景 A：Client 在 R7 terminal 前断线</h4>
-<p>假设 Host 仍存活，且动作由 Host/Runtime 的普通执行器承担，Client 断线本身不会取消 R7。R7 继续按自身生命周期推进，可能完成，也可能失败；持久终态形成后，Host 才据此发布完成状态，Client 重连时从 canonical snapshot 补齐观察。若动作依赖已经断线的 Client 执行能力，则要另外处理执行中断与效果未知，不能套用这条恢复路径。</p>
-<h4 id="场景-bclient-收到最终文本但-terminal-尚未-durable">场景 B：Client 收到最终文本，但 terminal 尚未 durable</h4>
-<p>先展示回答文字本身不构成错误；危险的是据此提前把执行状态标为 completed。可靠路径应以 durable terminal 为发布完成状态的依据，避免把“回答文字已到达”写成重启后无法证实的执行结论。</p>
-<h4 id="场景-cedit-产生效果后工具结果写入前崩溃">场景 C：Edit 产生效果后、工具结果写入前崩溃</h4>
-<p>RuntimeEvent 历史可能只有 tool call，没有确定 result。此时必须结合 Tool boundary journal 判断是否能安全 reconcile；不能仅因 transcript 没显示成功就重做 Edit。</p>
-<h4 id="场景-dterminal-已保存但-session-projection-仍显示-running">场景 D：terminal 已保存，但 Session projection 仍显示 running</h4>
-<p>恢复程序应修复投影，使它与 canonical terminal 对齐。不能反过来删除 terminal 来迎合过期 UI 状态。</p>
-<h3 id="两种顺序单次执行顺序与-session-全局顺序">两种顺序：单次执行顺序与 Session 全局顺序</h3>
-<p>这个细节解释多 Run 历史为什么不能只靠时间戳排序。</p>
-<p>Maka 的 RuntimeEvent 有两类顺序坐标：</p>
-<ul>
-<li><code>event_seq</code>：在一个 <code>invocationId</code> 内单调递增，用于单次执行前缀、工具边界和 replay；</li>
-<li>Session ordinal：为同一 Session 中跨 Run 的 immutable events 建立提交顺序。</li>
-</ul>
-<p>时间戳可能相同、不同机器的时钟也可能有偏差；<code>runId</code> 的字典序更不代表真实先后。因此 Session-wide projection 需要明确的 ordinal，而不是猜。</p>
-<h3 id="同一份回答怎样从-running-变成中断记录">同一份回答，怎样从 running 变成中断记录</h3>
-<p>增加一个恢复要求：**Host 退出后，新进程必须如实说明已经知道什么。**为单独观察状态层，下面把 R7 缩小为“对用户已提供的 README 差异给出中文说明”的无工具任务，用一个最小事件前缀手算。完整修复还会增加工具等事件，序号须按实际记录计算。以下按普通 RuntimeEvent/SQLite 路径推演，不是实测轨迹，也不包含 continuation claim、handoff 或特殊导入路径。</p>
-<p>事件与视图之间的关系可以写成：</p>
-<pre><code class="language-text">L：已经接受的完整事件前缀
-P：仍在变化的 partial 展示内容
-V = Project(L, P)：按用途生成的视图</code></pre>
-<p>这不是 Maka 的新 API。<code>Project</code> 还需执行身份和相关 authority 记录；资料损坏时可以失败。关键是 <strong>V 中有回答文字，不等于 L 中有结束事实</strong>。假设 S1 已有 30 条 immutable events，R7 接下来这样推进：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 同一份回答，怎样从 running 变成中断记录"><table><caption>表 3 / Table 3 · 同一份回答，怎样从 running 变成中断记录</caption><thead><tr><th scope="col">时点</th><th scope="col">R7 内序号 / S1 提交序号（Ordinal）</th><th scope="col">能得出的结论</th></tr></thead><tbody><tr><td>opening 保存，随后用户请求保存</td><td><code>(1,31)</code>、<code>(2,32)</code></td><td>知道 R7 存在、收到什么请求</td></tr>
-<tr><td>模型逐段输出“这处修改……”</td><td>写入 partial 展示记录；尚不占 <code>(3,33)</code></td><td>可以显示进展，仍未结束</td></tr>
-<tr><td>保存完整 assistant 内容</td><td><code>(3,33)</code>；移除匹配的 partial snapshot</td><td>有完整回答，仍没有 terminal</td></tr>
-<tr><td>Host 退出，普通启动恢复收束 R7</td><td>新 terminal 为 <code>(4,34)</code></td><td><code>failed / app_restarted</code>，旧回答仍是历史内容</td></tr>
-<tr><td>相同 terminal id 和内容再次提交</td><td>仍是 <code>(4,34)</code></td><td>exact retry，不追加第五条</td></tr>
-<tr><td>旧 callback 迟到，要求追加另一个成功 terminal</td><td>被 seal 拒绝</td><td>不会把 R7 重新裁决为成功</td></tr></tbody></table></div>
-<p>数字是教学值；真正 immutable 序号由存储事务分配。partial 走独立记录，完整事件替换其展示用途，并不意味着先前每个字都是一条永久普通事件。开放 Run 的显示还可以把尚在到达的文字整理成可读行，这也不是写回账本。</p>
-<p>谁实际使用这份状态？<code>SessionManager.getMessages/listTurns</code> 调用 RuntimeReadModel；它读取 invocation 和事件，构造消息与 Turn 视图。没有 terminal 的 invocation 仍标 running，因此“模型已写完一段回答”不会自动变成完成。启动恢复则由 SessionManager 分类：普通无 terminal 执行记录为中断；已存在合法 completed terminal 时保留它。若写入报错但记录其实已落账，要通过相应回读/terminal barrier 分辨，不能从异常推断应该再做一次任务。</p>
-<p>这条设计适合回答“谁在何时被系统接受为结束”。它保留过程、支持重新派生视图，也要求承担事件校验、存储与恢复分支的成本。它不能独自证明测试覆盖正确、文件已经回滚或任意进程能接着跑；这些问题分别交给评价、效果与持续运行模块。</p>
-<h3 id="视图失效不等于事实被撤回">视图失效，不等于事实被撤回</h3>
-<p>还沿用这个例子：Client 最后看见 running 快照，随后 Host 保存 terminal。旧快照应失效，terminal 无需改变。活跃 Host 会撤销旧 transcript overlay 并发布更高 revision 的 canonical projection；Client 消费者核对 Host、订阅身份、下一 sequence 和递增 revision。序列不连续时应报协议错误，不能拿旧帧覆盖新状态。</p>
-<p>这些数不能混用：S1 的 ordinal 34 是持久事件坐标；某次订阅的 sequence 41 是那条观察流的位置。新订阅从新 snapshot 开始，不必从 42 接着数。新进程没有旧内存缓存，重建视图与“给旧对象发一次 invalidate”也不是同一动作。具体界面是否自动重连，还取决于 Client 的恢复策略。</p>
-<h3 id="换一种需求保留探索历史只给模型一条当前路径">换一种需求：保留探索历史，只给模型一条当前路径</h3>
-<p>如果用户的重点是“从之前的思路重新尝试，同时保留旧分支”，只看 Run 终态还不够。另一种 Code Agent 实现 Pi 提供了具体设计：Session 条目有 <code>id/parentId</code>，当前叶节点（leaf）决定沿哪条祖先路径重建输入。它解决输入路径选择，不能直接代替 Maka 的终态裁决。</p>
-<p>用最小树手算，a 是用户问题，b/c 是第一次尝试：</p>
+<span class="heading-alias" id="账本不等于什么都放进去的一张表" aria-hidden="true"></span><span class="heading-alias" id="常见误解" aria-hidden="true"></span><span class="heading-alias" id="误解二有了-runtimeevent就不需要任何其他-store" aria-hidden="true"></span><span class="heading-alias" id="什么叫账本" aria-hidden="true"></span><span class="heading-alias" id="多账本怎样分配职责" aria-hidden="true"></span><h3 id="多账本ledger按要回答的问题寻找">多账本（Ledger）：按要回答的问题寻找</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 多账本（Ledger）：按要回答的问题寻找"><table><caption>表 4 / Table 4 · 多账本（Ledger）：按要回答的问题寻找</caption><thead><tr><th scope="col">记录类别</th><th scope="col">实际回答的问题</th><th scope="col">不足以单独证明什么</th></tr></thead><tbody><tr><td>顶层准入（Root Admission）</td><td>T7是否已接受、固定到哪个R7</td><td>模型（Model）服务已收到请求、R7已经结束</td></tr>
+<tr><td>运行时事件（Runtime Event）</td><td>模型（Model）与工具（Tool）交互、开始与终态事实（Terminal Fact）</td><td>其他业务的全部状态（State）</td></tr>
+<tr><td>执行操作账本（AgentRun Operational Ledger）</td><td>物理请求尝试（Physical Attempt）、检查点（Checkpoint）、投影变换（Projection Transition）等操作记录</td><td>当前界面该采用哪种布局</td></tr>
+<tr><td>工具边界日志（Tool Boundary Journal）</td><td>普通工具（Tool）何时可能开始、怎样结算</td><td>模型服务代执行工具（Provider-executed Tool）或客户端能力（Client Capability）有同样保证</td></tr>
+<tr><td>交互记录（Interaction Record）</td><td>沙箱边界（Sandbox Boundary）扩展或用户问题的请求、决定与关闭</td><td>完整模型历史（Model History）</td></tr>
+<tr><td>长期记忆（Long-Term Memory）</td><td>长期信息、来源、版本或文件组（Bundle）状态（State）</td><td>当前执行（Run）是否完成</td></tr></tbody></table></div>
+<p>一个协调器（Coordinator）维护一个明确范围的规则。用户界面（User Interface，UI）投影（Projection）不能自行批准沙箱边界（Sandbox Boundary）扩展，运行时事件（Runtime Event）也不能代替长期记忆（Long-Term Memory）的准入（Admission）策略。</p>
+<span class="heading-alias" id="误解一event-就是前端按钮点击事件" aria-hidden="true"></span><span class="heading-alias" id="runtimeevent执行语义的黑匣子" aria-hidden="true"></span><span class="heading-alias" id="sessionevent-与-runtimeevent-的直觉区别" aria-hidden="true"></span><h3 id="运行时事件runtime-event先映射再接纳和保存">运行时事件（Runtime Event）：先映射，再接纳和保存</h3>
+<p>执行后端（Agent Backend）产出会话事件（Session Event）；运行时（Runtime）补全工作身份（Work Identity）并映射其语义，交给 <code>AgentRun</code> 接纳。只有相应持久提交完成，恢复（Recovery）程序才能从该保存路径读回事实（Fact）。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 运行时事件（Runtime Event）：先映射，再接纳和保存"><table><caption>表 5 / Table 5 · 运行时事件（Runtime Event）：先映射，再接纳和保存</caption><thead><tr><th scope="col">层次</th><th scope="col">主要动作</th><th scope="col">不能跳过的条件</th></tr></thead><tbody><tr><td>会话事件（Session Event）产生</td><td>描述本次循环刚发生的情况</td><td>回调函数（Callback）发生不等于记录已保存</td></tr>
+<tr><td>运行时事件（Runtime Event）映射</td><td>补全身份（Identity）、内容与结束语义</td><td>接纳前仍可能失败，结束原因需按真实规则转换</td></tr>
+<tr><td><code>AgentRun</code>消费者（Consumer）</td><td>分流、保存并更新相应展示</td><td>专用工具（Tool）提交不在通用路径重复写；部分记录另有策略</td></tr>
+<tr><td>持久读取</td><td>形成后续模型输入（Model Input）与工作视图</td><td>不可读时应暴露错误，不能补造另一份历史</td></tr></tbody></table></div>
+<p>运行时事件（Runtime Event）还需表达工具调用（Tool Call）与结果、思考输出（Thinking Output）、可见性（Visibility）、来源（Origin）、使用量及执行（Run）关联。普通 <code>messages = [{role, content}]</code> 数组（Array）不足以承担这些全部责任。</p>
+<h4 id="结束原因怎样变成状态state">结束原因怎样变成状态（State）</h4>
+<p>先解释分支，再读真实片段。<code>mapCompleteStopReason</code>把一次流结束原因映射为运行时事件（Runtime Event）的状态（State）；其中 <code>user_stop</code>单独映射，其他原因通过失败分类函数判断。下面摘自Maka源码（Apache-2.0），它是完整的局部函数，尚不包含先前失败的影响：</p>
+<pre><code class="language-ts">export function mapCompleteStopReason(reason: CompleteStopReason): RuntimeEventStatus {
+  if (reason === &#39;user_stop&#39;) return &#39;aborted&#39;;
+  return failureClassFromCompleteStopReason(reason) ? &#39;failed&#39; : &#39;completed&#39;;
+}</code></pre>
+<p><code>failureClassFromCompleteStopReason</code>把 <code>error</code>归为 <code>runtime_error</code>，把 <code>step_limit</code>归为 <code>tool_step_cap_reached</code>；其他原因不由这个函数产生失败分类。最终保存前，同文件还有如下真实状态（State）表达式：</p>
+<pre><code class="language-ts">  const stopReason = event.stopReason;
+  const status =
+    memory.failureClass &amp;&amp; stopReason !== &#39;user_stop&#39;
+      ? &#39;failed&#39;
+      : mapCompleteStopReason(stopReason);</code></pre>
+<p><code>memory.failureClass</code>是映射过程中已经记录的失败分类，不是长期记忆（Long-Term Memory）。表达式先检查它是否存在；已有失败且不是 <code>user_stop</code>，即使后来收到 <code>end_turn</code>也保持 <code>failed</code>。完整结果如下：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 结束原因怎样变成状态（State）"><table><caption>表 6 / Table 6 · 结束原因怎样变成状态（State）</caption><thead><tr><th scope="col">输入条件</th><th scope="col">结果状态（State）</th><th scope="col">需要保留的解释</th></tr></thead><tbody><tr><td><code>user_stop</code>，有无既有失败均可</td><td><code>aborted</code></td><td>当前默认流的停止映射；其他接口可能使用 <code>cancelled</code></td></tr>
+<tr><td>无既有失败，<code>error</code>或<code>step_limit</code></td><td><code>failed</code></td><td>分别是错误或步骤额度耗尽</td></tr>
+<tr><td>无既有失败，<code>end_turn</code>、<code>max_tokens</code>等正常收束原因</td><td><code>completed</code></td><td>流按该原因结束；<code>max_tokens</code>仍可能留下不完整回答</td></tr>
+<tr><td>已有 <code>failureClass</code>，结束原因不是 <code>user_stop</code></td><td><code>failed</code></td><td>后来的正常结束原因不能抹去先前失败</td></tr></tbody></table></div>
+<p>因此 <code>CompleteEvent</code>不等于“任务成功”。其他宿主（Host）状态（State）接口、终态事实（Terminal Fact）与资源结算（Settlement）标志也不能被这张表当作统一枚举；每一层要找到真实消费者（Consumer）。</p>
+<span class="heading-alias" id="误解三保存了所有事件就应把所有事件都发给模型" aria-hidden="true"></span><span class="heading-alias" id="partial完整事件与模型可见性" aria-hidden="true"></span><h3 id="部分事件partial-event与面向模型model的可见性visibility">部分事件（Partial Event）与面向模型（Model）的可见性（Visibility）</h3>
+<p>流式回答可能先显示“已”，再显示“已更”“已更新README……”。这些部分事件（Partial Event）服务即时展示，不能把每个增量当成一条完整回答反复发回模型（Model）。</p>
+<p>重建模型历史（Model History）时还要判断：内容是否完整、是否对模型（Model）可见、工具调用（Tool Call）与结果是否配对、思考输出（Thinking Output）是否兼容当前服务、是否存在有效检查点（Checkpoint）及持久投影变换（Projection Transition）。后者记录大型结果等历史表示如何被调整，不等于改写原工具效果（Effect）。</p>
+<p>所以，“已经保存”与“下一次全部原样发给模型（Model）”仍是两件事。保存提供材料，实际消费者（Consumer）按本次用途与规则选择。</p>
+<span class="heading-alias" id="storedmessage有用但不是正常执行语义的最终-authority" aria-hidden="true"></span><h3 id="storedmessage读取视图不能代替执行事实execution-fact"><code>StoredMessage</code>：读取视图不能代替执行事实（Execution Fact）</h3>
+<p><code>StoredMessage</code>是方便界面和兼容读取的消息（Message）类型。当前普通会话（Session）从运行时事件（Runtime Event）派生这份视图，并非维护另一套独立的普通执行（Run）消息（Message）真相。旧格式导入与工作协调有专用入口，本节不把它们混入普通路径。</p>
+<p>当前普通模型历史（Model History）只从运行时事件（Runtime Event）构造。缺少相应上下文（Context）时，执行后端（Agent Backend）不会自动从 <code>StoredMessage</code>补历史；不支持的原生思考内容按能力过滤，只保留文本的降级表示也来自同一事实（Fact）来源。</p>
+<p>独立回填修复（Backfill）可以在严格条件下修复部分运行时事件（Runtime Event），但它不是每次请求都能使用的聊天记录回退（Transcript Fallback）。把两者混同，会掩盖数据缺失与协议约束。</p>
+<span class="heading-alias" id="opening-也是事件operational-ledger-仍有用途" aria-hidden="true"></span><h4 id="开始记录opening-event与操作记录各有用途">开始记录（Opening Event）与操作记录各有用途</h4>
+<p><code>invocation_opened</code>记录本次模型（Model）、连接与父子关联信息（Lineage）；<code>RuntimeInvocationRecord</code>从相关事件（Event）重建开始和结束视图，不是另一个可任意改状态（State）的执行器（Executor）。</p>
+<p>历史思考输出（Thinking Output）能否重放（Replay），还需核对服务路由来源（Route Provenance），不能只看旧记录里的模型（Model）名称。检查点（Checkpoint）、模型调用（Model Query）与投影变换（Projection Transition）仍有操作账本（Operational Ledger）用途；开始记录（Opening Event）改由运行时事件（Runtime Event）承载，不代表所有其他存储（Storage）都消失。</p>
+<span class="heading-alias" id="崩溃场景为什么事实边界很重要" aria-hidden="true"></span><span class="heading-alias" id="场景-aclient-在-r7-terminal-前断线" aria-hidden="true"></span><span class="heading-alias" id="场景-bclient-收到最终文本但-terminal-尚未-durable" aria-hidden="true"></span><span class="heading-alias" id="场景-cedit-产生效果后工具结果写入前崩溃" aria-hidden="true"></span><span class="heading-alias" id="场景-dterminal-已保存但-session-projection-仍显示-running" aria-hidden="true"></span><h3 id="四种中断四种不同判断">四种中断，四种不同判断</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 四种中断，四种不同判断"><table><caption>表 7 / Table 7 · 四种中断，四种不同判断</caption><thead><tr><th scope="col">场景与前提</th><th scope="col">已知或未知什么</th><th scope="col">应采取的下一步</th></tr></thead><tbody><tr><td>A：客户端（Client）断线，宿主（Host）仍存活，动作由普通执行器（Executor）承担</td><td>断线本身不取消R7；它仍可能完成或失败</td><td>合法持久终态（Terminal State）形成后发布结果，重连再读；若依赖断线的客户端能力（Client Capability），另查执行中断与效果（Effect）未知</td></tr>
+<tr><td>B：已经显示最终文本，尚未确认终态（Terminal State）持久保存</td><td>有回答内容，仍缺结束依据</td><td>可以显示文字，不能只凭文字标完成；回查是否已有合法结束记录</td></tr>
+<tr><td>C：<code>Edit</code>可能产生效果（Effect），结果写入前崩溃</td><td>文件可能已改，普通历史可能只有调用</td><td>联合工具边界日志（Tool Boundary Journal）与实际文件对账（Reconcile）；缺少成功消息（Message）不授权重做</td></tr>
+<tr><td>D：终态（Terminal State）已保存，工作投影（Projection）仍显示 <code>running</code></td><td>事实（Fact）已结束，展示落后</td><td>重建视图，不删除终态事实（Terminal Fact）去迎合旧界面</td></tr></tbody></table></div>
+<p>工具（Tool）结果未知、记录不可读与尚未执行不能合成一种失败。正确恢复（Recovery）有时意味着保留未知或收束中断，未必意味着继续动作。</p>
+<span class="heading-alias" id="两种顺序单次执行顺序与-session-全局顺序" aria-hidden="true"></span><h3 id="三种坐标执行run内会话session内与观察流">三种坐标：执行（Run）内、会话（Session）内与观察流</h3>
+<p>时间戳可能相同，机器时钟也可能偏移；<code>runId</code>的字典顺序更不是执行（Run）顺序。Maka因此使用不同坐标回答不同排序问题：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 三种坐标：执行（Run）内、会话（Session）内与观察流"><table><caption>表 8 / Table 8 · 三种坐标：执行（Run）内、会话（Session）内与观察流</caption><thead><tr><th scope="col">坐标</th><th scope="col">计数范围</th><th scope="col">主要用途</th></tr></thead><tbody><tr><td><code>event_seq</code></td><td>一个 <code>invocationId</code>内的不可变事件（Immutable Event）顺序</td><td>执行（Run）前缀、工具（Tool）边界与重放（Replay）</td></tr>
+<tr><td>会话提交序号（Session Ordinal）</td><td>同一会话（Session）跨执行（Run）的不可变事件（Immutable Event）提交顺序</td><td>跨执行（Run）的历史投影（History Projection）</td></tr>
+<tr><td>订阅序号（Subscription Sequence）与投影修订号（Projection Revision）</td><td>一条观察流及其发布视图</td><td>检查新旧观察是否属于当前订阅、顺序是否连续</td></tr></tbody></table></div>
+<p>部分事件（Partial Event）的展示记录另有路径，不能强行塞进普通不可变事件（Immutable Event）的序号中。后面的34和41分别属于第二、第三种坐标，不能直接比较大小决定哪份事实（Fact）更新。</p>
+<span class="heading-alias" id="同一份回答怎样从-running-变成中断记录" aria-hidden="true"></span><h3 id="同一份回答怎样成为中断记录">同一份回答，怎样成为中断记录</h3>
+<p>为单独观察结束判断，现在明确改变任务：R7只对用户已经提供的README差异（Diff）给出中文解释，不调用工具（Tool）。假设记录可读且合法，使用普通SQLite路径；没有续接认领（Continuation Claim）、交接（Handoff）、特殊导入、待修复工具（Tool）结算或沙箱边界（Sandbox Boundary）重启归因。下面是源码条件下的教学手算，不是实际崩溃轨迹（Trajectory）。</p>
+<p>先说明投影（Projection）需要哪些材料：已接纳的完整事件（Event）前缀记为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>L</mi></mrow><annotation encoding="application/x-tex">L</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">L</span></span></span></span></span>，仍在变化的部分展示内容记为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi></mrow><annotation encoding="application/x-tex">P</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span></span></span></span></span>，用途视图记为 <span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>V</mi></mrow><annotation encoding="application/x-tex">V</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.2222em;">V</span></span></span></span></span>。还要给定工作身份（Work Identity）、相关裁决权（Authority）记录和读取规则。固定这些条件后，用下式简记其关系：</p>
+<div class="course-math-block" tabindex="0" role="region" aria-label="数学公式：可横向滚动"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>V</mi><mo>=</mo><mi mathvariant="normal">Project</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>L</mi><mo separator="true">,</mo><mi>P</mi><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">V = \operatorname{Project}(L, P).</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.2222em;">V</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop"><span class="mord mathrm">Project</span></span><span class="mopen">(</span><span class="mord mathnormal">L</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mclose">)</span><span class="mord">.</span></span></span></span></span></div>
+<p><code>Project</code>是教学符号，不是新增应用程序编程接口（Application Programming Interface，API）；公式没有宣称真实实现只有两个参数，也不保证资料损坏时必能成功。它只帮助区分：<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>V</mi></mrow><annotation encoding="application/x-tex">V</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.2222em;">V</span></span></span></span></span>可以出现回答文字，而<span class="course-math-inline"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>L</mi></mrow><annotation encoding="application/x-tex">L</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">L</span></span></span></span></span>仍没有结束事实（Fact）。</p>
+<p>假设S1此前已有30条不可变事件（Immutable Event），接下来按完整过程计算：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 9 / Table 9 · 同一份回答，怎样成为中断记录"><table><caption>表 9 / Table 9 · 同一份回答，怎样成为中断记录</caption><thead><tr><th scope="col">时点</th><th scope="col">R7内序号 / S1提交序号</th><th scope="col">可以得出的结论</th></tr></thead><tbody><tr><td>保存开始记录（Opening Event），再保存用户请求</td><td><code>(1,31)</code>、<code>(2,32)</code></td><td>知道R7存在及本次输入</td></tr>
+<tr><td>模型（Model）逐段产生“这处修改……”</td><td>写部分展示记录，尚不占<code>(3,33)</code></td><td>可以展示进展，仍未结束</td></tr>
+<tr><td>保存完整回答内容</td><td><code>(3,33)</code>，移除匹配的部分展示快照（Snapshot）</td><td>有完整回答，仍缺终态（Terminal State）</td></tr>
+<tr><td>宿主（Host）退出，普通启动恢复（Recovery）收束R7</td><td>新结束记录为<code>(4,34)</code></td><td>状态（State）为 <code>failed</code>，失败分类为 <code>app_restarted</code>；旧回答仍可读</td></tr>
+<tr><td>相同结束记录的标识与内容再次提交</td><td>仍为<code>(4,34)</code></td><td>满足本普通追加路径的精确重试（Exact Retry），不追加第五条</td></tr>
+<tr><td>迟到回调函数（Callback）要求新增另一条成功结束记录</td><td>被封印（Seal）拒绝</td><td>不把R7重新裁决为成功</td></tr></tbody></table></div>
+<p>这里的数字是教学值，真实序号由相应存储事务分配。完整事件（Event）替换匹配的部分展示快照（Snapshot），不意味着先前每个字都是一条永久普通记录；开放执行（Run）的展示还可以把到达中的文字整理为可读内容，这只是读时变换。</p>
+<h4 id="真正读取这份结果的是谁">真正读取这份结果的是谁</h4>
+<p><code>SessionManager.getMessages/listTurns</code>调用 <code>RuntimeReadModel</code>，读取执行（Run）开始与结束结构和相关事件（Event），再构造消息（Message）与工作轮次（Turn）视图。尚未带结束记录的对象仍作为 <code>running</code>读取；完整回答不会自动使它完成。如果已有结束记录却无法验证为合法终态事实（Terminal Fact），读取应报错，不能把损坏内容降格成普通运行中状态（State）。</p>
+<p>启动恢复（Recovery）先分类，再保存决定。普通缺少结束记录的路径由 <code>classifyAgentRunRecovery</code>给出 <code>failed / app_restarted</code>；若存在合法终态事实（Terminal Fact），则按它保留结果。续接认领（Continuation Claim）与交接（Handoff）由其负责者（Owner）处理，不由通用恢复（Recovery）随意制造失败。</p>
+<p>源码还处理其他条件：读取失败或多个结束记录等损坏，严格模式报错，尽力模式可跳过；代码模式（Code Mode）欠缺工具结果（Tool Result）时先补结算，失败则暂不封印（Seal）；匹配沙箱边界（Sandbox Boundary）重启关闭记录时可调整失败分类。这些都不属于上表的纯文本手算，不能由 <code>app_restarted</code>覆盖全部中断。</p>
+<p>如果保存返回异常而记录其实已经落账，相应回读（Read-back）与终态提交屏障（Commit Barrier）须先确认它。异常不直接等于未提交，更不授权重新做文件操作。恢复（Recovery）后允许接纳新工作，也不表示旧R7重新执行。</p>
+<span class="heading-alias" id="投影通常应该可以重建" aria-hidden="true"></span><span class="heading-alias" id="投影也可能落后" aria-hidden="true"></span><span class="heading-alias" id="视图失效不等于事实被撤回" aria-hidden="true"></span><h3 id="视图失效不等于事实fact被撤回">视图失效，不等于事实（Fact）被撤回</h3>
+<p>假设客户端（Client）最后看见运行中快照（Snapshot），随后宿主（Host）保存终态（Terminal State）。活跃宿主（Host）会撤销旧对话叠加层（Transcript Overlay），清理相应展示缓存，再发布更高投影修订号（Projection Revision）的权威视图。</p>
+<p>客户端（Client）消费者（Consumer）核对 <code>hostEpoch</code>、<code>subscriptionId</code>、下一 <code>sequence</code>及递增的 <code>projectionRevision</code>。旧流或不连续序列不能直接覆盖新快照（Snapshot）；协议错误与具体界面怎样自动重连是两层问题。</p>
+<p>S1提交序号34属于持久事件（Event）；某次订阅序号（Subscription Sequence）41属于观察流。新订阅从新的快照（Snapshot）开始，不必接着42计数。新进程也没有旧内存缓存，从事实（Fact）重建与向旧对象发送失效通知不是同一动作。</p>
+<span class="heading-alias" id="换一种需求保留探索历史只给模型一条当前路径" aria-hidden="true"></span><h3 id="深化对照保存探索分支选择一条模型输入model-input路径">深化对照：保存探索分支，选择一条模型输入（Model Input）路径</h3>
+<p>如果用户想退回以前的思路继续尝试，同时保留旧探索记录，问题就变成输入路径选择。代码代理（Code Agent）Pi提供了一个具体例子：会话（Session）条目有 <code>id/parentId</code>，当前叶节点（Leaf）决定沿哪条祖先路径构造模型输入（Model Input）。它不代替Maka的终态（Terminal State）裁决。</p>
+<p>下面仍是教学推演：a是用户问题，b/c是第一次尝试，d是后来新增条目。</p>
 <pre><code class="language-text">原记录：a → b → c
-branch(a) 后追加新条目 d，且已保存：
-          a → b → c   仍在文件中
-          └→ d       当前路径为 a → d</code></pre>
-<p><code>branch(a)</code> 本身只移动内存 leaf；若尚未追加 d 就退出，重新打开文件会从最后有效条目 c 重建 leaf。若 d 已持久化，重建路径才是 a→d。<code>buildSessionContext</code> 还应用这条路径上的 compaction 边界，把合适条目变成消息；SDK <code>createAgentSession</code> 把结果赋给真实 <code>agent.state.messages</code>。普通 extension <code>custom</code> 记录不进入这份消息，<code>custom_message</code> 才进入，说明“扩展状态已保存”也不等于“模型已经读到”。</p>
-<p>持久化另有条件：这里的 <code>flushed</code> 是 Pi 会话写出分支使用的状态，表示已完成该分支的文件写出，不表示每条记录都做了 <code>fsync</code>（请求把数据同步到持久存储）。新普通 Session 尚无 assistant 且未 flushed 时，已有条目可以只在内存；第一条 assistant 到来后才统一写出。已存在并 flushed 的文件另有追加分支。读取会跳过 malformed JSON 行，并可能为非空尾行补换行。这是一种具体的容错与交互取舍，不能提升为事务、每条 fsync 或任意损坏下的正确重放保证。</p>
-<p>比较时问“我要恢复的是执行结果、模型输入还是工作文件”：选择历史分支不会撤销 c 阶段已经改过的文件。若需要可恢复的导航决定或更强写入确认，就必须另外定义持久合同，不能靠保留更多聊天文本实现。</p>
-<span class="heading-alias" id="深化自测与迁移" aria-hidden="true"></span><h3 id="机制与条件变化解析">机制与条件变化解析</h3>
-<p><strong>问题 1。</strong> 为什么流式 partial 不能全部当成独立历史消息发回模型？</p>
-<p><strong>解释。</strong> partial 是进行中的快照，可能被替换；逐个重放会重复甚至引用未完成内容。</p>
-<p><strong>问题 2。</strong> RuntimeEvent 不可用时，是否自动读取 StoredMessage 作为 provider history？</p>
-<p><strong>解释。</strong> 不会。当前 replay 只来自 RuntimeEvent；缺失 context 与独立 backfill 修复应分开。</p>
-<p><strong>问题 3。</strong> opening 迁入事件脊柱后，checkpoint operational ledger 是否消失？</p>
-<p><strong>解释。</strong> 没有。opening/terminal 的来源与 checkpoint、model-call、projection transition 的 operational 记录各有职责。</p>
-<h4 id="改变条件再判断恢复方案">改变条件，再判断恢复方案</h4>
-<p><strong>问题 1。</strong> R7 的回答完整，但 Host 重启前没有 terminal。可以根据“已完成”的文字补 completed 吗？若 terminal 实际已存在但回执丢了，答案怎样改变？</p>
-<p><strong>解释。</strong> 不能。当前普通无 claim/handoff 分支按缺少 terminal 收束为中断；若合法 terminal 已存在，就保留其结果。写失败和未提交不同，须由回读/barrier 确认。两种情况都不授权因为缺少界面回执而重做文件操作。</p>
-<p><strong>问题 2。</strong> 用户只想在 Pi 中退回 a 继续思考，点击分支后尚未追加新条目就退出。重开后的输入一定以 a 为 leaf 吗？如果要求这个选择也跨重启，该新增什么合同？</p>
-<p><strong>解释。</strong> 不一定；当前 <code>branch</code> 只改内存，重开默认由最后物理条目重建 leaf。若产品要持久保存纯导航，应新增明确的导航状态或可重放选择记录，并定义其与分支追加的一致性；这是迁移设计，不是当前已实现的功能。切换输入也不回滚旧文件效果。</p>
-<p><strong>问题 3。</strong> 新订阅收到快照（snapshot）后，旧订阅的一帧声称任务仍 running。应改写 terminal、复用旧序列，还是检查什么？</p>
-<p><strong>解释。</strong> 核对 hostEpoch、subscriptionId、sequence 与 projectionRevision；不符合当前观察流的帧不能覆盖快照。修复的是观察状态，已有 terminal 不因旧帧失效而改变。协议报错与具体 UI 怎样重连仍是两个层次。</p>
-<h4 id="迁移到另一种投影">迁移到另一种投影</h4>
-<p><strong>问题。</strong> 同一组 Read/Edit/Bash 事实，可给 UI 形成气泡，也可给 provider 形成完整协议单元；换成摘要或原文归档引用（archive ref）时，改变的是哪一层？</p>
-<p><strong>解释。</strong> 改变的是消费者得到的投影，不能据此改写原始执行事实。例如 Bash 原结果有两条失败断言，摘要只保留失败数量，模型就不能仅凭摘要复述具体期望值；UI 中仍可能展示原结果。archive ref 则只是定位入口：模型要得到原文，还需在权限与范围允许时调用读取工具，并等结果进入后续输入。保存原文、提供引用、实际回读是三个步骤；它们都不自动成为长期 Memory。三种表示的取舍见 <a href="../../../extended-reading.html#reference-3" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../comparisons/context-methods.md">Context 方法空间</a>。</p>
-<span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h3 id="相关章节">相关章节</h3>
-<ul>
-<li>相关章节：<a href="13-session-turn-run.html">第13章｜Session、Turn、Run 与 Owner</a></li>
-<li>相关章节：<a href="15-model-context.html">第15章｜模型输入与上下文组成</a></li>
-</ul>
-<h3 id="延伸阅读">延伸阅读</h3>
-<p><a href="../../../extended-reading.html#reference-1" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/system-map.md#多账本每个问题找自己的事实来源">系统地图的多账本说明</a>提供各类持久记录与消费者的完整分工。</p>
+branch(a) 后追加 d，并完成相应文件写出：
+          a → b → c   旧分支仍保存
+          └→ d       当前输入路径为 a → d</code></pre>
+<p><code>branch(a)</code>本身只移动内存叶节点（Leaf）；若还没追加d就退出，重新打开文件会按最后有效条目c重建。d已保存后才形成a→d的当前路径。选择分支也不会撤销c阶段已经发生的文件效果（Effect）。</p>
+<p><code>buildSessionContext</code>按所选路径和上下文压缩（Context Compaction）边界整理消息（Message），<code>createAgentSession</code>再把结果赋给真正的 <code>agent.state.messages</code>。普通扩展（Extension）的 <code>custom</code>记录不进入这份消息（Message），<code>custom_message</code>才进入；保存扩展（Extension）状态（State）与模型（Model）实际读到仍有消费者（Consumer）边界。</p>
+<p>写出也有具体条件。Pi的 <code>flushed</code>表示相应会话（Session）文件写出分支已经完成，不表示每条记录都执行文件同步（File Synchronization，<code>fsync</code>）。新普通会话（Session）尚无助手消息（Assistant Message）且未写出时，条目可以只在内存；首次助手消息（Assistant Message）出现后才统一写出，已存在且写出的文件另走追加分支。</p>
+<p>读取时会跳过格式损坏的JavaScript对象表示法（JavaScript Object Notation，JSON）行，并可能为非空尾行补换行。这是该实现的容错取舍，不是事务（Transaction）、每条文件同步（File Synchronization）或任意损坏下都正确重放（Replay）的保证。若要求纯导航选择也跨重启保存，需要另外定义持久记录与追加的一致性；不能把这一建议写成Pi已有能力。</p>
+<span class="heading-alias" id="深化自测与迁移" aria-hidden="true"></span><span class="heading-alias" id="机制与条件变化解析" aria-hidden="true"></span><span class="heading-alias" id="改变条件再判断恢复方案" aria-hidden="true"></span><h3 id="条件变化与直接答案">条件变化与直接答案</h3>
+<p><strong>问题1。</strong> 流式片段都已经显示，为什么不能每条都放入下一次模型输入（Model Input）？</p>
+<p><strong>参考答案。</strong> 部分事件（Partial Event）可能是进行中的增量或快照（Snapshot）；逐个当成完整回答会重复内容。实际模型历史（Model History）还要检查完整性、可见性（Visibility）、协议配对及兼容条件。</p>
+<p><strong>问题2。</strong> 运行时事件（Runtime Event）缺失时，可以自动用 <code>StoredMessage</code>补回吗？开始记录（Opening Event）进入事件（Event）后，操作账本（Operational Ledger）是否就能删除？</p>
+<p><strong>参考答案。</strong> 两者都不能这样推导。普通模型历史（Model History）不自动采用聊天记录回退（Transcript Fallback），独立回填修复（Backfill）另有条件；检查点（Checkpoint）、物理请求尝试（Physical Attempt）与投影变换（Projection Transition）仍有相应操作记录。</p>
+<p><strong>问题3。</strong> 回答中写“已完成”，宿主（Host）重启前却没有终态（Terminal State），能据文字补成功吗？如果只是回执丢失呢？</p>
+<p><strong>参考答案。</strong> 不能据文字补成功。先区分普通开放执行（Run）、专用续接和已有合法终态（Terminal State）；上面的普通纯文本例收束为中断，已有合法结果则保留。回执丢失要先回读（Read-back），两种情形都不自动授权重做动作。</p>
+<p><strong>问题4。</strong> Pi执行 <code>branch(a)</code>后没有追加条目就退出，重新打开时一定仍以a为当前叶节点（Leaf）吗？</p>
+<p><strong>参考答案。</strong> 不一定。内存导航未单独持久保存，重开按最后有效条目重建；若要求该选择也持久，就需要新增合同。输入分支选择不回滚文件效果（Effect）。</p>
+<p><strong>问题5。</strong> 新快照（Snapshot）之后收到旧订阅的一帧 <code>running</code>，应改写结束记录吗？</p>
+<p><strong>参考答案。</strong> 不应。检查当前宿主（Host）、订阅身份（Identity）、序号和修订号，拒绝不属于当前观察流的内容。修复的是观察，不是撤回终态事实（Terminal Fact）；具体自动重连仍要看客户端（Client）策略。</p>
+<span class="heading-alias" id="迁移到另一种投影" aria-hidden="true"></span><h4 id="换成摘要summary或归档引用archive-reference">换成摘要（Summary）或归档引用（Archive Reference）</h4>
+<p><strong>问题。</strong> 同一份 <code>Bash</code>原结果改成摘要（Summary）或归档引用（Archive Reference）给模型（Model），改变了哪一层？</p>
+<p><strong>参考答案。</strong> 改变的是消费者（Consumer）获得的投影（Projection），不能据此改写原执行事实（Execution Fact）。摘要（Summary）遗漏的细节不能凭空复述；归档引用（Archive Reference）只是定位入口，模型（Model）还须在权限（Permission）与范围允许时请求读取，并等结果进入后续输入。保存原文、提供引用、实际回读（Read-back）是三个步骤，也不自动等于长期记忆（Long-Term Memory）。</p>
+<span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><span class="heading-alias" id="相关章节" aria-hidden="true"></span><span class="heading-alias" id="延伸阅读" aria-hidden="true"></span><h3 id="相关章节与延伸阅读">相关章节与延伸阅读</h3>
+<p><a href="13-session-turn-run.html">第13章</a>建立身份（Identity）与负责者（Owner），<a href="15-model-context.html">第15章</a>继续整理实际模型输入（Model Input）。<a href="../../../extended-reading.html#reference-1" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/system-map.md#多账本每个问题找自己的事实来源">系统地图的多账本（Ledger）说明</a>与<a href="../../../extended-reading.html#reference-3" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../comparisons/context-methods.md">上下文方法比较</a>可供进一步查阅。</p>
 <hr>
-<p><a href="13-session-turn-run.html">上一章：第 13 章｜Session、Turn、Run 与 Owner</a> · <a href="15-model-context.html">下一章：第 15 章｜模型输入与上下文组成</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="13-session-turn-run.html"><span>← 上一章</span><strong>第 13 章｜Session、Turn、Run 与 Owner</strong></a><a href="15-model-context.html"><span>下一章 →</span><strong>第 15 章｜模型输入与上下文组成</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E6%96%AD%E7%BA%BF%E5%90%8E%E5%93%AA%E4%BB%BD%E8%AE%B0%E5%BD%95%E5%86%B3%E5%AE%9A%E5%AE%8C%E6%88%90%E7%8A%B6%E6%80%81">断线后，哪份记录决定完成状态</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E6%8C%81%E4%B9%85%E4%BA%8B%E5%AE%9E%E7%94%9F%E6%88%90%E7%94%A8%E9%80%94%E8%A7%86%E5%9B%BE">从持久事实生成用途视图</a></li><li class="toc-level-3"><a href="#%E4%BB%80%E4%B9%88%E5%8F%AB%E4%BA%8B%E5%AE%9E">什么叫“事实”</a></li><li class="toc-level-3"><a href="#%E4%BB%80%E4%B9%88%E5%8F%AB%E4%BA%8B%E4%BB%B6">什么叫“事件”</a></li><li class="toc-level-3"><a href="#%E4%BB%80%E4%B9%88%E5%8F%AB%E8%B4%A6%E6%9C%AC">什么叫“账本”</a></li><li class="toc-level-3"><a href="#%E6%8A%95%E5%BD%B1%E8%A7%86%E5%9B%BE%E6%8A%8A%E4%BA%8B%E5%AE%9E%E6%95%B4%E7%90%86%E6%88%90%E4%BA%BA%E6%88%96%E6%A8%A1%E5%9E%8B%E8%83%BD%E7%94%A8%E7%9A%84%E5%BD%A2%E7%8A%B6">投影视图：把事实整理成人或模型能用的形状</a></li><li class="toc-level-3"><a href="#terminal%E6%9C%80%E7%BB%88%E7%8A%B6%E6%80%81%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%94%AF%E4%B8%80%E8%A3%81%E5%86%B3">Terminal：最终状态为什么需要唯一裁决</a></li><li class="toc-level-3"><a href="#%E7%94%A8-r7-%E7%9C%8B%E4%B8%80%E6%AC%A1%E4%BA%8B%E5%AE%9E%E5%88%B0%E6%8A%95%E5%BD%B1%E7%9A%84%E8%BD%AC%E6%8D%A2">用 R7 看一次事实到投影的转换</a></li><li class="toc-level-3"><a href="#%E5%AF%B9%E7%85%A7%E4%B8%80%E6%AC%A1%E7%9C%9F%E5%AE%9E-edit-%E7%9A%84%E4%B8%A4%E7%A7%8D%E8%A1%A8%E7%A4%BA">对照一次真实 Edit 的两种表示</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E5%A4%9A%E8%B4%A6%E6%9C%AC%E6%80%8E%E6%A0%B7%E5%88%86%E9%85%8D%E8%81%8C%E8%B4%A3">多账本怎样分配职责</a></li><li class="toc-level-3"><a href="#terminal-%E8%A3%81%E5%86%B3%E4%B8%8E-settled-%E7%BB%93%E7%AE%97">Terminal 裁决与 settled 结算</a></li><li class="toc-level-3"><a href="#runtimeevent%E6%89%A7%E8%A1%8C%E8%AF%AD%E4%B9%89%E7%9A%84%E9%BB%91%E5%8C%A3%E5%AD%90">RuntimeEvent：执行语义的黑匣子</a></li><li class="toc-level-3"><a href="#partial%E5%AE%8C%E6%95%B4%E4%BA%8B%E4%BB%B6%E4%B8%8E%E6%A8%A1%E5%9E%8B%E5%8F%AF%E8%A7%81%E6%80%A7">Partial、完整事件与模型可见性</a></li><li class="toc-level-3"><a href="#storedmessage%E6%9C%89%E7%94%A8%E4%BD%86%E4%B8%8D%E6%98%AF%E6%AD%A3%E5%B8%B8%E6%89%A7%E8%A1%8C%E8%AF%AD%E4%B9%89%E7%9A%84%E6%9C%80%E7%BB%88-authority">StoredMessage：有用，但不是正常执行语义的最终 authority</a></li><li class="toc-level-3"><a href="#%E5%B4%A9%E6%BA%83%E5%9C%BA%E6%99%AF%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BA%8B%E5%AE%9E%E8%BE%B9%E7%95%8C%E5%BE%88%E9%87%8D%E8%A6%81">崩溃场景：为什么事实边界很重要</a></li><li class="toc-level-3"><a href="#%E4%B8%A4%E7%A7%8D%E9%A1%BA%E5%BA%8F%E5%8D%95%E6%AC%A1%E6%89%A7%E8%A1%8C%E9%A1%BA%E5%BA%8F%E4%B8%8E-session-%E5%85%A8%E5%B1%80%E9%A1%BA%E5%BA%8F">两种顺序：单次执行顺序与 Session 全局顺序</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E4%BB%BD%E5%9B%9E%E7%AD%94%E6%80%8E%E6%A0%B7%E4%BB%8E-running-%E5%8F%98%E6%88%90%E4%B8%AD%E6%96%AD%E8%AE%B0%E5%BD%95">同一份回答，怎样从 running 变成中断记录</a></li><li class="toc-level-3"><a href="#%E8%A7%86%E5%9B%BE%E5%A4%B1%E6%95%88%E4%B8%8D%E7%AD%89%E4%BA%8E%E4%BA%8B%E5%AE%9E%E8%A2%AB%E6%92%A4%E5%9B%9E">视图失效，不等于事实被撤回</a></li><li class="toc-level-3"><a href="#%E6%8D%A2%E4%B8%80%E7%A7%8D%E9%9C%80%E6%B1%82%E4%BF%9D%E7%95%99%E6%8E%A2%E7%B4%A2%E5%8E%86%E5%8F%B2%E5%8F%AA%E7%BB%99%E6%A8%A1%E5%9E%8B%E4%B8%80%E6%9D%A1%E5%BD%93%E5%89%8D%E8%B7%AF%E5%BE%84">换一种需求：保留探索历史，只给模型一条当前路径</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E4%B8%8E%E6%9D%A1%E4%BB%B6%E5%8F%98%E5%8C%96%E8%A7%A3%E6%9E%90">机制与条件变化解析</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="13-session-turn-run.html">上一章：第13章</a> · <a href="15-model-context.html">下一章：第15章</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="13-session-turn-run.html"><span>← 上一章</span><strong>第 13 章｜工作身份（Work Identity）与负责者（Owner）</strong></a><a href="15-model-context.html"><span>下一章 →</span><strong>第 15 章｜模型输入（Model Input）与上下文（Context）组成</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E8%BA%AB%E4%BB%BDidentity%E5%AE%9A%E4%BD%8D%E5%AF%B9%E8%B1%A1%E8%AE%B0%E5%BD%95%E6%94%AF%E6%8C%81%E5%88%A4%E6%96%AD">前情回顾：身份（Identity）定位对象，记录支持判断</a></li><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E5%9B%9B%E4%B8%AA%E6%A6%82%E5%BF%B5%E6%80%8E%E6%A0%B7%E7%BB%84%E6%88%90%E4%B8%80%E6%9D%A1%E5%88%A4%E6%96%AD%E9%93%BE">四个概念怎样组成一条判断链</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E4%BF%9D%E5%AD%98%E5%88%B0%E4%B8%A4%E4%B8%AA%E5%AE%9E%E9%99%85%E6%B6%88%E8%B4%B9%E8%80%85consumer">从保存到两个实际消费者（Consumer）</a></li><li class="toc-level-3"><a href="#%E4%BA%8B%E5%AE%9Efact%E8%83%BD%E8%AF%81%E6%98%8E%E5%88%B0%E5%93%AA%E9%87%8C">事实（Fact）能证明到哪里</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E4%BB%BD%E6%95%99%E5%AD%A6%E8%AE%B0%E5%BD%95%E6%80%8E%E6%A0%B7%E5%BD%A2%E6%88%90%E4%B8%A4%E7%A7%8D%E6%8A%95%E5%BD%B1projection">一份教学记录，怎样形成两种投影（Projection）</a></li><li class="toc-level-3"><a href="#%E5%AF%B9%E7%85%A7%E4%B8%80%E9%A1%B9%E5%8E%86%E5%8F%B2%E7%9C%9F%E5%AE%9E%E7%BC%96%E8%BE%91">对照一项历史真实编辑</a></li><li class="toc-level-3"><a href="#%E7%BB%88%E6%80%81terminal-state%E4%B8%8E%E5%AE%8C%E6%88%90%E6%96%87%E5%AD%97">终态（Terminal State）与完成文字</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E5%A4%9A%E8%B4%A6%E6%9C%ACledger%E6%8C%89%E8%A6%81%E5%9B%9E%E7%AD%94%E7%9A%84%E9%97%AE%E9%A2%98%E5%AF%BB%E6%89%BE">多账本（Ledger）：按要回答的问题寻找</a></li><li class="toc-level-3"><a href="#%E8%BF%90%E8%A1%8C%E6%97%B6%E4%BA%8B%E4%BB%B6runtime-event%E5%85%88%E6%98%A0%E5%B0%84%E5%86%8D%E6%8E%A5%E7%BA%B3%E5%92%8C%E4%BF%9D%E5%AD%98">运行时事件（Runtime Event）：先映射，再接纳和保存</a></li><li class="toc-level-3"><a href="#%E9%83%A8%E5%88%86%E4%BA%8B%E4%BB%B6partial-event%E4%B8%8E%E9%9D%A2%E5%90%91%E6%A8%A1%E5%9E%8Bmodel%E7%9A%84%E5%8F%AF%E8%A7%81%E6%80%A7visibility">部分事件（Partial Event）与面向模型（Model）的可见性（Visibility）</a></li><li class="toc-level-3"><a href="#storedmessage%E8%AF%BB%E5%8F%96%E8%A7%86%E5%9B%BE%E4%B8%8D%E8%83%BD%E4%BB%A3%E6%9B%BF%E6%89%A7%E8%A1%8C%E4%BA%8B%E5%AE%9Eexecution-fact">StoredMessage：读取视图不能代替执行事实（Execution Fact）</a></li><li class="toc-level-3"><a href="#%E5%9B%9B%E7%A7%8D%E4%B8%AD%E6%96%AD%E5%9B%9B%E7%A7%8D%E4%B8%8D%E5%90%8C%E5%88%A4%E6%96%AD">四种中断，四种不同判断</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E7%A7%8D%E5%9D%90%E6%A0%87%E6%89%A7%E8%A1%8Crun%E5%86%85%E4%BC%9A%E8%AF%9Dsession%E5%86%85%E4%B8%8E%E8%A7%82%E5%AF%9F%E6%B5%81">三种坐标：执行（Run）内、会话（Session）内与观察流</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E4%BB%BD%E5%9B%9E%E7%AD%94%E6%80%8E%E6%A0%B7%E6%88%90%E4%B8%BA%E4%B8%AD%E6%96%AD%E8%AE%B0%E5%BD%95">同一份回答，怎样成为中断记录</a></li><li class="toc-level-3"><a href="#%E8%A7%86%E5%9B%BE%E5%A4%B1%E6%95%88%E4%B8%8D%E7%AD%89%E4%BA%8E%E4%BA%8B%E5%AE%9Efact%E8%A2%AB%E6%92%A4%E5%9B%9E">视图失效，不等于事实（Fact）被撤回</a></li><li class="toc-level-3"><a href="#%E6%B7%B1%E5%8C%96%E5%AF%B9%E7%85%A7%E4%BF%9D%E5%AD%98%E6%8E%A2%E7%B4%A2%E5%88%86%E6%94%AF%E9%80%89%E6%8B%A9%E4%B8%80%E6%9D%A1%E6%A8%A1%E5%9E%8B%E8%BE%93%E5%85%A5model-input%E8%B7%AF%E5%BE%84">深化对照：保存探索分支，选择一条模型输入（Model Input）路径</a></li><li class="toc-level-3"><a href="#%E6%9D%A1%E4%BB%B6%E5%8F%98%E5%8C%96%E4%B8%8E%E7%9B%B4%E6%8E%A5%E7%AD%94%E6%A1%88">条件变化与直接答案</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82%E4%B8%8E%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">相关章节与延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
