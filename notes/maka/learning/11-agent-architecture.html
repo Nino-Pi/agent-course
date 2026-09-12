@@ -1,112 +1,96 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 11 章｜Maka 的 Agent Harness 结构 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 11 / 62</div><article id="main-content"><span class="heading-alias" id="00agent-到底是什么先从会聊天的模型走到能完成工作的系统" aria-hidden="true"></span><span class="heading-alias" id="m00agent-的系统结构" aria-hidden="true"></span><span class="heading-alias" id="第-10-章maka-的-agent-harness-结构" aria-hidden="true"></span><span class="heading-alias" id="第-10-章agent-的系统结构" aria-hidden="true"></span><h1 id="第-11-章maka-的-agent-harness-结构">第 11 章｜Maka 的 Agent Harness 结构</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 11 章｜Maka 的运行支撑（Agent Harness）结构 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 11 / 62</div><article id="main-content"><span class="heading-alias" id="00agent-到底是什么先从会聊天的模型走到能完成工作的系统" aria-hidden="true"></span><span class="heading-alias" id="m00agent-的系统结构" aria-hidden="true"></span><span class="heading-alias" id="第-10-章maka-的-agent-harness-结构" aria-hidden="true"></span><span class="heading-alias" id="第-10-章agent-的系统结构" aria-hidden="true"></span><span class="heading-alias" id="第-11-章maka-的-agent-harness-结构" aria-hidden="true"></span><h1 id="第-11-章maka-的运行支撑agent-harness结构">第 11 章｜Maka 的运行支撑（Agent Harness）结构</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：Maka 怎样把模型、工具、工作状态和客户端组织成一套 Agent Harness？</p>
-<p><strong>关键概念</strong>：Host 接纳并协调工作；Runtime 推进执行循环；Client 展示结果；工具执行器落实动作；持久存储保留工作与执行记录。</p>
-<p><strong>关系主线</strong>：任务经 Host 接纳，由 Runtime 组织模型与工具协作，运行记录被保存，Host 向客户端提供状态与展示增量。六组 Harness 职责落到这些部件；文件变化、测试结果与执行终态分别支持不同结论。</p>
+<p><strong>核心问题</strong>：Maka 怎样把模型（Model）、工具（Tool）、工作状态（State）和客户端（Client）组织成可追踪的协作过程？</p>
+<p><strong>关键概念</strong>：宿主（Host）接纳并协调工作；运行时（Runtime）推进一次执行（Run）；工具执行器（Tool Executor）产生实际结果；持久存储（Durable Storage）保留记录；客户端（Client）提交请求并显示状态（State）。</p>
+<p><strong>关系主线</strong>：先分清谁负责决定、谁读取输入、谁改变现实，再沿 README 修复连接这些部件。工具结果（Tool Result）、执行终态（Terminal State）与任务验收分别支持不同结论，记忆（Memory）还需要后续消费者（Consumer）。</p>
 </blockquote>
-<p>与最小循环的职责对应见 <a href="08-mini-to-maka.html#%E7%AC%AC-08-%E7%AB%A0%E4%BB%8E-mini-%E5%88%B0-maka-%E7%9A%84%E6%9C%BA%E5%88%B6%E5%AF%B9%E5%BA%94">从 mini 到 Maka</a>。</p>
-<span class="heading-alias" id="核心路线" aria-hidden="true"></span><span class="heading-alias" id="先看结论" aria-hidden="true"></span><span class="heading-alias" id="先认识模型它负责推理与生成不直接拥有你的电脑" aria-hidden="true"></span><span class="heading-alias" id="agent-loop让判断行动观察不断闭环" aria-hidden="true"></span><span class="heading-alias" id="五个最小组成部分" aria-hidden="true"></span><span class="heading-alias" id="1-模型做判断和表达" aria-hidden="true"></span><span class="heading-alias" id="2-上下文模型这一刻的工作台" aria-hidden="true"></span><span class="heading-alias" id="3-工具连接模型与外部世界" aria-hidden="true"></span><span class="heading-alias" id="容易混淆的相邻概念" aria-hidden="true"></span><span class="heading-alias" id="常见误解" aria-hidden="true"></span><span class="heading-alias" id="误解一agent-就是会调用函数的模型" aria-hidden="true"></span><span class="heading-alias" id="误解二模型看过文件所以以后一直记得" aria-hidden="true"></span><span class="heading-alias" id="agent-的五个组成部分" aria-hidden="true"></span><h2 id="maka-如何实现-agent-harness">Maka 如何实现 Agent Harness</h2>
-<p><a href="01-agent-components.html">第01章</a>把 Agent 解释为围绕目标观察、决策、行动并接收反馈的系统，把 Harness 解释为组织模型与外部世界交互的运行软件。本章沿用这一区分，观察 Maka 怎样分配责任。</p>
-<p>Maka 的 <strong>Host（宿主）接纳并协调工作，Runtime（运行时）推进一次执行，Client（客户端）展示结果并接收用户输入</strong>。工具执行器负责实际读写和命令运行；持久存储保留已接受的工作及执行记录。它们是协作的软件部件，模型在其中负责提出下一步和解释观察。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="Maka 如何实现 Agent Harness：可滚动示意图"><a href="../../../assets/diagrams/11-agent-architecture-1.svg"><img src="../../../assets/diagrams/11-agent-architecture-1.svg" alt="Host 接纳工作，Runtime 组装输入并协调模型与工具；工具操作项目环境后返回结果，运行事实保存到持久存储，Host 的观察服务将快照与增量提供给 Client。" width="998" height="1339" loading="lazy" style="width:998px;min-width:849px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>Host 从持久事实构造快照，并转发运行中的增量；Client 通过协议读取和订阅。因此即时展示不必等同于已经持久结算的结果。图中箭头表示主要信息流，不是全部接口：Client 的请求也经 Host 提交，工具可能由本地或其他执行端承载。可用性与当前授权由工具运行链检查，具体执行端落实资源限制；持久记录的写入时机则决定崩溃后能知道什么。</p>
+<h2 id="前情回顾从共同问题走到具体负责者owner">前情回顾：从共同问题走到具体负责者（Owner）</h2>
+<p><a href="08-mini-to-maka.html">第08章</a>把运行支撑（Agent Harness）分成六组教学职责，并用真实修复片段说明：mini 与 Maka 都能读取、修改、检查，但请求表达和执行顺序可以不同。文件已经改变、记录已经保存、界面已经更新，是三个需要分别核对的状态（State）。因此，比较架构不能只数类或工具（Tool），还要找谁对这些状态（State）负责。</p>
+<p>本章把负责更新某项状态（State）、接受相应结果的部件称为<strong>负责者（Owner）</strong>；把实际读取并使用一份材料的人或程序称为<strong>消费者（Consumer）</strong>。同一个部件可以同时承担两种角色，但“保存过”与“已经被下一步使用”仍是两件事。</p>
+<p><a href="09-project-workspace.html">第09章</a>讨论接手项目时怎样确认任务范围（Task Scope）、文件初态和检查入口；<a href="10-reading-typescript.html">第10章</a>提供类型、等待和事件交接的语言读法。本章将使用这些读法解释责任关系，不要求先记住全部源码入口，也不把一个类型所在的包直接当成执行负责者（Owner）。</p>
+<span class="heading-alias" id="核心路线" aria-hidden="true"></span><span class="heading-alias" id="先看结论" aria-hidden="true"></span><span class="heading-alias" id="先认识模型它负责推理与生成不直接拥有你的电脑" aria-hidden="true"></span><span class="heading-alias" id="agent-loop让判断行动观察不断闭环" aria-hidden="true"></span><span class="heading-alias" id="五个最小组成部分" aria-hidden="true"></span><span class="heading-alias" id="1-模型做判断和表达" aria-hidden="true"></span><span class="heading-alias" id="2-上下文模型这一刻的工作台" aria-hidden="true"></span><span class="heading-alias" id="3-工具连接模型与外部世界" aria-hidden="true"></span><span class="heading-alias" id="容易混淆的相邻概念" aria-hidden="true"></span><span class="heading-alias" id="常见误解" aria-hidden="true"></span><span class="heading-alias" id="误解一agent-就是会调用函数的模型" aria-hidden="true"></span><span class="heading-alias" id="误解二模型看过文件所以以后一直记得" aria-hidden="true"></span><span class="heading-alias" id="agent-的五个组成部分" aria-hidden="true"></span><span class="heading-alias" id="maka-如何实现-agent-harness" aria-hidden="true"></span><h2 id="maka-如何实现运行支撑agent-harness">Maka 如何实现运行支撑（Agent Harness）</h2>
+<p>智能代理（Agent）围绕目标读取情况、作出决定、请求行动并接收反馈。模型（Model）承担其中的决策与文本生成；运行支撑（Agent Harness）负责把这些决定接到真实程序、状态（State）与用户交互。本章讨论的是 Maka 当前普通宿主（Host）路径，具体运行由默认 <code>ai-sdk</code> 执行后端（Agent Backend）承载。执行后端（Agent Backend）是供上层选择的执行实现；换一条实现后，重试或恢复（Recovery）保证仍须重新核对。</p>
+<p>先按“收到什么、改变什么、交给谁”阅读各部件：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · Maka 如何实现运行支撑（Agent Harness）"><table><caption>表 1 / Table 1 · Maka 如何实现运行支撑（Agent Harness）</caption><thead><tr><th scope="col">部件</th><th scope="col">读取的输入</th><th scope="col">自己承担的责任</th><th scope="col">结果的直接消费者（Consumer）</th></tr></thead><tbody><tr><td>宿主（Host）</td><td>客户端（Client）请求、已有工作与授权（Authorization）状态（State）</td><td>检查能否接纳，固定工作身份（Work Identity），协调执行（Run）与连接</td><td>运行时（Runtime）读取已接纳的工作；客户端（Client）读取接纳与状态（State）信息</td></tr>
+<tr><td>运行时（Runtime）</td><td>任务、适用规则、执行事实（Execution Fact）与当前可用工具（Tool）</td><td>组装模型输入（Model Input），推进模型（Model）与工具（Tool）循环，接纳执行结果</td><td>模型（Model）、工具执行链（Tool Execution）和记录读取方</td></tr>
+<tr><td>模型（Model）</td><td>本次实际送入的上下文（Context）</td><td>提出下一项行动请求（Action），或生成说明文本</td><td>运行时（Runtime）解释响应并决定后续控制</td></tr>
+<tr><td>工具执行链（Tool Execution）</td><td>结构化工具调用（Tool Call）、当前参数与执行边界（Execution Boundary）</td><td>校验、绑定执行者、检查当前许可、执行并结算结果</td><td>运行时（Runtime）读取工具结果（Tool Result），随后组织下一次输入</td></tr>
+<tr><td>持久存储（Durable Storage）</td><td>对应负责者（Owner）提交的记录</td><td>按存储合同保存、读取与校验记录</td><td>恢复（Recovery）程序、输入组装与展示服务</td></tr>
+<tr><td>客户端（Client）</td><td>宿主（Host）提供的快照（Snapshot）与更新</td><td>接收用户意图，显示当前可见状态（State）</td><td>用户读取界面；新的请求再交给宿主（Host）</td></tr></tbody></table></div>
+<p>表中的执行边界（Execution Boundary）表示当前这次操作受哪些资源与授权（Authorization）条件约束。工具执行器（Tool Executor）最终读写文件或运行命令；前面的校验、绑定和许可检查不因此都归给底层执行器。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="负责者与消费者 · Owners and Consumers：可滚动示意图"><a href="../../../assets/diagrams/11-agent-architecture-1.svg"><img src="../../../assets/diagrams/11-agent-architecture-1.svg" alt="宿主（Host）接纳工作，运行时（Runtime）组织模型输入（Model Input）和工具执行链（Tool Execution）；执行环境（Environment）返回结果，运行时（Runtime）保存执行事实（Execution Fact）。宿主观察服务（Host Observation Service）将快照（Snapshot）与增量供给客户端（Client），新的客户端请求再交宿主。即时显示不等于持久结算。" width="1296" height="1422" loading="lazy" style="width:1296px;min-width:1102px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>沿中间的循环读，模型（Model）提出请求，工具执行链（Tool Execution）落实操作，结果再进入运行时（Runtime）。沿右侧记录与显示的路径读，宿主（Host）既能转发运行增量，也会回读持久事实（Durable Fact）构造快照（Snapshot）。<strong>正在显示的文字，不必已经完成持久结算（Durable Settlement）。</strong> 图中是主要信息流，不是全部接口或每个包的导入关系。</p>
+<p>这种分工让两个问题能够分别回答：一个工具（Tool）当前能否运行，由实际工具执行链（Tool Execution）判断；客户端（Client）断线后怎样重新显示工作，则由宿主（Host）的观察服务与持久记录共同支持。存储文件存在，不会自行开始模型调用（Model Query）；界面重新打开，也不会自行获得重新执行业务操作的许可。</p>
 <h3 id="六组职责在-maka-中的落点">六组职责在 Maka 中的落点</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 六组职责在 Maka 中的落点"><table><caption>表 1 / Table 1 · 六组职责在 Maka 中的落点</caption><thead><tr><th scope="col">学习分组</th><th scope="col">Maka 怎样承担这项责任</th><th scope="col">代码修复时要回答的问题</th></tr></thead><tbody><tr><td>输入组织（Input Composition）</td><td>Host 组成规则与能力基础，Runtime 选择本 step 历史，再经适配器发出请求</td><td>模型这一次是否拿到当前文件和测试结果？</td></tr>
-<tr><td>模型与工具循环（Model / Tool Loop）</td><td>Runtime 组织模型请求，工具运行链校验并执行动作，结果进入后续判断</td><td>Read、Edit、Bash 怎样接成修复过程？</td></tr>
-<tr><td>状态与恢复（State / Recovery）</td><td>Session/Turn/Run 标识不同工作层次，持久记录区分已知结果与未知效果</td><td>断线或崩溃后能接着哪里继续？</td></tr>
-<tr><td>权限与隔离（Permissions / Isolation）</td><td>当前授权限定允许的动作，具体执行端落实资源边界</td><td>能看见工具说明，是否就能改任意文件？</td></tr>
-<tr><td>任务推进与协作（Task Progress / Collaboration）</td><td>计划、持续目标、定时触发、依赖图和子任务按各自条件组织后续工作</td><td>是本次循环继续，还是另一次工作被触发？</td></tr>
-<tr><td>观察与评价（Observation / Evaluation）</td><td>工具结果、执行终态和任务判定分别描述动作、运行和交付</td><td>文件已改、执行结束、修复通过是否同时成立？</td></tr></tbody></table></div>
-<p>这六组是学习地图；具体机制不必各有一个同名类。Context 是本次输入，Memory 是供后续复用的信息：后者必须被读出并选入输入，才能影响当前模型调用。模型看到 Edit 的说明，只能提出调用意图，实际执行仍受工具绑定、参数和当前许可约束。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 六组职责在 Maka 中的落点"><table><caption>表 2 / Table 2 · 六组职责在 Maka 中的落点</caption><thead><tr><th scope="col">教学分组</th><th scope="col">Maka 怎样承担这项责任</th><th scope="col">代码修复时的判断对象</th></tr></thead><tbody><tr><td>输入组织（Input Composition）</td><td>宿主（Host）组成规则与能力基础，运行时（Runtime）选择本模型步骤（Model Step）的历史，再经模型协议适配器（Model Adapter）发出请求</td><td>模型（Model）本次是否收到当前文件与测试（Test）结果？</td></tr>
+<tr><td>模型与工具循环（Model / Tool Loop）</td><td>运行时（Runtime）组织模型调用（Model Query），工具执行链（Tool Execution）执行并回传结果</td><td><code>Read</code>、<code>Edit</code>、<code>Bash</code> 怎样连接成修复过程？</td></tr>
+<tr><td>状态与恢复（State / Recovery）</td><td>工作身份（Work Identity）关联归属与执行，持久记录区分已知结果与未知效果（Effect）</td><td>断线或崩溃后，哪些事情已知，哪些仍须核对？</td></tr>
+<tr><td>权限与隔离（Permissions / Isolation）</td><td>授权（Authorization）限定允许的操作，具体执行端强制限制资源访问</td><td>看见工具（Tool）说明，是否就能修改任意文件？</td></tr>
+<tr><td>任务推进与协作（Task Progress / Collaboration）</td><td>计划（Plan）、目标（Goal）、定时任务（Scheduled Task）和子任务（Subtask）按各自条件组织后续工作</td><td>当前执行（Run）还在继续，还是另一项工作被触发？</td></tr>
+<tr><td>观察与评价（Observation / Evaluation）</td><td>工具结果（Tool Result）、执行终态（Terminal State）和任务判定分别提供材料</td><td>文件已改、执行（Run）结束、修复通过是否都成立？</td></tr></tbody></table></div>
+<p>这里的模型步骤（Model Step）是一轮输入交给模型（Model）并取得决策的阶段，可以包含多个工具调用（Tool Call）。六组职责是学习地图，不要求分别存在六个同名类，也不是运行时（Runtime）要依次经过的六步流程。</p>
+<p>上下文（Context）是本次模型（Model）实际收到的组合；记忆（Memory）是供后续复用的信息。后者只有被读出并选入模型输入（Model Input），才可能影响这次回答。这条消费者（Consumer）关系也适用于工具（Tool）：看见 <code>Edit</code> 的说明只使模型（Model）能够提出调用意图，实际执行仍受绑定、参数和许可约束。</p>
 <h2 id="一项-readme-修复怎样推进">一项 README 修复怎样推进</h2>
-<h3 id="贯穿全套教程的案例">贯穿全套教程的案例</h3>
-<p>代码修复任务来自 <a href="04-code-repair.html#%E7%AC%AC-04-%E7%AB%A0%E4%BB%A3%E7%A0%81%E4%BF%AE%E5%A4%8Dcode-repair%E4%B8%8E%E6%B5%8B%E8%AF%95test">第04章 的四文件案例</a>：</p>
-<blockquote><p>修正 README 的测试步骤，找出并修复 <code>formatDuration</code> 的时间格式化错误，运行测试并检查 diff；用中文解释结果。</p>
+<span class="heading-alias" id="贯穿全套教程的案例" aria-hidden="true"></span><h3 id="贯穿教程的案例与本章初态">贯穿教程的案例与本章初态</h3>
+<p><a href="04-code-repair.html">第04章</a>的完整任务包含两处修改：修正 README 的测试（Test）入口，并把 <code>formatDuration(seconds)</code> 的余秒计算从 <code>% 100</code> 改为 <code>% 60</code>。函数接受非负安全整数秒，返回 <code>minutes:ss</code>；例如125秒应显示为 <code>2:05</code>。四份文件分别提供说明、项目配置、实现和断言（Assertion）。</p>
+<p><strong>本章改变初态：函数已经正确，既有四个测试（Test）原本通过，只需要修正 README。</strong> 本章允许修改 README，保留函数、测试（Test）与配置；没有沿用原始 <code>% 100</code> 缺陷。这个变化使我们能专注看责任交接，不能据此声称完整函数修复已经在此运行。</p>
+<p>教学请求是：</p>
+<blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，更新 README 的测试步骤，运行测试，检查改动范围，最后用中文总结；以后也请记住我希望使用中文解释。</p>
 </blockquote>
-<p><code>formatDuration(seconds)</code> 要把非负整数秒表示为 <code>minutes:ss</code>，例如 <code>125 → 2:05</code>。README 告诉人怎样启动测试，函数实现和测试则用来判断行为是否正确。</p>
-<p>这里抽出“只更新 README”的简化情形：假设功能测试原本已通过，只需要读、改说明、测、总结；这不证明完整任务中的函数缺陷已修复。<a href="16-tools-and-execution.html">第16章</a>使用完整修复任务。简化任务还包含一项长期偏好：</p>
-<blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，更新 README 的测试步骤，运行测试，最后用中文总结；以后也请记住我希望使用中文解释。</p>
-</blockquote>
-<p>这段工作使用三个教学标签：<a href="glossary.html#session%E4%BC%9A%E8%AF%9D">Session（会话）</a> S1 标识长期归属，<a href="glossary.html#turn%E8%BD%AE%E6%AC%A1--%E7%94%A8%E6%88%B7%E5%8F%AF%E8%A7%82%E5%AF%9F%E5%B7%A5%E4%BD%9C%E8%BE%B9%E7%95%8C">Turn（轮次）</a> T7 标识用户这项工作，<a href="glossary.html#run--agentrun%E8%BF%90%E8%A1%8C--%E6%89%A7%E8%A1%8C%E5%B0%81%E5%A5%97">Run（运行）</a> R7 标识一次具体执行。一次 Run 可以包含多次模型与工具调用；它们的生命周期见 <a href="13-session-turn-run.html">第13章</a>。</p>
+<p>README 当前写着 <code>npm run check</code>，项目配置只提供 <code>&quot;test&quot;: &quot;node --test&quot;</code>，实际入口为 <code>npm test</code>。<code>Read</code>、<code>Edit</code>、<code>Bash</code> 是 Maka 的实际工具标识，分别用于读取文件、修改文件和运行命令；标识保持原文，不能从名字直接推断参数或授权（Authorization）已合法。</p>
+<p>用三种工作身份（Work Identity）追踪它：会话（Session）S1 表示长期归属，工作轮次（Turn）T7 表示用户可识别的这一项工作，执行（Run）R7 表示本次具体执行。一次执行（Run）可以包含多次模型调用（Model Query）和工具调用（Tool Call）；三者的生命周期（Lifecycle）在<a href="13-session-turn-run.html">第13章</a>进一步展开。S1、T7、R7 都是教学标签，不是某次捕获的真实运行编号。</p>
 <span class="heading-alias" id="一个最小对照" aria-hidden="true"></span><span class="heading-alias" id="为什么不让模型一次性输出全部步骤" aria-hidden="true"></span><span class="heading-alias" id="用统一案例走一遍最小心智模型" aria-hidden="true"></span><h3 id="从提交到总结的调用链">从提交到总结的调用链</h3>
-<p>在只更新 README 的情形中，循环按下面的因果顺序推进：</p>
-<pre><code class="language-text">用户在 S1 中提交 T7
-  ↓
-系统接受任务，为它建立 R7
-  ↓
-构造第一次模型上下文
-  ↓
-模型请求 Read(package.json) 与 Read(README.md)
-  ↓
-工具返回两份真实文件内容，结果被保存
-  ↓
-构造下一次模型上下文（现在包含两个 Read 结果）
-  ↓
-模型请求 Edit(README.md, ...)
-  ↓
-工具执行修改并返回结果
-  ↓
-模型请求 Bash(测试命令)
-  ↓
-工具返回测试输出与退出状态
-  ↓
-模型用中文总结真实结果
-  ↓
-系统保存执行的结束状态，并通知客户端展示</code></pre>
-<p>下一步之所以依赖前一步，是因为结果可能推翻原来的判断。例如 README 写着 <code>npm run check</code>，<code>package.json</code> 的 scripts 却只声明 <code>test</code> 脚本，其调用入口为 <code>npm test</code>，模型应根据配置修正入口。完整修复任务还可能出现函数断言失败，那又需要诊断实现。重复读取未变化的文件也可能没有新发现；循环提供根据结果调整的机会，不保证每一步都增加信息。</p>
+<p>把任务分成可检查的交接。每一行都说明“下一位消费者（Consumer）现在多知道了什么”：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 从提交到总结的调用链"><table><caption>表 3 / Table 3 · 从提交到总结的调用链</caption><thead><tr><th scope="col">时点</th><th scope="col">已完成的动作与材料</th><th scope="col">下一位消费者（Consumer）怎样使用</th><th scope="col">还不能据此宣布什么</th></tr></thead><tbody><tr><td>提交</td><td>客户端（Client）发出T7的意图</td><td>宿主（Host）检查工作身份（Work Identity）和接纳条件</td><td>发送动画不证明R7已开始</td></tr>
+<tr><td>接纳</td><td>宿主（Host）保存准入（Admission）事实，固定R7</td><td>运行时（Runtime）取得本次工作及输入基础</td><td>已接纳不证明文件已读</td></tr>
+<tr><td>读取</td><td><code>Read</code> 返回配置和README的实际内容</td><td>下一模型步骤（Model Step）比较文档与真实入口</td><td>文件存在不证明内容已进入模型输入（Model Input）</td></tr>
+<tr><td>编辑</td><td><code>Edit</code> 局部替换错误命令并返回结果</td><td>运行时（Runtime）接纳工具结果（Tool Result），后续模型步骤（Model Step）决定检查</td><td>编辑命令成功不证明测试（Test）通过</td></tr>
+<tr><td>检查</td><td><code>Bash</code> 运行 <code>npm test</code>；另检查文件差异（Diff）</td><td>模型（Model）据真实结果说明行为与范围</td><td>单看退出码（Exit Code）0不证明检查覆盖了目标</td></tr>
+<tr><td>结束与展示</td><td>运行时（Runtime）记录执行终态（Terminal State），宿主（Host）发布状态（State）</td><td>客户端（Client）更新同一项工作的视图</td><td>执行终态（Terminal State）不代替任务验收</td></tr></tbody></table></div>
+<p>这不是规定真实模型（Model）必须采用相同的调用次数。下一步依赖前一步，是因为文件内容和执行输出（Output）可能推翻原判断：README 写了错误命令，配置却给出可用入口，就应以配置为依据修正文档。若下一次读取仍是未变化的文件，也可能没有取得新信息；循环提供调整机会，不保证每一步都增加进展。</p>
 <h3 id="正常例子与失败例子">正常例子与失败例子</h3>
-<h4 id="正常例子所有观察都能闭环">正常例子：所有观察都能闭环</h4>
-<ol>
-<li>两个 Read 分别返回 <code>package.json</code> 中的真实测试脚本和 README 当前说明；</li>
-<li>模型比较两份内容后生成精确 README 修改；</li>
-<li>Edit 明确返回修改成功；</li>
-<li>Bash 返回退出码 <code>0</code>，输出说明哪些测试已通过；</li>
-<li>检查文件差异（diff）确认改了预期位置，最终回答说明改了什么、运行了什么、测试覆盖到哪里。</li>
-</ol>
-<h4 id="失败例子测试命令不存在">失败例子：测试命令不存在</h4>
-<ol>
-<li>两个 Read 都成功，模型拿到配置和 README 当前内容；</li>
-<li>模型错误地请求一个不存在的测试脚本；</li>
-<li>Bash 返回非零退出状态和错误输出；</li>
-<li>模型应当根据错误决定是否尝试经过允许的替代命令，或者如实报告失败；</li>
-<li>即使系统正常结束了本次执行，也不能把“已结束”写成“已经满足所有用户要求”。</li>
-</ol>
-<p>失败结果会改变后续判断；它不会因 Run 已结束而变成测试通过。</p>
-<p><a href="22-agent-cases.html">第22章 的小代码修复</a>记录了实际工具调用、文件变化和测试结果。上面的 R7 是教学示意，不要求真实模型固定使用同一步数或动作顺序。</p>
+<span class="heading-alias" id="正常例子所有观察都能闭环" aria-hidden="true"></span><h4 id="正常例子每个结论都有对应材料">正常例子：每个结论都有对应材料</h4>
+<p>两个 <code>Read</code> 分别取得配置与README当前内容，模型（Model）据此形成精确局部替换。<code>Edit</code> 返回修改结果后，<code>Bash</code> 运行配置中确认的 <code>npm test</code>。在本章函数原本正确的条件下，教学预期为四项测试（Test）通过、退出码（Exit Code）0；随后检查差异（Diff），确认本次只改了README中的目标位置。</p>
+<p>最终说明应同时包含改动、运行过的检查与覆盖范围。说“已修复”是一个待支撑的结论，不能拿这句话替代文件、工具结果（Tool Result）或断言（Assertion）。</p>
+<span class="heading-alias" id="失败例子测试命令不存在" aria-hidden="true"></span><h4 id="失败例子测试test命令不存在">失败例子：测试（Test）命令不存在</h4>
+<p>假设两个 <code>Read</code> 已成功，但模型（Model）仍错误地请求 <code>npm run check</code>。<code>Bash</code> 返回非零退出码（Exit Code）和 <code>Missing script</code>。这说明测试（Test）入口没有找到，尚不能评价函数行为；下一步应依据已经取得的配置选择获准的正确命令，或者如实说明无法继续的原因。</p>
+<p>若改用 <code>npm test</code> 后实际出现断言（Assertion）失败，就有新证据推翻“函数原本正确”的教学假设。真实任务应报告所见失败，并按用户范围决定后续动作；不能为了维持示例而改写结果。即使R7正常结束，失败的测试（Test）也不会因此变成通过。</p>
+<p><a href="22-agent-cases.html">第22章</a>保存了真实工具调用（Tool Call）、文件变化和测试（Test）结果。本节的R7与四项通过是给定条件下的教学推演，不能拼接成那次真实运行的新增步骤。</p>
 <span class="heading-alias" id="核心出口自测与答案" aria-hidden="true"></span><h3 id="核心问题解析">核心问题解析</h3>
-<p><strong>问题 1。</strong> 模型说“已修复”能证明文件已经改变吗？还要检查什么？</p>
-<p><strong>解释。</strong> 只证明模型生成了这句话。文件变化看实际内容与 diff，行为看对应测试；还需确认测试覆盖了用户要求。</p>
-<p><strong>问题 2。</strong> 为什么先读文件、再编辑、再测试，通常需要多次模型调用？</p>
-<p><strong>解释。</strong> 当下一动作依赖尚未取得的文件内容或测试反馈时，要先执行、再把结果交给后续调用。一次工具调用也可能没有新发现；不能预先假定每一步都增加信息。</p>
-<p><strong>问题 3。</strong> 模型、工具执行器与循环控制各负责哪一件事？</p>
-<p><strong>解释。</strong> 模型提出下一步并解释结果；执行器产生真实操作与输出；循环控制组织输入、保存状态并决定继续或停止。</p>
+<p><strong>问题1。</strong> 模型（Model）说“已修复”能证明文件已经改变吗？</p>
+<p><strong>参考答案。</strong> 只能证明生成了这句话。文件变化要看当前内容与差异（Diff）；行为要看针对目标的测试（Test）。即使四项通过，也要核对这些断言（Assertion）是否覆盖本次要求。</p>
+<p><strong>问题2。</strong> 为什么先读文件、再编辑、再检查，通常需要多次模型调用（Model Query）？</p>
+<p><strong>参考答案。</strong> 下一项行动请求（Action）若依赖尚未取得的文件或执行结果，就要先实际执行，再把材料送入下一模型步骤（Model Step）。多个互不依赖的读取可以由一个模型步骤（Model Step）提出；调用次数与工具（Tool）数量不能直接相等。</p>
+<p><strong>问题3。</strong> 模型（Model）、工具执行器（Tool Executor）与循环控制各负责什么？</p>
+<p><strong>参考答案。</strong> 模型（Model）提出下一步并解释结果；工具执行器（Tool Executor）产生真实操作与输出；运行时（Runtime）组织输入、接纳执行记录并判断是否继续。负责展示的客户端（Client）不替这些部件完成验收。</p>
 <span class="heading-alias" id="实现深化" aria-hidden="true"></span><span class="heading-alias" id="maka-在最小循环外又增加了什么" aria-hidden="true"></span><h2 id="进程退出后工作依据怎样保留">进程退出后，工作依据怎样保留</h2>
-<span class="heading-alias" id="5-控制器决定谁可以开始何时停止" aria-hidden="true"></span><span class="heading-alias" id="1-工作身份不能含糊" aria-hidden="true"></span><span class="heading-alias" id="2-开始执行前要经过准入" aria-hidden="true"></span><h3 id="准入固定工作身份">准入固定工作身份</h3>
-<p>用户可以在同一个会话里发起多项工作。系统需要把模型事件、工具结果和结束状态关联到正确的 Session、Turn 和 Run，才有可能区分重试与新任务。</p>
-<p><a href="glossary.html#admission%E5%87%86%E5%85%A5">准入（Admission）</a>是 Host 正式接受工作并固定执行身份的过程。Client 点击发送只提交意图；Host 还要检查当前是否已有冲突工作、是否可以开始，再把接纳结果保存下来。<a href="12-request-lifecycle.html">第12章</a>展开了这些步骤。</p>
-<span class="heading-alias" id="4-状态保存已经发生了什么" aria-hidden="true"></span><span class="heading-alias" id="3-工具能力与权限要分开" aria-hidden="true"></span><span class="heading-alias" id="4-重要事实要能在重启后读回来" aria-hidden="true"></span><span class="heading-alias" id="5-外部操作可能出现不知道成功没有" aria-hidden="true"></span><span class="heading-alias" id="误解三工具名称出现在提示词里所以模型已经有权限" aria-hidden="true"></span><h3 id="执行许可与效果记录">执行许可与效果记录</h3>
-<p>模型看到 Edit 的说明，不代表可以修改任意文件。工具是否绑定、当前是否可用、目标是否获准、执行环境能否落实限制，是不同条件。权限必须在实际执行位置受到检查，不能仅靠提示词中的要求。</p>
-<p>如果 Edit 已把内容写入文件，程序却在保存结果前崩溃，重启后就可能不知道修改是否发生。重做可能重复效果，直接报告“没有修改”也可能错误。Maka 把关键执行记录写入<a href="glossary.html#durable%E6%8C%81%E4%B9%85%E5%B4%A9%E6%BA%83%E5%90%8E%E4%BB%8D%E5%8F%AF%E8%AF%BB">持久存储（Durable）</a>，使恢复程序能读取已提交的结果；记录仍不足时保留未知，而不猜测成功或失败。<a href="18-effects-and-recovery.html">第18章</a>用具体提交窗口解释这些判断。</p>
-<span class="heading-alias" id="6-展示结果不等于事实来源" aria-hidden="true"></span><span class="heading-alias" id="误解四聊天窗口显示完成就说明所有后台工作都完成了" aria-hidden="true"></span><h3 id="持久事实生成展示视图">持久事实生成展示视图</h3>
-<p><a href="glossary.html#fact%E4%BA%8B%E5%AE%9E">事实（Fact）</a>是负责相应状态的系统组件接受并保存的记录。<a href="glossary.html#client%E5%AE%A2%E6%88%B7%E7%AB%AF">客户端（Client）</a>如 Desktop、CLI、TUI 接收 Host 提供的快照、增量与聊天记录页面，生成聊天气泡和运行状态；界面可能延迟、断线或丢失缓存，重新打开时应通过服务接口回读状态并重建视图。</p>
-<p>回答文字和 Run 终态也不同：文字说明了模型输出什么，终态说明执行怎样结束。界面的 loading 动画结束，不能替代持久终态，更不能证明所有测试都通过。</p>
+<span class="heading-alias" id="5-控制器决定谁可以开始何时停止" aria-hidden="true"></span><span class="heading-alias" id="1-工作身份不能含糊" aria-hidden="true"></span><span class="heading-alias" id="2-开始执行前要经过准入" aria-hidden="true"></span><span class="heading-alias" id="准入固定工作身份" aria-hidden="true"></span><h3 id="准入admission固定工作身份work-identity">准入（Admission）固定工作身份（Work Identity）</h3>
+<p>用户可以在同一个会话（Session）发起多项工作。系统需要把模型（Model）事件、工具结果（Tool Result）和执行终态（Terminal State）关联到正确的会话（Session）、工作轮次（Turn）和执行（Run），才能区别“同一请求的重试”与“新工作”。</p>
+<p>准入（Admission）是宿主（Host）正式接受工作、固定输入与工作身份（Work Identity）的过程。客户端（Client）点击发送只提交意图；宿主（Host）还要检查会话（Session）状态（State）、冲突工作及相同身份（Identity）的既有内容。接纳结果先保存，才交给执行路径。<a href="12-request-lifecycle.html">第12章</a>会解释为什么网络超时不能直接触发一个新R7。</p>
+<span class="heading-alias" id="4-状态保存已经发生了什么" aria-hidden="true"></span><span class="heading-alias" id="3-工具能力与权限要分开" aria-hidden="true"></span><span class="heading-alias" id="4-重要事实要能在重启后读回来" aria-hidden="true"></span><span class="heading-alias" id="5-外部操作可能出现不知道成功没有" aria-hidden="true"></span><span class="heading-alias" id="误解三工具名称出现在提示词里所以模型已经有权限" aria-hidden="true"></span><span class="heading-alias" id="执行许可与效果记录" aria-hidden="true"></span><h3 id="执行许可与效果effect记录">执行许可与效果（Effect）记录</h3>
+<p>工具（Tool）说明可见、当前已经绑定、参数有效、目标已获准、执行环境（Environment）能强制限制资源，是不同条件。权限（Permission）需要在实际执行位置检查，不能仅靠提示词（Prompt）中的“不要越界”。</p>
+<p>若 <code>Edit</code> 已写入文件，程序却在保存结果前崩溃，重启后的记录可能不足以说明修改是否发生。重做可能重复效果（Effect），直接报告“没有修改”也可能错误。普通已接入持久结果接收端的工具（Tool）路径，用执行前后的持久边界保留可核对材料；恢复（Recovery）程序据此读取已提交结果，不足时保留结果未知（Outcome Unknown）。具体条件见<a href="18-effects-and-recovery.html">第18章</a>，不能将同一保证直接推广给所有执行后端（Agent Backend）。</p>
+<span class="heading-alias" id="6-展示结果不等于事实来源" aria-hidden="true"></span><span class="heading-alias" id="误解四聊天窗口显示完成就说明所有后台工作都完成了" aria-hidden="true"></span><span class="heading-alias" id="持久事实生成展示视图" aria-hidden="true"></span><h3 id="持久事实durable-fact生成展示视图">持久事实（Durable Fact）生成展示视图</h3>
+<p>持久事实（Durable Fact）是相应负责者（Owner）接纳并保存的记录。它不表示对真实世界的全部描述都已正确；例如一条已保存的测试（Test）失败结果，准确记录的就是失败。记录由谁提交、包含什么、保存成功怎样确认，仍有具体合同。</p>
+<p>客户端（Client）通过宿主（Host）提供的快照（Snapshot）、增量和历史页面显示内容。把事实（Fact）整理成某种可读视图的过程称为投影（Projection）。界面可能延迟或丢失缓存，重新连接时应回读状态（State）并重建投影（Projection），而不是凭旧画面重新执行任务。</p>
+<p>最终文本说明模型（Model）输出了什么，执行终态（Terminal State）说明R7怎样结束，两者也可能先后到达。加载动画结束不能代替持久终态（Terminal State），更不能证明测试（Test）通过。反过来，客户端（Client）未收到最终通知，也不能推导负责者（Owner）尚未保存结果。</p>
 <span class="heading-alias" id="误解五记忆就是把整段聊天放进向量数据库" aria-hidden="true"></span><h3 id="同一句请求中的长期偏好">同一句请求中的长期偏好</h3>
-<p>“本轮用中文”可以直接进入当前上下文。“以后也用中文”还需要<a href="glossary.html#memory%E8%AE%B0%E5%BF%86">长期记忆（Memory）</a>的写入、后续读取和输入组装；最终回答“我记住了”不完成这些步骤。即使偏好已进入后续输入，是否被正确使用仍要观察实际回答。</p>
-<p>会话历史、当前上下文、用户可编辑的长期笔记和结构化记忆解决不同问题。把整段聊天存进数据库也不能自动决定哪些内容适用、该更新什么，以及怎样影响下一次任务。<a href="20-memory.html">第20章</a>追踪保存、读取和使用的完整区别。</p>
+<p>“本轮用中文”可以直接进入当前上下文（Context）。“以后也用中文”则需要记忆（Memory）写入、后续读取与输入组织（Input Composition）；最终回答“我记住了”不完成这条链。即使偏好已进入下一次模型输入（Model Input），是否被正确使用仍要观察实际回答。</p>
+<p>会话（Session）历史、工作上下文（Working Context）、用户可编辑的长期笔记与结构化记忆（Memory）各有用途。工作上下文（Working Context）是为本次判断选取并整理的材料；保存整段聊天，并不会自动决定哪些偏好继续适用或怎样更新。<a href="20-memory.html">第20章</a>展开两种记忆（Memory）的读写与消费者（Consumer），下一章先说明本例为什么不能把“已写入”当作“未来一定会使用”。</p>
 <span class="heading-alias" id="深化自测" aria-hidden="true"></span><h3 id="机制问题解析">机制问题解析</h3>
-<p><strong>问题 1。</strong> Context 与完整历史有什么差别？</p>
-<p><strong>解释。</strong> Context 是本次模型实际收到的组合；历史可能更大，且部分内容不进入模型。</p>
-<p><strong>问题 2。</strong> 为什么 Client 不能独自宣布 Run 完成？</p>
-<p><strong>解释。</strong> Client 是展示端，完成判断应来自执行 owner 的持久终态事实。</p>
-<p><strong>问题 3。</strong> 为什么本轮中文回答不等于未来自动使用中文偏好？</p>
-<p><strong>解释。</strong> 未来使用还要完成保存、读取和注入；本轮要求可以直接放进当前输入。两种情况下都要观察实际回答，才能判断这次是否遵循。</p>
+<p><strong>问题1。</strong> 上下文（Context）与完整历史有什么差别？</p>
+<p><strong>参考答案。</strong> 上下文（Context）是本次模型（Model）实际收到的组合；保存的历史可能更大，部分内容没有入选。需要检查输入组织（Input Composition）及实际消费者（Consumer），不能只看数据库里有没有材料。</p>
+<p><strong>问题2。</strong> 为什么客户端（Client）不能独自宣布执行（Run）完成？</p>
+<p><strong>参考答案。</strong> 客户端（Client）管理显示，执行负责者（Owner）管理相应终态（Terminal State）。网络和缓存能改变眼前画面，却不能把未保存的终态（Terminal State）变成事实（Fact）。任务验收还需要单独的结果材料。</p>
+<p><strong>问题3。</strong> 本轮中文回答为什么不等于未来会使用中文偏好？</p>
+<p><strong>参考答案。</strong> 本轮指令可以直接进入模型输入（Model Input）；未来复用还需保存、选取、读取与装载。两种情况下都要检查实际回答，才能说明该次是否遵循。</p>
 <span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h3 id="相关章节">相关章节</h3>
 <ul>
-<li>前置概念：<a href="08-mini-to-maka.html">第08章｜从 mini 到 Maka 的机制对应</a></li>
-<li>相关章节：<a href="12-request-lifecycle.html">第12章｜一次请求的完整生命周期</a></li>
+<li>前置概念：<a href="08-mini-to-maka.html">第08章</a></li>
+<li>下一条主线：<a href="12-request-lifecycle.html">第12章</a></li>
 </ul>
 <h3 id="延伸阅读">延伸阅读</h3>
-<p><a href="../../../extended-reading.html#reference-1" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/system-map.md">系统地图</a>按身份、执行和展示职责梳理 Maka 的整体结构。</p>
+<p><a href="../../../extended-reading.html#reference-1" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/system-map.md">系统地图</a>继续按工作身份（Work Identity）、执行与展示职责定位实际源码。源码包说明定义放在哪里；负责者（Owner）与消费者（Consumer）仍须沿调用和读写链确认。</p>
 <hr>
-<p><a href="10-reading-typescript.html">上一章：第 10 章｜Python 与 TypeScript 控制流对照</a> · <a href="12-request-lifecycle.html">下一章：第 12 章｜一次请求的完整生命周期</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="10-reading-typescript.html"><span>← 上一章</span><strong>第 10 章｜Python 与 TypeScript 控制流对照</strong></a><a href="12-request-lifecycle.html"><span>下一章 →</span><strong>第 12 章｜一次请求的完整生命周期</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#maka-%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0-agent-harness">Maka 如何实现 Agent Harness</a></li><li class="toc-level-3"><a href="#%E5%85%AD%E7%BB%84%E8%81%8C%E8%B4%A3%E5%9C%A8-maka-%E4%B8%AD%E7%9A%84%E8%90%BD%E7%82%B9">六组职责在 Maka 中的落点</a></li><li class="toc-level-2"><a href="#%E4%B8%80%E9%A1%B9-readme-%E4%BF%AE%E5%A4%8D%E6%80%8E%E6%A0%B7%E6%8E%A8%E8%BF%9B">一项 README 修复怎样推进</a></li><li class="toc-level-3"><a href="#%E8%B4%AF%E7%A9%BF%E5%85%A8%E5%A5%97%E6%95%99%E7%A8%8B%E7%9A%84%E6%A1%88%E4%BE%8B">贯穿全套教程的案例</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E6%8F%90%E4%BA%A4%E5%88%B0%E6%80%BB%E7%BB%93%E7%9A%84%E8%B0%83%E7%94%A8%E9%93%BE">从提交到总结的调用链</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E4%BE%8B%E5%AD%90%E4%B8%8E%E5%A4%B1%E8%B4%A5%E4%BE%8B%E5%AD%90">正常例子与失败例子</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E8%BF%9B%E7%A8%8B%E9%80%80%E5%87%BA%E5%90%8E%E5%B7%A5%E4%BD%9C%E4%BE%9D%E6%8D%AE%E6%80%8E%E6%A0%B7%E4%BF%9D%E7%95%99">进程退出后，工作依据怎样保留</a></li><li class="toc-level-3"><a href="#%E5%87%86%E5%85%A5%E5%9B%BA%E5%AE%9A%E5%B7%A5%E4%BD%9C%E8%BA%AB%E4%BB%BD">准入固定工作身份</a></li><li class="toc-level-3"><a href="#%E6%89%A7%E8%A1%8C%E8%AE%B8%E5%8F%AF%E4%B8%8E%E6%95%88%E6%9E%9C%E8%AE%B0%E5%BD%95">执行许可与效果记录</a></li><li class="toc-level-3"><a href="#%E6%8C%81%E4%B9%85%E4%BA%8B%E5%AE%9E%E7%94%9F%E6%88%90%E5%B1%95%E7%A4%BA%E8%A7%86%E5%9B%BE">持久事实生成展示视图</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E5%8F%A5%E8%AF%B7%E6%B1%82%E4%B8%AD%E7%9A%84%E9%95%BF%E6%9C%9F%E5%81%8F%E5%A5%BD">同一句请求中的长期偏好</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="10-reading-typescript.html">上一章：第10章</a> · <a href="12-request-lifecycle.html">下一章：第12章</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="10-reading-typescript.html"><span>← 上一章</span><strong>第 10 章｜Python 与 TypeScript 控制流（Control Flow）对照</strong></a><a href="12-request-lifecycle.html"><span>下一章 →</span><strong>第 12 章｜一次请求的生命周期（Request Lifecycle）</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E4%BB%8E%E5%85%B1%E5%90%8C%E9%97%AE%E9%A2%98%E8%B5%B0%E5%88%B0%E5%85%B7%E4%BD%93%E8%B4%9F%E8%B4%A3%E8%80%85owner">前情回顾：从共同问题走到具体负责者（Owner）</a></li><li class="toc-level-2"><a href="#maka-%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E8%BF%90%E8%A1%8C%E6%94%AF%E6%92%91agent-harness">Maka 如何实现运行支撑（Agent Harness）</a></li><li class="toc-level-3"><a href="#%E5%85%AD%E7%BB%84%E8%81%8C%E8%B4%A3%E5%9C%A8-maka-%E4%B8%AD%E7%9A%84%E8%90%BD%E7%82%B9">六组职责在 Maka 中的落点</a></li><li class="toc-level-2"><a href="#%E4%B8%80%E9%A1%B9-readme-%E4%BF%AE%E5%A4%8D%E6%80%8E%E6%A0%B7%E6%8E%A8%E8%BF%9B">一项 README 修复怎样推进</a></li><li class="toc-level-3"><a href="#%E8%B4%AF%E7%A9%BF%E6%95%99%E7%A8%8B%E7%9A%84%E6%A1%88%E4%BE%8B%E4%B8%8E%E6%9C%AC%E7%AB%A0%E5%88%9D%E6%80%81">贯穿教程的案例与本章初态</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E6%8F%90%E4%BA%A4%E5%88%B0%E6%80%BB%E7%BB%93%E7%9A%84%E8%B0%83%E7%94%A8%E9%93%BE">从提交到总结的调用链</a></li><li class="toc-level-3"><a href="#%E6%AD%A3%E5%B8%B8%E4%BE%8B%E5%AD%90%E4%B8%8E%E5%A4%B1%E8%B4%A5%E4%BE%8B%E5%AD%90">正常例子与失败例子</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E8%BF%9B%E7%A8%8B%E9%80%80%E5%87%BA%E5%90%8E%E5%B7%A5%E4%BD%9C%E4%BE%9D%E6%8D%AE%E6%80%8E%E6%A0%B7%E4%BF%9D%E7%95%99">进程退出后，工作依据怎样保留</a></li><li class="toc-level-3"><a href="#%E5%87%86%E5%85%A5admission%E5%9B%BA%E5%AE%9A%E5%B7%A5%E4%BD%9C%E8%BA%AB%E4%BB%BDwork-identity">准入（Admission）固定工作身份（Work Identity）</a></li><li class="toc-level-3"><a href="#%E6%89%A7%E8%A1%8C%E8%AE%B8%E5%8F%AF%E4%B8%8E%E6%95%88%E6%9E%9Ceffect%E8%AE%B0%E5%BD%95">执行许可与效果（Effect）记录</a></li><li class="toc-level-3"><a href="#%E6%8C%81%E4%B9%85%E4%BA%8B%E5%AE%9Edurable-fact%E7%94%9F%E6%88%90%E5%B1%95%E7%A4%BA%E8%A7%86%E5%9B%BE">持久事实（Durable Fact）生成展示视图</a></li><li class="toc-level-3"><a href="#%E5%90%8C%E4%B8%80%E5%8F%A5%E8%AF%B7%E6%B1%82%E4%B8%AD%E7%9A%84%E9%95%BF%E6%9C%9F%E5%81%8F%E5%A5%BD">同一句请求中的长期偏好</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

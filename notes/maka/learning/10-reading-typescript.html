@@ -1,33 +1,38 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 10 章｜Python 与 TypeScript 控制流对照 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 10 / 62</div><article id="main-content"><span class="heading-alias" id="b02按需语言桥把-mini-的-python-控制流读成-maka-的-typescript" aria-hidden="true"></span><span class="heading-alias" id="b02python-与-typescript-控制流对照" aria-hidden="true"></span><span class="heading-alias" id="第-09-章python-与-typescript-控制流对照" aria-hidden="true"></span><h1 id="第-10-章python-与-typescript-控制流对照">第 10 章｜Python 与 TypeScript 控制流对照</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 10 章｜Python 与 TypeScript 控制流（Control Flow）对照 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第一部分：最小 Agent、项目环境与机制桥接 · 10 / 62</div><article id="main-content"><span class="heading-alias" id="b02按需语言桥把-mini-的-python-控制流读成-maka-的-typescript" aria-hidden="true"></span><span class="heading-alias" id="b02python-与-typescript-控制流对照" aria-hidden="true"></span><span class="heading-alias" id="第-09-章python-与-typescript-控制流对照" aria-hidden="true"></span><span class="heading-alias" id="第-10-章python-与-typescript-控制流对照" aria-hidden="true"></span><h1 id="第-10-章python-与-typescript-控制流control-flow对照">第 10 章｜Python 与 TypeScript 控制流（Control Flow）对照</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：怎样从 TypeScript 的类型、异步语法和导入关系读出真实控制顺序？</p>
-<p><strong>关键概念</strong>：unknown（未知类型）要求先检查；判别联合按标签区分字段；Promise/await（异步结果与等待）控制继续时点；yield（产出事件）交给消费者；import type（类型导入）只供静态检查。</p>
-<p><strong>关系主线</strong>：类型约束数据形状，运行时检查验证输入，等待与事件消费决定何时继续。只有结合实际写入和消费者合同，才能判断事件是否保存，不能从类型或语法名称推导持久保证。</p>
+<p><strong>核心问题</strong>：读到 TypeScript 的类型与异步语法，怎样判断程序检查了什么、何时继续，以及谁真正处理了结果？</p>
+<p><strong>关键概念</strong>：静态类型（Static Type）描述允许的数据；运行时检查（Runtime Check）判断实际值；判别联合（Discriminated Union）按标签区分字段；异步结果（Promise）与消费确认（Acknowledgment，ack）分别表达操作结果和事件（Event）交接进度。</p>
+<p><strong>关系主线</strong>：先读数据形状，再读分支与等待，最后追到实际消费者（Consumer）。类型、控制顺序和持久化（Persistence）各回答不同问题，需要逐项建立依据。</p>
 </blockquote>
-<p>第02章的 <a href="02-agent-loop.html#python-%E6%9C%80%E5%B0%8F%E9%98%85%E8%AF%BB%E5%8D%A1">Python 最小阅读卡</a>已经在首次代码前解释了 <code>self</code>、列表末项、字典取值和方法调用。本章在这些读法上增加后续 TypeScript 源码的语言对照，类型、等待和事件交接都会配中文解释；不熟悉这些新写法时，从本章建立读法再进入后续实现。已经熟悉相关语法的读者可以继续<a href="11-agent-architecture.html">第11章</a>。这里提前选用的摘要保存与事件例子，只用于解释控制顺序；完整机制将在第14、19章展开，理解它们不需要先猜测本章尚未给出的系统细节。</p>
-<p>以下代码摘自 Maka（Apache-2.0）。</p>
-<span class="heading-alias" id="短卡一类型说明允许什么运行时检查确认收到什么" aria-hidden="true"></span><h2 id="类型声明与运行时检查">类型声明与运行时检查</h2>
-<p>mini 的 Python 类型标注可以帮助阅读方法的输入与输出，但不会自动检查模型返回的每一份 JSON。TypeScript 也一样：<code>ReadInput</code> 是“读取文件所需参数”的类型名，<code>input: ReadInput</code> 是静态约定，网络或磁盘来的值还要在运行时检查。<code>unknown</code> 表示“暂时不能假定它有什么字段”；<code>as ReadInput</code> 只是让检查器接受一种断言，不会把坏输入变成正确数据。</p>
-<p>运行事件是描述用户输入、模型响应或工具结果等情况的记录。下面只检查事件的角色字段，完整事件机制将在第14章展开。Maka 的真实短窗口来自 <code>packages/core/src/runtime-event.ts</code> 的 <a href="https://github.com/apache/maka/blob/HEAD/packages/core/src/runtime-event.ts">角色类型与检查函数</a>：</p>
+<h2 id="前情回顾把返回以后读得更精确">前情回顾：把“返回以后”读得更精确</h2>
+<p><a href="02-agent-loop.html#python-%E6%9C%80%E5%B0%8F%E9%98%85%E8%AF%BB%E5%8D%A1">第02章的Python最小阅读卡</a>已经解释对象、方法调用、列表（List）和字典（Dictionary）。代理循环（Agent Loop）的基本顺序是：模型调用（Model Query）返回行动请求（Action），执行器（Executor）执行，再把观察结果（Observation）加入消息列表（Message List）。只要调用是同步的，“返回以后继续下一句”就足以理解那段程序。</p>
+<p>后续Maka源码还包含等待存储、逐个产出事件（Event）等操作。这时看见函数调用，不一定说明操作已经完成；看见某个类型名，也不说明数据经过检查。本章用三件小事建立读法：检查角色（Role）字符串、区分摘要规划结果、等待保存并交接事件（Event）。摘要与事件（Event）的完整机制将在第19、14章展开，这里先给理解片段所需的背景，不要求提前掌握整个系统。</p>
+<p>本章是按需阅读的语言桥。熟悉相关语法的读者可以继续<a href="11-agent-architecture.html">第11章</a>，遇到具体控制顺序再回查。以下明确标注的真实代码摘自Maka（Apache-2.0）；源码中的标识符和注释保留原文，中文框架解释放在代码前后。</p>
+<span class="heading-alias" id="短卡一类型说明允许什么运行时检查确认收到什么" aria-hidden="true"></span><span class="heading-alias" id="类型声明与运行时检查" aria-hidden="true"></span><h2 id="静态类型static-type与运行时检查runtime-check分别保证什么">静态类型（Static Type）与运行时检查（Runtime Check）分别保证什么？</h2>
+<p>假设模型（Model）返回一份准备读取文件的参数。写成Python的类型标注（Type Annotation），或TypeScript的 <code>input: ReadInput</code>，都可以帮助作者发现类型使用错误；但磁盘或网络送来的实际内容，仍可能缺字段、用错字段类型，甚至根本不是对象。<strong>程序中声明“这里需要什么”，与实际检查“拿到的是什么”，是两步。</strong></p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 静态类型（Static Type）与运行时检查（Runtime Check）分别保证什么？"><table><caption>表 1 / Table 1 · 静态类型（Static Type）与运行时检查（Runtime Check）分别保证什么？</caption><thead><tr><th scope="col">写法或概念</th><th scope="col">对阅读有什么帮助</th><th scope="col">不应据此推导什么</th></tr></thead><tbody><tr><td>静态类型（Static Type），如 <code>ReadInput</code></td><td>描述读取文件所需参数的形状</td><td>外部输入已经通过检查</td></tr>
+<tr><td>未知类型（Unknown Type），即 <code>unknown</code></td><td>要求使用前先缩小允许范围，不能直接假定字段存在</td><td>这个值一定有问题或无法使用</td></tr>
+<tr><td>类型断言（Type Assertion），如 <code>value as ReadInput</code></td><td>要求检查器按作者指定的类型理解表达式</td><td>程序已经转换或验证实际数据</td></tr>
+<tr><td>运行时检查（Runtime Check），如字符串判断</td><td>执行时根据当前值决定通过或拒绝</td><td>已经检查本函数没有覆盖的其他条件</td></tr></tbody></table></div>
+<p>运行时事件（Runtime Event）是描述用户输入、模型响应或工具结果等情况的记录，其中角色（Role）标明这份记录在模型（Model）所读历史中的类别，而不是精确的作者身份。下面只检查角色（Role），不检查完整记录。代码可以先按三块读：列出允许值、建立对应类型、写出实际判断。</p>
+<p>真实片段来自 <code>packages/core/src/runtime-event.ts</code> 的<a href="https://github.com/apache/maka/blob/HEAD/packages/core/src/runtime-event.ts">角色（Role）类型与检查函数</a>：</p>
 <pre><code class="language-ts">export const RUNTIME_EVENT_ROLES = [&#39;user&#39;, &#39;model&#39;, &#39;tool&#39;, &#39;system&#39;] as const;
 export type RuntimeEventRole = (typeof RUNTIME_EVENT_ROLES)[number];
 
 export function isRuntimeEventRole(value: unknown): value is RuntimeEventRole {
   return typeof value === &#39;string&#39; &amp;&amp; (RUNTIME_EVENT_ROLES as readonly string[]).includes(value);
 }</code></pre>
-<p>静态类型与实际判断分别起作用：</p>
-<ul>
-<li><code>as const</code> 保留四个字面值；<code>[number]</code> 从数组成员得到允许的联合类型。它们服务静态检查，不会验证外部输入。</li>
-<li><code>typeof value === &#39;string&#39;</code> 与 <code>includes(value)</code> 是实际会运行的判断。<code>value is RuntimeEventRole</code> 告诉检查器：函数返回 true 时，该值通过了这项检查。</li>
-</ul>
-<p>这里 <code>readonly string[]</code> 中的 <code>readonly</code> 也要按范围理解：只读数组类型限制通过这份类型视图进行修改，不代表深度冻结对象、进程隔离或数据库事务。找到写入 owner 仍然是另一项工作。</p>
-<p>例如 <code>&quot;model&quot;</code> 满足角色检查，<code>&quot;assistant&quot;</code> 和数字 <code>7</code> 不满足。这里仅检查 role，不能拿它证明整个事件合法。完整 <a href="https://github.com/apache/maka/blob/HEAD/packages/core/src/runtime-event.ts">decodeRuntimeEvent</a>还检查对象形状、身份、时间、内容和归属，再返回或抛错。</p>
-<p>**问题：**把 <code>unknown</code> 改成 <code>RuntimeEvent</code>，是否可以删掉 decoder？不能。类型写法不会让磁盘内容或外部数据自动符合契约；删除检查会改变运行时保证。</p>
-<span class="heading-alias" id="短卡二先读标签再读这个分支拥有的字段" aria-hidden="true"></span><h2 id="判别联合标签决定字段范围">判别联合：标签决定字段范围</h2>
-<p>先借历史摘要的规划结果说明类型分支。这里的压缩是把一段历史整理成较短摘要；checkpoint 指记录摘要及其来源范围的数据，compacted 表示规划结果含有这种记录。摘要怎样保存和生效，将在第19章展开。</p>
-<p>在 Python 中，你可能先写 <code>if result[&quot;decision&quot;] == &quot;compacted&quot;</code> 再取 checkpoint。TypeScript 可以把两种结果的合法字段直接写在类型中。这叫判别联合：每种形状有一个可以区分它的固定标签。</p>
-<p>两种标签决定可用字段。<code>fail_open</code> 表示本次规划没有得到可用的压缩替换，返回原因而不应用新 checkpoint；能否继续由调用方处理。<code>compacted</code> 则带有候选 checkpoint，可交给后续保存与应用流程。下面是 Maka 的完整真实类型，来自 <code>packages/runtime/src/history-compaction.ts</code> 的 <a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/history-compaction.ts">PlanHistoryCompactionResult</a>：</p>
+<p>第一行的 <code>as const</code> 保留四个字面值（Literal）；第二行的 <code>[number]</code> 取得数组（Array）各成员类型的联合（Union），所以合法取值是四种字符串之一。这两处服务静态类型（Static Type），没有处理任何外部数据。</p>
+<p>第三块才真正判断：先确认 <code>value</code> 是字符串，再看它是否属于允许集合。返回类型中的 <code>value is RuntimeEventRole</code> 是类型守卫（Type Guard）的声明：返回 <code>true</code> 后，检查器可以在相应分支里按这个较小范围理解该值。它依赖函数中的实际判断写得正确，并不是自动生成检查逻辑。</p>
+<p>这就能解释三个输入：<code>&quot;model&quot;</code> 通过，<code>&quot;assistant&quot;</code> 和数字 <code>7</code> 不通过。前者也只证明角色（Role）合法；完整的<a href="https://github.com/apache/maka/blob/HEAD/packages/core/src/runtime-event.ts">解码函数 <code>decodeRuntimeEvent</code></a>还要检查对象形状、标识、时间、内容与归属。不能拿一个局部判断替代整份记录的验证（Validation）。</p>
+<p>另一个容易误读的词是只读（Readonly）。片段里的 <code>readonly string[]</code> 限制通过这份类型视图修改数组（Array），不表示对象已深度冻结（Deep Freeze），更不表示进程隔离（Process Isolation）或数据库事务（Database Transaction）。判断谁能写入、写入是否完成，仍需继续找实际负责者（Owner）。</p>
+<p><strong>问题。</strong> 把外部输入的 <code>unknown</code> 改成 <code>RuntimeEvent</code>，是否可以删掉解码器（Decoder）？</p>
+<p><strong>参考答案。</strong> 不可以。改名只改变静态类型（Static Type）的约定，没有使外部数据自动满足条件。要保留的实际保证来自运行时检查（Runtime Check），不是类型断言（Type Assertion）。</p>
+<span class="heading-alias" id="短卡二先读标签再读这个分支拥有的字段" aria-hidden="true"></span><span class="heading-alias" id="判别联合标签决定字段范围" aria-hidden="true"></span><h2 id="判别联合discriminated-union先认结果分支再读字段">判别联合（Discriminated Union）：先认结果分支，再读字段</h2>
+<p>后续的历史压缩（History Compaction）会把一段历史整理为较短表示。这里先认识两个对象：检查点（Checkpoint）记录摘要及其来源范围；投影（Projection）是根据这些记录整理出来、供后续模型输入（Model Input）使用的表示。本节只读“规划得到了什么”，暂不把规划结果当作已经保存并生效。</p>
+<p>假设一个函数有两种返回结果：没有得到可用替换时返回原因；得到候选检查点（Checkpoint）时返回该记录及相关事件（Event）。在Python里，常见读法是先检查 <code>result[&quot;decision&quot;]</code>，再取对应键。TypeScript的判别联合（Discriminated Union）把这条规则写进类型：<strong>先用一个固定标签区分形状，标签确定后才有对应字段。</strong></p>
+<p>下面先看每个分支开头的 <code>decision</code>，再看它后面的字段；不必一开始记住所有名称。真实类型来自 <code>packages/runtime/src/history-compaction.ts</code> 的<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/history-compaction.ts">规划结果 <code>PlanHistoryCompactionResult</code></a>：</p>
 <pre><code class="language-ts">export type PlanHistoryCompactionResult =
   | {
       decision: &#39;fail_open&#39;;
@@ -44,21 +49,34 @@ export function isRuntimeEventRole(value: unknown): value is RuntimeEventRole {
       estimatedTokensBefore: number;
       estimatedTokensAfter: number;
     };</code></pre>
-<p><code>|</code> 表示两种形状之一；<code>?</code> 表示字段可能缺失；<code>RuntimeEvent[]</code> 表示事件数组。根据 <code>decision</code> 区分结果：<code>fail_open</code> 有失败原因，<code>compacted</code> 才有 checkpoint 与 replacementEvents。检查器会在判断标签后收窄字段范围。</p>
-<p>这是一份<strong>规划函数的结果</strong>，不是整个持久化流程已经成功的终态证明。调用者还要验证、保存并应用 checkpoint；“类型叫 compacted”不能代替查调用者。对应因果链见 <a href="19-context-compaction.html#%E6%BA%90%E7%A0%81%E8%B5%B0%E8%AF%BB%E4%B8%80%E4%BB%BD%E5%8F%AF%E7%94%A8%E6%91%98%E8%A6%81%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%98%E4%B8%8D%E8%83%BD%E7%AB%8B%E5%8D%B3%E7%94%9F%E6%95%88">第19章 源码走读</a>。</p>
-<p>**问题：**在判断 <code>decision</code> 前读取 <code>result.checkpoint</code> 为什么有问题？因为 fail_open 分支没有这个字段。应先处理分支，而不是用类型断言压掉错误。</p>
-<span class="heading-alias" id="短卡三promise-是一个待结算结果事件流是一连串交接" aria-hidden="true"></span><h2 id="promise-与事件流的控制顺序">Promise 与事件流的控制顺序</h2>
-<p>mini 的基础调用线可以同步读成“query 返回，再 execute，再记录 observation”。Maka 有模型流、异步存储和事件消费者，需要区别三种动作：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · Promise 与事件流的控制顺序"><table><caption>表 1 / Table 1 · Promise 与事件流的控制顺序</caption><thead><tr><th scope="col">写法</th><th scope="col">如何读</th><th scope="col">仍需注意</th></tr></thead><tbody><tr><td><code>Promise&lt;T&gt;</code></td><td>表示一次异步操作的结果；成功时得到 T，拒绝时带有原因，也可以仍在 pending（等待中）</td><td>拿到 Promise 对象时，操作可能尚未结束；它也不保证及时结束</td></tr>
-<tr><td><code>await operation()</code></td><td>等待操作结果；成功后取得结果并往下执行，拒绝则走异常路径</td><td>等待只暂停当前异步函数，其他工作仍可运行；重试与事务需另行实现</td></tr>
-<tr><td><code>yield event</code> / <code>for await</code></td><td>逐个交付／消费事件，中间可以等待</td><td>交付事件本身不保证事件已保存，也不表示整个任务结束</td></tr></tbody></table></div>
-<p>recorder 在这里指保存记录的函数。先用两行教学伪代码表示顺序，完整实现还要处理校验与异常：</p>
-<pre><code class="language-ts">await recorder(checkpoint);  // 等待保存记录
-updateProjection(checkpoint); // 保存成功后才更新使用中的视图</code></pre>
-<p>下图仍只解释这两行伪代码的控制顺序：等待正常返回才可进入后续更新，异常支路不经过这条更新语句。它没有承诺任意 recorder 都提供相同的持久性。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="等待保存成功，再更新投影：可滚动示意图"><a href="../../../assets/diagrams/10-reading-typescript-1.svg"><img src="../../../assets/diagrams/10-reading-typescript-1.svg" alt="已准备的检查点仍须等待 recorder 保存；await 正常返回后才执行后续投影更新，抛错走异常路径而不经过这条更新语句，具体持久保证取决于 recorder 合同。" width="720" height="653" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>第19章的真实 recorder 调用展示这条顺序：等待保存成功之后，才更新投影；<code>catch</code> 返回时，后面的更新不再执行。<code>Promise.resolve(...)</code> 让一个同步返回值或 Promise 都能通过同一 <code>await</code> 处理。</p>
-<p>事件交接遵循另一条顺序。ack 是 acknowledgment（确认）的缩写：<code>yield ev</code> 交出事件，消费者继续拉取后，<code>ackConsumed()</code> 才执行消费确认。确认具体覆盖哪些处理，由消费者和队列的合同决定。</p>
-<p><a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/ai-sdk-turn.ts"><code>AiSdkTurn.drain</code></a> 的完整方法将交付、确认和分离写成三个控制点：</p>
+<p><code>|</code> 表示两种形状之一，<code>?</code> 表示字段可以缺失，<code>RuntimeEvent[]</code> 表示运行时事件（Runtime Event）的数组（Array）。沿标签阅读，可以把这些字段分成几组：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 判别联合（Discriminated Union）：先认结果分支，再读字段"><table><caption>表 2 / Table 2 · 判别联合（Discriminated Union）：先认结果分支，再读字段</caption><thead><tr><th scope="col">分支或字段组</th><th scope="col">在本次规划中的含义</th></tr></thead><tbody><tr><td><code>decision: &#39;fail_open&#39;</code></td><td>本次未得到可用压缩替换，返回原因，不应用新的检查点（Checkpoint）；能否继续由调用方处理</td></tr>
+<tr><td><code>decision: &#39;compacted&#39;</code> 与 <code>checkpoint</code></td><td>已得到候选检查点（Checkpoint），可进入后续验证（Validation）、保存和应用流程</td></tr>
+<tr><td><code>coveredRuntimeEvents</code>、<code>tailRuntimeEvents</code></td><td>区分被摘要覆盖的历史前缀（Prefix）与仍保留的后缀（Tail）</td></tr>
+<tr><td><code>replacementEvents</code></td><td>用检查点（Checkpoint）表示覆盖部分，并接上仍保留的后续投影（Projection），组成候选替换</td></tr>
+<tr><td><code>estimatedTokensBefore</code>、<code>estimatedTokensAfter</code></td><td>比较被覆盖前缀（Prefix）与检查点（Checkpoint）表示的估算词元（Token）数量；不等于包含全部后缀（Tail）的真实请求账单</td></tr></tbody></table></div>
+<p>最后一组尤其要按计算范围理解：名字里的 <code>Before</code>、<code>After</code> 不是“整个系统之前与之后”的承诺。词元（Token）在这里是模型文本计量所用单位，源码得到的是估算值；是否覆盖全部请求、是否为服务端实际计费，都要另找依据。</p>
+<p>通过 <code>decision</code> 判断后，检查器会进行类型收窄（Type Narrowing）：进入 <code>compacted</code> 分支，才可以按这个类型安全地读取 <code>checkpoint</code>。反过来，尚未判断就访问该字段，等于把“某一分支拥有”错当成“两种结果都拥有”。用类型断言（Type Assertion）压掉报错，只会隐藏这个推理缺口。</p>
+<p>还要再跨过一层边界：<strong>候选结果存在，不等于副作用（Side Effect）完成。</strong> 这个类型来自规划函数；保存、验证（Validation）和应用还在调用链（Call Chain）后面。第19章的<a href="19-context-compaction.html#%E6%BA%90%E7%A0%81%E8%B5%B0%E8%AF%BB%E4%B8%80%E4%BB%BD%E5%8F%AF%E7%94%A8%E6%91%98%E8%A6%81%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%98%E4%B8%8D%E8%83%BD%E7%AB%8B%E5%8D%B3%E7%94%9F%E6%95%88">源码走读</a>会继续解释，一份可用摘要为什么不能立即替换当前模型输入（Model Input）。</p>
+<p><strong>问题。</strong> 看到 <code>decision === &#39;compacted&#39;</code>，能否报告“检查点（Checkpoint）已保存，恢复时可读”？</p>
+<p><strong>参考答案。</strong> 不能。这里确认的是候选规划分支，不是持久化（Persistence）终态。还需找到保存调用、成功条件、失败处理和后续读取路径；类型标签不能代替这些步骤。</p>
+<span class="heading-alias" id="短卡三promise-是一个待结算结果事件流是一连串交接" aria-hidden="true"></span><span class="heading-alias" id="promise-与事件流的控制顺序" aria-hidden="true"></span><h2 id="异步结果promise与等待await下一句何时执行">异步结果（Promise）与等待（await）：下一句何时执行？</h2>
+<p>同步函数直接返回结果时，可以接着使用返回值。异步操作（Asynchronous Operation）还需要表达“工作已开始，结果可能稍后才有”。异步结果（Promise）就是这样一个对象：它可以处于等待中（Pending），也可以兑现（Fulfilled）为成功值，或拒绝（Rejected）并给出原因。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 异步结果（Promise）与等待（await）：下一句何时执行？"><table><caption>表 3 / Table 3 · 异步结果（Promise）与等待（await）：下一句何时执行？</caption><thead><tr><th scope="col">写法</th><th scope="col">控制流（Control Flow）怎样继续</th><th scope="col">适用边界</th></tr></thead><tbody><tr><td><code>Promise&lt;T&gt;</code></td><td>表达异步结果（Promise）；成功时可得到类型为 <code>T</code> 的值</td><td>拿到对象不等于操作结束，也不保证它会及时结束</td></tr>
+<tr><td><code>await operation()</code></td><td>当前异步函数（Async Function）等待结果；成功后取得值，拒绝时进入异常路径（Error Path）</td><td>其他工作仍可运行；重试（Retry）与事务（Transaction）需要另外实现</td></tr>
+<tr><td><code>yield event</code> 与 <code>for await</code></td><td>逐个产出与消费事件（Event），相邻两项之间也可以等待</td><td>交出一项不等于已经保存，也不等于整个任务（Task）结束</td></tr></tbody></table></div>
+<p>先把等待（await）放回一个具体问题：新检查点（Checkpoint）已经准备好，程序希望保存调用成功后，再更新正在使用的投影（Projection）。下列两行是<strong>教学伪代码</strong>，<code>recorder</code> 表示保存记录的函数，完整实现还要处理验证（Validation）与异常。</p>
+<pre><code class="language-ts">await recorder(checkpoint);   // 等待保存调用成功；拒绝时不会直接进入下一句
+updateProjection(checkpoint); // 此时再更新后续使用的视图</code></pre>
+<p>需要看到的是顺序，而不是两个函数名：第一句还在等待，第二句不能越过它；第一句以拒绝结束，执行进入异常路径（Error Path），也不会直接经过第二句。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="等待结果，再更新投影 · Await, Then Update：可滚动示意图"><a href="../../../assets/diagrams/10-reading-typescript-1.svg"><img src="../../../assets/diagrams/10-reading-typescript-1.svg" alt="已准备的检查点（Checkpoint）仍须等待保存调用；await正常返回后才执行后续投影（Projection）更新，抛错进入异常路径（Error Path）。图说明语句顺序，具体持久性（Durability）取决于保存函数的合同。" width="720" height="682" loading="lazy" style="width:720px;min-width:612px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>第19章使用的真实保存调用遵循这个顺序：<code>await Promise.resolve(recorder(...))</code> 将同步返回值与异步结果（Promise）统一交给等待（await）；保存调用抛错或返回的异步结果（Promise）拒绝时，<code>catch</code> 分支返回失败，后面的投影（Projection）更新不再执行。调用正常返回后，程序才能继续更新相关状态。</p>
+<p>顺序成立仍不等于任意 <code>recorder</code> 都拥有同样的持久性（Durability）。如果某个函数只把记录放入内存就返回，那么等待（await）等到的也是这个函数约定的完成点。要判断是否已经写入可恢复存储，还须看它的真实实现与合同（Contract）。语法能保证“先等待这次调用，再继续”，不能替被调用方补出不存在的存储保证。</p>
+<p><strong>问题。</strong> 删除第一句的 <code>await</code>，第二句一定会等到保存完成吗？</p>
+<p><strong>参考答案。</strong> 不会。若保存函数返回尚未完成的异步结果（Promise），第二句可以继续，失败也不再由原来的等待位置接收。是否造成数据丢失取决于其余实现，但这里的先后保证已经被改变。</p>
+<h2 id="事件event交接与消费确认acknowledgment交出以后发生什么">事件（Event）交接与消费确认（Acknowledgment）：交出以后发生什么？</h2>
+<p>逐项读取还有一种不同的暂停：生成器（Generator）先产出一项，把控制权交给消费者（Consumer）；当对方请求下一项时，生成器（Generator）从上次暂停处继续。异步生成器（Async Generator）写成 <code>async *</code>，允许这个过程中还出现异步等待。</p>
+<p>在本例中，消费确认（Acknowledgment，ack）表示队列（Queue）记下某项已按交接合同（Contract）处理。要把三个时点分开：<code>yield ev</code> 交出当前事件（Event）；对方完成本轮处理并继续拉取；<code>ackConsumed()</code> 才推进确认计数。若把第三步提前到第一步之前，就会把“即将交出”算成“已处理”。</p>
+<p>下面是<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/ai-sdk-turn.ts"><code>AiSdkTurn.drain</code></a>的完整真实方法。先看 <code>try</code> 中的交出与确认，再看 <code>finally</code> 中的分离处理；保留的英文源码注释描述这条接线的设计意图，实际存储条件在片段后解释。</p>
 <pre><code class="language-ts">  private async *drain(queue: AsyncEventQueue&lt;SessionEvent&gt;): AsyncIterable&lt;SessionEvent&gt; {
     try {
       for await (const ev of queue) {
@@ -77,28 +95,36 @@ updateProjection(checkpoint); // 保存成功后才更新使用中的视图</cod
       queue.noteConsumerDetached();
     }
   }</code></pre>
-<p><code>async *</code> 定义异步生成器；<code>AsyncIterable&lt;SessionEvent&gt;</code> 表达逐个产出 SessionEvent 的接口。<code>yield ev</code> 把当前事件交给消费者，消费者继续拉下一项后，生成器才走到 <code>ackConsumed()</code>。<code>finally</code> 在这段迭代结束或被关闭时处理消费者分离。</p>
-<p>关键区别在于：<strong>JavaScript 提供交接顺序，Maka 的消费者合同才赋予 ack 以含义。</strong> 该代码与相邻消费者约定相配合，已处理事件要么持久化，要么按规则跳过；不能从任意 <code>yield</code> 或 <code>ack</code> 名称推出持久化保证。Runtime 的整体事实边界见 <a href="14-events-and-projections.html">第14章</a>。</p>
-<p>**问题：**删掉 <code>await recorder(...)</code>，或把 ack 放到 yield 之前，会怎样？前者可能在保存尚未结束时继续；后者在消费者尚未处理时就确认。两者都改变控制顺序。是否真的导致数据丢失，还取决于上下游实现，不能仅靠语法宣布完整恢复保证。</p>
-<span class="heading-alias" id="短卡四顺着-import-找定义再继续找执行和保存" aria-hidden="true"></span><h2 id="import类型归属与执行负责者">import、类型归属与执行负责者</h2>
-<p>读 Python 时会从 <code>import</code> 找类在哪里定义；TypeScript 也可以这样读，但要分清只用于类型检查的名字和实际执行的函数。下面是 <code>packages/runtime/src/history-compact-checkpoint.ts</code> 的真实 <a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/history-compact-checkpoint.ts">import 片段</a>：</p>
+<p><code>AsyncIterable&lt;SessionEvent&gt;</code> 是异步可迭代对象（Async Iterable）的类型，表达逐个提供会话事件（Session Event）的接口（Interface）。循环中的 <code>ev</code> 就是当前一项，读法可拆成四个控制点：</p>
+<ol>
+<li><code>for await</code> 从队列（Queue）取得一项；没有就等待，取得后进入循环体。</li>
+<li><code>yield ev</code> 将它交给消费者（Consumer），暂停在这里。当前暂停不说明对方已经完成处理。</li>
+<li>对方完成处理并继续请求下一项，生成器（Generator）才执行 <code>ackConsumed()</code>。队列（Queue）据此推进已消费计数，并唤醒相应等待者。</li>
+<li>当迭代正常结束或被关闭而进入 <code>finally</code>，<code>noteConsumerDetached()</code> 标记消费者（Consumer）分离，唤醒等待确认的代码，使其能观察到分离，而不是一直等待。这不是代替尚未处理的事件（Event）补发成功确认。</li>
+</ol>
+<p>这里的背压（Backpressure）通过拉取节奏体现：对方尚未继续请求，当前方法就不会越过 <code>yield</code> 去确认本项。若对方交出后既不继续拉取、也不关闭迭代，这段代码不会仅因时间过去而自动确认；也不能从 <code>finally</code> 的存在推导出对方一定会及时关闭。</p>
+<p><strong>消费确认（Acknowledgment，ack）是否意味着持久化（Persistence）完成，要看实际消费者（Consumer）与存储策略。</strong> 相邻的 <code>AgentRun</code> 接线会按事件（Event）类型分流：部分事件（Partial Event）进入专门处理路径，非终止错误（Non-Terminal Error）可以跳过常规运行时事件（Runtime Event）写入，已由工具协议（Tool Protocol）保存的投影（Projection）也避免重复写入。记录路径还区分必须成功的持久写入与其他写入模式：写入是否为强制条件、怎样确认已写入，以及写失败是否允许继续，都由接线与模式决定。因此，不能把源码注释里的简写扩展为“任何收到消费确认（Acknowledgment，ack）的事件（Event）都已经可靠保存”。</p>
+<p>语言语法在这里给出交接顺序；程序合同（Contract）决定已处理究竟覆盖了哪些动作；持久性（Durability）则需要追踪具体写入及失败政策。这三层分别核对，才不会把一个名称读成完整恢复保证。第14章将把<a href="14-events-and-projections.html">事件（Event）与投影（Projection）</a>放回运行时（Runtime）的完整关系中。</p>
+<span class="heading-alias" id="短卡四顺着-import-找定义再继续找执行和保存" aria-hidden="true"></span><span class="heading-alias" id="import类型归属与执行负责者" aria-hidden="true"></span><h2 id="导入import之后还要找到实际负责者owner">导入（Import）之后，还要找到实际负责者（Owner）</h2>
+<p>从Python的 <code>import</code> 寻找定义来源，这个习惯可以延续到TypeScript。不过，静态类型（Static Type）的来源和运行时（Runtime）函数的来源需要分开看。下面是真实的<a href="https://github.com/apache/maka/blob/HEAD/packages/runtime/src/history-compact-checkpoint.ts">导入（Import）片段</a>，来自 <code>packages/runtime/src/history-compact-checkpoint.ts</code>：</p>
 <pre><code class="language-ts">import { createHash } from &#39;node:crypto&#39;;
 import { Buffer } from &#39;node:buffer&#39;;
 import type { ExecutionLogCoverage } from &#39;@maka/core/execution-log-coverage&#39;;
 import type { RuntimeEvent } from &#39;@maka/core/runtime-event&#39;;
 import type { ModelMessage } from &#39;./model-protocol.js&#39;;
 import { stableStringify } from &#39;./request-shape.js&#39;;</code></pre>
-<p><code>import type</code> 只带入静态类型，不在运行时取得一个 RuntimeEvent 对象。<code>createHash</code> 和 <code>stableStringify</code> 则是实际函数依赖。<code>@maka/core/runtime-event</code> 是包的公开导出入口，不能把包名当成本地相对路径；<a href="https://github.com/apache/maka/blob/HEAD/packages/core/package.json">core/package.json</a>的 exports 指向构建产物，源码定义位于对应 src 文件。源码中写 <code>.js</code> 也不说明旁边没有 <code>.ts</code>，要结合模块导出和构建结构判断。</p>
-<p>找到定义只是第一步。例如 checkpoint 类型描述什么字段合法，不负责决定何时压缩，也不负责把它写到磁盘。继续沿当前问题找：</p>
-<ol>
-<li><strong>定义</strong>：<code>history-compact-checkpoint.ts</code> 怎样表达来源与覆盖范围；</li>
-<li><strong>使用</strong>：第19章 的 <code>compactActiveRequestHistory</code> 为什么验证、等待 recorder、再选择投影；</li>
-<li><strong>实际接线</strong>：谁向 Runtime 提供 recorder，写入何种 ledger；后面的<a href="19-context-compaction.html#checkpoint-%E7%9A%84%E4%BF%9D%E5%AD%98%E4%B8%8E%E8%AF%BB%E5%8F%96%E9%93%BE">第19章保存与消费链</a>将继续追踪。</li>
-</ol>
-<p>不要仅凭 <code>@maka/core</code> 或一个 interface 就认定 Core 是执行 owner。类型归属、状态归属、执行负责者是不同问题。</p>
-<p>**问题：**找到 <code>RuntimeEvent</code> interface 后能否断言事件已经保存？不能。类型定义没有存储副作用；还要找调用、写入与失败处理。</p>
-<span class="heading-alias" id="回到原来的问题" aria-hidden="true"></span><h2 id="相关机制">相关机制</h2>
-<p>这些写法分别用于 <a href="15-model-context.html">第15章 的模型输入</a>、<a href="19-context-compaction.html">第19章 的 checkpoint 保存</a>与 <a href="16-tools-and-execution.html">第16章 的工具执行</a>。字段范围、控制顺序和状态归属需要分别判断。</p>
+<p>先按用途拆开。类型导入（Type Import）写作 <code>import type</code>，只供静态检查（Static Checking），不在运行时（Runtime）取出一个运行时事件（Runtime Event）对象。<code>createHash</code>、<code>Buffer</code> 和 <code>stableStringify</code> 则作为实际值导入，其中函数可以参与后续执行；仅有导入（Import）语句，还不说明当前路径一定调用过它们。</p>
+<p>再看路径。<code>@maka/core/runtime-event</code> 是包导出（Package Export）入口，不是相对于当前文件的路径。<a href="https://github.com/apache/maka/blob/HEAD/packages/core/package.json"><code>core/package.json</code></a>中的 <code>exports</code> 将它指向构建产物（Build Artifact），对应源码在 <code>src</code> 下。相对路径写 <code>.js</code> 也不说明旁边没有 <code>.ts</code> 源码，需要结合模块解析（Module Resolution）与构建安排判断，不能只按扩展名停止查找。</p>
+<p>找到定义之后，还应沿当前问题再走三步。以检查点（Checkpoint）为例：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 导入（Import）之后，还要找到实际负责者（Owner）"><table><caption>表 4 / Table 4 · 导入（Import）之后，还要找到实际负责者（Owner）</caption><thead><tr><th scope="col">接下来寻找什么</th><th scope="col">要回答的问题</th></tr></thead><tbody><tr><td>类型与数据定义</td><td>它包含哪些字段，怎样表达来源与覆盖范围？</td></tr>
+<tr><td>使用这些数据的调用链（Call Chain）</td><td>谁验证候选、等待保存调用，再决定采用哪个投影（Projection）？</td></tr>
+<tr><td>真实接线与写入</td><td>谁提供保存函数，写到哪种账本（Ledger），失败怎样处理，之后由谁读取？</td></tr></tbody></table></div>
+<p>类型归属（Type Ownership）、状态归属（State Ownership）与执行负责者（Owner）不是同一件事。类型放在Core包中，不说明Core包会自行启动压缩或保存记录。第19章的<a href="19-context-compaction.html#checkpoint-%E7%9A%84%E4%BF%9D%E5%AD%98%E4%B8%8E%E8%AF%BB%E5%8F%96%E9%93%BE">检查点（Checkpoint）保存与读取链</a>将继续追到实际消费者（Consumer），而不是停在接口（Interface）名称上。</p>
+<p><strong>问题。</strong> 找到了 <code>RuntimeEvent</code> 的接口（Interface），是否就可以断言这份运行时事件（Runtime Event）已经保存？</p>
+<p><strong>参考答案。</strong> 不能。类型定义没有存储副作用（Side Effect）。需要继续查创建、调用、实际写入和失败处理；导入（Import）关系只提供了追踪入口。</p>
+<span class="heading-alias" id="回到原来的问题" aria-hidden="true"></span><span class="heading-alias" id="相关机制" aria-hidden="true"></span><h2 id="把三种读法带回后续机制">把三种读法带回后续机制</h2>
+<p>读后续源码时，可以沿同一条短线推进：先问数据属于哪个分支，再问当前语句何时继续，最后问结果交给哪位消费者（Consumer）。遇到陌生字段，先确定它在这条线中回答什么问题，再追完整定义。</p>
+<p><a href="15-model-context.html">第15章的模型输入（Model Input）</a>主要帮助理解数据如何组织，<a href="19-context-compaction.html">第19章的检查点（Checkpoint）保存</a>会用到等待与应用顺序，<a href="16-tools-and-execution.html">第16章的工具执行（Tool Execution）</a>则继续展开行动请求（Action）如何产生副作用（Side Effect）。本章的语言桥提供阅读方法；各条路径的实际保证，仍由对应机制与实现来证明。</p>
 <hr>
-<p><a href="09-project-workspace.html">上一章：第 09 章｜Code Agent 的项目工作环境</a> · <a href="11-agent-architecture.html">下一章：第 11 章｜Maka 的 Agent Harness 结构</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="09-project-workspace.html"><span>← 上一章</span><strong>第 09 章｜Code Agent 的项目工作环境</strong></a><a href="11-agent-architecture.html"><span>下一章 →</span><strong>第 11 章｜Maka 的 Agent Harness 结构</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E7%B1%BB%E5%9E%8B%E5%A3%B0%E6%98%8E%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%97%B6%E6%A3%80%E6%9F%A5">类型声明与运行时检查</a></li><li class="toc-level-2"><a href="#%E5%88%A4%E5%88%AB%E8%81%94%E5%90%88%E6%A0%87%E7%AD%BE%E5%86%B3%E5%AE%9A%E5%AD%97%E6%AE%B5%E8%8C%83%E5%9B%B4">判别联合：标签决定字段范围</a></li><li class="toc-level-2"><a href="#promise-%E4%B8%8E%E4%BA%8B%E4%BB%B6%E6%B5%81%E7%9A%84%E6%8E%A7%E5%88%B6%E9%A1%BA%E5%BA%8F">Promise 与事件流的控制顺序</a></li><li class="toc-level-2"><a href="#import%E7%B1%BB%E5%9E%8B%E5%BD%92%E5%B1%9E%E4%B8%8E%E6%89%A7%E8%A1%8C%E8%B4%9F%E8%B4%A3%E8%80%85">import、类型归属与执行负责者</a></li><li class="toc-level-2"><a href="#%E7%9B%B8%E5%85%B3%E6%9C%BA%E5%88%B6">相关机制</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="09-project-workspace.html">上一章：第09章｜代码代理（Code Agent）的项目工作环境（Project Environment）</a> · <a href="11-agent-architecture.html">下一章：第11章｜Maka的运行支撑（Agent Harness）结构</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="09-project-workspace.html"><span>← 上一章</span><strong>第 09 章｜代码代理（Code Agent）的项目工作环境（Project Environment）</strong></a><a href="11-agent-architecture.html"><span>下一章 →</span><strong>第 11 章｜Maka 的运行支撑（Agent Harness）结构</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E6%8A%8A%E8%BF%94%E5%9B%9E%E4%BB%A5%E5%90%8E%E8%AF%BB%E5%BE%97%E6%9B%B4%E7%B2%BE%E7%A1%AE">前情回顾：把“返回以后”读得更精确</a></li><li class="toc-level-2"><a href="#%E9%9D%99%E6%80%81%E7%B1%BB%E5%9E%8Bstatic-type%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%97%B6%E6%A3%80%E6%9F%A5runtime-check%E5%88%86%E5%88%AB%E4%BF%9D%E8%AF%81%E4%BB%80%E4%B9%88">静态类型（Static Type）与运行时检查（Runtime Check）分别保证什么？</a></li><li class="toc-level-2"><a href="#%E5%88%A4%E5%88%AB%E8%81%94%E5%90%88discriminated-union%E5%85%88%E8%AE%A4%E7%BB%93%E6%9E%9C%E5%88%86%E6%94%AF%E5%86%8D%E8%AF%BB%E5%AD%97%E6%AE%B5">判别联合（Discriminated Union）：先认结果分支，再读字段</a></li><li class="toc-level-2"><a href="#%E5%BC%82%E6%AD%A5%E7%BB%93%E6%9E%9Cpromise%E4%B8%8E%E7%AD%89%E5%BE%85await%E4%B8%8B%E4%B8%80%E5%8F%A5%E4%BD%95%E6%97%B6%E6%89%A7%E8%A1%8C">异步结果（Promise）与等待（await）：下一句何时执行？</a></li><li class="toc-level-2"><a href="#%E4%BA%8B%E4%BB%B6event%E4%BA%A4%E6%8E%A5%E4%B8%8E%E6%B6%88%E8%B4%B9%E7%A1%AE%E8%AE%A4acknowledgment%E4%BA%A4%E5%87%BA%E4%BB%A5%E5%90%8E%E5%8F%91%E7%94%9F%E4%BB%80%E4%B9%88">事件（Event）交接与消费确认（Acknowledgment）：交出以后发生什么？</a></li><li class="toc-level-2"><a href="#%E5%AF%BC%E5%85%A5import%E4%B9%8B%E5%90%8E%E8%BF%98%E8%A6%81%E6%89%BE%E5%88%B0%E5%AE%9E%E9%99%85%E8%B4%9F%E8%B4%A3%E8%80%85owner">导入（Import）之后，还要找到实际负责者（Owner）</a></li><li class="toc-level-2"><a href="#%E6%8A%8A%E4%B8%89%E7%A7%8D%E8%AF%BB%E6%B3%95%E5%B8%A6%E5%9B%9E%E5%90%8E%E7%BB%AD%E6%9C%BA%E5%88%B6">把三种读法带回后续机制</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>

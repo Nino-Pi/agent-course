@@ -1,270 +1,197 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 12 章｜一次请求的完整生命周期 · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 12 / 62</div><article id="main-content"><span class="heading-alias" id="01一次请求怎样端到端完成跟着-s1--t7--r7-走完整条路" aria-hidden="true"></span><span class="heading-alias" id="m01一次请求的完整生命周期" aria-hidden="true"></span><span class="heading-alias" id="第-11-章一次请求的完整生命周期" aria-hidden="true"></span><h1 id="第-12-章一次请求的完整生命周期">第 12 章｜一次请求的完整生命周期</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="从 Agent 与 Harness 的基本概念，到工具、状态、权限、协作与完整设计案例。01–62 章完整课程。"><title>第 12 章｜一次请求的生命周期（Request Lifecycle） · Agent 工程课程</title><link rel="stylesheet" href="../../../assets/site.css"><link rel="stylesheet" href="../../../assets/course-visual-style.css"><script defer src="../../../assets/site.js"></script></head><body data-course-root="../../../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../../../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../../../index.html">全部章节</a><a href="README.html">学习路线</a><a href="glossary.html">术语表</a><a class="back-link" data-course-back href="../../../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">第二部分：Maka 核心机制与任务接续 · 12 / 62</div><article id="main-content"><span class="heading-alias" id="01一次请求怎样端到端完成跟着-s1--t7--r7-走完整条路" aria-hidden="true"></span><span class="heading-alias" id="m01一次请求的完整生命周期" aria-hidden="true"></span><span class="heading-alias" id="第-11-章一次请求的完整生命周期" aria-hidden="true"></span><span class="heading-alias" id="第-12-章一次请求的完整生命周期" aria-hidden="true"></span><h1 id="第-12-章一次请求的生命周期request-lifecycle">第 12 章｜一次请求的生命周期（Request Lifecycle）</h1>
 <blockquote class="chapter-brief" aria-label="本章概览"><p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：客户端发送请求之后，系统怎样区分已经接纳、正在执行和已经结束？</p>
-<p><strong>关键概念</strong>：Admission（准入）固定工作身份与输入；Host（宿主）接单并协调；Runtime（运行时）驱动模型和工具；model step（模型步骤）形成一次决策；terminal（终态）记录执行结束。</p>
-<p><strong>关系主线</strong>：请求先经准入；普通工具分支再循环组装输入、执行与保存结果，客户端读取状态视图。最终文本、持久终态和任务验收并不等价，断线也不自动授权重新执行。</p>
+<p><strong>核心问题</strong>：客户端（Client）发送请求以后，怎样分别确认工作已被接纳、工具（Tool）已执行、结果已保存以及界面已更新？</p>
+<p><strong>关键概念</strong>：准入（Admission）固定工作身份（Work Identity）与输入；运行时（Runtime）推进模型步骤（Model Step）；工具结算（Tool Settlement）保存调用结果；终态（Terminal State）记录执行（Run）怎样结束；投影（Projection）把事实（Fact）整理成视图。</p>
+<p><strong>关系主线</strong>：沿同一项 README 修复追踪输入、消费者（Consumer）和状态（State）变化，再检查重试、写入中断、取消与长期偏好。最终文本、持久终态（Terminal State）和任务验收各有证据，断线不能自动授权重做。</p>
 </blockquote>
+<h2 id="前情回顾把责任地图变成一条请求">前情回顾：把责任地图变成一条请求</h2>
+<p><a href="11-agent-architecture.html">第11章</a>已经分清：宿主（Host）接纳并协调工作，运行时（Runtime）组织模型（Model）与工具（Tool）循环，客户端（Client）提交意图并显示结果。负责某项状态（State）的部件是负责者（Owner），实际读取并使用材料的部件是消费者（Consumer）；这两种角色必须沿真实连接寻找。</p>
+<p>本章沿用会话（Session）S1、工作轮次（Turn）T7和执行（Run）R7。会话（Session）回答长期归属，工作轮次（Turn）回答用户发起哪项工作，执行（Run）回答本次具体运行是哪一次。一个执行（Run）可以包含多个模型步骤（Model Step）：每个步骤把输入交给模型（Model），取得文字或工具调用（Tool Call），一个步骤也可以提出多个工具（Tool）请求。</p>
+<p>现在把这些对象放进时间顺序。我们不仅问“哪个部件做了事”，还问“它当时拿到什么、改变了什么、下一位消费者（Consumer）是否已经得到结果”。<a href="10-reading-typescript.html">第10章</a>的等待与事件交接读法仍然适用：调用存在、返回成功和结果已经持久保存，不应仅凭名字推导。</p>
 <h2 id="核心路线">核心路线</h2>
 <span class="heading-alias" id="本章要回答什么" aria-hidden="true"></span><h3 id="从任务要求确定执行对象">从任务要求确定执行对象</h3>
-<p>任务包含文件操作、测试和长期偏好：</p>
-<blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，更新 README 的测试步骤，运行测试，最后用中文总结；以后也请记住我希望使用中文解释。</p>
+<p>教学请求继续是：</p>
+<blockquote><p>检查 <code>package.json</code> 与 <code>README.md</code>，更新 README 的测试步骤，运行测试，检查改动范围，最后用中文总结；以后也请记住我希望使用中文解释。</p>
 </blockquote>
-<p>这是 <a href="11-agent-architecture.html#%E8%B4%AF%E7%A9%BF%E5%85%A8%E5%A5%97%E6%95%99%E7%A8%8B%E7%9A%84%E6%A1%88%E4%BE%8B">第11章 主任务</a>中只改 README 的简化阶段：暂时假设功能测试原本已通过，尚未展开 <code>formatDuration</code> 的缺陷。我们把长期会话记为 S1、这次用户工作记为 T7、实际执行记为 R7。</p>
-<p>本章 R7 的顺序是教学示意。后面的<a href="22-agent-cases.html#2-maka%E5%90%8C%E4%B8%80%E4%BB%B6%E5%B7%A5%E4%BD%9C%E6%8D%A2%E4%B8%80%E7%A7%8D%E5%B7%A5%E5%85%B7%E8%A1%A8%E8%BE%BE">第22章 Maka 主案例</a>将展示包含函数修复的真实调用；真实模型可以先依据源码修改再测试，不需要逐步照着本章示意走。</p>
-<span class="heading-alias" id="先看全景" aria-hidden="true"></span><h3 id="准入执行与展示的完整链路">准入、执行与展示的完整链路</h3>
-<p>**model step（模型步骤）**指一次模型决策：系统把本次输入交给模型，得到文字或工具请求；一个步骤可以请求多个工具。</p>
-<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="准入、执行与展示的完整链路：可滚动示意图"><a href="../../../assets/diagrams/12-request-lifecycle-1.svg"><img src="../../../assets/diagrams/12-request-lifecycle-1.svg" alt="Client 提交 S1/T7，Host 准入并固定 R7、先保存再启动；Runtime 在输入、模型、工具和已保存结算之间循环，裁决终态后由 Host 从持久记录整理快照供 Client 展示和重连回读。" width="806" height="1860" loading="lazy" style="width:806px;min-width:686px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中 Host 保存准入成功后发起执行，Runtime 才进入“输入 → 模型 → 工具 → 结算记录 → 下一次输入”的循环。Runtime 在组装输入时回读执行事实；虚线提供回读材料，不表示记录库主动启动下一步。Read、Edit、测试可以多次经过这个循环。底部由 Host 根据执行记录整理展示：准入记录说明工作被接纳，执行记录说明后续发生了什么。</p>
-<p><strong>边界与失败。</strong> 最终文本进入 Runtime 处理，不等于文字本身就是 Run 终态；错误、取消或额度耗尽也可能让执行结束，且不保证还能生成总结。图中的记录与回读只表示本章普通路径：工具效果可能先于结果记录发生，保存失败时不能据缺少回执重做；Client 断线也不能据旧画面重启任务。终态与任务是否做对、资源是否已清理，仍须分别核对。</p>
-<p>这里的<a href="glossary.html#runtime%E8%BF%90%E8%A1%8C%E6%97%B6">运行时（Runtime）</a>是实际驱动模型—工具循环的程序部分；Runtime Host 则是更外层的长期控制者，负责接受连接、准入工作并协调生命周期。</p>
-<h3 id="第-0-站工作开始前s1-已经存在">第 0 站：工作开始前，S1 已经存在</h3>
-<p><a href="glossary.html#session%E4%BC%9A%E8%AF%9D">会话（Session）</a> S1 是长期存在的工作房间。它可能已经包含以前的用户消息、模型回答和工具事实，也可能是一个刚建立的空会话。</p>
-<p>开始 T7 前，可以把状态想成：</p>
-<pre><code class="language-text">Session S1
-  历史：若干已有事实
-  当前顶层工作：无
-  Client：已经连接并正在显示 S1</code></pre>
-<p>“当前顶层工作为空”很重要：Host 要防止同一个 Session 的两项顶层任务未经协调地同时争抢控制权。这里的“顶层”指 Host 接纳的整项工作，内部仍可有并行工具；精确的准入范围放在 第13章 深化区。</p>
-<h4 id="用户此时看见什么">用户此时看见什么</h4>
-<p>用户看见一个聊天或任务界面，以及输入框。</p>
-<h4 id="系统此时知道什么">系统此时知道什么</h4>
-<p>Host 能识别 S1，知道它是否存在、是否归档、是否已有待执行或正在执行的顶层工作。</p>
-<h4 id="模型此时知道什么">模型此时知道什么</h4>
-<p>本例尚未把 T7 交给模型。模型不是一直挂在 S1 上持续思考；只有 Runtime 真正发起请求时，它才收到为那次调用构造的输入。</p>
-<h3 id="第-1-站client-提交-t7但它没有权力宣布已经开跑">第 1 站：Client 提交 T7，但它没有权力宣布“已经开跑”</h3>
-<p>用户点击发送后，<a href="glossary.html#client%E5%AE%A2%E6%88%B7%E7%AB%AF">客户端（Client）</a>把大致如下的意图交给 Host：</p>
-<pre><code class="language-text">sessionId = S1
-turnId    = T7
-content   = &quot;检查 package.json 与 README.md……以后用中文解释&quot;</code></pre>
-<p><a href="glossary.html#turn%E8%BD%AE%E6%AC%A1--%E7%94%A8%E6%88%B7%E5%8F%AF%E8%A7%82%E5%AF%9F%E5%B7%A5%E4%BD%9C%E8%BE%B9%E7%95%8C">轮次（Turn）</a> T7 表示用户能识别的一项顶层工作。Client 可以提出 <code>turnId</code> 和内容，但不应自行编造权威 <code>runId</code>，也不能因为界面已经出现一个 loading 动画，就断言执行已经开始。</p>
-<p>为什么要这样分权？设想网络在发送后立刻断开：</p>
-<ul>
-<li>Client 不知道 Host 是否收到；</li>
-<li>Host 可能已收到并持久化；</li>
-<li>UI 的本地状态无法证明服务端事实。</li>
-</ul>
-<p>因此按钮状态只是用户体验层面的临时视图。</p>
-<h3 id="第-2-站host-检查并准入固定-s1--t7--r7">第 2 站：Host 检查并准入，固定 S1 / T7 / R7</h3>
-<p><a href="glossary.html#admission%E5%87%86%E5%85%A5">准入（Admission）</a>是 Host 正式接受这项工作并固定关键输入与身份的过程。对本案例，Host 要确认至少这些问题：</p>
-<ul>
-<li>S1 确实存在，并且没有归档；</li>
-<li>当前没有冲突的顶层执行；</li>
-<li>输入是否合法，所需执行能力是否可用；</li>
-<li>T7 如果以前出现过，这次是否是内容完全相同的重试。</li>
-</ul>
-<p>检查通过后，Host 为这项工作建立<a href="glossary.html#run--agentrun%E8%BF%90%E8%A1%8C--%E6%89%A7%E8%A1%8C%E5%B0%81%E5%A5%97">运行（Run）</a> R7，并先保存一条持久化的准入事实：</p>
-<pre><code class="language-text">这不是实际 schema，只是教学表示：
-
-admission {
-  session: S1,
-  turn: T7,
-  run: R7,
-  input: 规范化后的用户要求
-}</code></pre>
-<p>这里采用“先保存，再启动”的顺序。原因是：如果先启动模型、后保存身份，进程刚好在两者之间崩溃，重启后就很难判断那次工作是否已经开始。</p>
-<h3 id="第-3-站host-组成这一轮稳定的工作基础">第 3 站：Host 组成这一轮稳定的工作基础</h3>
-<p>正式调用模型前，系统要决定 R7 以什么规则、能力和模型配置工作。可以把它类比成开工前发放一个“工作包”：</p>
-<pre><code class="language-text">R7 工作包
-  ├─ 必须遵守的规则
-  ├─ 项目背景
-  ├─ 本轮任务
-  ├─ 允许看到的历史
-  ├─ 工具说明
-  └─ 模型配置</code></pre>
-<h3 id="第-4-站runtime-为模型-step-1-构造它真正能看到的内容">第 4 站：Runtime 为模型 step 1 构造它真正能看到的内容</h3>
-<p>Runtime 不会把整个数据库或整个工作目录直接塞给模型。它会构造<a href="glossary.html#working-context%E5%B7%A5%E4%BD%9C%E4%B8%8A%E4%B8%8B%E6%96%87">工作上下文（Working Context）</a>，例如：</p>
-<pre><code class="language-text">系统规则与项目指令
-+ 可注入的长期信息
-+ S1 中选中并整理过的历史
-+ T7 的当前用户输入
-+ 本 step 可用工具的名称与参数说明</code></pre>
-<p>此时模型通常<strong>还看不到 <code>package.json</code> 与 <code>README.md</code> 的真实内容</strong>。它只知道存在一个 Read 工具，以及用户要求检查这两份文件。文件内容要等工具实际读取后，才会进入下一次模型调用。</p>
-<p>这是理解 Agent 的关键分界：</p>
-<pre><code class="language-text">模型知道“可以请求 Read”
-    不等于
-模型已经知道文件内容</code></pre>
-<span class="heading-alias" id="误解一一次-turn-就是一次模型-api-请求" aria-hidden="true"></span><h3 id="第-5-站模型-step-1-请求两个互不依赖的-read">第 5 站：模型 step 1 请求两个互不依赖的 Read</h3>
-<p>第一次模型调用可以在同一个 step 输出两个互不依赖的结构化意图：</p>
-<pre><code class="language-text">tool_call A { name: &quot;Read&quot;, arguments: { path: &quot;package.json&quot; } }
-tool_call B { name: &quot;Read&quot;, arguments: { path: &quot;README.md&quot; } }</code></pre>
-<p>这段示例是教学用简化表示，不是 Maka 的实际序列化格式。</p>
-<p>执行器先检查参数和当前读取边界，不能把模型愿望当成执行许可。</p>
-<p>检查通过后，两个只读调用可以并行执行，并分别返回内容或错误。这里的关键区别是：<strong>一个 model step 可以产生多个 tool call</strong>；step 是一次模型决策，不是某一个工具调用的别名。</p>
-<h4 id="read-成功时">Read 成功时</h4>
-<pre><code class="language-text">Read result A:
-  package.json 内容
-Read result B:
-  README.md 当前内容
-两者都可能是受控、可能截断的读取结果</code></pre>
-<p>工具结果会形成可追踪的执行事实，再成为下一步上下文的一部分。</p>
-<h4 id="read-失败时">Read 失败时</h4>
-<p>可能原因包括：路径不存在、越过当前边界、编码或读取错误。模型下一步看到的应该是明确失败，而不是系统悄悄假装文件为空。</p>
-<h3 id="第-6-站模型-step-2-基于两份真实文件内容请求-edit">第 6 站：模型 step 2 基于两份真实文件内容请求 Edit</h3>
-<p>Runtime 再次构造模型输入。这一次与 step 1 不同：</p>
-<pre><code class="language-text">原有规则和任务
-+ 两个 Read 调用意图
-+ package.json 与 README.md 的真实结果
-+ 当前仍可用的工具说明</code></pre>
-<p>模型现在才能把 <code>package.json</code> 的实际脚本、包名或项目结构与 README 当前文本对照，生成可定位旧文本的精确修改，并请求 Edit：</p>
-<pre><code class="language-text">Edit(README.md, 精确修改内容)</code></pre>
-<p>Edit 是会产生副作用的工具：它可能改变用户磁盘上的文件。因此“模型请求 Edit”和“Edit 已完成”之间必须有明确执行边界。</p>
-<p>执行器返回修改结果后，Runtime 保存它，下一次模型调用才有依据选择测试。若写入已发生、结果却没保存，恢复判断就会遇到<a href="#edit-%E7%9A%84%E6%8C%81%E4%B9%85%E8%BE%B9%E7%95%8C%E4%B8%8E%E6%89%A9%E6%9D%83%E5%88%86%E6%94%AF">不确定窗口</a>。</p>
-<h3 id="第-7-站模型-step-3-请求-bash-运行测试">第 7 站：模型 step 3 请求 Bash 运行测试</h3>
-<p>Edit 结果进入下一次上下文后，模型请求 Bash 执行在 <code>package.json</code> 中确认过的测试命令。</p>
-<p>Bash 的结果不只有屏幕上的几行文字，还包括至少两个维度：</p>
-<pre><code class="language-text">stdout / stderr  人类可读输出
-exit status      程序是否成功退出的机器信号</code></pre>
-<p>例如：</p>
+<p>条件与第11章相同：函数已经正确，四个既有测试（Test）原本通过；README却写着 <code>npm run check</code>，配置只提供 <code>&quot;test&quot;: &quot;node --test&quot;</code>，所以真正入口是 <code>npm test</code>。本章只允许修改README，保留函数、测试（Test）与配置。这与<a href="04-code-repair.html">第04章</a>仍含 <code>% 100</code> 函数缺陷的原始样例不同。</p>
+<p>S1、T7、R7以及后面的四个模型步骤（Model Step）都是教学记号，不是新运行记录。<a href="22-agent-cases.html#2-maka%E5%90%8C%E4%B8%80%E4%BB%B6%E5%B7%A5%E4%BD%9C%E6%8D%A2%E4%B8%80%E7%A7%8D%E5%B7%A5%E5%85%B7%E8%A1%A8%E8%BE%BE">第22章的真实 Maka 案例</a>包含函数修复，其模型（Model）可采用不同的读取、编辑与检查顺序。本章不把示意步骤补进那份真实执行轨迹（Trajectory）。</p>
+<span class="heading-alias" id="先看全景" aria-hidden="true"></span><span class="heading-alias" id="准入执行与展示的完整链路" aria-hidden="true"></span><h3 id="准入admission执行run与展示的完整链路">准入（Admission）、执行（Run）与展示的完整链路</h3>
+<p>本章使用当前普通宿主（Host）和默认 <code>ai-sdk</code> 执行后端（Agent Backend）路径，并限定工具（Tool）走已接入持久结果接收端的普通调用链。运行时（Runtime）是驱动模型（Model）与工具（Tool）的程序部分；外层运行时宿主（Runtime Host）在本文简称宿主（Host），负责连接、准入（Admission）和生命周期（Lifecycle）协调。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="准入、执行与回读 · Admission, Execution, Readback：可滚动示意图"><a href="../../../assets/diagrams/12-request-lifecycle-1.svg"><img src="../../../assets/diagrams/12-request-lifecycle-1.svg" alt="客户端（Client）提交会话（Session）S1与工作轮次（Turn）T7；宿主（Host）准入（Admission）并固定执行（Run）R7，保存成功再启动。运行时（Runtime）在模型步骤（Model Step）、工具调用（Tool Call）和已保存工具结算（Tool Settlement）之间循环。终态（Terminal State）提交后，宿主回读事实构造快照（Snapshot），客户端显示或重连回读；虚线回读不代表记录库主动触发执行。" width="1078" height="1949" loading="lazy" style="width:1078px;min-width:917px"></a></div><figcaption>宽图可左右滚动；点击图像打开原图，用浏览器返回继续阅读。</figcaption></figure><p>图中的循环由运行时（Runtime）推进，记录库的虚线只提供回读材料，不会主动启动下一步。准入记录说明工作被接纳，持久执行记录说明后续发生了什么。普通工具（Tool）结算成功且控制条件允许时，结果才成为后续判断的依据。</p>
+<p>底部只画基于持久事实（Durable Fact）的状态（State）展示；运行中的文字增量还可经宿主（Host）直接用于界面更新，并非每个可见片段都已经结算。工具效果（Effect）也可能早于结果记录发生。因此，缺少回执不能证明没有执行，旧界面也不能授权重新开始任务。</p>
+<span class="heading-alias" id="第-0-站工作开始前s1-已经存在" aria-hidden="true"></span><span class="heading-alias" id="用户此时看见什么" aria-hidden="true"></span><span class="heading-alias" id="系统此时知道什么" aria-hidden="true"></span><span class="heading-alias" id="模型此时知道什么" aria-hidden="true"></span><h3 id="第0站工作开始前会话sessions1已经存在">第0站：工作开始前，会话（Session）S1已经存在</h3>
+<p>S1可以已有用户消息（Message）、模型（Model）回答与工具（Tool）事实（Fact），也可以刚刚创建。本例开始时，S1未归档，没有冲突的顶层工作；客户端（Client）已连接并显示它。“顶层工作”是宿主（Host）接纳的整项工作，内部仍可以有并行工具（Tool）。具体准入（Admission）范围在<a href="13-session-turn-run.html">第13章</a>继续展开。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 第0站：工作开始前，会话（Session）S1已经存在"><table><caption>表 1 / Table 1 · 第0站：工作开始前，会话（Session）S1已经存在</caption><thead><tr><th scope="col">此时的观察位置</th><th scope="col">实际知道什么</th><th scope="col">尚不能推出什么</th></tr></thead><tbody><tr><td>用户与客户端（Client）</td><td>当前显示S1，可以输入任务</td><td>输入框可用不证明某项请求已经被接纳</td></tr>
+<tr><td>宿主（Host）</td><td>S1是否存在、归档或已有待执行工作</td><td>尚未提交的T7没有执行（Run）结果</td></tr>
+<tr><td>模型（Model）</td><td>本例尚未收到T7的输入</td><td>模型（Model）不是一直挂在S1上持续思考</td></tr></tbody></table></div>
+<p>只有运行时（Runtime）真正发起模型调用（Model Query）时，模型（Model）才收到为该次调用构造的内容。长期会话（Session）存在，不等于每一轮所有历史都已经被读取。</p>
+<span class="heading-alias" id="第-1-站client-提交-t7但它没有权力宣布已经开跑" aria-hidden="true"></span><h3 id="第1站客户端client提交t7">第1站：客户端（Client）提交T7</h3>
+<p>客户端（Client）提交的是工作意图，主要说明归属、用户工作编号和内容。以下是字段关系示意，不是实际协议的完整结构，也不是已接纳记录：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 / Table 2 · 第1站：客户端（Client）提交T7"><table><caption>表 2 / Table 2 · 第1站：客户端（Client）提交T7</caption><thead><tr><th scope="col">字段标识</th><th scope="col">本例内容</th><th scope="col">谁使用它</th></tr></thead><tbody><tr><td><code>sessionId</code></td><td><code>S1</code></td><td>宿主（Host）定位会话（Session）</td></tr>
+<tr><td><code>turnId</code></td><td><code>T7</code></td><td>宿主（Host）识别当前工作意图及可能的重试</td></tr>
+<tr><td><code>content</code></td><td>当前README修复与中文偏好请求</td><td>输入归一化与准入（Admission）逻辑</td></tr></tbody></table></div>
+<p>客户端（Client）可以提出 <code>turnId</code> 与内容，不能自行编造负责执行的权威 <code>runId</code>。界面出现加载动画，只表明本地提交操作正在进行。</p>
+<p>假设网络随即断开：客户端（Client）可能不知道宿主（Host）是否收到；宿主（Host）也可能已经持久接纳。两种实际情况能对应同一个“连接失败”画面，所以本地显示无法裁定服务端状态（State）。</p>
+<span class="heading-alias" id="第-2-站host-检查并准入固定-s1--t7--r7" aria-hidden="true"></span><h3 id="第2站宿主host检查并准入admission">第2站：宿主（Host）检查并准入（Admission）</h3>
+<p>宿主（Host）检查S1存在且未归档、没有冲突的顶层执行（Run），再核对输入与执行能力。若T7已经出现，还须判断是不是同一项规范化意图的精确重试（Exact Retry）。精确重试（Exact Retry）要求身份（Identity）和已固定的内容、执行描述等保持一致，不能只比较一段相同文字。</p>
+<p>接纳以后，宿主（Host）把T7关联到R7，并先保存准入（Admission）事实（Fact）。可以用下面的四项理解这份记录的用途，不把它当实际存储结构：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 3 / Table 3 · 第2站：宿主（Host）检查并准入（Admission）"><table><caption>表 3 / Table 3 · 第2站：宿主（Host）检查并准入（Admission）</caption><thead><tr><th scope="col">记录关系</th><th scope="col">回答的问题</th></tr></thead><tbody><tr><td>S1 → T7</td><td>用户在哪个会话（Session）发起哪项工作？</td></tr>
+<tr><td>T7 → R7</td><td>这项工作接到哪次具体执行（Run）？</td></tr>
+<tr><td>T7 → 规范化输入</td><td>重试是否仍指向原来那项要求？</td></tr>
+<tr><td>R7 → 已固定的执行描述</td><td>使用哪条执行路径和相应配置？</td></tr></tbody></table></div>
+<p><strong>先保存，再启动</strong>避免一种缺口：若先发起模型调用（Model Query），随后才保存工作身份（Work Identity），中途崩溃就可能留下实际请求，却没有可核对的归属。保存返回异常也不能一律解释为没有接纳；恢复（Recovery）仍要按负责者（Owner）的合同核对记录。</p>
+<span class="heading-alias" id="第-3-站host-组成这一轮稳定的工作基础" aria-hidden="true"></span><h3 id="第3站宿主host组成稳定的工作基础">第3站：宿主（Host）组成稳定的工作基础</h3>
+<p>正式调用前，宿主（Host）决定R7使用哪些规则、项目资料、模型（Model）配置与工具（Tool）能力。组成基础不是把整座仓库复制给模型（Model），而是确定本次工作可以从哪些来源取材料、采用哪些配置。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 / Table 4 · 第3站：宿主（Host）组成稳定的工作基础"><table><caption>表 4 / Table 4 · 第3站：宿主（Host）组成稳定的工作基础</caption><thead><tr><th scope="col">来源</th><th scope="col">在本例中提供什么</th><th scope="col">为什么仍需后续选择</th></tr></thead><tbody><tr><td>系统规则与工作区指令（Workspace Instructions）</td><td>保留用户内容、遵守修改范围等约束</td><td>适用位置与装载条件须匹配当前项目</td></tr>
+<tr><td>当前任务</td><td>只改README、检查测试（Test）、使用中文</td><td>当前任务不能被旧历史中的不同目标覆盖</td></tr>
+<tr><td>已获准的长期信息</td><td>适用时补充用户偏好</td><td>保存存在不等于当前读取已开启</td></tr>
+<tr><td>工具（Tool）与模型（Model）配置</td><td>可用执行能力及请求方式</td><td>本步骤仍要检查可用性（Availability）与输入大小</td></tr></tbody></table></div>
+<p>这里的可用性（Availability）表示某项能力在当前步骤能否被提供或调用；它与“包里定义了这个工具（Tool）”不同。宿主（Host）固定工作基础以后，运行时（Runtime）仍会为不同模型步骤（Model Step）选择不同材料。</p>
+<span class="heading-alias" id="第-4-站runtime-为模型-step-1-构造它真正能看到的内容" aria-hidden="true"></span><h3 id="第4站运行时runtime构造第一个模型步骤model-step的输入">第4站：运行时（Runtime）构造第一个模型步骤（Model Step）的输入</h3>
+<p>工作上下文（Working Context）是为本次判断选取并整理的内容：适用规则、允许注入的长期信息、S1中选中的历史、T7的输入，以及本步骤可用工具（Tool）的名称与参数说明。直接消费者（Consumer）是本次接收输入的模型（Model）。数据库、文件系统或记忆（Memory）中未被选入的材料，不能自动算作模型（Model）已知内容。</p>
+<p>本例给定第一步没有预先载入两份文件正文。模型（Model）只知道存在 <code>Read</code> 工具标识，以及要检查 <code>package.json</code> 与 <code>README.md</code>，还不知道它们此刻的真实内容。<strong>知道可以请求读取，不等于已经完成读取。</strong></p>
+<p>这也是为什么不能直接生成可靠的精确替换：旧文本、匹配位置与可能存在的用户段落都尚未取得。工具（Tool）实际读取之后，结果才可能进入下一次模型输入（Model Input）。</p>
+<span class="heading-alias" id="误解一一次-turn-就是一次模型-api-请求" aria-hidden="true"></span><span class="heading-alias" id="第-5-站模型-step-1-请求两个互不依赖的-read" aria-hidden="true"></span><h3 id="第5站第一个模型步骤model-step请求两次读取">第5站：第一个模型步骤（Model Step）请求两次读取</h3>
+<p><code>Read</code> 是实际工具标识。模型（Model）在同一步提出读取配置和README的两个工具调用（Tool Call），它们的参数分别指向两条文件路径。两个读取互不依赖，允许时可以并行；这不意味着任意两个工具调用（Tool Call）都可以并行。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 / Table 5 · 第5站：第一个模型步骤（Model Step）请求两次读取"><table><caption>表 5 / Table 5 · 第5站：第一个模型步骤（Model Step）请求两次读取</caption><thead><tr><th scope="col">调用关系</th><th scope="col">执行输入</th><th scope="col">成功时的结果</th><th scope="col">后续消费者（Consumer）</th></tr></thead><tbody><tr><td>读取A</td><td><code>package.json</code> 的路径</td><td>当前测试（Test）脚本配置</td><td>下一模型步骤（Model Step）中的模型（Model）确认实际入口</td></tr>
+<tr><td>读取B</td><td><code>README.md</code> 的路径</td><td>当前说明文字</td><td>下一模型步骤（Model Step）中的模型（Model）定位错误命令与保留内容</td></tr></tbody></table></div>
+<p>工具执行链（Tool Execution）先检查参数和当前读取边界，再交给真正执行者。一个模型步骤（Model Step）产生了两个工具调用（Tool Call）；两者不是同一个计数单位。</p>
+<span class="heading-alias" id="read-成功时" aria-hidden="true"></span><h4 id="读取成功时">读取成功时</h4>
+<p>返回的是受读取规则约束的内容，可能因范围或大小限制而截断。当前片段足以看见目标配置，不代表已经通读整个文件；下一步必须按实际返回范围判断。工具结果（Tool Result）形成可追踪的执行事实（Execution Fact），再进入后续工作上下文（Working Context）。</p>
+<span class="heading-alias" id="read-失败时" aria-hidden="true"></span><h4 id="读取失败时">读取失败时</h4>
+<p>路径不存在、越过当前边界、编码错误等原因，应返回明确失败。失败消息（Message）不能被悄悄替换成空文件，否则下一步可能把“读不到”误解为“文件为空”，据此覆盖有效内容。</p>
+<span class="heading-alias" id="第-6-站模型-step-2-基于两份真实文件内容请求-edit" aria-hidden="true"></span><h3 id="第6站第二个模型步骤model-step请求编辑">第6站：第二个模型步骤（Model Step）请求编辑</h3>
+<p>运行时（Runtime）重新组装输入，加入两个读取意图与实际结果。模型（Model）这时才有材料比较：README写 <code>npm run check</code>，配置只声明 <code>test</code>；它据此请求 <code>Edit</code>，以当前旧文本定位局部替换，并保留其余内容。</p>
+<p>编辑请求与文件效果（Effect）之间有执行边界（Execution Boundary）：参数必须有效，操作必须在当前授权（Authorization）内，实际执行环境（Environment）还要落实资源限制。模型（Model）希望修改，不等于文件已经改变。</p>
+<p>普通结果完成持久结算（Durable Settlement）以后，下一模型步骤（Model Step）才能将其作为已接纳的结果。若写入发生但结果保存失败，应转入相应失败或恢复（Recovery）处理，不能凭缺少记录重做。下文的工具（Tool）持久边界会解释这个窗口。</p>
+<span class="heading-alias" id="第-7-站模型-step-3-请求-bash-运行测试" aria-hidden="true"></span><h3 id="第7站第三个模型步骤model-step运行测试test">第7站：第三个模型步骤（Model Step）运行测试（Test）</h3>
+<p>编辑结果进入下一次上下文（Context）后，模型（Model）请求 <code>Bash</code> 运行从配置确认的 <code>npm test</code>。<code>Bash</code> 是工具标识，执行时使用命令解释器（Shell）；它返回文本与退出状态（Exit Status），两者要结合命令结构读取。</p>
+<p>标准输出（Standard Output）与标准错误（Standard Error）提供可读过程，退出码（Exit Code）按命令自己的约定报告结束情况。下面两块都是教学结果示意，不是原始日志：</p>
 <pre><code class="language-text">Tests: 4 passed
 exit status: 0</code></pre>
-<p>和：</p>
 <pre><code class="language-text">Tests: 1 failed
 exit status: 1</code></pre>
-<p>会让模型得出不同的总结与下一步。输出说明命令做了什么，退出码按该命令的约定报告成功或失败；还必须确认这确实启动了目标测试，而非只打印了一句“passed”。本段的 <code>4 passed</code> 假定函数原本正确；若仍使用<a href="04-code-repair.html">第04章</a>的原始 <code>% 100</code> 版本，只改 README 后仍是 2 通过、2 失败，真实记录见<a href="22-agent-cases.html#3-%E5%8F%AA%E4%BF%AE-readme%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B5%8B%E8%AF%95%E4%BB%8D%E7%BA%A2%E4%B9%9F%E8%83%BD%E5%AE%8C%E6%88%90%E8%BF%99%E9%A1%B9%E4%BB%BB%E5%8A%A1">第22章第3例</a>。完整函数修复中的失败分支在第16章展开。</p>
-<h3 id="第-8-站模型-step-4-生成中文总结">第 8 站：模型 step 4 生成中文总结</h3>
-<p>如果模型已经看到：</p>
-<ul>
-<li>Read 的文件内容；</li>
-<li>Edit 的完成结果；</li>
-<li>Bash 的输出与退出状态；</li>
-<li>用户要求用中文说明；</li>
-</ul>
-<p>它就可以生成有证据依据的最终文本，例如：</p>
+<p>它们应导向不同结论。第一块还需要确认确实运行了目标测试（Test），不能只打印一句“passed”；第二块不能因为工具调用（Tool Call）本身正常返回，就被写成“检查通过”。本例还需要查看文件差异（Diff），证明修改没有扩出README目标位置。</p>
+<p><code>4 passed</code>依赖本章函数原本正确的初态。若沿用第04章的 <code>% 100</code> 缺陷，只改README仍会得到2项通过、2项失败，<a href="22-agent-cases.html#3-%E5%8F%AA%E4%BF%AE-readme%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B5%8B%E8%AF%95%E4%BB%8D%E7%BA%A2%E4%B9%9F%E8%83%BD%E5%AE%8C%E6%88%90%E8%BF%99%E9%A1%B9%E4%BB%BB%E5%8A%A1">第22章的只修README案例</a>保留了该区别。不能把两个初态合并为一次运行。</p>
+<span class="heading-alias" id="第-8-站模型-step-4-生成中文总结" aria-hidden="true"></span><h3 id="第8站第四个模型步骤model-step生成中文总结">第8站：第四个模型步骤（Model Step）生成中文总结</h3>
+<p>现在模型（Model）已取得读取内容、编辑结果、测试（Test）输出及差异（Diff）检查，才有材料说明当前结果。给定所有检查都符合本章条件时，可以形成下面的教学回答：</p>
 <pre><code class="language-text">已根据 package.json 中的实际命令更新 README，并运行测试。
 测试共 4 项，全部通过。</code></pre>
-<p>这段文本本身仍不是整个生命周期的终点。Runtime 还要把模型输出和<a href="glossary.html#terminal-state--terminal-fact%E7%BB%88%E6%80%81--%E7%BB%88%E6%80%81%E4%BA%8B%E5%AE%9E">终态（Terminal State）</a>写入负责执行语义的持久记录。</p>
-<p>终态可能是：</p>
-<ul>
-<li>completed：正常完成；</li>
-<li>failed：因错误结束；</li>
-<li>cancelled：被取消。</li>
-</ul>
-<p>这里的“正常完成”描述本次执行如何结束，任务是否做对仍要看文件、测试与用户要求。Agent 可以正常结束并诚实报告“测试仍失败”；也可能因步骤额度用尽而结束，没有机会再调用模型生成总结。<strong>读到结束状态，不能替代核对完成证据。</strong></p>
-<span class="heading-alias" id="误解三最终回答生成后ui-就是事实源" aria-hidden="true"></span><h3 id="第-9-站host-和-client-从事实得到完成视图">第 9 站：Host 和 Client 从事实得到完成视图</h3>
-<p>Runtime 写入终态后，Host 从权威记录整理出当前状态快照，并向订阅 S1 的 Client 发布更新。Client 再把它画成聊天气泡、完成状态或运行详情。第14章 会把这种“从记录整理显示内容”的过程称为投影。</p>
-<p>这里的方向是：</p>
-<pre><code class="language-text">持久执行事实 → Host 状态快照 → Client 展示</code></pre>
-<p>而不是：</p>
-<pre><code class="language-text">Client 显示完成 → 系统因此认定执行完成</code></pre>
-<p>这使得 Client 断线重连后，仍可以从持久事实恢复同一项工作的状态。</p>
+<p>实际交付还应说明修改范围与检查限制。这段文字本身仍不是执行（Run）的终点；运行时（Runtime）要接纳模型（Model）输出，并保存终态（Terminal State）事实（Fact）。</p>
+<p>终态（Terminal State）表示相应执行（Run）怎样结束，具体状态值还取决于读的是哪个接口。先隔离结束原因本身：在默认流转成运行时事件（Runtime Event）时，若此前没有已记录的失败分类 <code>failureClass</code>，映射如下：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 6 / Table 6 · 第8站：第四个模型步骤（Model Step）生成中文总结"><table><caption>表 6 / Table 6 · 第8站：第四个模型步骤（Model Step）生成中文总结</caption><thead><tr><th scope="col">原始结束原因标识</th><th scope="col">映射后的状态标识</th><th scope="col">可以怎样解释</th></tr></thead><tbody><tr><td><code>end_turn</code></td><td><code>completed</code></td><td>模型流按这一结束原因收束，不等于任务验收已经通过</td></tr>
+<tr><td><code>error</code>、<code>step_limit</code></td><td><code>failed</code></td><td>因错误或步骤上限结束，可能没有后续总结</td></tr>
+<tr><td><code>user_stop</code></td><td><code>aborted</code></td><td>用户停止触发当前流的中断终态（Terminal State）</td></tr></tbody></table></div>
+<p>完整映射还会优先检查此前记录的失败分类 <code>failureClass</code>：已经记录失败时，<code>end_turn</code>、<code>max_tokens</code>等原因最终仍形成 <code>failed</code>；<code>user_stop</code>保留 <code>aborted</code>。因此，上表不能代替整个运行时事件（Runtime Event）的判断。</p>
+<p>其他状态（State）接口还可能出现 <code>cancelled</code>，不能把所有取消相关字段替换成同一个字符串。<code>CompleteEvent</code> 只是流结束通知，不能看见“Complete”就判断成功；未记录先前失败时，<code>max_tokens</code>等原因可映射为 <code>completed</code>，却仍可能留下不完整回答。</p>
+<p>智能代理（Agent）也可以正常结束并诚实报告测试（Test）仍失败。读到终态（Terminal State）支持的是执行（Run）如何结束，不能替代任务要求、文件效果（Effect）与验证（Verification）材料。</p>
+<span class="heading-alias" id="误解三最终回答生成后ui-就是事实源" aria-hidden="true"></span><span class="heading-alias" id="第-9-站host-和-client-从事实得到完成视图" aria-hidden="true"></span><h3 id="第9站宿主host与客户端client恢复完成视图">第9站：宿主（Host）与客户端（Client）恢复完成视图</h3>
+<p>终态（Terminal State）提交后，宿主（Host）回读相应事实（Fact），构造状态快照（Snapshot）并发布给订阅S1的客户端（Client）。客户端（Client）再显示聊天内容、运行详情与结束状态（State）。把已有记录整理成特定可读视图的过程称为投影（Projection）。</p>
+<p>方向是“持久事实（Durable Fact）被宿主（Host）读取，再由客户端（Client）显示”；界面显示完成，不会反向创造执行终态（Terminal State）。运行增量可以更早显示，但完成视图仍须来自负责者（Owner）接受的记录。</p>
+<p>若最终通知丢失，重新连接后读取已有事实（Fact）即可重建同一项工作的视图。这不要求模型（Model）重新回答，更不要求再运行一遍修改命令。<a href="14-events-and-projections.html">第14章</a>继续区分执行事实（Execution Fact）与不同展示形式。</p>
 <span class="heading-alias" id="核心出口自测与答案" aria-hidden="true"></span><h3 id="核心问题解析">核心问题解析</h3>
-<p><strong>问题 1。</strong> 从发送 T7 到第一次模型调用，Host/Runtime 分别补上了什么？</p>
-<p><strong>解释。</strong> Host 检查并持久接纳工作、固定 R7；Runtime 组成输入并驱动模型与工具。界面出现 loading 不是已准入的事实。</p>
-<p><strong>问题 2。</strong> 为什么第一次 Read 前不能可靠生成 README 的精确替换？</p>
-<p><strong>解释。</strong> 模型还没有当前文件内容与匹配位置。Read 将真实内容变成下一轮可用的观察，才能形成有根据的编辑请求。</p>
-<p><strong>问题 3。</strong> Bash 的输出与退出码各能证明什么？最终通知丢失后应该重做任务吗？</p>
-<p><strong>解释。</strong> 输出帮助解释运行过程，退出码表示命令自己的成功/失败约定，还要核对它覆盖了什么要求。通知丢失应读已有事实并恢复展示，不能据此重做任务。</p>
+<p><strong>问题1。</strong> 从发送T7到第一次模型调用（Model Query），宿主（Host）与运行时（Runtime）分别补上了什么？</p>
+<p><strong>参考答案。</strong> 宿主（Host）核对并持久接纳工作、固定R7与输入基础；运行时（Runtime）取得执行依据，组装本步骤输入并驱动模型（Model）与工具（Tool）。加载动画不是准入（Admission）成功的证据。</p>
+<p><strong>问题2。</strong> 为什么第一次读取前不能可靠生成README的精确替换？</p>
+<p><strong>参考答案。</strong> 本例没有预先载入文件，模型（Model）还不知道当前旧文本与匹配位置。读取把真实内容变成下一次可用材料，才能提出有依据的编辑；仍需检查返回内容是否截断。</p>
+<p><strong>问题3。</strong> 命令文本与退出码（Exit Code）各能证明什么？最终通知丢失后应重做任务吗？</p>
+<p><strong>参考答案。</strong> 执行输出（Output）帮助判断实际运行过程，退出码（Exit Code）按命令约定报告结束情况，还需核对目标行为与修改范围。通知丢失应回读事实（Fact）并恢复展示，不能据此重做已有工作。</p>
 <h2 id="实现深化">实现深化</h2>
-<span class="heading-alias" id="exact-retry为什么重发相同-t7-不能偷偷换内容" aria-hidden="true"></span><h3 id="准入重试同一个身份也要核对内容">准入重试：同一个身份也要核对内容</h3>
-<p>网络超时后，Client 可能重发 T7。安全的处理方式不是简单再开一个 Run，而是检查：</p>
-<pre><code class="language-text">相同 T7 + 相同规范化输入 → 可以识别为同一意图的重试
-相同 T7 + 不同输入       → 拒绝，避免身份指向两项不同工作</code></pre>
-<p>这就是“固定身份与输入”的意义。</p>
-<h3 id="组成快照与物理调用诊断">组成快照与物理调用诊断</h3>
-<p>组成快照之前，系统还要固定或核对这些来源：</p>
-<ul>
-<li>基础系统规则；</li>
-<li>当前 <a href="glossary.html#workspace-instructions%E5%B7%A5%E4%BD%9C%E5%8C%BA%E6%8C%87%E4%BB%A4">workspace instructions（工作区指令）</a>；</li>
-<li>允许注入的用户长期信息；</li>
-<li>当前 <a href="glossary.html#skill%E6%8A%80%E8%83%BD%E8%AF%B4%E6%98%8E%E5%8C%85">Skill</a>，或 <a href="glossary.html#plan%E8%AE%A1%E5%88%92">Plan（计划）</a>/<a href="glossary.html#goal%E7%9B%AE%E6%A0%87">Goal（持续目标）</a> 等控制域附带的上下文；</li>
-<li>选择的模型与 <a href="glossary.html#provider%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E6%8F%90%E4%BE%9B%E6%96%B9">provider（模型服务）</a>选项；</li>
-<li>这项 Run 最多可以使用哪些工具；</li>
-<li>工具在当前 step 是否可用。</li>
-</ul>
-<p>Maka 会保存一份<a href="glossary.html#composition-snapshot--promptcomposition%E7%BB%84%E6%88%90%E5%BF%AB%E7%85%A7--%E8%AF%B7%E6%B1%82%E7%BB%84%E6%88%90%E8%AF%8A%E6%96%AD">组成快照及指纹</a>，标识这一轮采用的配置和来源。当前公共 provider 主路径还记录物理调用 attempt（一次实际请求尝试）及有界的 promptComposition（各类请求材料的大小与组成诊断）。这能帮助核对配置变化前后的执行依据和调用状态，但指纹与大小分布都不是完整请求正文，不能靠它们还原模型看过的每一个字。</p>
-<span class="heading-alias" id="误解二readeditbash-是模型自己执行的" aria-hidden="true"></span><h3 id="普通工具调用前的检查">普通工具调用前的检查</h3>
-<p>Runtime 收到工具请求后，不会只凭模型的意愿直接执行。普通工具路径还要经过多层检查，例如：</p>
-<ul>
-<li>参数是否符合 schema（声明的参数结构与类型）；</li>
-<li>这项工具是否在 R7 的有效能力范围内；</li>
-<li>当前 step 是否允许它出现；</li>
-<li>调用次数和循环限制是否允许；</li>
-<li>实时执行边界是否允许读取目标路径。</li>
-</ul>
-<h3 id="edit-的持久边界与扩权分支">Edit 的持久边界与扩权分支</h3>
-<p>在 production Runtime Host 已接入持久结果接收端（durable sink）的普通 MakaTool 路径中，执行顺序是：</p>
-<pre><code class="language-text">检查调用
-  → 记录“实现可能从这里开始”的边界
-  → 在当前 sandbox / executor 中执行
-  → 记录结果
-  → 再把结果交给模型</code></pre>
-<p>前后两个持久边界分别称为 T1 和 T2：T1 表明实现可能开始执行，T2 保存这次调用的结算结果。恢复程序用它们区分尚未进入实现、已有结果和结果仍未知的情形。</p>
-<h4 id="如果-edit-越过边界">如果 Edit 越过边界</h4>
-<p>假设当前只允许修改 workspace，模型却请求写入外部目录。工具不能因为模型“很确定”就自行扩大权限。当前边界不覆盖这次操作时，先拒绝越界执行；只有相应入口允许申请、且工具返回了明确的扩边需求，才由模型在后续步骤提出申请。批准后还需按新边界重新判断下一次调用，不会自动重做原 Edit；命中显式拒绝也不能靠普通扩边绕过。</p>
-<span class="heading-alias" id="为什么-shell-工具通常更敏感" aria-hidden="true"></span><h3 id="shell-字符串为何需要执行边界">Shell 字符串为何需要执行边界</h3>
-<p>一段 shell 字符串可以间接读写大量资源、启动子进程或访问网络。静态看命令名字往往不足以推断真实效果，因此 Runtime 仍要在实际执行位置应用安全边界，而不是只在提示词中写“请勿越权”。</p>
-<h3 id="终态与资源结算的两个时刻">终态与资源结算的两个时刻</h3>
-<p>最终回答出现与所有后台资源彻底清理完，也可能是两个时刻。Maka 区分权威执行终态（canonical terminal）与随后的资源收尾（settled/cleanup），避免把“用户已经有结果”与“所有事件迭代器和资源已释放”混为一谈。用户按 Stop 时也要区分“已请求取消”“终态已保存”“资源已收敛”；取消不能撤销已经完成的文件修改。工具结算案例见 <a href="18-effects-and-recovery.html#stop-%E4%B9%9F%E8%A6%81%E7%AD%89%E5%BE%85%E5%8F%AF%E4%BB%A5%E7%BB%93%E7%AE%97%E7%9A%84%E5%B7%A5%E5%85%B7">第18章</a>。</p>
-<h3 id="第-10-站以后记住中文偏好走另一条路径">第 10 站：“以后记住中文偏好”走另一条路径</h3>
-<p>用户的句子同时包含本轮要求和长期意图：</p>
-<pre><code class="language-text">本轮要求：最终总结用中文
-长期意图：以后也希望中文解释</code></pre>
-<p>前者可以直接作为本轮指令进入 T7 的上下文，是否遵循要看实际回答。后者还需要明确的 Memory 写入，以及后续的读取和使用路径。</p>
-<p>本节先区分“保存”与“未来读到”，完整 Memory 机制在第20章展开。当前 Maka 有两套接近但不同的机制：</p>
-<ol>
-<li>Local Memory（本地记忆笔记）：以 <code>MEMORY.md</code> 为主体、用户可见且可编辑的一组笔记；</li>
-<li>Atomic LTM（条目化长期记忆）：由 <code>memory_remember</code> 等路径写入 <code>memory.sqlite</code> 的结构化记录。</li>
-</ol>
-<p>Atomic LTM 已有结构化写入和存储查询，但生产 Agent 尚未接通从中选取相关记忆、装入模型输入的调用链；它也不会自动同步到 <code>MEMORY.md</code>。因此：</p>
-<pre><code class="language-text">memory_remember 报告保存成功
-    不等于
-下一轮模型一定会自动看到这条偏好</code></pre>
-<p>如果产品希望下一轮稳定注入这项偏好，还需要使用已启用读取的透明 Local Memory 路径，或者未来接通 Atomic LTM 的召回侧。</p>
-<span class="heading-alias" id="常见误解" aria-hidden="true"></span><span class="heading-alias" id="误解四一句话里的所有要求都属于同一个子系统" aria-hidden="true"></span><h3 id="把整条链拆成四种不同信息流">把整条链拆成四种不同信息流</h3>
-<p>同一个请求里，其实有四条同时发生的流：</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 1 / Table 1 · 把整条链拆成四种不同信息流"><table><caption>表 1 / Table 1 · 把整条链拆成四种不同信息流</caption><thead><tr><th scope="col">信息流（Information Flow）</th><th scope="col">从哪里到哪里</th><th scope="col">例子</th></tr></thead><tbody><tr><td>控制流（Control Flow）</td><td>Client → Host → Runtime</td><td>T7 被准入为 R7；开始、停止、完成</td></tr>
-<tr><td>模型流（Model Flow）</td><td>Context → Model → 下一步意图</td><td>请求 Read、Edit、Bash，最后生成文本</td></tr>
-<tr><td>副作用流（Effect Flow）</td><td>Tool Runtime → 外部世界</td><td>读取文件、写 README、启动测试进程</td></tr>
-<tr><td>事实流（Fact Flow）</td><td>Runtime/Host → durable stores → projection</td><td>保存调用、结果、终态，再重建 UI</td></tr></tbody></table></div>
-<p>控制流决定工作能否推进，副作用流改变外部状态，事实流保存已知结果；模型只能基于已进入上下文的结果选择下一步。</p>
+<span class="heading-alias" id="exact-retry为什么重发相同-t7-不能偷偷换内容" aria-hidden="true"></span><span class="heading-alias" id="准入重试同一个身份也要核对内容" aria-hidden="true"></span><h3 id="准入admission重试同一身份identity还要核对内容">准入（Admission）重试：同一身份（Identity）还要核对内容</h3>
+<p>网络超时后，客户端（Client）可以重发同一T7，但宿主（Host）不能仅凭编号就再开一次执行（Run）。原身份（Identity）必须继续指向原规范化意图与已固定的执行描述：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 7 / Table 7 · 准入（Admission）重试：同一身份（Identity）还要核对内容"><table><caption>表 7 / Table 7 · 准入（Admission）重试：同一身份（Identity）还要核对内容</caption><thead><tr><th scope="col">重试材料</th><th scope="col">应如何判断</th></tr></thead><tbody><tr><td>同一T7，规范化输入及已固定描述一致</td><td>可按精确重试（Exact Retry）核对已有准入（Admission），不任意创建重复工作</td></tr>
+<tr><td>同一T7，用户内容或执行描述改变</td><td>不能作为原意图的重试接受</td></tr>
+<tr><td>新的工作要求</td><td>依新任务协议取得工作身份（Work Identity），并重新检查接纳条件</td></tr></tbody></table></div>
+<p>实际准入（Admission）还核对已保存的执行（Run）、用户消息（Message）等关联，不只是比较这张教学表里的文本。相同编号不是跳过内容校验的通行证；相同文本也不是相同身份（Identity）的充分证据。</p>
+<span class="heading-alias" id="组成快照与物理调用诊断" aria-hidden="true"></span><h3 id="组成快照composition-snapshot与物理请求尝试physical-attempt">组成快照（Composition Snapshot）与物理请求尝试（Physical Attempt）</h3>
+<p>组成快照（Composition Snapshot）记录这次执行（Run）采用的配置和来源标识，便于比较“为什么两次请求的工作基础不同”。来源包括系统规则、工作区指令（Workspace Instructions）、允许读取的长期信息、当前技能说明包（Skill），以及计划（Plan）或目标（Goal）等控制域提供的适用内容。技能说明包（Skill）是可按条件装载的方法材料，不是名字出现就已执行的方法。</p>
+<p>工具（Tool）上限、当前步骤可用性（Availability）、模型（Model）与模型服务提供方（Provider）选项也要对应本次执行（Run）。模型服务提供方（Provider）是接收模型请求并返回结果的服务；模型协议适配器（Model Adapter）按其协议组织实际请求。</p>
+<p>一次逻辑模型调用（Model Query）还可能有物理请求尝试（Physical Attempt）：例如原请求失败后，在满足条件时重新向服务发出请求。当前公共模型服务提供方（Provider）路径记录尝试状态（State），以及有界的 <code>promptComposition</code>，即请求材料的组成与大小诊断。</p>
+<p><strong>组成指纹与大小分布都不是完整请求正文。</strong> 它们可以帮助定位配置变化与调用状态（State），不能据此逐字还原模型（Model）看过的每一段内容，也不能从同一个R7推导服务只收到过一次请求。</p>
+<span class="heading-alias" id="误解二readeditbash-是模型自己执行的" aria-hidden="true"></span><span class="heading-alias" id="普通工具调用前的检查" aria-hidden="true"></span><h3 id="普通工具调用tool-call前的检查">普通工具调用（Tool Call）前的检查</h3>
+<p>运行时（Runtime）取得工具调用（Tool Call）以后，至少还要分别确认下列问题：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 8 / Table 8 · 普通工具调用（Tool Call）前的检查"><table><caption>表 8 / Table 8 · 普通工具调用（Tool Call）前的检查</caption><thead><tr><th scope="col">检查位置</th><th scope="col">要确认什么</th><th scope="col">失败意味着什么</th></tr></thead><tbody><tr><td>参数结构（Schema）与实际校验</td><td>参数满足声明及具体工具（Tool）的运行时检查</td><td>不能把格式错误交给实现盲目执行</td></tr>
+<tr><td>本次执行（Run）的能力范围</td><td>该工具（Tool）属于获准的能力集合</td><td>模型（Model）提出了当前并不允许的能力</td></tr>
+<tr><td>当前步骤可用性（Availability）</td><td>工具（Tool）此时已装载并允许出现</td><td>包中存在定义不等于本步骤可调用</td></tr>
+<tr><td>次数与循环限制</td><td>当前请求未触发相关控制闸门</td><td>需要停止或调整判断，不能无限重复</td></tr>
+<tr><td>实时执行边界（Execution Boundary）</td><td>此次目标与操作处于当前授权（Authorization）和资源边界内</td><td>不能凭模型（Model）的信心扩权</td></tr></tbody></table></div>
+<p>参数结构（Schema）说明合法输入的形状；实际校验还要看具体实现。检查通过之后，也只意味着可以进入对应执行路径，并没有提前产生成功结果。</p>
+<span class="heading-alias" id="edit-的持久边界与扩权分支" aria-hidden="true"></span><h3 id="edit-的持久边界与扩边分支"><code>Edit</code> 的持久边界与扩边分支</h3>
+<p>在本章普通工具（Tool）路径中，运行时宿主（Runtime Host）已经接入持久结果接收端（Durable Result Sink）。接收端负责把结果交给相应持久写入逻辑；它不是额外的模型（Model）或自动恢复（Recovery）算法。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 9 / Table 9 · `Edit` 的持久边界与扩边分支"><table><caption>表 9 / Table 9 · `Edit` 的持久边界与扩边分支</caption><thead><tr><th scope="col">阶段</th><th scope="col">状态（State）改变</th><th scope="col">后续可以依据什么</th></tr></thead><tbody><tr><td>执行前检查</td><td>确认参数、能力与当前边界</td><td>尚不能据此说文件已改变</td></tr>
+<tr><td>工具开始边界（T1）</td><td>保存实现可能从这里开始的记录</td><td>实现可能已经进入，不能仅凭此认定效果（Effect）完成</td></tr>
+<tr><td>实际执行</td><td>执行器（Executor）在当前沙箱（Sandbox）或其他执行环境（Environment）中运行</td><td>外部文件可能已经改变</td></tr>
+<tr><td>工具结果边界（T2）</td><td>保存该调用的结算结果</td><td>后续模型（Model）与恢复（Recovery）程序有已接纳结果可读</td></tr></tbody></table></div>
+<p>T1、T2是一个工具调用（Tool Call）前后的边界标签，<strong>不是工作轮次（Turn）T7，也不是两个新的工作轮次（Turn）</strong>。T1之后、T2之前崩溃时，结果可能仍未知；有T1不证明写入完成，无T2也不证明写入没有发生。</p>
+<p>这套顺序不能直接移植到所有后端或由模型服务提供方（Provider）内部执行的工具（Tool）。普通结果的持久提交失败也不能降格成“测试（Test）失败”继续喂给模型（Model），应交给相应失败与恢复（Recovery）逻辑。<a href="18-effects-and-recovery.html">第18章</a>会把具体窗口展开。</p>
+<h4 id="如果-edit-越过边界">如果 <code>Edit</code> 越过边界</h4>
+<p>假设当前只允许修改工作区（Workspace），却请求写入外部目录。当前执行边界（Execution Boundary）不覆盖时，先拒绝这次操作；只有对应入口允许申请，并且工具结果（Tool Result）给出明确扩边需求，模型（Model）才可在后续步骤提出扩边申请。</p>
+<p>批准（Approval）以后仍须按新边界重新判断<strong>下一次调用</strong>，不会自动重做原 <code>Edit</code>。命中显式拒绝（Explicit Deny）时，也不能靠普通扩边绕过。审批消息（Message）与执行许可、实际效果（Effect）是连续但不同的材料。</p>
+<span class="heading-alias" id="为什么-shell-工具通常更敏感" aria-hidden="true"></span><span class="heading-alias" id="shell-字符串为何需要执行边界" aria-hidden="true"></span><h3 id="命令解释器shell字符串为何需要执行边界execution-boundary">命令解释器（Shell）字符串为何需要执行边界（Execution Boundary）</h3>
+<p>一个 <code>Bash</code> 请求中的命令字符串，可以间接读写文件、启动子进程或访问网络。静态看程序名，不足以证明所有间接行为。因此实际执行位置仍须应用授权（Authorization）与隔离（Isolation）条件，不能只在提示词（Prompt）中写“请勿越权”。</p>
+<p>参数可解析、当前获准、环境强制限制资源、执行结果符合任务，这四个判断不能互相替代。这里不把整段命令解释为任意情况下都能安全重试的单一操作。</p>
+<span class="heading-alias" id="终态与资源结算的两个时刻" aria-hidden="true"></span><h3 id="终态terminal-state与资源结算settlement的两个时刻">终态（Terminal State）与资源结算（Settlement）的两个时刻</h3>
+<p>最终文本可见、终态（Terminal State）已持久保存、后台资源全部释放，可能是三个时点。资源结算（Settlement）在这里对应后续的 <code>settled</code> 承诺与清理：事件迭代器、活动工具（Tool）和相关资源完成收尾。它不是前文单个工具结果边界（T2）的同义词。</p>
+<p>用户按 <code>Stop</code> 后，还应区分已发出取消（Cancellation）请求、已提交终态（Terminal State）以及资源已收敛。取消（Cancellation）不能撤销已写入的文件；普通工具（Tool）仍需完成可结算结果，具体终态负责者（Owner）再依据事实（Fact）收束。晚到的停止请求也不能覆盖已接纳的终态（Terminal State）。</p>
+<p>这些是本章默认路径的控制关系，不保证任意远端执行端立即停止。<a href="18-effects-and-recovery.html#stop-%E4%B9%9F%E8%A6%81%E7%AD%89%E5%BE%85%E5%8F%AF%E4%BB%A5%E7%BB%93%E7%AE%97%E7%9A%84%E5%B7%A5%E5%85%B7">第18章</a>继续说明停止时的工具结算（Tool Settlement）。</p>
+<span class="heading-alias" id="第-10-站以后记住中文偏好走另一条路径" aria-hidden="true"></span><h3 id="第10站以后记住中文偏好走另一条路径">第10站：“以后记住中文偏好”走另一条路径</h3>
+<p>同一句请求中的“本轮总结用中文”，可以作为当前指令进入模型输入（Model Input）；是否遵循看实际回答。“以后也希望中文解释”还需要记忆（Memory）写入，以及未来读取和使用的消费者（Consumer）。</p>
+<p>先定义两条不同的数据路径，完整机制在<a href="20-memory.html">第20章</a>展开：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 10 / Table 10 · 第10站：“以后记住中文偏好”走另一条路径"><table><caption>表 10 / Table 10 · 第10站：“以后记住中文偏好”走另一条路径</caption><thead><tr><th scope="col">机制</th><th scope="col">写入哪里</th><th scope="col">当前读取与使用边界</th></tr></thead><tbody><tr><td>本地记忆笔记（Local Memory）</td><td>以 <code>MEMORY.md</code> 为主体的用户可见笔记</td><td>用户开启读取并满足适用范围时，可由输入组装选入；仍受范围、大小与缓存条件约束</td></tr>
+<tr><td>条目化长期记忆（Atomic Long-Term Memory，Atomic LTM）</td><td><code>memory.sqlite</code> 中的结构化条目</td><td>有写入与存储查询能力，但默认运行时（Runtime）/宿主（Host）的智能代理（Agent）召回与输入装载尚未接线</td></tr></tbody></table></div>
+<p><code>memory_remember</code> 是实际写入工具标识。它返回保存成功，不能证明下一次模型（Model）已读到偏好；条目化长期记忆（Atomic LTM）也不会自动同步到 <code>MEMORY.md</code>。存在 <code>readItem</code>、<code>searchByKeys</code> 存储接口，不等于生产输入组装已经调用它们。</p>
+<p>所以需要追踪“谁读取、何时选入、哪次模型（Model）收到”。使用已开启读取的本地记忆笔记（Local Memory）时也仍要核对实际输入与回答；不能把开启开关直接写成永远遵循。条目化长期记忆（Atomic LTM）未接入的结论限定这里的默认生产路径，不声称已经穷尽所有应用或外部调用者。</p>
+<span class="heading-alias" id="常见误解" aria-hidden="true"></span><span class="heading-alias" id="误解四一句话里的所有要求都属于同一个子系统" aria-hidden="true"></span><span class="heading-alias" id="把整条链拆成四种不同信息流" aria-hidden="true"></span><h3 id="把整条链拆成四种信息流information-flow">把整条链拆成四种信息流（Information Flow）</h3>
+<p>同一项工作里有四种不同方向。它们可以在不同时间交错，不要求每个时刻都同时活跃：</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 11 / Table 11 · 把整条链拆成四种信息流（Information Flow）"><table><caption>表 11 / Table 11 · 把整条链拆成四种信息流（Information Flow）</caption><thead><tr><th scope="col">信息流（Information Flow）</th><th scope="col">主要方向与消费者（Consumer）</th><th scope="col">本例说明什么</th></tr></thead><tbody><tr><td>控制流（Control Flow）</td><td>客户端（Client）提交，宿主（Host）接纳，运行时（Runtime）推进</td><td>T7被准入（Admission）为R7；是否开始、继续或停止</td></tr>
+<tr><td>模型流（Model Flow）</td><td>工作上下文（Working Context）交给模型（Model），意图交回运行时（Runtime）</td><td>提出读取、编辑、检查或总结</td></tr>
+<tr><td>效果流（Effect Flow）</td><td>工具执行链（Tool Execution）进入外部执行环境（Environment）</td><td>读取文件、改写README、启动测试（Test）进程</td></tr>
+<tr><td>事实流（Fact Flow）</td><td>负责者（Owner）提交记录，输入或展示消费者（Consumer）再回读</td><td>保存调用、结果与终态（Terminal State），按用途构造视图</td></tr></tbody></table></div>
+<p>读取工具（Tool）会接触环境并返回信息，但不必产生文件修改。把它放在效果流（Effect Flow）这一行，只表示执行跨入外部环境；具体发生了什么变化仍要按操作判断。</p>
 <h3 id="三个关键时间点">三个关键时间点</h3>
-<p>这项任务至少有三个不能混淆的时间点：</p>
-<pre><code class="language-text">① submitted  Client 已提交 T7
-② admitted   Host 已持久接受并固定 R7
-③ terminal   Runtime 已写入 R7 的最终执行事实</code></pre>
-<p>它们之间都可能发生断线或崩溃。</p>
-<h4 id="情况-asubmitted-后admitted-前断线">情况 A：submitted 后、admitted 前断线</h4>
-<p>Client 不能仅凭本地界面判断是否已被接受。重试时要用相同 T7 和相同内容，让 Host 判断是否为身份与内容都相同的精确重试（exact retry）。</p>
-<h4 id="情况-badmitted-后模型调用前崩溃">情况 B：admitted 后、模型调用前崩溃</h4>
-<p>持久准入仍在，因此重启后系统知道 R7 已被接受；恢复逻辑不应无身份地创造另一个重复工作。</p>
-<h4 id="情况-cedit-开始后结果记录完成前崩溃">情况 C：Edit 开始后、结果记录完成前崩溃</h4>
-<p>文件可能已经修改，也可能没有。这是危险的不确定窗口。系统应依据工具执行边界核对原操作与实际效果（reconcile），或暂时停放工作，不能盲目重复一个非幂等修改。</p>
-<h4 id="情况-dterminal-已写入client-尚未收到">情况 D：terminal 已写入、Client 尚未收到</h4>
-<p>重连后 Client 可以从 canonical facts 重新得到完成视图；不需要要求模型再生成一次答案。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 12 / Table 12 · 三个关键时间点"><table><caption>表 12 / Table 12 · 三个关键时间点</caption><thead><tr><th scope="col">时间点</th><th scope="col">谁已完成什么</th><th scope="col">仍可能缺少什么</th></tr></thead><tbody><tr><td>已提交（Submitted）</td><td>客户端（Client）发出T7请求</td><td>不一定已收到接纳答复</td></tr>
+<tr><td>已接纳（Admitted）</td><td>宿主（Host）持久固定T7与R7</td><td>模型调用（Model Query）可能尚未开始</td></tr>
+<tr><td>已有终态（Terminal）</td><td>运行时（Runtime）已写入R7结束事实（Fact）</td><td>客户端（Client）可能未收到通知，资源也可能仍在清理</td></tr></tbody></table></div>
+<p>这里的已提交（Submitted）描述请求时点，与第05章mini的 <code>Submitted</code> 异常类型不是同一协议。三个时点之间都可能发生断线或崩溃。</p>
+<span class="heading-alias" id="情况-asubmitted-后admitted-前断线" aria-hidden="true"></span><h4 id="情况a已提交submitted后已接纳admitted前断线">情况A：已提交（Submitted）后、已接纳（Admitted）前断线</h4>
+<p>客户端（Client）不能仅凭旧界面判断是否收到。重试要保留原工作身份（Work Identity）和相同规范化意图，让宿主（Host）核对是否是精确重试（Exact Retry），而不是先创造一个无关联的新任务。</p>
+<span class="heading-alias" id="情况-badmitted-后模型调用前崩溃" aria-hidden="true"></span><h4 id="情况b已接纳admitted后模型调用model-query前崩溃">情况B：已接纳（Admitted）后、模型调用（Model Query）前崩溃</h4>
+<p>准入（Admission）事实（Fact）仍在，恢复（Recovery）程序可以知道R7已被接受，再检查执行打开记录与实际进展。它不能无身份地创建重复工作，也不能仅凭已接纳就断言服务请求已发出。恢复（Recovery）状态（State）不等于重建旧程序调用栈。</p>
+<span class="heading-alias" id="情况-cedit-开始后结果记录完成前崩溃" aria-hidden="true"></span><h4 id="情况c编辑开始后结果记录完成前崩溃">情况C：编辑开始后、结果记录完成前崩溃</h4>
+<p>文件可能已经修改，也可能尚未修改。需要对账（Reconcile），即结合原执行记录与现实效果（Effect）核对当前情况；证据不足时保留结果未知（Outcome Unknown）或停放状态（Parked），不能盲目重复非幂等修改。幂等性（Idempotency）只说明重复特定操作是否保持相同结果，不能由局部替换推导整条组合命令都可重放。</p>
+<span class="heading-alias" id="情况-dterminal-已写入client-尚未收到" aria-hidden="true"></span><h4 id="情况d已有终态terminal而客户端client尚未收到">情况D：已有终态（Terminal）而客户端（Client）尚未收到</h4>
+<p>重连后回读持久事实（Durable Fact），重建完成视图即可。已经保存的答案不需要重新生成；显示失败也不能把原成功结果改写成执行失败。</p>
 <h3 id="一个正常分支和两个异常分支">一个正常分支和两个异常分支</h3>
 <h4 id="正常分支">正常分支</h4>
-<pre><code class="language-text">两个 Read 都成功
-→ Edit 成功
-→ Bash exit 0
-→ 中文总结
-→ R7 completed</code></pre>
-<h4 id="异常分支一测试失败但系统仍正常工作">异常分支一：测试失败，但系统仍正常工作</h4>
-<pre><code class="language-text">两个 Read 都成功
-→ Edit 成功
-→ Bash exit 1
-→ 模型根据错误决定修复或报告</code></pre>
-<p>“测试失败”是任务世界中的失败，但工具链本身可能运行得完全正确。模型不能把 exit 1 改写成“测试通过”。</p>
-<h4 id="异常分支二模型-provider-中途断开">异常分支二：模型 provider 中途断开</h4>
-<p>如果 provider 请求还没有产生可观察输出，Runtime 还要检查错误是否可重试、剩余步骤与 attempt 额度，才可能重发。已有回答文本或工具活动时，不能把它当成“什么都没发生”。仅有 thinking（思考输出）片段的少数情况有专用恢复路径，需先封存片段并发布 retry 事件，不是静默抹掉旧输出。</p>
-<p>这与 Bash exit 1 的下一步不同：测试错误已经是一条可交回模型的观察；provider 错误若不满足恢复条件，当前模型调用无法继续，应保留 partial（未完成的流式片段）与失败事实，结束 Run。源码里的 <code>CompleteEvent</code> 只是一次流的结束通知，<code>complete(error)</code>、<code>complete(step_limit)</code> 都会映射为失败，不能按名字读成成功。<a href="13-session-turn-run.html#%E9%A2%84%E7%AE%97%E9%99%90%E5%88%B6%E7%9A%84%E6%98%AF%E5%93%AA%E4%B8%80%E4%B8%AA%E5%8D%95%E4%BD%8D">第13章 的计数例</a>解释为何三步额度不保证还有第四步总结。</p>
+<p>在给定初态下，两次读取取得实际内容，编辑成功，<code>Bash</code>运行目标测试（Test）并返回退出码（Exit Code）0，差异（Diff）检查符合范围，模型（Model）中文总结，运行时（Runtime）记录结束。这条分支中每个结论都有材料，但正常结束仍不替代对任务要求的核对。</p>
+<span class="heading-alias" id="异常分支一测试失败但系统仍正常工作" aria-hidden="true"></span><h4 id="异常分支一测试test失败工具执行链tool-execution仍可正常工作">异常分支一：测试（Test）失败，工具执行链（Tool Execution）仍可正常工作</h4>
+<p>假设读取与编辑都成功，测试（Test）却返回退出码（Exit Code）1及失败断言（Assertion）。工具执行链（Tool Execution）可能完整执行并正确返回了这个错误；失败发生在任务世界中，不能因此断言工具（Tool）传输损坏。</p>
+<p>已结算的失败结果可以进入后续模型输入（Model Input）。若预算（Budget）与停止条件仍允许，模型（Model）可诊断或如实报告；它不能把退出码（Exit Code）1改写成测试（Test）通过，也不能超出“只改README”的授权（Authorization）去修函数。</p>
+<span class="heading-alias" id="异常分支二模型-provider-中途断开" aria-hidden="true"></span><h4 id="异常分支二模型服务提供方provider中途断开">异常分支二：模型服务提供方（Provider）中途断开</h4>
+<p>要先问本次物理请求尝试（Physical Attempt）已经留下什么可观察结果。若还没有可观察输出，还需同时满足错误可重试、剩余模型步骤（Model Step）与尝试额度等条件，才可能重发。没有输出不是“可以无限重试”，也不证明服务没有收到请求或产生费用。</p>
+<p>若已经有回答文本、工具（Tool）活动或完成的步骤边界，就不能沿“没有输出”的分支重发整个请求。只有思考输出（Thinking Output）片段的少数情况具有专用恢复（Recovery）路径：先封存符合条件的片段，再发布可观察的重试事件；不能静默抹掉旧片段，伪装成一次没有失败的调用。其他未完成片段（Partial Output）不因此都具备重试资格。</p>
+<p>不满足恢复（Recovery）条件时，应保留可保存的片段和失败事实（Fact），结束相应执行（Run）。这与 <code>Bash</code> 测试（Test）失败不同：后者已经有一条可交回模型（Model）的业务结果，前者可能连当前模型步骤（Model Step）都无法完成。</p>
+<p>源码中的 <code>complete(error)</code>、<code>complete(step_limit)</code>都会映射为失败；不能依据事件名 <code>CompleteEvent</code> 解释成成功。<a href="13-session-turn-run.html#%E9%A2%84%E7%AE%97%E9%99%90%E5%88%B6%E7%9A%84%E6%98%AF%E5%93%AA%E4%B8%80%E4%B8%AA%E5%8D%95%E4%BD%8D">第13章</a>会用计数例说明，为何三步额度不保证还有第四步总结。这里不混同模型步骤（Model Step）、物理请求尝试（Physical Attempt）与工具调用（Tool Call）的计数。</p>
 <span class="heading-alias" id="深化自测" aria-hidden="true"></span><h3 id="机制问题解析">机制问题解析</h3>
-<p><strong>问题 1。</strong> 同一 T7 换了输入，为什么不应作为重试接受？</p>
-<p><strong>解释。</strong> 身份需要对应同一项规范化意图，内容变化会破坏重试语义。</p>
-<p><strong>问题 2。</strong> Edit 已写入但结果尚未保存时，为什么不能只看 transcript 判断能否重做？</p>
-<p><strong>解释。</strong> 记录可能落后于 effect；需结合该执行路径的持久边界与核对现实的能力判断，不能从缺少结果推导没有执行。</p>
-<p><strong>问题 3。</strong> 长期偏好已写入 Atomic LTM，下一次是否必然进入模型输入？</p>
-<p><strong>解释。</strong> 不必然。当前的写入与存储查询，不等于生产 Agent 已接通记忆选择和输入装载。</p>
-<h3 id="下一步行动怎样取得进展">下一步行动怎样取得进展</h3>
-<p>工具结算后，后续模型步骤取得可用反馈；Runtime 按预算、停止条件与执行边界判断是否允许继续，模型再依据观察选择下一行动。<strong>允许继续</strong>回答控制条件，<strong>值得做什么</strong>回答决策问题，两者不能合成一个“还没完成就一直运行”的规则。</p>
-<p>普通 Maka 失败闸门会阻止同一调用签名连续失败后的再次执行，限制无效消耗；但它不判断修改后的请求是否增加了信息。改一个无关参数可能绕开重复签名，却没有取得进展。<a href="16-tools-and-execution.html#%E5%BE%AA%E7%8E%AF%E6%B7%B1%E5%8C%96%E7%94%A8%E8%A7%82%E5%AF%9F%E4%B8%8E%E9%A2%84%E7%AE%97%E9%80%89%E6%8B%A9%E4%B8%8B%E4%B8%80%E8%A1%8C%E5%8A%A8">第16章的循环深化</a>将继续比较补充观察、直接修改与重复测试，并给出完整预算演算。</p>
-<p>工具反馈怎样进入下一次请求，见<a href="15-model-context.html#%E6%A8%A1%E5%9E%8B%E5%9B%9E%E5%BA%94%E4%B9%9F%E6%9C%89%E8%BF%98%E6%B2%A1%E5%AE%8C%E6%88%90%E7%9A%84%E7%8A%B6%E6%80%81">第15章的返回与再次输入</a>。这里保留生命周期的主线：取得结果、检查是否可继续、再做新的模型决策；任何一步失败都不能被“模型还想继续”替代。</p>
+<p><strong>问题1。</strong> 同一T7换了输入，为什么不应作为原重试接受？</p>
+<p><strong>参考答案。</strong> 工作身份（Work Identity）对应已固定的规范化意图与执行描述。内容改变会让同一身份（Identity）指向不同工作；精确重试（Exact Retry）必须核对这些条件，而不是只检查编号。</p>
+<p><strong>问题2。</strong> <code>Edit</code>可能已写入但结果没有保存，为什么不能只看聊天记录决定重做？</p>
+<p><strong>参考答案。</strong> 展示和持久记录都可能落后于效果（Effect）。需要结合本路径的T1/T2、实际文件与对账（Reconcile）能力判断。缺少结果不能推导没有执行，重放也可能产生重复效果（Effect）。</p>
+<p><strong>问题3。</strong> 偏好已写入条目化长期记忆（Atomic LTM），下一次是否必然进入模型输入（Model Input）？</p>
+<p><strong>参考答案。</strong> 不必然。该默认生产路径有写入与存储查询，尚未接通智能代理（Agent）的选择、召回和输入装载。还需找到实际消费者（Consumer），不能用“已保存”代替“已读到”。</p>
+<span class="heading-alias" id="下一步行动怎样取得进展" aria-hidden="true"></span><h3 id="下一项行动请求action怎样取得进展">下一项行动请求（Action）怎样取得进展</h3>
+<p>工具结算（Tool Settlement）后，后续模型步骤（Model Step）取得可用反馈。运行时（Runtime）按预算（Budget）、停止条件和执行边界（Execution Boundary）判断能否继续；模型（Model）再根据材料选择值得做什么。允许继续是控制问题，取得进展是决策问题，两者不能合成“没有结束就一直运行”。</p>
+<p>普通失败闸门按调用来源、工具（Tool）名与规范化参数形成签名（Signature），限制相同请求的连续失败。它保存的是最近一组失败签名（Signature）的连续计数：同签名此前失败两次，第三次尝试就在实际实现前被挡住；任意成功清空该串，另一签名（Signature）失败则从一次开始。这个普通路径的闸门不比较错误文本，也不判断请求是否增加了信息。</p>
+<p>所以，改一个无关参数可能改变签名（Signature），却没有取得新证据。闸门只是限制某类机械重复，不能当作完整规划算法；计算机操作（Computer Use）等路径还可能有独立控制条件。<a href="16-tools-and-execution.html#%E5%BE%AA%E7%8E%AF%E6%B7%B1%E5%8C%96%E7%94%A8%E8%A7%82%E5%AF%9F%E4%B8%8E%E9%A2%84%E7%AE%97%E9%80%89%E6%8B%A9%E4%B8%8B%E4%B8%80%E8%A1%8C%E5%8A%A8">第16章的循环深化</a>继续比较补充观察、直接修改与重复测试（Test），并给出预算（Budget）演算。</p>
+<p>工具反馈怎样进入下一次请求，见<a href="15-model-context.html">第15章</a>。本章保留这条主线：取得结果、检查是否可继续、再形成新的模型（Model）决策；任何一步缺失，都不能由“模型（Model）还想继续”补足。</p>
 <span class="heading-alias" id="上一章与下一章" aria-hidden="true"></span><h3 id="相关章节">相关章节</h3>
 <ul>
-<li>相关章节：<a href="11-agent-architecture.html">第11章｜Maka 的 Agent Harness 结构</a></li>
-<li>相关章节：<a href="13-session-turn-run.html">第13章｜Session、Turn、Run 与 Owner</a></li>
+<li>责任关系：<a href="11-agent-architecture.html">第11章</a></li>
+<li>工作身份（Work Identity）与负责者（Owner）：<a href="13-session-turn-run.html">第13章</a></li>
 </ul>
 <h3 id="延伸阅读">延伸阅读</h3>
-<p><a href="../../../extended-reading.html#reference-2" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/plain-turn.md">普通 Turn 的完整调用链</a>可用于继续核对准入、模型调用、工具结算与结束之间的接线。</p>
+<p><a href="../../../extended-reading.html#reference-2" title="本次课程发布包未收录；查看资料说明" class="deferred-reference" data-link-kind="reference-fallback" data-original-href="../architecture/plain-turn.md">普通工作轮次（Turn）的完整调用链</a>可继续核对准入（Admission）、模型调用（Model Query）、工具结算（Tool Settlement）和结束之间的实际接线。</p>
 <hr>
-<p><a href="11-agent-architecture.html">上一章：第 11 章｜Maka 的 Agent Harness 结构</a> · <a href="13-session-turn-run.html">下一章：第 13 章｜Session、Turn、Run 与 Owner</a></p>
-</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="11-agent-architecture.html"><span>← 上一章</span><strong>第 11 章｜Maka 的 Agent Harness 结构</strong></a><a href="13-session-turn-run.html"><span>下一章 →</span><strong>第 13 章｜Session、Turn、Run 与 Owner</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E4%BB%BB%E5%8A%A1%E8%A6%81%E6%B1%82%E7%A1%AE%E5%AE%9A%E6%89%A7%E8%A1%8C%E5%AF%B9%E8%B1%A1">从任务要求确定执行对象</a></li><li class="toc-level-3"><a href="#%E5%87%86%E5%85%A5%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%B1%95%E7%A4%BA%E7%9A%84%E5%AE%8C%E6%95%B4%E9%93%BE%E8%B7%AF">准入、执行与展示的完整链路</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-0-%E7%AB%99%E5%B7%A5%E4%BD%9C%E5%BC%80%E5%A7%8B%E5%89%8Ds1-%E5%B7%B2%E7%BB%8F%E5%AD%98%E5%9C%A8">第 0 站：工作开始前，S1 已经存在</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-1-%E7%AB%99client-%E6%8F%90%E4%BA%A4-t7%E4%BD%86%E5%AE%83%E6%B2%A1%E6%9C%89%E6%9D%83%E5%8A%9B%E5%AE%A3%E5%B8%83%E5%B7%B2%E7%BB%8F%E5%BC%80%E8%B7%91">第 1 站：Client 提交 T7，但它没有权力宣布“已经开跑”</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-2-%E7%AB%99host-%E6%A3%80%E6%9F%A5%E5%B9%B6%E5%87%86%E5%85%A5%E5%9B%BA%E5%AE%9A-s1--t7--r7">第 2 站：Host 检查并准入，固定 S1 / T7 / R7</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-3-%E7%AB%99host-%E7%BB%84%E6%88%90%E8%BF%99%E4%B8%80%E8%BD%AE%E7%A8%B3%E5%AE%9A%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%9F%BA%E7%A1%80">第 3 站：Host 组成这一轮稳定的工作基础</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-4-%E7%AB%99runtime-%E4%B8%BA%E6%A8%A1%E5%9E%8B-step-1-%E6%9E%84%E9%80%A0%E5%AE%83%E7%9C%9F%E6%AD%A3%E8%83%BD%E7%9C%8B%E5%88%B0%E7%9A%84%E5%86%85%E5%AE%B9">第 4 站：Runtime 为模型 step 1 构造它真正能看到的内容</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-5-%E7%AB%99%E6%A8%A1%E5%9E%8B-step-1-%E8%AF%B7%E6%B1%82%E4%B8%A4%E4%B8%AA%E4%BA%92%E4%B8%8D%E4%BE%9D%E8%B5%96%E7%9A%84-read">第 5 站：模型 step 1 请求两个互不依赖的 Read</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-6-%E7%AB%99%E6%A8%A1%E5%9E%8B-step-2-%E5%9F%BA%E4%BA%8E%E4%B8%A4%E4%BB%BD%E7%9C%9F%E5%AE%9E%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9%E8%AF%B7%E6%B1%82-edit">第 6 站：模型 step 2 基于两份真实文件内容请求 Edit</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-7-%E7%AB%99%E6%A8%A1%E5%9E%8B-step-3-%E8%AF%B7%E6%B1%82-bash-%E8%BF%90%E8%A1%8C%E6%B5%8B%E8%AF%95">第 7 站：模型 step 3 请求 Bash 运行测试</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-8-%E7%AB%99%E6%A8%A1%E5%9E%8B-step-4-%E7%94%9F%E6%88%90%E4%B8%AD%E6%96%87%E6%80%BB%E7%BB%93">第 8 站：模型 step 4 生成中文总结</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-9-%E7%AB%99host-%E5%92%8C-client-%E4%BB%8E%E4%BA%8B%E5%AE%9E%E5%BE%97%E5%88%B0%E5%AE%8C%E6%88%90%E8%A7%86%E5%9B%BE">第 9 站：Host 和 Client 从事实得到完成视图</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E5%87%86%E5%85%A5%E9%87%8D%E8%AF%95%E5%90%8C%E4%B8%80%E4%B8%AA%E8%BA%AB%E4%BB%BD%E4%B9%9F%E8%A6%81%E6%A0%B8%E5%AF%B9%E5%86%85%E5%AE%B9">准入重试：同一个身份也要核对内容</a></li><li class="toc-level-3"><a href="#%E7%BB%84%E6%88%90%E5%BF%AB%E7%85%A7%E4%B8%8E%E7%89%A9%E7%90%86%E8%B0%83%E7%94%A8%E8%AF%8A%E6%96%AD">组成快照与物理调用诊断</a></li><li class="toc-level-3"><a href="#%E6%99%AE%E9%80%9A%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8%E5%89%8D%E7%9A%84%E6%A3%80%E6%9F%A5">普通工具调用前的检查</a></li><li class="toc-level-3"><a href="#edit-%E7%9A%84%E6%8C%81%E4%B9%85%E8%BE%B9%E7%95%8C%E4%B8%8E%E6%89%A9%E6%9D%83%E5%88%86%E6%94%AF">Edit 的持久边界与扩权分支</a></li><li class="toc-level-3"><a href="#shell-%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%BA%E4%BD%95%E9%9C%80%E8%A6%81%E6%89%A7%E8%A1%8C%E8%BE%B9%E7%95%8C">Shell 字符串为何需要执行边界</a></li><li class="toc-level-3"><a href="#%E7%BB%88%E6%80%81%E4%B8%8E%E8%B5%84%E6%BA%90%E7%BB%93%E7%AE%97%E7%9A%84%E4%B8%A4%E4%B8%AA%E6%97%B6%E5%88%BB">终态与资源结算的两个时刻</a></li><li class="toc-level-3"><a href="#%E7%AC%AC-10-%E7%AB%99%E4%BB%A5%E5%90%8E%E8%AE%B0%E4%BD%8F%E4%B8%AD%E6%96%87%E5%81%8F%E5%A5%BD%E8%B5%B0%E5%8F%A6%E4%B8%80%E6%9D%A1%E8%B7%AF%E5%BE%84">第 10 站：“以后记住中文偏好”走另一条路径</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E6%95%B4%E6%9D%A1%E9%93%BE%E6%8B%86%E6%88%90%E5%9B%9B%E7%A7%8D%E4%B8%8D%E5%90%8C%E4%BF%A1%E6%81%AF%E6%B5%81">把整条链拆成四种不同信息流</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E4%B8%AA%E5%85%B3%E9%94%AE%E6%97%B6%E9%97%B4%E7%82%B9">三个关键时间点</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E4%B8%AA%E6%AD%A3%E5%B8%B8%E5%88%86%E6%94%AF%E5%92%8C%E4%B8%A4%E4%B8%AA%E5%BC%82%E5%B8%B8%E5%88%86%E6%94%AF">一个正常分支和两个异常分支</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E4%B8%8B%E4%B8%80%E6%AD%A5%E8%A1%8C%E5%8A%A8%E6%80%8E%E6%A0%B7%E5%8F%96%E5%BE%97%E8%BF%9B%E5%B1%95">下一步行动怎样取得进展</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
+<p><a href="11-agent-architecture.html">上一章：第11章</a> · <a href="13-session-turn-run.html">下一章：第13章</a></p>
+</article><nav class="chapter-pagination" aria-label="顺序阅读"><a href="11-agent-architecture.html"><span>← 上一章</span><strong>第 11 章｜Maka 的运行支撑（Agent Harness）结构</strong></a><a href="13-session-turn-run.html"><span>下一章 →</span><strong>第 13 章｜Session、Turn、Run 与 Owner</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#%E5%89%8D%E6%83%85%E5%9B%9E%E9%A1%BE%E6%8A%8A%E8%B4%A3%E4%BB%BB%E5%9C%B0%E5%9B%BE%E5%8F%98%E6%88%90%E4%B8%80%E6%9D%A1%E8%AF%B7%E6%B1%82">前情回顾：把责任地图变成一条请求</a></li><li class="toc-level-2"><a href="#%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF">核心路线</a></li><li class="toc-level-3"><a href="#%E4%BB%8E%E4%BB%BB%E5%8A%A1%E8%A6%81%E6%B1%82%E7%A1%AE%E5%AE%9A%E6%89%A7%E8%A1%8C%E5%AF%B9%E8%B1%A1">从任务要求确定执行对象</a></li><li class="toc-level-3"><a href="#%E5%87%86%E5%85%A5admission%E6%89%A7%E8%A1%8Crun%E4%B8%8E%E5%B1%95%E7%A4%BA%E7%9A%84%E5%AE%8C%E6%95%B4%E9%93%BE%E8%B7%AF">准入（Admission）、执行（Run）与展示的完整链路</a></li><li class="toc-level-3"><a href="#%E7%AC%AC0%E7%AB%99%E5%B7%A5%E4%BD%9C%E5%BC%80%E5%A7%8B%E5%89%8D%E4%BC%9A%E8%AF%9Dsessions1%E5%B7%B2%E7%BB%8F%E5%AD%98%E5%9C%A8">第0站：工作开始前，会话（Session）S1已经存在</a></li><li class="toc-level-3"><a href="#%E7%AC%AC1%E7%AB%99%E5%AE%A2%E6%88%B7%E7%AB%AFclient%E6%8F%90%E4%BA%A4t7">第1站：客户端（Client）提交T7</a></li><li class="toc-level-3"><a href="#%E7%AC%AC2%E7%AB%99%E5%AE%BF%E4%B8%BBhost%E6%A3%80%E6%9F%A5%E5%B9%B6%E5%87%86%E5%85%A5admission">第2站：宿主（Host）检查并准入（Admission）</a></li><li class="toc-level-3"><a href="#%E7%AC%AC3%E7%AB%99%E5%AE%BF%E4%B8%BBhost%E7%BB%84%E6%88%90%E7%A8%B3%E5%AE%9A%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%9F%BA%E7%A1%80">第3站：宿主（Host）组成稳定的工作基础</a></li><li class="toc-level-3"><a href="#%E7%AC%AC4%E7%AB%99%E8%BF%90%E8%A1%8C%E6%97%B6runtime%E6%9E%84%E9%80%A0%E7%AC%AC%E4%B8%80%E4%B8%AA%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4model-step%E7%9A%84%E8%BE%93%E5%85%A5">第4站：运行时（Runtime）构造第一个模型步骤（Model Step）的输入</a></li><li class="toc-level-3"><a href="#%E7%AC%AC5%E7%AB%99%E7%AC%AC%E4%B8%80%E4%B8%AA%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4model-step%E8%AF%B7%E6%B1%82%E4%B8%A4%E6%AC%A1%E8%AF%BB%E5%8F%96">第5站：第一个模型步骤（Model Step）请求两次读取</a></li><li class="toc-level-3"><a href="#%E7%AC%AC6%E7%AB%99%E7%AC%AC%E4%BA%8C%E4%B8%AA%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4model-step%E8%AF%B7%E6%B1%82%E7%BC%96%E8%BE%91">第6站：第二个模型步骤（Model Step）请求编辑</a></li><li class="toc-level-3"><a href="#%E7%AC%AC7%E7%AB%99%E7%AC%AC%E4%B8%89%E4%B8%AA%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4model-step%E8%BF%90%E8%A1%8C%E6%B5%8B%E8%AF%95test">第7站：第三个模型步骤（Model Step）运行测试（Test）</a></li><li class="toc-level-3"><a href="#%E7%AC%AC8%E7%AB%99%E7%AC%AC%E5%9B%9B%E4%B8%AA%E6%A8%A1%E5%9E%8B%E6%AD%A5%E9%AA%A4model-step%E7%94%9F%E6%88%90%E4%B8%AD%E6%96%87%E6%80%BB%E7%BB%93">第8站：第四个模型步骤（Model Step）生成中文总结</a></li><li class="toc-level-3"><a href="#%E7%AC%AC9%E7%AB%99%E5%AE%BF%E4%B8%BBhost%E4%B8%8E%E5%AE%A2%E6%88%B7%E7%AB%AFclient%E6%81%A2%E5%A4%8D%E5%AE%8C%E6%88%90%E8%A7%86%E5%9B%BE">第9站：宿主（Host）与客户端（Client）恢复完成视图</a></li><li class="toc-level-3"><a href="#%E6%A0%B8%E5%BF%83%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">核心问题解析</a></li><li class="toc-level-2"><a href="#%E5%AE%9E%E7%8E%B0%E6%B7%B1%E5%8C%96">实现深化</a></li><li class="toc-level-3"><a href="#%E5%87%86%E5%85%A5admission%E9%87%8D%E8%AF%95%E5%90%8C%E4%B8%80%E8%BA%AB%E4%BB%BDidentity%E8%BF%98%E8%A6%81%E6%A0%B8%E5%AF%B9%E5%86%85%E5%AE%B9">准入（Admission）重试：同一身份（Identity）还要核对内容</a></li><li class="toc-level-3"><a href="#%E7%BB%84%E6%88%90%E5%BF%AB%E7%85%A7composition-snapshot%E4%B8%8E%E7%89%A9%E7%90%86%E8%AF%B7%E6%B1%82%E5%B0%9D%E8%AF%95physical-attempt">组成快照（Composition Snapshot）与物理请求尝试（Physical Attempt）</a></li><li class="toc-level-3"><a href="#%E6%99%AE%E9%80%9A%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8tool-call%E5%89%8D%E7%9A%84%E6%A3%80%E6%9F%A5">普通工具调用（Tool Call）前的检查</a></li><li class="toc-level-3"><a href="#edit-%E7%9A%84%E6%8C%81%E4%B9%85%E8%BE%B9%E7%95%8C%E4%B8%8E%E6%89%A9%E8%BE%B9%E5%88%86%E6%94%AF">Edit 的持久边界与扩边分支</a></li><li class="toc-level-3"><a href="#%E5%91%BD%E4%BB%A4%E8%A7%A3%E9%87%8A%E5%99%A8shell%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%BA%E4%BD%95%E9%9C%80%E8%A6%81%E6%89%A7%E8%A1%8C%E8%BE%B9%E7%95%8Cexecution-boundary">命令解释器（Shell）字符串为何需要执行边界（Execution Boundary）</a></li><li class="toc-level-3"><a href="#%E7%BB%88%E6%80%81terminal-state%E4%B8%8E%E8%B5%84%E6%BA%90%E7%BB%93%E7%AE%97settlement%E7%9A%84%E4%B8%A4%E4%B8%AA%E6%97%B6%E5%88%BB">终态（Terminal State）与资源结算（Settlement）的两个时刻</a></li><li class="toc-level-3"><a href="#%E7%AC%AC10%E7%AB%99%E4%BB%A5%E5%90%8E%E8%AE%B0%E4%BD%8F%E4%B8%AD%E6%96%87%E5%81%8F%E5%A5%BD%E8%B5%B0%E5%8F%A6%E4%B8%80%E6%9D%A1%E8%B7%AF%E5%BE%84">第10站：“以后记住中文偏好”走另一条路径</a></li><li class="toc-level-3"><a href="#%E6%8A%8A%E6%95%B4%E6%9D%A1%E9%93%BE%E6%8B%86%E6%88%90%E5%9B%9B%E7%A7%8D%E4%BF%A1%E6%81%AF%E6%B5%81information-flow">把整条链拆成四种信息流（Information Flow）</a></li><li class="toc-level-3"><a href="#%E4%B8%89%E4%B8%AA%E5%85%B3%E9%94%AE%E6%97%B6%E9%97%B4%E7%82%B9">三个关键时间点</a></li><li class="toc-level-3"><a href="#%E4%B8%80%E4%B8%AA%E6%AD%A3%E5%B8%B8%E5%88%86%E6%94%AF%E5%92%8C%E4%B8%A4%E4%B8%AA%E5%BC%82%E5%B8%B8%E5%88%86%E6%94%AF">一个正常分支和两个异常分支</a></li><li class="toc-level-3"><a href="#%E6%9C%BA%E5%88%B6%E9%97%AE%E9%A2%98%E8%A7%A3%E6%9E%90">机制问题解析</a></li><li class="toc-level-3"><a href="#%E4%B8%8B%E4%B8%80%E9%A1%B9%E8%A1%8C%E5%8A%A8%E8%AF%B7%E6%B1%82action%E6%80%8E%E6%A0%B7%E5%8F%96%E5%BE%97%E8%BF%9B%E5%B1%95">下一项行动请求（Action）怎样取得进展</a></li><li class="toc-level-3"><a href="#%E7%9B%B8%E5%85%B3%E7%AB%A0%E8%8A%82">相关章节</a></li><li class="toc-level-3"><a href="#%E5%BB%B6%E4%BC%B8%E9%98%85%E8%AF%BB">延伸阅读</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../../../index.html">返回课程目录</a><a href="../../../extended-reading.html">扩展资料说明</a></footer></body></html>
