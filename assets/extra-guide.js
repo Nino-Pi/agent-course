@@ -10,16 +10,15 @@
     link, target: document.getElementById(decodeURIComponent(link.hash.slice(1))),
   }));
 
-  // Both native anchor positioning and the shared reader's current-section
-  // calculation use this one clearance, including the sticky route bar.
+  // Only the site header stays above the article. Native anchor positioning and
+  // the shared reader's current-section calculation use the same clearance.
   const measureClearance = () => {
     const headerHeight = document.querySelector('.site-header')?.getBoundingClientRect().height || 72;
-    document.documentElement.style.scrollPaddingTop = `${headerHeight + (routeNav?.getBoundingClientRect().height || 0) + 20}px`;
+    document.documentElement.style.scrollPaddingTop = `${headerHeight + 12}px`;
   };
   measureClearance();
   if (typeof ResizeObserver === 'function') {
     const observer = new ResizeObserver(measureClearance);
-    if (routeNav) observer.observe(routeNav);
     const header = document.querySelector('.site-header');
     if (header) observer.observe(header);
   } else addEventListener('resize', measureClearance, { passive: true });
@@ -123,7 +122,7 @@
   const initial = revealTarget(location.hash);
   const initializeLocation = () => {
     measureClearance();
-    // A deep link may have been positioned before the route bar was measured.
+    // A deep link may have been positioned before the site header was measured.
     const navigation = performance.getEntriesByType('navigation')[0];
     if (initial && navigation?.type === 'navigate') initial.target.scrollIntoView({ block: 'start' });
     requestAnimationFrame(() => { syncLocation(); revealOutlineLocation(); });
