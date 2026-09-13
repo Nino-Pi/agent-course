@@ -2,7 +2,7 @@
 
 一套持续更新的中文学习资料：从智能代理（Agent）怎样围绕目标行动，逐步理解运行支撑（Agent Harness）如何组织模型、工具、状态、权限与协作，再进入系统设计、能力改进与算法复习。
 
-**[在线课程首页](https://nino-pi.github.io/agent-course/)** · **[从第 01 章开始](https://nino-pi.github.io/agent-course/notes/maka/learning/01-agent-components.html)** · **[前沿进阶](https://nino-pi.github.io/agent-course/frontier/index.html)** · **[Hot100 两小时速览](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-review)**
+**[在线课程首页](https://nino-pi.github.io/agent-course/)** · **[从第 01 章开始](https://nino-pi.github.io/agent-course/notes/maka/learning/01-agent-components.html)** · **[前沿进阶](https://nino-pi.github.io/agent-course/frontier/index.html)** · **[Hot100 三小时系统速览](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-review)**
 
 ## 仓库包含什么
 
@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | **Agent 工程基础** | 01–66 章，分五个阶段，从最小执行循环到完整系统设计与代表实现 | [学习路线](https://nino-pi.github.io/agent-course/notes/maka/learning/README.html) |
 | **Agent 前沿进阶** | 已发布 01–08 章，讨论失败诊断、实验评价、经验使用、主动取证和训练基础 | [进阶目录](https://nino-pi.github.io/agent-course/frontier/index.html) |
-| **Hot100 · Python 3.9** | 输入输出、21 个知识单元、两小时回顾、分轮题单与完整参考程序 | [完整指南](https://nino-pi.github.io/agent-course/extras/hot100-python39.html) |
+| **Hot100 · Python 3.9** | 输入输出、21 个知识单元、三小时系统速览、分轮题单与完整参考程序 | [完整指南](https://nino-pi.github.io/agent-course/extras/hot100-python39.html) |
 | **随读查阅材料** | 中英文术语、专题路线、运行案例和图解索引 | [术语表](https://nino-pi.github.io/agent-course/notes/maka/learning/glossary.html) · [运行案例](https://nino-pi.github.io/agent-course/notes/maka/learning/labs/README.html) · [工程图解](https://nino-pi.github.io/agent-course/notes/maka/learning/advanced/diagram-index.html) |
 
 ## 基础课程的五阶段框架
@@ -47,12 +47,12 @@
 
 | 阅读方式 | 适合的场景 | 直接入口 |
 | --- | --- | --- |
-| **两小时快速回顾** | 已有基础，用 120 分钟回顾输入输出、全部 21 类题型、关键状态与边界 | [两小时速览](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-review) |
+| **三小时系统速览** | 已有 Python 基础，用 180 分钟阅读全部 20 道 Easy、68 道 Medium 的解题思路；12 道 Hard 选读 | [三小时速览](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-review) |
 | **第一轮：38 题** | 按知识单元建立解题骨架 | [第一轮题单](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#round-1) |
 | **第二轮：62 题** | 同型迁移与综合提升，与第一轮合计覆盖 Hot100 | [第二轮题单](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#round-2) |
 | **第三轮：18 题** | 从面试经典 150 中补充重要模型，独立计数 | [第三轮拓展](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#round-3) |
 
-两小时版为**回溯（Backtracking）安排 22 分钟、动态规划（Dynamic Programming，DP）安排 20 分钟**，保留 N 皇后、网格搜索、编辑距离和两类背包等困难内容。完整讲解、输入输出示例、参考代码和附录仍可从同一页面查阅。
+三小时主线按“代表完整模板 → 同类逐题迁移 → 边界”阅读，每道 Easy、Medium 都有实际解法说明，并提供[88 题定位表](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-coverage)。其中**回溯（Backtracking）20 分钟、动态规划（Dynamic Programming，DP）25 分钟**；LRU、随机链表复制、树构造、路径计数、网格回溯和编辑距离均属必读。12 道 Hard 在[独立选读区](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-hard)保留，复杂代码可展开；完整教材与分轮题单继续保留。
 
 ## 怎样阅读
 
