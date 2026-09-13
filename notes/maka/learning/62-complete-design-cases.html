@@ -103,8 +103,12 @@ Memory 后续工作：撤回 A 例外，取得提交确认后才报告长期更�
         return query_or_resume_dispatch(decision.run_id)
     if decision.kind == &quot;rejected&quot;:
         return decision.reason
-    # 新接纳也只派发刚绑定的 Run，不再另建执行身份。
-    return query_or_resume_dispatch(decision.run_id)</code></pre>
+    if decision.kind == &quot;new&quot;:
+        # 新接纳也只派发刚绑定的 Run，不再另建执行身份。
+        return query_or_resume_dispatch(decision.run_id)
+    # 未识别的准入决定不能通过默认分支进入派发。
+    raise ValueError(f&quot;Unknown admission decision: {decision.kind!r}&quot;)</code></pre>
+<p>末尾的守卫（Guard）把“拒绝未知决定”直接落实在这段接续代码中：即使抽象辅助函数错误地返回了新类别，也会先报错，由上层处理接口问题，不调用派发消费者（Consumer）。</p>
 <p><code>query_or_resume_dispatch</code> 同样是抽象消费者（Consumer）：它按原执行（Run）身份处理已认领但未开始的派发，运行中或已达终态（Terminal State）的执行只查询与收敛。它还必须在执行负责者处与停止请求仲裁，不能每次恢复（Recovery）都创建新进程。</p>
 <p>因此，这段代码只说明接口应怎样衔接，没有实现数据库事务、进程去重或跨机器接管。真正实现之后，才可以沿下表判断每个里程碑由什么证据支持。</p>
 <div class="table-scroll" data-columns="3" tabindex="0" role="region" aria-label="表 3 / Table 3 · 案例 C · 正常流程与完整参考方案"><table><caption>表 3 / Table 3 · 案例 C · 正常流程与完整参考方案</caption><thead><tr><th scope="col">里程碑（Milestone）</th><th scope="col">已确认状态（State）</th><th scope="col">尚不能推出</th></tr></thead><tbody><tr><td>f7 被接纳为 r7</td><td>本次触发（Fire）有唯一执行归属</td><td>子任务（Subtask）已完成或用户允许修改</td></tr>

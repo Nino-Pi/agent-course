@@ -39,7 +39,7 @@
 <tr><td>H7</td><td>E1的工具结果（Tool Result）：README已修改</td><td>1,000</td></tr>
 <tr><td>H8</td><td>助手消息（Assistant Message）调用 <code>Bash</code>，标识B1</td><td>200</td></tr>
 <tr><td>H9</td><td>B1的工具结果（Tool Result）：长日志显示测试失败</td><td>8,000</td></tr></tbody></table></div>
-<p><code>keepRecentTokens=9,000</code> 是向后寻找保留尾部（Retained Tail）的目标。<code>findCutPoint</code> 从末尾累计到目标后，仍要选合法边界，不能让工具结果（Tool Result）失去对应调用。</p>
+<p>本例把 <code>keepRecentTokens</code> 设为9,000，作为向后寻找保留尾部（Retained Tail）的目标；这个设置值也属于教学条件。<code>findCutPoint</code> 从末尾累计到目标后，仍要选合法边界，不能让工具结果（Tool Result）失去对应调用。</p>
 <h3 id="两组数字为什么分别保留h8与h6">两组数字，为什么分别保留H8与H6</h3>
 <div class="table-scroll" data-columns="4" tabindex="0" role="region" aria-label="表 3 / Table 3 · 两组数字，为什么分别保留H8与H6"><table><caption>表 3 / Table 3 · 两组数字，为什么分别保留H8与H6</caption><thead><tr><th scope="col">情况</th><th scope="col">从末尾累计</th><th scope="col">首次达到目标处</th><th scope="col">合法保留范围</th></tr></thead><tbody><tr><td>原例H7=1,000</td><td>H9:8,000 → H8:8,200 → H7:9,200</td><td>H7是结果，不能独自作为起点</td><td>向后选择H8，保留H8–H9，共8,200</td></tr>
 <tr><td>仅把H7改为600</td><td>H9:8,000 → H8:8,200 → H7:8,800 → H6:9,000</td><td>H6是合法助手消息（Assistant Message）起点</td><td>保留H6–H9，共9,000</td></tr></tbody></table></div>

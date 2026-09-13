@@ -24,9 +24,10 @@ s_{t+1} &amp;= T(s_t,a_t,e_t).
 <p>对象定位（Grounding）至少有两个环节。第一步是语义选择（Semantic Selection）：用户说的“保存”对应哪个控件？第二步是引用解析（Reference Resolution）：运行程序怎样把这个选择解析为当前可操作的对象？模型（Model）选对名称，并不保证第二步仍然指向同一个对象。</p>
 <div class="table-scroll" data-columns="4" tabindex="0" role="region" aria-label="表 1 / Table 1 · 2. 对象定位（Grounding）：从“那个按钮”到当前对象"><table><caption>表 1 / Table 1 · 2. 对象定位（Grounding）：从“那个按钮”到当前对象</caption><thead><tr><th scope="col">观察表示（Observation Representation）</th><th scope="col">目标如何表示</th><th scope="col">帮助解决什么</th><th scope="col">仍须核对什么</th></tr></thead><tbody><tr><td>文件文本（File Text）</td><td>工作区、路径、匹配文本或版本</td><td>把编辑意图落到具体内容</td><td>文件所属工作区、文本是否已变、匹配是否唯一</td></tr>
 <tr><td>文档对象模型（Document Object Model，DOM）</td><td>定位器（Locator），如角色与可访问名称</td><td>在当前页面结构中查找控件</td><td>当前页面、账户、匹配数量及业务含义</td></tr>
-<tr><td>可访问性树（Accessibility Tree，AX Tree）</td><td>观察编号（Observation ID）与元素编号（Element ID）</td><td>表达角色、名称、值及可执行动作</td><td>引用所属窗口、元素是否变化、观察（Observation）是否截断</td></tr>
+<tr><td>带引用的可访问性树（Accessibility Tree，AX Tree）</td><td>工具接口提供的观察编号（Observation ID）与元素编号（Element ID）等引用</td><td>表达角色、名称、值及可执行动作</td><td>引用所属窗口、元素是否变化、观察（Observation）是否截断</td></tr>
 <tr><td>截图（Screenshot）</td><td>像素坐标（Pixel Coordinates）或带编号的区域</td><td>表达布局、图标与视觉关系</td><td>图像与屏幕坐标系、缩放、滚动及采集时点</td></tr>
 <tr><td>结构化应用编程接口（Structured API）</td><td>账户标识与业务对象标识</td><td>减少界面布局带来的歧义</td><td>权限、对象版本、请求结果与实际持久状态</td></tr></tbody></table></div>
+<p>表中的可访问性树（AX Tree）一行描述了工具接口包装后的表示。观察编号（Observation ID）与元素编号（Element ID）的具体格式、有效期和解析规则由接口定义，不能当作所有原生可访问性树（AX Tree）都具有的统一字段。</p>
 <p>应用编程接口（Application Programming Interface，API）在这里指程序直接访问业务对象的接口；结构化结果仍要带有账户和对象范围。</p>
 <p>这些表示没有一条通用的优劣排名。可访问性树（AX Tree）可能缺少自绘画布中的对象；截图（Screenshot）能显示它们，却要另做定位。结构化应用编程接口（Structured API）提供稳定对象标识，也可能使用了错误账户或过时版本。</p>
 <p>Playwright 的定位器（Locator）是一个有用对照：执行动作时会重新查找当前文档对象模型（DOM）元素，而不是永久保存第一次找到的节点。因此重新渲染后仍可能找到新节点。但重新解析只解决引用新鲜度的一部分；页面若切到另一个账户，同名“保存”按钮仍可能被成功找到。<strong>技术上的唯一匹配，不等于任务上的正确对象。</strong> 这一对照依据<a href="https://playwright.dev/docs/locators">官方定位器说明</a>，不意味着所有浏览器代理（Browser Agent）都采用相同实现。</p>

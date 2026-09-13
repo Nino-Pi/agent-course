@@ -24,7 +24,8 @@
 <p>系统从数据库认领（Claim）满足来源、时间和数量限制的过程记录作业（Rollout Job）。认领（Claim）带有归属令牌（Ownership Token）与租约（Lease）：前者标识这次持有资格，后者限制有效时间。随后才在有界并发下提取。它们解决重复竞争同一候选的问题，不替模型（Model）判断什么值得记住。</p>
 <p>每个作业（Job）的模型输入（Model Input）先经过过滤与敏感信息遮蔽（Secret Redaction）。输出存在两个分支：</p>
 <div class="table-scroll" data-columns="3" tabindex="0" role="region" aria-label="表 2 / Table 2 · 认领（Claim）把处理责任交给谁"><table><caption>表 2 / Table 2 · 认领（Claim）把处理责任交给谁</caption><thead><tr><th scope="col">分支</th><th scope="col">生成字段</th><th scope="col">输入和输出的区别</th></tr></thead><tbody><tr><td>默认分支 <code>V1</code></td><td><code>raw_memory</code>、<code>rollout_summary</code>、可空的短名称 <code>rollout_slug</code></td><td>保留原始记忆材料与摘要</td></tr>
-<tr><td>仅摘要分支 <code>V2</code></td><td><code>rollout_summary</code>、字符串 <code>rollout_slug</code></td><td>先区分用户、智能代理（Agent）、上下文（Context）和工具（Tool）来源，按预算（Budget）选择输入；输出不包含原始记忆字段</td></tr></tbody></table></div>
+<tr><td>仅摘要分支 <code>V2</code></td><td><code>rollout_summary</code>、字符串 <code>rollout_slug</code></td><td>按输入层级（Input Tier）区分来源与助手输出类型，再按预算（Budget）选择输入；输出不包含原始记忆字段</td></tr></tbody></table></div>
+<p>这里的输入层级（Input Tier）有六类：用户（Human User）、助手最终回复（Assistant Final）、其他智能代理（Other Agent）、助手过程说明（Assistant Commentary）、运行支撑上下文（Harness Context）和工具（Tool）。把助手自己的输出与其他智能代理（Other Agent）的消息分开，才能准确理解输入筛选保留了哪些材料。</p>
 <p>生成字段还会再次脱敏，仅摘要分支限制摘要长度。结构约束让下游可以解析，脱敏降低特定泄漏风险；两者都不能证明语义正确。例如，格式完全合法的一句“这个项目永远不能改 README”，仍可能错误扩大用户仅对本次任务（Task）提出的限制。</p>
 <h3 id="从一次性细节中提取适用条件applicability">从一次性细节中提取适用条件（Applicability）</h3>
 <p>对检查器而言，“测试目录中包含带空格路径，修改路径解析要覆盖这一边界”可能是项目经验；某次临时文件名通常没有长期价值。“用户本次不要改 README”必须保留任务范围（Task Scope），不能变成未来所有任务（Task）的永久禁令。</p>

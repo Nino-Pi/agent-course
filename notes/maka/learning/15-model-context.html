@@ -101,7 +101,7 @@
 <p>Read 或 Bash 可能返回非常大的内容。如果每个后续模型步骤（Model Step）都原样重复，上下文（Context）很快被耗尽。</p>
 <p>Maka 可以在模型（Model）投影（Projection）中用可回读引用替代大正文。当前新写入的账本归档引用（Ledger Archive Reference）根据已保存事件和投影变换（Projection Transition）记录重建有效表示；旧式文件产物引用（Artifact Reference）只保留读取兼容。归档后的输入变化是：</p>
 <div class="table-scroll" data-columns="3" tabindex="0" role="region" aria-label="表 5 / Table 5 · 大型工具结果（Tool Result）：保存事实与节省模型输入（Model Input）可以同时成立"><table><caption>表 5 / Table 5 · 大型工具结果（Tool Result）：保存事实与节省模型输入（Model Input）可以同时成立</caption><thead><tr><th scope="col">层次</th><th scope="col">保留什么</th><th scope="col">下一步怎样取得细节</th></tr></thead><tbody><tr><td>持久事实（Durable Fact）</td><td>原始工具结果（Tool Result）及关联身份</td><td>沿执行记录核对来源</td></tr>
-<tr><td>模型（Model）投影（Projection）</td><td><code>maka://archive/...</code> 引用和必要元信息</td><td>模型（Model）先知道材料在哪里</td></tr>
+<tr><td>模型（Model）投影（Projection）</td><td>当前账本归档引用（Ledger Archive Reference），形如 <code>maka://archive-ledger/v1/...</code>，及必要元信息</td><td>模型（Model）先知道材料在哪里</td></tr>
 <tr><td>按需回读</td><td><code>ArchiveRead</code> 取得获准范围的片段</td><td>片段进入后续输入后，才可支持细节判断</td></tr></tbody></table></div>
 <p>关键顺序是先确认归档可回读并持久写入投影变换（Projection Transition），再替换模型（Model）视图。归档失败时应保留原结果，而不是生成一个无法读取的假链接。</p>
 <span class="heading-alias" id="memorymd-什么时候会进入模型视野" aria-hidden="true"></span><h3 id="memorymd-什么时候会进入模型model视野"><code>MEMORY.md</code> 什么时候会进入模型（Model）视野</h3>
