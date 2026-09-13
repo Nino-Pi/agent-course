@@ -16,3 +16,20 @@
 .extra-guide-article pre{background:#f7f7f9}
 @media(max-width:700px){.extra-directory{margin-bottom:30px}.extra-directory h2{font-size:25px}.extra-card{display:flex;flex-direction:column;gap:10px;padding:20px}.extra-card>strong{font-size:19px}.extra-card-description{font-size:13px}.extra-card-action{align-self:flex-start;margin-top:3px}.extra-guide-article details{padding:0 13px}.extra-guide-article details>summary{font-size:14px}}
 @media print{.extra-card{break-inside:avoid}.extra-guide-article details{border:0;background:transparent;padding:0}}
+
+/* Hot100 routes remain reachable while reading the long, complete guide. */
+.guide-route-nav{position:sticky;top:calc(var(--reader-header-height,72px) + 8px);z-index:5;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 28px;padding:7px;background:#fff;border:1px solid #e7cbd3;border-radius:12px;box-shadow:0 5px 20px #42233012}
+.guide-route-nav a{display:flex;align-items:center;justify-content:center;min-height:44px;padding:8px 6px;border-radius:7px;color:#783549;background:#fff7f9;font-size:13px;font-weight:650;line-height:1.5;text-align:center;text-decoration:none}
+.guide-route-nav a:first-child{background:#ab1034;color:#fff}
+.guide-route-nav a:hover{background:#f8dde5;color:#80223e}
+.guide-route-nav a:first-child:hover{background:#8d0d2b;color:#fff}
+.extra-guide-article :is(h2,h3,h4){scroll-margin-top:110px}
+.guide-quick-review{min-width:0;margin:34px 0 54px;padding-top:4px;border-top:3px solid #ab1034}
+.guide-quick-review>h2:first-of-type{border:0;padding-bottom:0;margin-top:20px;color:#81243e}
+.guide-quick-review>h3{margin-top:42px;padding:13px 16px;border-left:4px solid #bd4c69;background:#fff6f8;border-radius:0 7px 7px 0;font-size:20px}
+.guide-quick-review .table-scroll{margin:24px 0}
+.guide-quick-review tbody tr:nth-child(even){background:#fcf9fa}
+.guide-quick-review th{background:#f7edf0;color:#51333d}
+.guide-quick-review>:is(p,h2,h3,ul,ol){max-width:52rem;margin-left:auto;margin-right:auto}
+@media(max-width:600px){.guide-route-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:6px}.guide-route-nav a{min-height:40px;font-size:12px}.extra-guide-article a[id],.extra-guide-article :is(h2,h3,h4){scroll-margin-top:120px}.guide-quick-review>h3{font-size:18px;padding:11px 13px}}
+@media print{.guide-route-nav{position:static;box-shadow:none}.guide-quick-review{border-top:2px solid #888}.guide-quick-review>h3{break-after:avoid}}
