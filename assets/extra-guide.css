@@ -14,6 +14,16 @@
 .extra-guide-article details>:last-child{margin-bottom:18px}
 .extra-guide-article details>summary:last-child{margin-bottom:0}
 .extra-guide-article pre{background:#f7f7f9}
+/* Build-time Python colors work offline and keep selected/copied text intact.
+   Bare identifiers (write, nums, etc.) inherit the deep teal base color. */
+.extra-guide-article pre code:is(.language-python,.language-py){color:#175765}
+.extra-guide-article .syntax-comment{color:#4e6b4d}
+.extra-guide-article .syntax-keyword{color:#7e348c;font-weight:600}
+.extra-guide-article .syntax-function{color:#1d4fa5}
+.extra-guide-article .syntax-class{color:#175765;font-weight:600}
+.extra-guide-article .syntax-string{color:#975015}
+.extra-guide-article :is(.syntax-number,.syntax-literal){color:#aa3744}
+@media(forced-colors:active){.extra-guide-article pre code:is(.language-python,.language-py),.extra-guide-article pre code span{color:CanvasText}}
 @media(max-width:700px){.extra-directory{margin-bottom:30px}.extra-directory h2{font-size:25px}.extra-card{display:flex;flex-direction:column;gap:10px;padding:20px}.extra-card>strong{font-size:19px}.extra-card-description{font-size:13px}.extra-card-action{align-self:flex-start;margin-top:3px}.extra-guide-article details{padding:0 13px}.extra-guide-article details>summary{font-size:14px}}
 @media print{.extra-card{break-inside:avoid}.extra-guide-article details{border:0;background:transparent;padding:0}}
 
