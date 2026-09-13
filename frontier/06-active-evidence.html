@@ -342,6 +342,7 @@ RANKED = [&quot;search&quot;, &quot;blog&quot;, &quot;notice&quot;, &quot;cached
             and spent + fee + 1 + 2 &lt;= 20
             and seconds + delay + 8 &lt;= 120)
 </code></pre><p>调用它时，本轮决策的1点和8秒已经支付；<code>+1</code>与<code>+8</code>为下一次最终报告预留，<code>+2</code>给外层判定。第6次决策已经没有后续报告槽位，只能结束。若本轮拟选动作（Action）付不起，本轮直接形成报告，不能先白花一次“拒绝决策”，再免费补一次模型调用（Model Query）。真实实现若还要再次调用模型（Model）解释拒绝，就必须为它另留额度。</p>
+<p>这里检查的是本策略（Policy）选中的动作（Action）；若它无法通过预算（Budget）检查，本轮便报告已有结果，尚未比较其他可用动作（Action）是否更便宜。</p>
 <h3 id="执行观察observation再次选择最终保留完整记录">执行、观察（Observation）、再次选择，最终保留完整记录</h3>
 <p><code>run</code>先构造独立初态，再重复“支付决策→选择→准入（Admission）→执行→观察（Observation）更新”。<code>unavailable=True</code>只把刷新返回改成503，其余资料保持相同。外层保存完整<code>observations</code>；后续选择消费的是<code>state</code>这个投影，二者职责不同。</p>
 <pre><code class="language-python">def run(active, unavailable=False):

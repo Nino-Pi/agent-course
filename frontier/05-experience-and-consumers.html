@@ -10,7 +10,7 @@
 <h2 id="前情回顾总分过程和后续用途各自说明什么">前情回顾：总分、过程和后续用途各自说明什么</h2>
 <p>第02章把任务（Task）与试次（Trial）分开：一道题可以从相同初态执行多次，一次执行内部又可以发生多次模型调用（Model Query）。第03章进一步说明，用于开发与选择的材料已经影响方案，不能再冒充未参与选择的最终评价。第04章则区分有效失败（Valid Failure）与未知评分（Unknown Score）：前者已有不满足要求的证据，后者尚不能完成判定。</p>
 <p>把这些关系放回一个小例子：某次修改工具（Tool）返回成功，执行者没有运行规定测试就报告“已经验证”。外层判定器（Grader）可以因缺少必要验证依据判为失败；这不等于补丁（Patch）的每一行都错，也不允许事后把外层检查结果填回当时的模型（Model）输入。接下来要改善行为，就需要知道哪个消费者（Consumer）会读这些材料，以及它究竟需要什么。</p>
-<p>本章共同核心承接<a href="02-paired-experiments.html">02</a>、<a href="03-selection-and-attribution.html">03</a>和<a href="04-environment-and-supervision.html">04</a>，暂不计算模型参数（Model Parameters）怎样更新。训练（Training）路线在读过07–08后再进入本章末尾的深化部分；只研究固定模型（Model）时怎样利用经验（Experience），可以在共同核心出口继续读06。</p>
+<p>本章共同核心承接<a href="02-paired-experiments.html">02</a>、<a href="03-selection-and-attribution.html">03</a>和<a href="04-environment-and-supervision.html">04</a>，暂不计算模型参数（Model Parameters）怎样更新。训练（Training）路线在读过07–08后，再进入本章末尾链接的独立训练（Training）深化页；只研究固定模型（Model）时怎样利用经验（Experience），可以在共同核心出口继续读06。</p>
 <a id="先把一次执行拆成能追踪的对象"></a>
 <h2 id="一次修复留下的不只有最后一句完成">一次修复留下的，不只有最后一句“完成”</h2>
 <p>沿用01与04的Python文档检查器情境，并在这里把该教学项目命名为P。包装函数原先会拆开空格路径，当前配置<code>cfg-v1</code>声明测试入口是<code>python -m pytest</code>；README顶部已有用户笔记。允许修改包装函数与README，测试文件只读。模型（Model）M0与运行支撑（Agent Harness）H0固定，跨任务记忆（Memory）为空；本次仍限6次模型调用（Model Query）、8次工具调用（Tool Call）和120秒，随后按04的合同取得判定。</p>
