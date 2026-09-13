@@ -13,7 +13,7 @@
 <p><strong>链接使用：</strong> 快览中的题号进入本页讲解；完整题单中的力扣链接打开原题，“讲解”与阅读路线留在本页。两小时部分默认展开，原教材的完整程序、备选比较继续按原设计折叠；这些内容没有删减。文中约定的输入协议要先读清，不能仅凭题号推测读入方式。</p>
 <section class="guide-quick-review" aria-label="两小时快速回顾"><p><a id="quick-review"></a></p>
 <h2 id="hot100-两小时快速回顾最小输入输出与全部-21-类算法模板">两小时快速回顾：最小输入输出与全部 21 类算法模板</h2>
-<p>本节面向已有基础、需要在两小时内恢复写法的读者。每一类按 <strong>输入与输出 → 完整核心代码 → 边界</strong> 阅读；代码只保留必要状态，使用 Python 3.9 标准库。除第一段完整程序外，后面的函数接收已经解析好的参数，复制时带上该段的导入和节点定义即可。</p>
+<p>本节面向已有基础、需要在两小时内恢复写法的读者。每一类按 <strong>输入与输出 → 完整核心代码 → 边界</strong> 阅读；代码以状态清楚、容易写对为先，使用 Python 3.9 标准库。空间压缩、读写提速等可选技巧放在注释中；题目要求的复杂度和避免超时所需的方法仍保留。除第一段完整程序外，后面的函数接收已经解析好的参数，复制时带上该段的导入和节点定义即可。</p>
 <p><strong>直接入口：<a href="#quick-io">读入、异常与结束</a> · <a href="#quick-two-pointers">双指针完整模板</a> · <a href="#quick-backtracking">回溯重点</a>。</strong> 输入不需要 <code>iter()</code> / <code>next()</code>，每类算法给出实际代码。 两小时压缩的是重复解释和同型题量，每个主线知识单元都有可写出的代表模板。回溯（Backtracking）保留 22 分钟，动态规划（Dynamic Programming，DP）保留 20 分钟；完整题单仍按<a href="#round-1">第一轮 38 题</a>、<a href="#round-2">第二轮 62 题</a>继续。</p>
 <h3 id="hot100-120-分钟阅读安排">120 分钟阅读安排</h3>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 2 · 120 分钟阅读安排"><table><caption>表 2 · 120 分钟阅读安排</caption><thead><tr><th scope="col">时间段</th><th scope="col">阅读块</th><th scope="col">覆盖单元</th><th scope="col">这一块要抓住什么</th></tr></thead><tbody><tr><td>00–12 分钟 · 12 分钟</td><td><a href="#quick-io">输入输出与终止</a></td><td>Python / ACM 前置</td><td>逐行读取、空行与 EOF、格式异常、标准输出</td></tr>
@@ -29,23 +29,21 @@
 <p>所有代码默认展开。两小时用于回顾模板，不代表从零掌握全部题目；题号链接可回查完整推导。下文各函数是独立题目的解法，不需要把整页拼成一个程序。</p>
 <p><a id="quick-io"></a></p>
 <h3 id="hot100-0012-分钟一个能读入求解输出并正常结束的程序">00–12 分钟｜一个能读入、求解、输出并正常结束的程序</h3>
-<p><strong><code>iter()</code> 不是必须的。</strong> 它只是取得迭代器，配合 <code>next()</code> 顺序取值；本节用 <code>sys.stdin.readline()</code> 直接读一行。<code>readline()</code> 到文件末尾返回 <code>&quot;&quot;</code>，空白行通常是 <code>&quot;\n&quot;</code>，二者要分开。<code>input()</code> 也能用，但遇到末尾会抛 <code>EOFError</code>。在终端手工输入时，macOS / Linux 可在空行处按 Ctrl+D 表示输入结束；只按回车仍是空白行。</p>
+<p><strong>不需要显式写 <code>iter()</code> / <code>next()</code>。</strong> 本节用 <code>for header in sys.stdin</code> 逐行取得组头，到文件末尾自动结束；用 <code>sys.stdin.readline()</code> 读取本组下一行。这里选它是为了直接区分结束与空行，不是解题必须背的提速技巧：<code>readline()</code> 在 EOF 返回 <code>&quot;&quot;</code>，空白行通常是 <code>&quot;\n&quot;</code>。<code>input()</code> 同样能正确读入，但 EOF 要用 <code>except EOFError</code> 处理。在终端手工输入时，macOS / Linux 可在空行处按 Ctrl+D 表示输入结束；只按回车仍是空白行。</p>
 <p>下面采用明确的 <strong>EOF 多组、每组固定两行</strong> 协议：第一行 <code>n target</code>，第二行恰好 n 个整数；组与组之间允许空白行。寻找两个不同下标，使对应数之和等于 target；有解输出一对从 0 开始的下标，无解输出 <code>-1 -1</code>。这里没有首行测试组数 T，数组也不跨行。</p>
 <pre><code class="language-python">import sys
 
 def two_sum(nums, target):
     seen = {}
     for i, value in enumerate(nums):
-        if target - value in seen:
-            return seen[target - value], i
+        complement = target - value
+        if complement in seen:
+            return seen[complement], i
         seen[value] = i
     return None
 
 def main():
-    while True:
-        header = sys.stdin.readline()
-        if header == &quot;&quot;:                 # 组间遇到 EOF：正常结束
-            break
+    for header in sys.stdin:             # 组间遇到 EOF：自动结束
         if not header.strip():           # 只跳过组间空白行
             continue
         row = sys.stdin.readline()       # 每组固定占用下一行
@@ -55,10 +53,11 @@ def main():
         try:
             n, target = map(int, header.split())
             nums = list(map(int, row.split()))
-            if n &lt; 0 or len(nums) != n:
-                raise ValueError(&quot;数组长度与 n 不符&quot;)
         except ValueError:
-            print(&quot;跳过本组：格式或数组长度错误&quot;, file=sys.stderr)
+            print(&quot;跳过本组：格式错误&quot;, file=sys.stderr)
+            continue
+        if n &lt; 0 or len(nums) != n:
+            print(&quot;跳过本组：数组长度错误&quot;, file=sys.stderr)
             continue
 
         answer = two_sum(nums, target)
@@ -84,10 +83,27 @@ if __name__ == &quot;__main__&quot;:
 -1 -1</code></pre>
 <p>固定两行使错误组的边界仍然可知，才能 <code>continue</code>。<strong>如果丢了一整行，后续内容就可能错位，不能靠这个模板自动恢复。</strong> 题目允许数组跨行时，应按 n 个数收集，并在不足时结束；不要跳过一个坏数字后把下一组的数补进来。上面的 <code>try</code> 只包围解析，算法错误不会被吞掉。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 3 · 00–12 分钟｜一个能读入、求解、输出并正常结束的程序"><table><caption>表 3 · 00–12 分钟｜一个能读入、求解、输出并正常结束的程序</caption><thead><tr><th scope="col">题面规定</th><th scope="col">最短读取方式</th><th scope="col">结束与异常</th></tr></thead><tbody><tr><td>每行是一个独立整数序列，处理到 EOF</td><td><code>for line in sys.stdin:</code>；每行用 <code>list(map(int, line.split()))</code></td><td>文件结束自动停止；坏行可以单独拒绝</td></tr>
-<tr><td>固定两行一组，处理到 EOF</td><td>上面的 <code>while + readline()</code></td><td>组间 EOF 正常结束；半组 EOF 说明输入不完整</td></tr>
+<tr><td>固定两行一组，处理到 EOF</td><td>上面的 <code>for header in sys.stdin</code>，组内再读一行</td><td>组间 EOF 正常结束；半组 EOF 说明输入不完整</td></tr>
 <tr><td>首行是 T，后面固定 T 组</td><td>先读并校验非负 T，再用 <code>for _ in range(T)</code> 读取每组</td><td>T 组前遇到 EOF 是缺数据；T 组读完即结束</td></tr>
 <tr><td>单组输入</td><td>只保留一次读入与求解，不写外层循环</td><td>空输入直接结束；字段错误要明确拒绝</td></tr>
 <tr><td>指定结束标记，如 <code>0 0</code></td><td>在读到组头后、读取本组其余内容前检查该标记</td><td>只按题面约定使用，不能把合法的 0 当作 EOF</td></tr></tbody></table></div>
+<p><a id="quick-io-performance"></a></p>
+<h3 id="hot100-输入输出提速需要时再换输出结果不变">输入输出提速：需要时再换，输出结果不变</h3>
+<p>上面的程序不需要整份读入，也不需要缓存全部答案。<code>input()</code>、逐行读取和二进制读取并不改变算法算出的答案；能否通过还取决于题目的时限、内存和输入格式。<strong>没有“超过固定多少行就必须换 API”的通用阈值。</strong> 先检查算法复杂度；最大规模下确实卡在读写时，再采用下面的对应方法。文件逐行循环、文本和二进制流的行为见 <a href="https://docs.python.org/3.9/tutorial/inputoutput.html#methods-of-file-objects">Python 输入输出教程</a>与 <a href="https://docs.python.org/3.9/library/sys.html#sys.stdin">标准流说明</a>。</p>
+<pre><code class="language-python"># 可选：纯数字输入成为瓶颈时，可统一用 sys.stdin.buffer 逐行读。
+# 它返回 bytes；int(b&quot;12&quot;) 可以直接转换，EOF 要比较 b&quot;&quot;。
+# 不要在同一程序里交替读 sys.stdin 和 sys.stdin.buffer。
+# 字符串题需按题目编码 decode；不能把字节下标当作字符下标。
+
+# 可选：内存足够、行边界无意义时，read().split() 可整份读入。
+# 它会等待 EOF；拆分时原输入与新片段并存，峰值内存更高，未必更快。
+# 本题靠固定两行识别错误组，不能直接换成整份 split()。
+
+# 大量输出成为瓶颈时：收集一批已格式化的行，用 &quot;\n&quot;.join(lines)
+# 拼接后 write，再清空该批；最后不足一批也要输出，末尾补 &quot;\n&quot;。
+# 交互题不能等攒够一批才输出，按协议 print(..., flush=True)。
+# 不要循环使用 answer += text 拼长字符串；分批 join 避免反复复制。</code></pre>
+<p>当整份输入或输出放不进内存时，<strong>逐行／分块处理是必要条件</strong>，不能用“全部读入后再说”换速度。逐行法仍须容纳当前一行和本题必需的算法状态；若题目把巨量数据放在单行，要按固定大小分块解析，并保留块尾尚未读完整的数字。若算法自身需要保存全量数据，改 I/O 也不能消除这部分空间。</p>
 <h3 id="hot100-常用对象怎样接到算法">常用对象怎样接到算法</h3>
 <ul>
 <li><strong>整数与数组：</strong> <code>x = int(line)</code>；<code>nums = list(map(int, line.split()))</code>。<code>map</code> 做逐项转换，<code>list</code> 得到可以按下标访问的数组。</li>
@@ -134,6 +150,7 @@ if __name__ == &quot;__main__&quot;:
     for i in range(len(nums) - 2):
         if i &gt; 0 and nums[i] == nums[i - 1]:
             continue
+        # 可选剪枝：排序后首项已大于 0，后面不可能凑成 0。
         if nums[i] &gt; 0:
             break
         left, right = i + 1, len(nums) - 1
@@ -158,6 +175,7 @@ if __name__ == &quot;__main__&quot;:
 <pre><code class="language-python">def longest_palindrome(s):
     start = length = 0
     for center in range(len(s)):
+        # 两个起点分别处理奇数长度与偶数长度回文。
         for left, right in ((center, center), (center, center + 1)):
             while left &gt;= 0 and right &lt; len(s) and s[left] == s[right]:
                 if right - left + 1 &gt; length:
@@ -207,34 +225,40 @@ if __name__ == &quot;__main__&quot;:
 <pre><code class="language-python">def longest_unique(s):
     seen = set()
     left = answer = 0
-    for right in range(len(s)):
-        while s[right] in seen:
+    for right, char in enumerate(s):
+        while char in seen:
             seen.remove(s[left])
             left += 1
-        seen.add(s[right])
+        seen.add(char)
         answer = max(answer, right - left + 1)
     return answer</code></pre>
-<p><a href="#lc76">LC76 最小覆盖子串</a>：<code>ADOBECODEBANC</code> 覆盖 <code>ABC</code> → <code>BANC</code>。<code>missing</code> 统计还缺的字符<strong>个数</strong>，目标为 <code>AA</code> 时必须满足两个 A。</p>
+<p><a href="#lc76">LC76 最小覆盖子串</a>：<code>ADOBECODEBANC</code> 覆盖 <code>ABC</code> → <code>BANC</code>。<code>need</code> 记录目标需要的数量，<code>window</code> 记录当前窗口内的数量；<code>formed</code> 记录数量已经达标的字符<strong>种类数</strong>。目标为 <code>AA</code> 时，窗口里要有两个 A，这一种字符才算达标。</p>
 <pre><code class="language-python">from collections import Counter
 
 def min_window(s, t):
     if not t:
         return &quot;&quot;
     need = Counter(t)
-    missing, left = len(t), 0
+    window = Counter()
+    formed = 0
+    left = 0
     start, size = 0, len(s) + 1
-    for right in range(len(s)):
-        if need[s[right]] &gt; 0:
-            missing -= 1
-        need[s[right]] -= 1
-        while missing == 0:
+    for right, char in enumerate(s):
+        window[char] += 1
+        if char in need and window[char] == need[char]:
+            formed += 1
+        while formed == len(need):
             if right - left + 1 &lt; size:
                 start, size = left, right - left + 1
-            need[s[left]] += 1
-            if need[s[left]] &gt; 0:
-                missing += 1
+            leaving = s[left]
+            # 移走前恰好达标，移走后才会少一种；多余字符不影响达标。
+            if leaving in need and window[leaving] == need[leaving]:
+                formed -= 1
+            window[leaving] -= 1
             left += 1
-    return &quot;&quot; if size &gt; len(s) else s[start:start + size]</code></pre>
+    if size &gt; len(s):
+        return &quot;&quot;
+    return s[start:start + size]</code></pre>
 <p>LC3 在恢复合法后更新最长答案；LC76 在仍然覆盖时更新最短答案并继续收缩。两个指针都不后退，时间分别为 O(|s|)、O(|s|+|t|)，空间与所遇到的不同字符数有关。不能把 <code>while</code> 改成只收缩一次的 <code>if</code>。</p>
 <p><a id="quick-stacks"></a></p>
 <h3 id="hot100-3040-分钟栈与单调结构四个可以直接使用的模板">30–40 分钟｜栈与单调结构：四个可以直接使用的模板</h3>
@@ -247,18 +271,21 @@ def min_window(s, t):
         if char in &#39;([{&#39;:
             stack.append(char)
         elif char in pairs:
-            if not stack or stack.pop() != pairs[char]:
+            if not stack:
+                return False
+            opening = stack.pop()
+            if opening != pairs[char]:
                 return False
         else:
             return False
-    return len(stack) == 0</code></pre>
+    return not stack</code></pre>
 <p><code>valid_brackets(&quot;([])&quot;) → True</code>；<code>valid_brackets(&quot;([)]&quot;) → False</code>；空串返回 <code>True</code>。输入约定只包含括号；这里将其他字符判为非法。时间 O(n)、空间 O(n)。<a href="#lc394">LC394 字符串解码</a>还要保存外层字符串与重复次数，不能直接套这个“只存左括号”的函数。</p>
 <p><strong>单调栈（Monotonic Stack）· <a href="#lc739">LC739 每日温度</a>：</strong> 栈里存尚未找到更高温度的<strong>下标</strong>。</p>
 <pre><code class="language-python">def daily_temperatures(temperatures):
     answer = [0] * len(temperatures)
     stack = []
-    for i in range(len(temperatures)):
-        while stack and temperatures[i] &gt; temperatures[stack[-1]]:
+    for i, temperature in enumerate(temperatures):
+        while stack and temperature &gt; temperatures[stack[-1]]:
             previous = stack.pop()
             answer[previous] = i - previous
         stack.append(i)
@@ -270,25 +297,26 @@ def min_window(s, t):
 def window_maximum(nums, k):
     if k &lt;= 0 or k &gt; len(nums):
         return []
-    queue = deque()
+    queue = deque()  # 队首删除用 popleft()；列表 pop(0) 每次需要搬动后续元素
     answer = []
-    for i in range(len(nums)):
+    for i, value in enumerate(nums):
         while queue and queue[0] &lt;= i - k:
             queue.popleft()
-        while queue and nums[queue[-1]] &lt;= nums[i]:
+        while queue and nums[queue[-1]] &lt;= value:
             queue.pop()
         queue.append(i)
         if i &gt;= k - 1:
             answer.append(nums[queue[0]])
     return answer</code></pre>
-<p><code>window_maximum([1,3,-1,-3,5,3,6,7], 3) → [3,3,5,5,6,7]</code>。有效窗口要求 <code>1 &lt;= k &lt;= len(nums)</code>；本函数对非法 k 返回空列表。只存值无法判断过期。时间 O(n)、队列空间 O(k)，不计答案。</p>
+<p><code>window_maximum([1,3,-1,-3,5,3,6,7], 3) → [3,3,5,5,6,7]</code>。有效窗口要求 <code>1 &lt;= k &lt;= len(nums)</code>；本函数对非法 k 返回空列表。存下标可以直接判断过期；若改成只存值，还需要正确处理重复值和出窗元素。时间 O(n)、队列空间 O(k)，不计答案。</p>
+<p><code>enumerate(nums)</code> 只是同时取出“下标、当前值”的常用写法，等价于用 <code>range(len(nums))</code> 再读取 <code>nums[i]</code>；它不改变算法。这里真正影响大输入效率的是单调队列：每个窗口重新调用 <code>max</code> 会变成 O(nk)，把 <code>deque.popleft()</code> 换成列表的 <code>pop(0)</code> 也可能退化到 O(nk)。</p>
 <p><strong>困难边界 · <a href="#lc84">LC84 柱状图最大矩形</a>：</strong> 遇到更矮柱子，结算被弹出柱子能延伸的宽度。</p>
 <pre><code class="language-python">def largest_rectangle(heights):
     values = heights + [0]  # 末尾补 0，结算仍在栈中的正高度
     stack = []
     answer = 0
-    for right in range(len(values)):
-        while stack and values[stack[-1]] &gt; values[right]:
+    for right, current_height in enumerate(values):
+        while stack and values[stack[-1]] &gt; current_height:
             height = values[stack.pop()]
             left = stack[-1] if stack else -1
             width = right - left - 1
@@ -338,6 +366,7 @@ def search_range(nums, target):
 <p><code>search_rotated([4,5,6,7,0,1,2], 0) → 4</code>；查 3 返回 -1；空数组返回 -1。有重复元素时，“哪一半有序”的判断可能不充分，要另加边界处理。时间 O(log(n+1))、空间 O(1)。</p>
 <p><strong>困难题 · <a href="#lc4">LC4 两个正序数组的中位数</a>：</strong> 两个输入数组分别非递减，至少一个非空；在较短数组上二分分割线。</p>
 <pre><code class="language-python">def median_sorted_arrays(a, b):
+    # 在较短数组上二分，保证另一数组的分割位置有效
     if len(a) &gt; len(b):
         a, b = b, a
     m, n = len(a), len(b)
@@ -361,6 +390,7 @@ def search_range(nums, target):
                 return max(left_a, left_b)
             return (max(left_a, left_b) + min(right_a, right_b)) / 2</code></pre>
 <p><code>median_sorted_arrays([1,3], [2]) → 2</code>；<code>[1,2]</code> 与 <code>[3,4] → 2.5</code>；<code>[]</code> 与 <code>[1] → 1</code>。分割成功时，左边数量比右边多 0 或 1，且左右交界不逆序；两边都空显式报错。时间 O(log(min(m,n)+1))、空间 O(1)。排序是输入前提，本函数不额外扫描验证。</p>
+<p>把两组数合成新列表再排序也能得到正确的中位数，但仅复制全部数字就需要 O(m+n) 时间，不满足 LC4 的 O(log(m+n)) 时间要求。因此这里保留二分分割，它是本题要求的核心算法，不是输入输出的额外加速技巧。</p>
 <p><a id="quick-linked"></a></p>
 <h3 id="hot100-4756-分钟链表与归并反转环入口和排序都给完整代码">47–56 分钟｜链表与归并：反转、环入口和排序都给完整代码</h3>
 <p>分配：<strong>反转 2 分钟、快慢指针 2 分钟、归并排序 4 分钟、困难变式 1 分钟</strong>。本组共用下面的节点类；值列表需要先连接成节点，才能交给算法。</p>
@@ -408,7 +438,7 @@ def list_values(head):
                 slow = slow.next
             return pointer
     return None</code></pre>
-<p>若 <code>a → b → c → b</code>，返回的是<strong>节点 b</strong>；无环或空链表返回 <code>None</code>。示例可构造为 <code>a=ListNode(1); b=ListNode(2); c=ListNode(3); a.next=b; b.next=c; c.next=b</code>。节点身份用 <code>is</code> 判断，不能把值相等当作相遇。时间 O(n)、空间 O(1)。</p>
+<p>若三个不同节点连接为 <code>a → b → c → b</code>，也就是 <code>c.next</code> 指回 b，返回的是<strong>节点 b</strong>；无环或空链表返回 <code>None</code>。节点身份用 <code>is</code> 判断，不能把值相等当作相遇。时间 O(n)、空间 O(1)。</p>
 <p><strong>归并排序（Merge Sort）· <a href="#lc148">LC148</a>：</strong> 断开成两个更短的链，分别排好后合并；返回新的头节点。</p>
 <pre><code class="language-python">def merge_lists(a, b):
     dummy = ListNode()
@@ -454,11 +484,12 @@ class TreeNode:
 def level_order(root):
     if root is None:
         return []
-    queue = deque([root])
+    queue = deque([root])  # 层很宽时，popleft() 仍为 O(1)，不要换成列表 pop(0)
     answer = []
     while queue:
         level = []
-        for _ in range(len(queue)):
+        level_size = len(queue)  # 固定本层数量，后面加入的孩子属于下一层
+        for _ in range(level_size):
             node = queue.popleft()
             level.append(node.val)
             if node.left is not None:
@@ -467,9 +498,10 @@ def level_order(root):
                 queue.append(node.right)
         answer.append(level)
     return answer</code></pre>
-<p><code>level_order(TreeNode(1, TreeNode(2), TreeNode(3))) → [[1],[2,3]]</code>；空树返回 <code>[]</code>。<code>len(queue)</code> 在进入该层循环时计算一次，新加入的孩子留到下一层。时间 O(n)、队列空间 O(w)，w 为最大层宽，不计答案。</p>
+<p><code>level_order(TreeNode(1, TreeNode(2), TreeNode(3))) → [[1],[2,3]]</code>；空树返回 <code>[]</code>。<code>level_size</code> 在进入该层循环时计算一次，新加入的孩子留到下一层。时间 O(n)、队列空间 O(w)，w 为最大层宽，不计答案。宽树若用列表反复 <code>pop(0)</code>，总时间可能退化到 O(n²)。</p>
 <p><strong>困难树形递归 · <a href="#lc124">LC124 最大路径和</a>：</strong> 当前节点可以用左右两边更新答案，返回给父节点的贡献只能选一边。</p>
 <pre><code class="language-python">def max_path_sum(root):
+    # 很深的树可能超过 Python 递归深度限制；这时需要改写为显式栈
     if root is None:
         return 0
     best = float(&#39;-inf&#39;)
@@ -494,11 +526,13 @@ def kth_largest(nums, k):
         raise ValueError(&#39;k 必须在 1 到数组长度之间&#39;)
     heap = []
     for value in nums:
+        # 可选加速：堆满后可用 heappushpop 合并入堆、出堆；不影响答案与复杂度
         heapq.heappush(heap, value)
         if len(heap) &gt; k:
             heapq.heappop(heap)
     return heap[0]</code></pre>
 <p><code>kth_largest([3,2,1,5,6,4], 2) → 5</code>；<code>kth_largest([3,3,2], 2) → 3</code>。第 k 大按元素位置计数，不去重。时间 O(n log(k+1))、空间 O(k)。<code>heapq</code> 是最小堆，内部列表并非完全有序；需要手写时看<a href="#stage-13">原单元 13</a>。</p>
+<p>如果题目只问一次且允许 O(n log n)，完整排序后取倒数第 k 个也能得到正确答案。本节保留容量为 k 的堆，是为了复习堆的核心思路，并支持 n 很大、k 较小的情况；不必为了常数速度把清楚的入堆、出堆步骤压成一行。</p>
 <p><strong>双堆（Two Heaps）· <a href="#lc295">LC295 数据流中位数</a>：</strong> 左半用负数最小堆表示最大堆，右半用普通最小堆。</p>
 <pre><code class="language-python">import heapq
 
@@ -508,6 +542,7 @@ class MedianFinder:
         self.high = []
 
     def addNum(self, num):
+        # 保留分开的入堆、出堆步骤；heappushpop 只是可选的常数优化
         heapq.heappush(self.low, -num)
         largest_low = -heapq.heappop(self.low)
         heapq.heappush(self.high, largest_low)
@@ -572,7 +607,7 @@ class Trie:
                 continue
             answer += 1
             grid[r][c] = &quot;0&quot;
-            stack = [(r, c)]
+            stack = [(r, c)]  # 显式栈也适合大连通块，避免递归过深。
             while stack:
                 x, y = stack.pop()
                 for dx, dy in directions:
@@ -588,7 +623,7 @@ def oranges_rotting(grid):
     if not grid or not grid[0]:
         return 0
     rows, cols = len(grid), len(grid[0])
-    queue = deque()
+    queue = deque()  # 头部弹出用 popleft()；list.pop(0) 会搬移后面的元素。
     fresh = 0
     for r in range(rows):
         for c in range(cols):
@@ -617,7 +652,7 @@ def can_finish(n, prerequisites):
     for course, before in prerequisites:
         graph[before].append(course)
         indegree[course] += 1
-    queue = deque()
+    queue = deque()  # 保留 deque，避免大量出队时 list.pop(0) 的反复搬移。
     for course in range(n):
         if indegree[course] == 0:
             queue.append(course)
@@ -647,13 +682,11 @@ def min_jumps(nums):
     steps = end = farthest = 0
     for i in range(len(nums) - 1):
         farthest = max(farthest, i + nums[i])
-        if i == end:
+        if i == end:  # 当前步数覆盖的范围已扫完，再扩展一步。
             if farthest == end:
                 return -1
             steps += 1
             end = farthest
-            if end &gt;= len(nums) - 1:
-                return steps
     return steps</code></pre>
 <p><strong><a href="#lc56">LC56 合并区间</a>：</strong> 闭区间列表 <code>[[1,3],[2,6],[8,10]] → [[1,6],[8,10]]</code>，每项满足左端 ≤ 右端。先按左端排序，再比较最后一个合并结果；端点相等也算重叠。复制区间后再修改，避免改到原输入。时间 O(n log n)，包含排序与输出的空间 O(n)。</p>
 <pre><code class="language-python">def merge_intervals(intervals):
@@ -676,14 +709,17 @@ def min_jumps(nums):
 <h3 id="hot100-7494-分钟动态规划重点一维二维与两种背包都保留">74–94 分钟｜动态规划重点：一维、二维与两种背包都保留</h3>
 <p>分配：<strong>4 分钟一维，6 分钟二维，7 分钟背包，3 分钟边界对照。</strong> 动态规划（Dynamic Programming，DP）统一按“状态含义 → 初值 → 转移 → 遍历方向 → 返回值”读。下面保留完整函数，二维状态先用二维表，不要求为了节省空间而背更绕的写法。</p>
 <p><strong>单元 17，一维 DP。</strong> <a href="#lc198">LC198 打家劫舍</a>的状态是前缀最优，可以不选；<a href="#lc53">LC53 最大子数组和</a>的状态是<strong>必须以当前位置结尾的非空连续段</strong>；<a href="#lc300">LC300 最长递增子序列</a>的状态是以位置 i 结尾的最长严格递增子序列，允许不连续。</p>
-<p><code>rob([2,7,9,3,1]) → 12</code>，房屋金额非负，空数组返回 0。<code>max_subarray([-2,-1]) → -1</code>，要求输入非空，不能从 0 初始化掩盖全负答案。前两题时间 O(n)、辅助空间 O(1)。<code>length_of_lis([10,9,2,5,3,7,101,18]) → 4</code>；<code>[2,2] → 1</code>，严格递增用 <code>&lt;</code>；空数组返回 0。此处选容易写对的 O(n²) 时间、O(n) 空间版本。</p>
+<p><code>rob([2,7,9,3,1]) → 12</code>，房屋金额非负，空数组返回 0。直接用 <code>dp[i]</code> 表示前 i 间房的最优金额：不拿第 i 间，或拿它并接上前 i−2 间的答案。<code>max_subarray([-2,-1]) → -1</code>，要求输入非空，不能从 0 初始化掩盖全负答案；<code>ending</code> 是以当前位置结尾的最优和，<code>best</code> 是全局答案，两个名字直接区分两种状态。前两题时间均 O(n)，辅助空间分别 O(n)、O(1)。<code>length_of_lis([10,9,2,5,3,7,101,18]) → 4</code>；<code>[2,2] → 1</code>，严格递增用 <code>&lt;</code>；空数组返回 0。此处选容易写对的 O(n²) 时间、O(n) 空间版本。</p>
+<p><strong>规模提醒：</strong> 最长递增子序列的这版代码会比较 n(n−1)/2 对位置；n=100,000 时接近 50 亿次，不能指望只加快读入就通过，应改用 <a href="#alts-lc300">O(n log n) 二分解法</a>。是否需要换算法，要看题目的数据上限和时间限制。</p>
 <pre><code class="language-python">def rob(nums):
-    prev2 = prev1 = 0
-    for value in nums:
-        current = max(prev1, prev2 + value)
-        prev2 = prev1
-        prev1 = current
-    return prev1
+    if not nums:
+        return 0
+    # 若内存受限，可只保留前两个状态，将辅助空间降为 O(1)；答案不变。
+    dp = [0] * (len(nums) + 1)
+    dp[1] = nums[0]
+    for i in range(2, len(nums) + 1):
+        dp[i] = max(dp[i - 1], dp[i - 2] + nums[i - 1])
+    return dp[-1]
 
 def max_subarray(nums):
     ending = best = nums[0]
@@ -695,7 +731,7 @@ def max_subarray(nums):
 def length_of_lis(nums):
     if not nums:
         return 0
-    dp = [1] * len(nums)
+    dp = [1] * len(nums)  # 大 n 时换 O(n log n) 二分解法，见上面的规模提醒。
     for i in range(len(nums)):
         for j in range(i):
             if nums[j] &lt; nums[i]:
@@ -706,15 +742,18 @@ def length_of_lis(nums):
     if rows &lt;= 0 or cols &lt;= 0:
         return 0
     dp = [[1] * cols for _ in range(rows)]
+    # 内存放不下整张表时可只保留一行；空间降为 O(cols)，转移与答案不变。
     for r in range(1, rows):
         for c in range(1, cols):
             dp[r][c] = dp[r - 1][c] + dp[r][c - 1]
     return dp[-1][-1]</code></pre>
 <p><strong><a href="#lc1143">LC1143 最长公共子序列</a></strong>：<code>longest_common_subsequence(&quot;abcde&quot;,&quot;ace&quot;) → 3</code>，子序列不要求连续。<code>dp[i][j]</code> 表示两个前缀 <code>a[:i]</code>、<code>b[:j]</code> 的答案；末字符相等取左上加 1，否则跳过一边，取上方和左方最大值。</p>
 <p><strong><a href="#lc72">LC72 编辑距离</a></strong>：<code>edit_distance(&quot;horse&quot;,&quot;ros&quot;) → 3</code>，<code>edit_distance(&quot;&quot;,&quot;ab&quot;) → 2</code>。状态改为两个前缀间的最少插入、删除、替换次数；空前缀边界不再全为 0，而是另一边的长度。两题均支持空字符串；设长度为 m、n，以下版本时间、空间均 O((m+1)(n+1))。每行用列表推导独立创建，不能写 <code>[[0]*(n+1)]*(m+1)</code>。</p>
+<p>两题只求长度或次数，因此整张表超过内存限制时，可以保留“上一行 + 当前行”，把辅助空间降为 O(n)。这里先保留最直观的二维表；滚动数组只节省空间，不会减少 O(mn) 次转移。若题目还要还原具体子序列或编辑操作，需要另外记录或重建路径。</p>
 <pre><code class="language-python">def longest_common_subsequence(a, b):
     m, n = len(a), len(b)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
+    # 仅求长度且整表超出内存限制时，可改为两行；转移公式不变。
     for i in range(1, m + 1):
         for j in range(1, n + 1):
             if a[i - 1] == b[j - 1]:
@@ -726,6 +765,7 @@ def length_of_lis(nums):
 def edit_distance(a, b):
     m, n = len(a), len(b)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
+    # 仅求次数且整表超出内存限制时，可改为两行；转移公式不变。
     for i in range(m + 1):
         dp[i][0] = i
     for j in range(n + 1):
@@ -743,6 +783,7 @@ def edit_distance(a, b):
     return dp[m][n]</code></pre>
 <p><strong>单元 19，背包与前缀可达性。</strong> <a href="#lc416">LC416 分割等和子集</a>中，每个正整数只用一次：0/1 背包（0/1 Knapsack）<strong>容量逆序</strong>，避免本轮反复使用同一个数。<code>can_partition([1,5,11,5]) → True</code>；<code>[1,2,5] → False</code>，错误的正序会把一个 2 用两遍。</p>
 <p>**<a href="#lc322">LC322 零钱兑换</a>**中，正整数面额可以复用，金额为非负整数：完全背包（Unbounded Knapsack）<strong>容量正序</strong>，允许沿用本轮刚更新的状态。<code>coin_change([1,2,5],11) → 3</code>，<code>coin_change([2],3) → -1</code>，金额为 0 返回 0。不能用 0 代表“不可能凑出”。设元素数为 k、目标为 C，两题时间 O(kC)、辅助空间 O(C)，依赖目标数值大小。</p>
+<p>这两题保留一维表和明确的遍历方向：它们就是要记住的背包模板。不能为了少记方向，把 0/1 背包也改成容量正序。若 C 大到无法分配表，或 kC 超过时间预算，需要根据题目限制重新选择算法；加快输入输出无法解决状态数过多的问题。</p>
 <pre><code class="language-python">def can_partition(nums):
     total = sum(nums)
     if total % 2:
@@ -751,7 +792,7 @@ def edit_distance(a, b):
     dp = [False] * (target + 1)
     dp[0] = True
     for value in nums:
-        for capacity in range(target, value - 1, -1):
+        for capacity in range(target, value - 1, -1):  # 逆序：本轮的数最多用一次。
             dp[capacity] = dp[capacity] or dp[capacity - value]
     return dp[target]
 
@@ -759,16 +800,17 @@ def coin_change(coins, amount):
     dp = [amount + 1] * (amount + 1)
     dp[0] = 0
     for coin in coins:
-        for value in range(coin, amount + 1):
+        for value in range(coin, amount + 1):  # 正序：当前面额允许继续使用。
             dp[value] = min(dp[value], dp[value - coin] + 1)
     return -1 if dp[amount] &gt; amount else dp[amount]</code></pre>
 <p><strong><a href="#lc139">LC139 单词拆分</a></strong>：<code>word_break(&quot;leetcode&quot;,[&quot;leet&quot;,&quot;code&quot;]) → True</code>；<code>&quot;catsandog&quot;</code> 用 <code>[&quot;cats&quot;,&quot;dog&quot;,&quot;sand&quot;,&quot;and&quot;,&quot;cat&quot;]</code> 无法拆分，返回 False。<code>dp[i]</code> 表示前缀 <code>s[:i]</code> 能否由字典单词拼成，单词可重复使用。切点 j 必须同时满足“前缀可达”和“当前整段在字典里”；不是只检查单个字符。空串对应空拼接，返回 True。设串长 n、字典总字符数 W，此直观切片版时间最坏 O(n³+W)，辅助空间 O(n+W)；切片会复制字符，不能把它当 O(1)。</p>
 <pre><code class="language-python">def word_break(s, word_dict):
-    words = set(word_dict)
+    words = set(word_dict)  # 避免列表的逐项比较；切片与首次哈希仍需读字符。
     dp = [False] * (len(s) + 1)
     dp[0] = True
     for i in range(1, len(s) + 1):
         for j in range(i):
+            # 大字符串可只检查字典中存在的单词长度，减少切点与切片复制。
             if dp[j] and s[j:i] in words:
                 dp[i] = True
                 break
@@ -777,10 +819,13 @@ def coin_change(coins, amount):
 <p><a id="quick-backtracking"></a></p>
 <h3 id="hot100-94116-分钟回溯选择递归撤销都要写全">94–116 分钟｜回溯：选择、递归、撤销都要写全</h3>
 <p>分配：<strong>5 分钟排列/子集，5 分钟组合与约束，5 分钟网格路径，7 分钟 N 皇后。</strong> 每种搜索都明确候选、终点和撤销动作；相同的递归骨架不能代替不同约束。</p>
+<p>下面尽量用同一顺序：<strong>先判断是否收集答案，再枚举合法选择，记录选择，递归，撤销选择。</strong> <code>path.copy()</code> 保存已经找到的答案，<code>path.pop()</code> 恢复正在探索的路径，两者不能互相代替。网格与 N 皇后还有额外的占用状态，也要一起撤销。</p>
 <p><strong>排列（Permutation）：</strong> 输入元素互不相同。结果保存 <code>path.copy()</code>，不能把不断修改的同一个列表反复放入答案。</p>
 <pre><code class="language-python">def permutations(nums):
-    answer, path = [], []
+    answer = []
+    path = []
     used = [False] * len(nums)
+
     def visit():
         if len(path) == len(nums):
             answer.append(path.copy())
@@ -793,25 +838,31 @@ def coin_change(coins, amount):
             visit()
             path.pop()
             used[i] = False
+
     visit()
     return answer</code></pre>
 <p><code>[1,2] → [[1,2],[2,1]]</code>。对应 <a href="#lc46">LC46 全排列</a>，含结果复制的时间 O(n·n!)，辅助空间 O(n)，不计答案。</p>
 <p><strong>子集（Subset）：</strong> <a href="#lc78">LC78 子集</a> 输入元素互不相同；每个节点都收集答案，下一层从 i+1 开始。</p>
 <pre><code class="language-python">def subsets(nums):
-    answer, path = [], []
+    answer = []
+    path = []
+
     def visit(start):
         answer.append(path.copy())
         for i in range(start, len(nums)):
             path.append(nums[i])
             visit(i + 1)
             path.pop()
+
     visit(0)
     return answer</code></pre>
 <p><code>[1,2] → [[],[1],[1,2],[2]]</code>。含复制的时间 O(n·2ⁿ)，辅助空间 O(n)，不计答案。排列用 <code>used</code>，子集用 <code>start</code>；不能把排列的每个前缀都当作不同子集。</p>
-<p><strong>组合总和（Combination Sum）：</strong> <a href="#lc39">LC39</a> 候选是互不相同的正整数，target≥0。排序后才能使用 <code>value &gt; remain</code> 的 <code>break</code> 剪枝。</p>
+<p><strong>组合总和（Combination Sum）：</strong> <a href="#lc39">LC39</a> 候选是互不相同的正整数，target≥0。排序让“当前数已超过剩余量”能推出“后面也都不用试”，所以这里保留排序和 <code>break</code> 剪枝；<code>sorted</code> 创建新列表，不修改传入的候选列表。</p>
 <pre><code class="language-python">def combination_sum(candidates, target):
     candidates = sorted(candidates)
-    answer, path = [], []
+    answer = []
+    path = []
+
     def visit(start, remain):
         if remain == 0:
             answer.append(path.copy())
@@ -823,16 +874,22 @@ def coin_change(coins, amount):
             path.append(value)
             visit(i, remain - value)
             path.pop()
+
     visit(0, target)
     return answer</code></pre>
-<p><code>[2,3,6,7]</code>、target=7 → <code>[[2,2,3],[7]]</code>。如果每层都从 0 开始，会重复得到不同顺序的同一个组合；如果传 i+1，则漏掉 <code>[2,2,3]</code>。搜索规模随目标和候选增长，不能统一写成 O(2ⁿ)；候选非空时，递归深度最多为 <code>target // 最小候选</code>。</p>
+<p><code>[2,3,6,7]</code>、target=7 → <code>[[2,2,3],[7]]</code>。如果每层都从 0 开始，会重复得到不同顺序的同一个组合；如果传 i+1，则漏掉 <code>[2,2,3]</code>。target=0 的答案是 <code>[[]]</code>，表示一个不选任何数的方案；候选为空且 target&gt;0 时答案是 <code>[]</code>。</p>
+<p>设候选数为 c、最大路径长度为 d。候选非空时，<code>d=target // 最小候选</code>；每次选择正数都会减少剩余量，递归才能结束。搜索规模随目标与候选增长，不能统一写成 O(2ᶜ)；排序另需 O(c log(c+1)) 时间，保存候选副本、路径与递归栈需 O(c+d) 辅助空间。目标很大或最小候选很小时，即使方案不多，也可能先达到解释器递归深度限制。</p>
 <p><strong>网格路径（Grid Path）：</strong> <a href="#lc79">LC79 单词搜索</a> 输入是规则字符矩阵；字符不能在同一条路径重复使用。下面的 <code>None</code> 临时占位不属于字符表，成功或失败返回前都恢复棋盘；约定空单词可匹配空路径。</p>
 <pre><code class="language-python">def word_exists(board, word):
     if not word:
         return True
     if not board or not board[0]:
         return False
-    rows, cols = len(board), len(board[0])
+    rows = len(board)
+    cols = len(board[0])
+    if len(word) &gt; rows * cols:
+        return False  # 每格最多使用一次，格子总数不足就不可能成功。
+
     def visit(row, col, k):
         if not (0 &lt;= row &lt; rows and 0 &lt;= col &lt; cols):
             return False
@@ -847,25 +904,36 @@ def coin_change(coins, amount):
             if visit(row + dr, col + dc, k + 1):
                 found = True
                 break
+        # 找到答案也先恢复，不能在上面的循环内直接 return True。
         board[row][col] = saved
         return found
+
     for row in range(rows):
         for col in range(cols):
             if visit(row, col, 0):
                 return True
     return False</code></pre>
-<p>棋盘 <code>ABCE / SFCS / ADEE</code> 可以找到 <code>ABCCED</code>，不能找到 <code>ABCB</code>，后者需要重用 B。全局图遍历的“访问后永不撤销”不能直接搬到这道题。若单词长度为 L，宽松时间上界 O(r·c·4ᴸ)，辅助递归空间 O(L)。</p>
+<p>棋盘 <code>ABCE / SFCS / ADEE</code> 可以找到 <code>ABCCED</code>，不能找到 <code>ABCB</code>，后者需要重用 B。全局图遍历的“访问后永不撤销”不能直接搬到这道题。末字符匹配时直接返回，因为该层尚未修改棋盘；其他层必须先恢复，再返回搜索结果。</p>
+<p>若单词长度为 L，宽松时间上界 O(r·c·4ᴸ)，辅助递归空间 O(L)。长度检查能排除格子数不足的情况，但不能消除大量相同字符造成的分支；大网格与长单词仍可能搜索过久。字符频次预检等优化可以在确有规模需要时再加，这里不增加另一份状态表。</p>
 <p><strong>N 皇后（N-Queens）：</strong> <a href="#lc51">LC51</a> 输入 n≥1，结果为所有棋盘。<code>columns</code> 记录每行选中的列；这一路径与三个占用集合共同定义当前状态。</p>
 <pre><code class="language-python">def n_queens(n):
-    answer, columns = [], []
-    occupied_cols, diag_down, diag_up = set(), set(), set()
+    answer = []
+    columns = []
+    occupied_cols = set()
+    diag_down = set()
+    diag_up = set()
+
     def visit(row):
         if row == n:
-            answer.append([&quot;.&quot; * col + &quot;Q&quot; + &quot;.&quot; * (n - col - 1)
-                           for col in columns])
+            board = []
+            for col in columns:
+                row_text = &quot;.&quot; * col + &quot;Q&quot; + &quot;.&quot; * (n - col - 1)
+                board.append(row_text)
+            answer.append(board)
             return
         for col in range(n):
-            down, up = row - col, row + col
+            down = row - col
+            up = row + col
             if col in occupied_cols or down in diag_down or up in diag_up:
                 continue
             columns.append(col)
@@ -877,26 +945,37 @@ def coin_change(coins, amount):
             diag_down.remove(down)
             occupied_cols.remove(col)
             columns.pop()
+
     visit(0)
     return answer</code></pre>
-<p>n=4 恰有两种列路径 <code>[1,3,0,2]</code> 与 <code>[2,0,3,1]</code>；n=1 有一个答案，n=2、3 没有答案。只检查“相邻行的斜线”不够，之前任意一行都可能冲突。粗上界为 O(n·n! + S·n²) 时间，S 是答案数；不计输出时辅助空间 O(n)。</p>
-<p>最后用一句话区分：<strong>排列约束“下标是否用过”，组合约束“下一项从哪里选”，网格约束“当前路径占用了哪些格子”，N 皇后约束“列和两种对角线”。</strong> 相同的选择—递归—撤销骨架，不能替代这些不同的合法性条件。</p>
+<p>n=4 恰有两种列路径 <code>[1,3,0,2]</code> 与 <code>[2,0,3,1]</code>；n=1 有一个答案，n=2、3 没有答案。只检查“相邻行的斜线”不够，之前任意一行都可能冲突。粗上界为 O(n·n! + S·n²) 时间，S 是答案数；不计输出时辅助空间 O(n)。每个答案本身还要写出 n² 个字符；n 增大时，位掩码等优化只能减少部分处理成本，不能消除搜索与输出的增长，所以本轮保留直观的三个集合。</p>
 <p><strong>两个约束变式也保留完整写法：</strong> <a href="#lc22">LC22 括号生成</a> 只延伸合法前缀；<a href="#lc131">LC131 分割回文串</a> 只延伸回文切片。</p>
+<p><strong>括号生成（Generate Parentheses）：</strong> n≥0，<code>left/right</code> 是已经使用的左/右括号数量。左括号还没用完才添加，右括号少于左括号才添加；路径始终是合法前缀。</p>
 <pre><code class="language-python">def generate_parentheses(n):
     answer = []
-    def visit(text, left, right):
-        if len(text) == 2 * n:
-            answer.append(text)
+    path = []
+
+    def visit(left, right):
+        if len(path) == 2 * n:
+            answer.append(&quot;&quot;.join(path))
             return
         if left &lt; n:
-            visit(text + &quot;(&quot;, left + 1, right)
+            path.append(&quot;(&quot;)
+            visit(left + 1, right)
+            path.pop()
         if right &lt; left:
-            visit(text + &quot;)&quot;, left, right + 1)
-    visit(&quot;&quot;, 0, 0)
-    return answer
+            path.append(&quot;)&quot;)
+            visit(left, right + 1)
+            path.pop()
 
-def palindrome_partitions(s):
-    answer, path = [], []
+    visit(0, 0)
+    return answer</code></pre>
+<p><code>generate_parentheses(2) → [&quot;(())&quot;,&quot;()()&quot;]</code>；n=0 时为 <code>[&quot;&quot;]</code>，表示空括号串。两个条件保证 <code>right≤left≤n</code>，不能先随意生成所有字符串再过滤。这里只在完整方案处 <code>join</code> 一次，不在每一层复制已有字符串。设合法答案数为 Cₙ，时间为 O((n+1)·Cₙ)，辅助空间 O(n+1)，输出空间另计；Cₙ 随 n 快速增长。</p>
+<p><strong>分割回文串（Palindrome Partitioning）：</strong> <code>start</code> 是尚未切分部分的起点；每次选择一个非空片段，确认回文后再递归。切片边界始终使用左闭右开 <code>[start,end)</code>，于是下一层直接从 end 开始。</p>
+<pre><code class="language-python">def palindrome_partitions(s):
+    answer = []
+    path = []
+
     def visit(start):
         if start == len(s):
             answer.append(path.copy())
@@ -908,9 +987,12 @@ def palindrome_partitions(s):
             path.append(piece)
             visit(end)
             path.pop()
+
     visit(0)
     return answer</code></pre>
-<p><code>generate_parentheses(2) → [&quot;(())&quot;,&quot;()()&quot;]</code>；<code>palindrome_partitions(&quot;aab&quot;) → [[&quot;a&quot;,&quot;a&quot;,&quot;b&quot;],[&quot;aa&quot;,&quot;b&quot;]]</code>。前者约定 n≥0，始终 <code>right≤left≤n</code>；后者消费完字符串才收集。它们生成所有答案，搜索与输出可以是指数规模；回文分割的切片和反转还会产生复制成本。</p>
+<p><code>palindrome_partitions(&quot;aab&quot;) → [[&quot;a&quot;,&quot;a&quot;,&quot;b&quot;],[&quot;aa&quot;,&quot;b&quot;]]</code>；空串得到 <code>[[]]</code>，表示已经完成的一份空切分。消费完字符串才收集答案，不能把只切出前半段的路径提前保存。</p>
+<p><code>piece[::-1]</code> 生成反向副本，再与原片段比较，不会修改 s。若 s 长度为 n，这版时间可用 O((n+1)²·2ⁿ) 作宽松上界：不仅枚举切分，还要计算切片与反向副本；不计答案时，当前路径、递归栈与切片的总辅助空间为 O(n+1)。输入越长，尤其重复字符越多，可行切分就越多。预先用二维表保存回文结果能减少重复判断，但不能消除输出规模；两小时回顾先保留这一份直接判回文的写法。</p>
+<p>最后用一句话区分：<strong>排列约束“下标是否用过”，子集与组合约束“下一项从哪里选”，网格约束“当前路径占用了哪些格子”，N 皇后约束“列和两种对角线”，括号约束“前缀是否合法”，回文分割约束“刚选的片段是否回文”。</strong> 相同的选择—递归—撤销骨架，不能替代这些不同的合法性条件。排列、子集、括号与回文分割都会生成全部答案；输入规模大时，运行时间、答案内存或递归深度可能先成为限制，不能只靠调高递归上限解决。</p>
 <p><a id="quick-bits"></a></p>
 <h3 id="hot100-116120-分钟位运算与函数图前提成立才使用模板">116–120 分钟｜位运算与函数图：前提成立才使用模板</h3>
 <p><strong>单元 21，<a href="#lc136">LC136 只出现一次的数字</a>：</strong> 非空整数数组中恰好一个数只出现一次，其余均出现两次；<code>[4,1,2,1,2] → 4</code>。异或（XOR）满足 <code>x ^ x = 0</code>、<code>x ^ 0 = x</code>，把成对项消掉。若其他数出现三次，这个模板就不成立。时间 O(n)、辅助空间 O(1)。</p>
@@ -919,7 +1001,7 @@ def palindrome_partitions(s):
     for value in nums:
         answer ^= value
     return answer</code></pre>
-<p><strong><a href="#lc287">LC287 寻找重复数</a>：</strong> 输入有 n+1 个数，值都在 <code>[1,n]</code>，只有一个重复的数，但可以重复多次；<code>[1,3,4,2,2] → 2</code>。把 <code>下标 → nums[下标]</code> 看成函数图（Functional Graph），用快慢指针（Fast and Slow Pointers）找环入口。<strong>相遇后必须复位一个指针，再同步走一步找入口</strong>，第一次相遇的位置未必就是重复数。输入越界时不能套这个映射。时间 O(n)、辅助空间 O(1)，不修改数组。</p>
+<p><strong><a href="#lc287">LC287 寻找重复数</a>：</strong> 输入有 n+1 个数，值都在 <code>[1,n]</code>，只有一个重复的数，但可以重复多次；<code>[1,3,4,2,2] → 2</code>。本题还要求不修改数组且只用 O(1) 辅助空间，因此不能直接用集合记已见数字。把 <code>下标 → nums[下标]</code> 看成函数图（Functional Graph），用快慢指针（Fast and Slow Pointers）找环入口。<strong>相遇后必须复位一个指针，再同步走一步找入口</strong>，第一次相遇的位置未必就是重复数。输入越界时不能套这个映射。时间 O(n)、辅助空间 O(1)，不修改数组。</p>
 <pre><code class="language-python">def find_duplicate(nums):
     slow = fast = 0
     while True:
@@ -17729,4 +17811,4 @@ if __name__ == &quot;__main__&quot;:
 </ul>
 <pre><code class="language-bash">python3.9 tools/check_python39.py --require-runtime39</code></pre>
 <p>有限测试不能证明绝对不存在隐藏错误；正式笔试仍应以题面给定的输入、输出和复杂度约束为准。</p>
-</article><nav class="chapter-pagination" aria-label="返回课程"><a href="../index.html"><span>返回首页</span><strong>查看课程与额外章节</strong></a><a href="#hot100-leetcode-hot100--python-39%E4%B8%A4%E5%B0%8F%E6%97%B6%E9%80%9F%E8%A7%88%E4%B8%8E%E5%88%86%E8%BD%AE%E5%AD%A6%E4%B9%A0"><span>回到顶部 ↑</span><strong>Hot100 完整指南</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#hot100-%E7%8E%B0%E5%9C%A8%E4%BB%8E%E5%93%AA%E9%87%8C%E5%BC%80%E5%A7%8B">现在从哪里开始</a></li><li class="toc-level-2"><a href="#hot100-%E4%B8%A4%E5%B0%8F%E6%97%B6%E5%BF%AB%E9%80%9F%E5%9B%9E%E9%A1%BE%E6%9C%80%E5%B0%8F%E8%BE%93%E5%85%A5%E8%BE%93%E5%87%BA%E4%B8%8E%E5%85%A8%E9%83%A8-21-%E7%B1%BB%E7%AE%97%E6%B3%95%E6%A8%A1%E6%9D%BF">两小时快速回顾：最小输入输出与全部 21 类算法模板</a></li><li class="toc-level-3"><a href="#hot100-120-%E5%88%86%E9%92%9F%E9%98%85%E8%AF%BB%E5%AE%89%E6%8E%92">120 分钟阅读安排</a></li><li class="toc-level-3"><a href="#hot100-0012-%E5%88%86%E9%92%9F%E4%B8%80%E4%B8%AA%E8%83%BD%E8%AF%BB%E5%85%A5%E6%B1%82%E8%A7%A3%E8%BE%93%E5%87%BA%E5%B9%B6%E6%AD%A3%E5%B8%B8%E7%BB%93%E6%9D%9F%E7%9A%84%E7%A8%8B%E5%BA%8F">00–12 分钟｜一个能读入、求解、输出并正常结束的程序</a></li><li class="toc-level-3"><a href="#hot100-%E5%B8%B8%E7%94%A8%E5%AF%B9%E8%B1%A1%E6%80%8E%E6%A0%B7%E6%8E%A5%E5%88%B0%E7%AE%97%E6%B3%95">常用对象怎样接到算法</a></li><li class="toc-level-3"><a href="#hot100-1230-%E5%88%86%E9%92%9F%E6%95%B0%E7%BB%84%E4%B8%8E%E5%8F%8C%E6%8C%87%E9%92%88%E6%8A%8A%E7%A7%BB%E5%8A%A8%E6%9D%A1%E4%BB%B6%E5%86%99%E5%87%BA%E6%9D%A5">12–30 分钟｜数组与双指针：把移动条件写出来</a></li><li class="toc-level-4"><a href="#hot100-03%E5%B7%A6%E5%8F%B3%E5%A4%B9%E9%80%BC%E7%9B%9B%E6%B0%B4%E4%B8%8E%E4%B8%89%E6%95%B0%E4%B9%8B%E5%92%8C">03｜左右夹逼：盛水与三数之和</a></li><li class="toc-level-3"><a href="#hot100-3040-%E5%88%86%E9%92%9F%E6%A0%88%E4%B8%8E%E5%8D%95%E8%B0%83%E7%BB%93%E6%9E%84%E5%9B%9B%E4%B8%AA%E5%8F%AF%E4%BB%A5%E7%9B%B4%E6%8E%A5%E4%BD%BF%E7%94%A8%E7%9A%84%E6%A8%A1%E6%9D%BF">30–40 分钟｜栈与单调结构：四个可以直接使用的模板</a></li><li class="toc-level-3"><a href="#hot100-4047-%E5%88%86%E9%92%9F%E4%BA%8C%E5%88%86%E6%99%AE%E9%80%9A%E8%BE%B9%E7%95%8C%E6%97%8B%E8%BD%AC%E6%95%B0%E7%BB%84%E5%92%8C%E4%B8%AD%E4%BD%8D%E6%95%B0%E5%88%86%E5%88%AB%E5%86%99">40–47 分钟｜二分：普通边界、旋转数组和中位数分别写</a></li><li class="toc-level-3"><a href="#hot100-4756-%E5%88%86%E9%92%9F%E9%93%BE%E8%A1%A8%E4%B8%8E%E5%BD%92%E5%B9%B6%E5%8F%8D%E8%BD%AC%E7%8E%AF%E5%85%A5%E5%8F%A3%E5%92%8C%E6%8E%92%E5%BA%8F%E9%83%BD%E7%BB%99%E5%AE%8C%E6%95%B4%E4%BB%A3%E7%A0%81">47–56 分钟｜链表与归并：反转、环入口和排序都给完整代码</a></li><li class="toc-level-3"><a href="#hot100-5666-%E5%88%86%E9%92%9F%E6%A0%91%E5%A0%86%E5%AD%97%E5%85%B8%E6%A0%91%E8%BE%93%E5%85%A5%E4%B8%8E%E8%BF%94%E5%9B%9E%E5%80%BC%E5%88%86%E6%B8%85%E6%A5%9A">56–66 分钟｜树、堆、字典树：输入与返回值分清楚</a></li><li class="toc-level-3"><a href="#hot100-6674-%E5%88%86%E9%92%9F%E5%9B%BE%E6%8B%93%E6%89%91%E4%B8%8E%E8%B4%AA%E5%BF%83%E7%9B%B4%E6%8E%A5%E8%AE%B0%E4%BD%8F%E6%8E%A8%E8%BF%9B%E6%9D%A1%E4%BB%B6">66–74 分钟｜图、拓扑与贪心：直接记住推进条件</a></li><li class="toc-level-3"><a href="#hot100-7494-%E5%88%86%E9%92%9F%E5%8A%A8%E6%80%81%E8%A7%84%E5%88%92%E9%87%8D%E7%82%B9%E4%B8%80%E7%BB%B4%E4%BA%8C%E7%BB%B4%E4%B8%8E%E4%B8%A4%E7%A7%8D%E8%83%8C%E5%8C%85%E9%83%BD%E4%BF%9D%E7%95%99">74–94 分钟｜动态规划重点：一维、二维与两种背包都保留</a></li><li class="toc-level-3"><a href="#hot100-94116-%E5%88%86%E9%92%9F%E5%9B%9E%E6%BA%AF%E9%80%89%E6%8B%A9%E9%80%92%E5%BD%92%E6%92%A4%E9%94%80%E9%83%BD%E8%A6%81%E5%86%99%E5%85%A8">94–116 分钟｜回溯：选择、递归、撤销都要写全</a></li><li class="toc-level-3"><a href="#hot100-116120-%E5%88%86%E9%92%9F%E4%BD%8D%E8%BF%90%E7%AE%97%E4%B8%8E%E5%87%BD%E6%95%B0%E5%9B%BE%E5%89%8D%E6%8F%90%E6%88%90%E7%AB%8B%E6%89%8D%E4%BD%BF%E7%94%A8%E6%A8%A1%E6%9D%BF">116–120 分钟｜位运算与函数图：前提成立才使用模板</a></li><li class="toc-level-2"><a href="#hot100-%E5%AE%8C%E6%95%B4%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E7%AC%AC%E4%B8%80%E8%BD%AE--%E7%AC%AC%E4%BA%8C%E8%BD%AE--%E7%AC%AC%E4%B8%89%E8%BD%AE">完整学习路线：第一轮 → 第二轮 → 第三轮</a></li><li class="toc-level-2"><a href="#hot100-%E7%AC%AC%E4%B8%80%E8%BD%AE%E5%BF%85%E5%88%B7r1-01r1-38%E5%85%A8%E9%83%A8%E6%9D%A5%E8%87%AA-hot100">第一轮必刷：R1-01—R1-38，全部来自 Hot100</a></li><li class="toc-level-2"><a href="#hot100-%E7%AC%AC%E4%BA%8C%E8%BD%AE%E5%BF%85%E5%88%B7r2-01r2-62%E8%A1%A5%E9%BD%90-hot100">第二轮必刷：R2-01—R2-62，补齐 Hot100</a></li><li class="toc-level-2"><a href="#hot100-%E7%AC%AC%E4%B8%89%E8%BD%AE%E8%A1%A5%E7%BC%BA%E5%BF%85%E7%BB%83r3-01r3-18%E9%9D%A2%E8%AF%95%E7%BB%8F%E5%85%B8-150-%E7%B2%BE%E9%80%89">第三轮补缺必练：R3-01—R3-18，面试经典 150 精选</a></li><li class="toc-level-2"><a href="#hot100-0-%E5%AD%A6%E4%B9%A0%E5%85%A8%E6%99%AF%E5%85%88%E8%A1%A8%E7%A4%BA%E5%90%8E%E6%93%8D%E4%BD%9C%E5%86%8D%E7%AE%97%E6%B3%95">0. 学习全景：先表示，后操作，再算法</a></li><li class="toc-level-2"><a href="#hot100-1-python-%E4%B8%8E-acm-%E5%89%8D%E7%BD%AE">1. Python 与 ACM 前置</a></li><li class="toc-level-2"><a href="#hot100-2-%E9%80%89%E5%9E%8B%E7%8A%B6%E6%80%81%E4%B8%8E%E6%8E%92%E9%94%99">2. 选型、状态与排错</a></li><li class="toc-level-2"><a href="#hot100-3-%E6%A8%A1%E6%9D%BF%E6%80%8E%E4%B9%88%E5%A4%8D%E7%94%A8%E5%85%88%E6%A0%B8%E5%AF%B9%E5%A5%91%E7%BA%A6%E5%86%8D%E6%94%B9%E4%BB%A3%E7%A0%81">3. 模板怎么复用：先核对契约，再改代码</a></li><li class="toc-level-2"><a href="#hot100-401-%E6%95%B0%E7%BB%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8E%E5%8E%9F%E5%9C%B0%E6%89%AB%E6%8F%8F">4.01 数组、字符串与原地扫描</a></li><li class="toc-level-2"><a href="#hot100-402-%E5%93%88%E5%B8%8C%E8%A1%A8%E4%B8%8E%E9%9B%86%E5%90%88">4.02 哈希表与集合</a></li><li class="toc-level-2"><a href="#hot100-403-%E5%8F%8C%E6%8C%87%E9%92%88%E4%B8%8E%E4%B8%AD%E5%BF%83%E6%89%A9%E5%B1%95">4.03 双指针与中心扩展</a></li><li class="toc-level-2"><a href="#hot100-404-%E7%9F%A9%E9%98%B5%E4%B8%8E%E4%BA%8C%E7%BB%B4%E4%B8%8B%E6%A0%87">4.04 矩阵与二维下标</a></li><li class="toc-level-2"><a href="#hot100-405-%E5%89%8D%E7%BC%80%E7%BB%9F%E8%AE%A1%E4%B8%8E%E5%8C%BA%E9%97%B4%E8%AE%A1%E6%95%B0">4.05 前缀统计与区间计数</a></li><li class="toc-level-2"><a href="#hot100-406-%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E5%AE%9A%E9%95%BF%E6%9C%80%E9%95%BF%E6%9C%80%E7%9F%AD">4.06 滑动窗口：定长、最长、最短</a></li><li class="toc-level-2"><a href="#hot100-407-%E6%A0%88%E9%98%9F%E5%88%97%E4%B8%8E%E5%B5%8C%E5%A5%97%E7%8A%B6%E6%80%81">4.07 栈、队列与嵌套状态</a></li><li class="toc-level-2"><a href="#hot100-408-%E5%8D%95%E8%B0%83%E6%A0%88%E4%B8%8E%E5%8D%95%E8%B0%83%E9%98%9F%E5%88%97">4.08 单调栈与单调队列</a></li><li class="toc-level-2"><a href="#hot100-409-%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E4%B8%8E%E8%BE%B9%E7%95%8C">4.09 二分查找与边界</a></li><li class="toc-level-2"><a href="#hot100-410-%E9%93%BE%E8%A1%A8%E8%8A%82%E7%82%B9%E8%BA%AB%E4%BB%BD%E4%B8%8E-lru">4.10 链表、节点身份与 LRU</a></li><li class="toc-level-2"><a href="#hot100-411-%E9%80%92%E5%BD%92%E5%A5%91%E7%BA%A6%E4%B8%8E%E5%BD%92%E5%B9%B6%E5%88%86%E6%B2%BB">4.11 递归契约与归并分治</a></li><li class="toc-level-2"><a href="#hot100-412-%E4%BA%8C%E5%8F%89%E6%A0%91bst-%E4%B8%8E%E5%AD%90%E6%A0%91%E9%80%92%E6%8E%A8">4.12 二叉树、BST 与子树递推</a></li><li class="toc-level-2"><a href="#hot100-413-%E5%A0%86top-k-%E4%B8%8E%E5%A4%9A%E8%B7%AF%E5%90%88%E5%B9%B6">4.13 堆、Top-K 与多路合并</a></li><li class="toc-level-2"><a href="#hot100-414-%E5%AD%97%E5%85%B8%E6%A0%91%E5%89%8D%E7%BC%80%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8D%95%E8%AF%8D">4.14 字典树：前缀与完整单词</a></li><li class="toc-level-2"><a href="#hot100-415-%E5%9B%BE%E7%BD%91%E6%A0%BC%E6%90%9C%E7%B4%A2%E4%B8%8E%E6%8B%93%E6%89%91%E6%8E%92%E5%BA%8F">4.15 图、网格搜索与拓扑排序</a></li><li class="toc-level-2"><a href="#hot100-416-%E8%B4%AA%E5%BF%83%E5%8F%AF%E8%A1%8C%E6%80%A7%E4%B8%8E%E5%B1%80%E9%83%A8%E9%80%89%E6%8B%A9">4.16 贪心：可行性与局部选择</a></li><li class="toc-level-2"><a href="#hot100-417-%E4%B8%80%E7%BB%B4%E5%8A%A8%E6%80%81%E8%A7%84%E5%88%92%E5%85%88%E5%AE%9A%E4%B9%89%E7%BB%93%E5%B0%BE%E7%8A%B6%E6%80%81">4.17 一维动态规划：先定义结尾状态</a></li><li class="toc-level-2"><a href="#hot100-418-%E4%BA%8C%E7%BB%B4%E5%8A%A8%E6%80%81%E8%A7%84%E5%88%92%E7%BD%91%E6%A0%BC%E4%B8%8E%E5%8F%8C%E5%BA%8F%E5%88%97">4.18 二维动态规划：网格与双序列</a></li><li class="toc-level-2"><a href="#hot100-419-%E8%83%8C%E5%8C%85%E4%B8%8E%E5%89%8D%E7%BC%80%E5%8F%AF%E8%BE%BE%E6%80%A7">4.19 背包与前缀可达性</a></li><li class="toc-level-2"><a href="#hot100-420-%E5%9B%9E%E6%BA%AF%E9%80%89%E6%8B%A9%E9%80%92%E5%BD%92%E4%B8%8E%E6%81%A2%E5%A4%8D">4.20 回溯：选择、递归与恢复</a></li><li class="toc-level-2"><a href="#hot100-421-%E4%BD%8D%E8%BF%90%E7%AE%97%E4%B8%8E%E5%87%BD%E6%95%B0%E5%9B%BE%E5%BB%BA%E6%A8%A1">4.21 位运算与函数图建模</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-a110-%E4%B8%AA%E5%A4%87%E9%80%89%E5%AE%9E%E7%8E%B0">附录 A：110 个备选实现</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-b%E5%85%AC%E5%85%B1%E7%BB%93%E6%9E%84%E4%B8%8E-acm-%E7%A8%8B%E5%BA%8F">附录 B：公共结构与 ACM 程序</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-c36-%E4%B8%AA%E6%89%A9%E5%B1%95%E6%A8%A1%E5%9D%97">附录 C：36 个扩展模块</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-d6-%E4%B8%AA%E9%80%89%E8%AF%BB%E4%B8%93%E9%A1%B9">附录 D：6 个选读专项</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-e20-%E5%BC%A0-python-%E8%AF%AD%E4%B9%89%E5%8D%A1%E6%8C%89%E9%9C%80%E6%9F%A5%E9%98%85">附录 E：20 张 Python 语义卡（按需查阅）</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-f%E7%AC%AC%E4%B8%89%E8%BD%AE%E8%A1%A5%E7%BC%BA%E8%8C%83%E4%BE%8B%E4%B8%8E%E9%A2%9D%E5%A4%96%E9%80%89%E8%AF%BB">附录 F：第三轮补缺范例与额外选读</a></li><li class="toc-level-2"><a href="#hot100-%E4%BD%BF%E7%94%A8%E4%B8%8E%E9%AA%8C%E8%AF%81%E8%AF%B4%E6%98%8E">使用与验证说明</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../index.html">返回课程目录</a><a href="../extended-reading.html">扩展资料说明</a></footer></body></html>
+</article><nav class="chapter-pagination" aria-label="返回课程"><a href="../index.html"><span>返回首页</span><strong>查看课程与额外章节</strong></a><a href="#hot100-leetcode-hot100--python-39%E4%B8%A4%E5%B0%8F%E6%97%B6%E9%80%9F%E8%A7%88%E4%B8%8E%E5%88%86%E8%BD%AE%E5%AD%A6%E4%B9%A0"><span>回到顶部 ↑</span><strong>Hot100 完整指南</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页目录 <span aria-hidden="true">⌄</span></summary><nav aria-label="本页小节"><ol><li class="toc-level-2"><a href="#hot100-%E7%8E%B0%E5%9C%A8%E4%BB%8E%E5%93%AA%E9%87%8C%E5%BC%80%E5%A7%8B">现在从哪里开始</a></li><li class="toc-level-2"><a href="#hot100-%E4%B8%A4%E5%B0%8F%E6%97%B6%E5%BF%AB%E9%80%9F%E5%9B%9E%E9%A1%BE%E6%9C%80%E5%B0%8F%E8%BE%93%E5%85%A5%E8%BE%93%E5%87%BA%E4%B8%8E%E5%85%A8%E9%83%A8-21-%E7%B1%BB%E7%AE%97%E6%B3%95%E6%A8%A1%E6%9D%BF">两小时快速回顾：最小输入输出与全部 21 类算法模板</a></li><li class="toc-level-3"><a href="#hot100-120-%E5%88%86%E9%92%9F%E9%98%85%E8%AF%BB%E5%AE%89%E6%8E%92">120 分钟阅读安排</a></li><li class="toc-level-3"><a href="#hot100-0012-%E5%88%86%E9%92%9F%E4%B8%80%E4%B8%AA%E8%83%BD%E8%AF%BB%E5%85%A5%E6%B1%82%E8%A7%A3%E8%BE%93%E5%87%BA%E5%B9%B6%E6%AD%A3%E5%B8%B8%E7%BB%93%E6%9D%9F%E7%9A%84%E7%A8%8B%E5%BA%8F">00–12 分钟｜一个能读入、求解、输出并正常结束的程序</a></li><li class="toc-level-3"><a href="#hot100-%E8%BE%93%E5%85%A5%E8%BE%93%E5%87%BA%E6%8F%90%E9%80%9F%E9%9C%80%E8%A6%81%E6%97%B6%E5%86%8D%E6%8D%A2%E8%BE%93%E5%87%BA%E7%BB%93%E6%9E%9C%E4%B8%8D%E5%8F%98">输入输出提速：需要时再换，输出结果不变</a></li><li class="toc-level-3"><a href="#hot100-%E5%B8%B8%E7%94%A8%E5%AF%B9%E8%B1%A1%E6%80%8E%E6%A0%B7%E6%8E%A5%E5%88%B0%E7%AE%97%E6%B3%95">常用对象怎样接到算法</a></li><li class="toc-level-3"><a href="#hot100-1230-%E5%88%86%E9%92%9F%E6%95%B0%E7%BB%84%E4%B8%8E%E5%8F%8C%E6%8C%87%E9%92%88%E6%8A%8A%E7%A7%BB%E5%8A%A8%E6%9D%A1%E4%BB%B6%E5%86%99%E5%87%BA%E6%9D%A5">12–30 分钟｜数组与双指针：把移动条件写出来</a></li><li class="toc-level-4"><a href="#hot100-03%E5%B7%A6%E5%8F%B3%E5%A4%B9%E9%80%BC%E7%9B%9B%E6%B0%B4%E4%B8%8E%E4%B8%89%E6%95%B0%E4%B9%8B%E5%92%8C">03｜左右夹逼：盛水与三数之和</a></li><li class="toc-level-3"><a href="#hot100-3040-%E5%88%86%E9%92%9F%E6%A0%88%E4%B8%8E%E5%8D%95%E8%B0%83%E7%BB%93%E6%9E%84%E5%9B%9B%E4%B8%AA%E5%8F%AF%E4%BB%A5%E7%9B%B4%E6%8E%A5%E4%BD%BF%E7%94%A8%E7%9A%84%E6%A8%A1%E6%9D%BF">30–40 分钟｜栈与单调结构：四个可以直接使用的模板</a></li><li class="toc-level-3"><a href="#hot100-4047-%E5%88%86%E9%92%9F%E4%BA%8C%E5%88%86%E6%99%AE%E9%80%9A%E8%BE%B9%E7%95%8C%E6%97%8B%E8%BD%AC%E6%95%B0%E7%BB%84%E5%92%8C%E4%B8%AD%E4%BD%8D%E6%95%B0%E5%88%86%E5%88%AB%E5%86%99">40–47 分钟｜二分：普通边界、旋转数组和中位数分别写</a></li><li class="toc-level-3"><a href="#hot100-4756-%E5%88%86%E9%92%9F%E9%93%BE%E8%A1%A8%E4%B8%8E%E5%BD%92%E5%B9%B6%E5%8F%8D%E8%BD%AC%E7%8E%AF%E5%85%A5%E5%8F%A3%E5%92%8C%E6%8E%92%E5%BA%8F%E9%83%BD%E7%BB%99%E5%AE%8C%E6%95%B4%E4%BB%A3%E7%A0%81">47–56 分钟｜链表与归并：反转、环入口和排序都给完整代码</a></li><li class="toc-level-3"><a href="#hot100-5666-%E5%88%86%E9%92%9F%E6%A0%91%E5%A0%86%E5%AD%97%E5%85%B8%E6%A0%91%E8%BE%93%E5%85%A5%E4%B8%8E%E8%BF%94%E5%9B%9E%E5%80%BC%E5%88%86%E6%B8%85%E6%A5%9A">56–66 分钟｜树、堆、字典树：输入与返回值分清楚</a></li><li class="toc-level-3"><a href="#hot100-6674-%E5%88%86%E9%92%9F%E5%9B%BE%E6%8B%93%E6%89%91%E4%B8%8E%E8%B4%AA%E5%BF%83%E7%9B%B4%E6%8E%A5%E8%AE%B0%E4%BD%8F%E6%8E%A8%E8%BF%9B%E6%9D%A1%E4%BB%B6">66–74 分钟｜图、拓扑与贪心：直接记住推进条件</a></li><li class="toc-level-3"><a href="#hot100-7494-%E5%88%86%E9%92%9F%E5%8A%A8%E6%80%81%E8%A7%84%E5%88%92%E9%87%8D%E7%82%B9%E4%B8%80%E7%BB%B4%E4%BA%8C%E7%BB%B4%E4%B8%8E%E4%B8%A4%E7%A7%8D%E8%83%8C%E5%8C%85%E9%83%BD%E4%BF%9D%E7%95%99">74–94 分钟｜动态规划重点：一维、二维与两种背包都保留</a></li><li class="toc-level-3"><a href="#hot100-94116-%E5%88%86%E9%92%9F%E5%9B%9E%E6%BA%AF%E9%80%89%E6%8B%A9%E9%80%92%E5%BD%92%E6%92%A4%E9%94%80%E9%83%BD%E8%A6%81%E5%86%99%E5%85%A8">94–116 分钟｜回溯：选择、递归、撤销都要写全</a></li><li class="toc-level-3"><a href="#hot100-116120-%E5%88%86%E9%92%9F%E4%BD%8D%E8%BF%90%E7%AE%97%E4%B8%8E%E5%87%BD%E6%95%B0%E5%9B%BE%E5%89%8D%E6%8F%90%E6%88%90%E7%AB%8B%E6%89%8D%E4%BD%BF%E7%94%A8%E6%A8%A1%E6%9D%BF">116–120 分钟｜位运算与函数图：前提成立才使用模板</a></li><li class="toc-level-2"><a href="#hot100-%E5%AE%8C%E6%95%B4%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E7%AC%AC%E4%B8%80%E8%BD%AE--%E7%AC%AC%E4%BA%8C%E8%BD%AE--%E7%AC%AC%E4%B8%89%E8%BD%AE">完整学习路线：第一轮 → 第二轮 → 第三轮</a></li><li class="toc-level-2"><a href="#hot100-%E7%AC%AC%E4%B8%80%E8%BD%AE%E5%BF%85%E5%88%B7r1-01r1-38%E5%85%A8%E9%83%A8%E6%9D%A5%E8%87%AA-hot100">第一轮必刷：R1-01—R1-38，全部来自 Hot100</a></li><li class="toc-level-2"><a href="#hot100-%E7%AC%AC%E4%BA%8C%E8%BD%AE%E5%BF%85%E5%88%B7r2-01r2-62%E8%A1%A5%E9%BD%90-hot100">第二轮必刷：R2-01—R2-62，补齐 Hot100</a></li><li class="toc-level-2"><a href="#hot100-%E7%AC%AC%E4%B8%89%E8%BD%AE%E8%A1%A5%E7%BC%BA%E5%BF%85%E7%BB%83r3-01r3-18%E9%9D%A2%E8%AF%95%E7%BB%8F%E5%85%B8-150-%E7%B2%BE%E9%80%89">第三轮补缺必练：R3-01—R3-18，面试经典 150 精选</a></li><li class="toc-level-2"><a href="#hot100-0-%E5%AD%A6%E4%B9%A0%E5%85%A8%E6%99%AF%E5%85%88%E8%A1%A8%E7%A4%BA%E5%90%8E%E6%93%8D%E4%BD%9C%E5%86%8D%E7%AE%97%E6%B3%95">0. 学习全景：先表示，后操作，再算法</a></li><li class="toc-level-2"><a href="#hot100-1-python-%E4%B8%8E-acm-%E5%89%8D%E7%BD%AE">1. Python 与 ACM 前置</a></li><li class="toc-level-2"><a href="#hot100-2-%E9%80%89%E5%9E%8B%E7%8A%B6%E6%80%81%E4%B8%8E%E6%8E%92%E9%94%99">2. 选型、状态与排错</a></li><li class="toc-level-2"><a href="#hot100-3-%E6%A8%A1%E6%9D%BF%E6%80%8E%E4%B9%88%E5%A4%8D%E7%94%A8%E5%85%88%E6%A0%B8%E5%AF%B9%E5%A5%91%E7%BA%A6%E5%86%8D%E6%94%B9%E4%BB%A3%E7%A0%81">3. 模板怎么复用：先核对契约，再改代码</a></li><li class="toc-level-2"><a href="#hot100-401-%E6%95%B0%E7%BB%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8E%E5%8E%9F%E5%9C%B0%E6%89%AB%E6%8F%8F">4.01 数组、字符串与原地扫描</a></li><li class="toc-level-2"><a href="#hot100-402-%E5%93%88%E5%B8%8C%E8%A1%A8%E4%B8%8E%E9%9B%86%E5%90%88">4.02 哈希表与集合</a></li><li class="toc-level-2"><a href="#hot100-403-%E5%8F%8C%E6%8C%87%E9%92%88%E4%B8%8E%E4%B8%AD%E5%BF%83%E6%89%A9%E5%B1%95">4.03 双指针与中心扩展</a></li><li class="toc-level-2"><a href="#hot100-404-%E7%9F%A9%E9%98%B5%E4%B8%8E%E4%BA%8C%E7%BB%B4%E4%B8%8B%E6%A0%87">4.04 矩阵与二维下标</a></li><li class="toc-level-2"><a href="#hot100-405-%E5%89%8D%E7%BC%80%E7%BB%9F%E8%AE%A1%E4%B8%8E%E5%8C%BA%E9%97%B4%E8%AE%A1%E6%95%B0">4.05 前缀统计与区间计数</a></li><li class="toc-level-2"><a href="#hot100-406-%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E5%AE%9A%E9%95%BF%E6%9C%80%E9%95%BF%E6%9C%80%E7%9F%AD">4.06 滑动窗口：定长、最长、最短</a></li><li class="toc-level-2"><a href="#hot100-407-%E6%A0%88%E9%98%9F%E5%88%97%E4%B8%8E%E5%B5%8C%E5%A5%97%E7%8A%B6%E6%80%81">4.07 栈、队列与嵌套状态</a></li><li class="toc-level-2"><a href="#hot100-408-%E5%8D%95%E8%B0%83%E6%A0%88%E4%B8%8E%E5%8D%95%E8%B0%83%E9%98%9F%E5%88%97">4.08 单调栈与单调队列</a></li><li class="toc-level-2"><a href="#hot100-409-%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E4%B8%8E%E8%BE%B9%E7%95%8C">4.09 二分查找与边界</a></li><li class="toc-level-2"><a href="#hot100-410-%E9%93%BE%E8%A1%A8%E8%8A%82%E7%82%B9%E8%BA%AB%E4%BB%BD%E4%B8%8E-lru">4.10 链表、节点身份与 LRU</a></li><li class="toc-level-2"><a href="#hot100-411-%E9%80%92%E5%BD%92%E5%A5%91%E7%BA%A6%E4%B8%8E%E5%BD%92%E5%B9%B6%E5%88%86%E6%B2%BB">4.11 递归契约与归并分治</a></li><li class="toc-level-2"><a href="#hot100-412-%E4%BA%8C%E5%8F%89%E6%A0%91bst-%E4%B8%8E%E5%AD%90%E6%A0%91%E9%80%92%E6%8E%A8">4.12 二叉树、BST 与子树递推</a></li><li class="toc-level-2"><a href="#hot100-413-%E5%A0%86top-k-%E4%B8%8E%E5%A4%9A%E8%B7%AF%E5%90%88%E5%B9%B6">4.13 堆、Top-K 与多路合并</a></li><li class="toc-level-2"><a href="#hot100-414-%E5%AD%97%E5%85%B8%E6%A0%91%E5%89%8D%E7%BC%80%E4%B8%8E%E5%AE%8C%E6%95%B4%E5%8D%95%E8%AF%8D">4.14 字典树：前缀与完整单词</a></li><li class="toc-level-2"><a href="#hot100-415-%E5%9B%BE%E7%BD%91%E6%A0%BC%E6%90%9C%E7%B4%A2%E4%B8%8E%E6%8B%93%E6%89%91%E6%8E%92%E5%BA%8F">4.15 图、网格搜索与拓扑排序</a></li><li class="toc-level-2"><a href="#hot100-416-%E8%B4%AA%E5%BF%83%E5%8F%AF%E8%A1%8C%E6%80%A7%E4%B8%8E%E5%B1%80%E9%83%A8%E9%80%89%E6%8B%A9">4.16 贪心：可行性与局部选择</a></li><li class="toc-level-2"><a href="#hot100-417-%E4%B8%80%E7%BB%B4%E5%8A%A8%E6%80%81%E8%A7%84%E5%88%92%E5%85%88%E5%AE%9A%E4%B9%89%E7%BB%93%E5%B0%BE%E7%8A%B6%E6%80%81">4.17 一维动态规划：先定义结尾状态</a></li><li class="toc-level-2"><a href="#hot100-418-%E4%BA%8C%E7%BB%B4%E5%8A%A8%E6%80%81%E8%A7%84%E5%88%92%E7%BD%91%E6%A0%BC%E4%B8%8E%E5%8F%8C%E5%BA%8F%E5%88%97">4.18 二维动态规划：网格与双序列</a></li><li class="toc-level-2"><a href="#hot100-419-%E8%83%8C%E5%8C%85%E4%B8%8E%E5%89%8D%E7%BC%80%E5%8F%AF%E8%BE%BE%E6%80%A7">4.19 背包与前缀可达性</a></li><li class="toc-level-2"><a href="#hot100-420-%E5%9B%9E%E6%BA%AF%E9%80%89%E6%8B%A9%E9%80%92%E5%BD%92%E4%B8%8E%E6%81%A2%E5%A4%8D">4.20 回溯：选择、递归与恢复</a></li><li class="toc-level-2"><a href="#hot100-421-%E4%BD%8D%E8%BF%90%E7%AE%97%E4%B8%8E%E5%87%BD%E6%95%B0%E5%9B%BE%E5%BB%BA%E6%A8%A1">4.21 位运算与函数图建模</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-a110-%E4%B8%AA%E5%A4%87%E9%80%89%E5%AE%9E%E7%8E%B0">附录 A：110 个备选实现</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-b%E5%85%AC%E5%85%B1%E7%BB%93%E6%9E%84%E4%B8%8E-acm-%E7%A8%8B%E5%BA%8F">附录 B：公共结构与 ACM 程序</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-c36-%E4%B8%AA%E6%89%A9%E5%B1%95%E6%A8%A1%E5%9D%97">附录 C：36 个扩展模块</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-d6-%E4%B8%AA%E9%80%89%E8%AF%BB%E4%B8%93%E9%A1%B9">附录 D：6 个选读专项</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-e20-%E5%BC%A0-python-%E8%AF%AD%E4%B9%89%E5%8D%A1%E6%8C%89%E9%9C%80%E6%9F%A5%E9%98%85">附录 E：20 张 Python 语义卡（按需查阅）</a></li><li class="toc-level-2"><a href="#hot100-%E9%99%84%E5%BD%95-f%E7%AC%AC%E4%B8%89%E8%BD%AE%E8%A1%A5%E7%BC%BA%E8%8C%83%E4%BE%8B%E4%B8%8E%E9%A2%9D%E5%A4%96%E9%80%89%E8%AF%BB">附录 F：第三轮补缺范例与额外选读</a></li><li class="toc-level-2"><a href="#hot100-%E4%BD%BF%E7%94%A8%E4%B8%8E%E9%AA%8C%E8%AF%81%E8%AF%B4%E6%98%8E">使用与验证说明</a></li></ol></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../index.html">返回课程目录</a><a href="../extended-reading.html">扩展资料说明</a></footer></body></html>
