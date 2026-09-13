@@ -3,27 +3,53 @@
 <body><header><a href="index.html">Agent 前沿进阶</a><span>能力增长、自主研究与自我改进</span></header><main><h1 id="第-01-章一次失败之后究竟该改什么">第 01 章｜一次失败之后，究竟该改什么</h1>
 <blockquote>
 <p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：Agent 没有完成任务时，怎样找到值得改变的对象，并判断一次修好能说明什么？</p>
-<p><strong>关键概念</strong>：干预：有意改变一个条件；能力对象：被评价的模型或完整系统；归因：区分结果变化来自哪里；消费者：实际读取并使用新信息或新程序的后续执行者。</p>
-<p><strong>关系主线</strong>：从空格路径失败追到参数传递，用受控回放区分执行缺陷与决策失误，再比较补输入、增计算、存经验、改参数和改程序；每条路线都回到同条件的后续任务评价。</p>
+<p><strong>核心问题</strong>：智能代理（Agent）没有完成工作时，怎样辨认值得改变的对象，判断一次修好能说明什么？</p>
+<p><strong>关键概念</strong>：干预（Intervention）是有意改变一个条件；归因（Attribution）是辨认结果变化来自哪里；消费者（Consumer）是实际读取并使用新信息或新程序的后续执行者。</p>
+<p><strong>关系主线</strong>：从一个路径被拆成两个参数的失败出发，用固定输入的小程序分开决策与执行问题，再追踪改变留在哪里、未来由谁使用，最后形成同条件的改进比较。</p>
 </blockquote>
-<h2 id="先固定这次失败的世界">先固定这次失败的世界</h2>
-<p>本册沿用“模型提出下一步，Harness 组织输入、执行工具并保存状态”的基础关系。Harness 是运行支撑；项目文件、进程和测试是工作环境。若尚不熟悉这个区分，可回读<a href="../notes/maka/learning/01-agent-components.html">旧课第01章</a>。本章增加的问题是：工作没有完成时，<strong>怎样选择能区分原因的下一项检查，怎样从单次修复走向可复用改善</strong>。</p>
-<p>先承接<a href="../notes/maka/learning/62-complete-design-cases.html">旧课第62章案例 A</a>的 Python/pytest 情境。本章重新给出理解所需的全部条件，不借用旧49章的 JavaScript 项目：</p>
-<ul>
-<li>用户要求修复文档检查器对空格路径的处理，更新 README 的测试说明，并保留 README 顶部已有的部署笔记。</li>
-<li>项目配置明确以 pytest 运行测试。允许编辑 <code>runner.py</code> 的包装函数与 README；测试及其他文件只读。本例不涉及发布。</li>
-<li>当前目录含 <code>checker.py</code>、普通路径 <code>docs/guide.md</code> 和空格路径 <code>docs/guide draft.md</code>。检查器只接收一个文件参数；文件不存在应返回非零状态与原因。</li>
-<li>固定模型 M0、固定运行支撑 H0，最多6次模型调用、8次工具调用和120秒；本次开始时跨任务记忆为空。数值是教学预算，不是服务限制。</li>
-<li>工具返回原始命令、退出码和输出。成功需要两种路径均保持完整、缺失文件的错误仍可见、相关用例确实执行、修改范围及用户笔记保持正确。</li>
-</ul>
-<p>以下 Agent 的行动是给定的教学轨迹；稍后的参数探针是本地实际执行的小程序。二者不能合并成“模型已经独立修好了项目”。</p>
-<p>模型首先选择读取包装函数，看到的核心逻辑是把解释器、脚本和文件路径拼成 shell 命令。它随后发出结构化动作 <code>check_document(path=&quot;docs/guide draft.md&quot;)</code>。本例的工具适配器把 <code>path</code> 字符串原样交给项目 <code>runner.py</code> 的 <code>run_checker</code>，包装函数再拼接 shell 命令启动 <code>checker.py</code>。动作记录、包装函数入口的参数记录、子程序的参数记录三者齐全；不是根据最终报错倒推模型动作。子程序收到两个参数 <code>docs/guide</code> 与 <code>draft.md</code>，报“需要一个路径”，尚未检查文档内容。模型又尝试同样的调用，仍失败，预算已经少了一次。</p>
-<p>这时不能仅凭失败说“底模不会写 Python”。模型给出了正确的完整路径；路径是在被测项目的包装函数启动子程序时被拆开的。这里 <code>runner.py</code> 是用户要求修复的任务产物，尚不是 Agent 自己的 Harness。当前证据首先指向项目内的参数传递；至于 Agent 为什么没有修好它，还需检查实际输入与后续决策。</p>
-<h2 id="用一个探针区分三种解释">用一个探针区分三种解释</h2>
-<p>把含糊的“Agent 不够强”拆成三种可区分的解释：模型没有取得正确路径；模型取得路径却提出了错误动作；动作正确，但被调用的项目包装函数改变了参数边界。三种问题可以产生相同的最终报错，修法却不同。</p>
-<p>本例先比较模型动作与执行器交给子程序的参数。如果原动作中是完整的 <code>docs/guide draft.md</code>，而子程序收到两个参数，那么至少这一次有直接的执行边界证据。为隔离这一层，下面固定动作内容，不调用模型，只让子程序打印收到的参数。</p>
-<p>这是可执行参考代码，适用于本例的 POSIX shell。<code>shlex.quote</code> 只用于保护解释器和固定探针文本；旧方式刻意保留未引用的示例路径，以复现缺陷。路径是本章写死的无害字面量，不能把这个旧方式用于任意外部输入。</p>
+<a id="先固定这次失败的世界"></a>
+<h2 id="前情回顾提出正确动作还需要正确执行">前情回顾：提出正确动作，还需要正确执行</h2>
+<p>在基础课程中，智能代理（Agent）围绕目标观察、决定下一步并取得反馈；模型（Model）提出行动请求（Action），运行支撑（Agent Harness）组织输入、执行工具（Tool）与控制过程，执行环境（Environment）提供被操作的文件和检查程序。比如“读取 README”只是请求，文件内容还要经执行返回，才能成为下一次判断的依据。可以从<a href="../notes/maka/learning/01-agent-components.html">基础第01章</a>回看这张关系图。</p>
+<p>同样，模型（Model）已经写出正确路径，并不保证子程序收到正确路径；子程序正常结束，也不保证完成了用户要求。基础第26章把这几种判断分开。本章向前一步：<strong>当失败已经出现，下一项检查应该改变什么，才能把几个可能原因分开？</strong></p>
+<p>本章重新交代<a href="../notes/maka/learning/62-complete-design-cases.html">基础第62章案例 A</a>的必要背景：这是一个 Python 文档检查项目。<code>checker.py</code> 应接收一个文件路径；项目内的 <code>runner.py</code> 提供包装函数 <code>run_checker</code>，负责启动它。普通路径 <code>docs/guide.md</code> 正常，含空格的 <code>docs/guide draft.md</code> 却报“需要一个路径”。先只追这个现象，暂时不扩大成整个项目的修改方案。以下过程是给定的教学执行轨迹（Trajectory），其中的小型参数探针（Probe）另有实际运行结果。</p>
+<a id="用一个探针区分三种解释"></a>
+<h2 id="一个报错为什么可能有三种原因">一个报错，为什么可能有三种原因</h2>
+<p>只看“需要一个路径”，至少还存在三种解释：当前输入没有给出完整路径；模型（Model）看到了完整路径，却生成了两个参数；生成的请求正确，后面的程序才把一个路径拆开。三者都能使检查器报同一句话。</p>
+<p>要作归因（Attribution），先补沿途的观察结果（Observation）。本例给定三段彼此关联的记录：</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>位置</th>
+<th>记录中的具体内容</th>
+<th>它排除了什么解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>模型（Model）发出的行动请求（Action）</td>
+<td><code>check_document(path=&quot;docs/guide draft.md&quot;)</code></td>
+<td>这一次提交的是一个完整路径字段</td>
+</tr>
+<tr>
+<td>工具适配器（Tool Adapter）交给项目包装函数</td>
+<td><code>run_checker</code> 的 <code>path</code> 仍是完整字符串</td>
+<td>转交这一步没有拆开它</td>
+</tr>
+<tr>
+<td><code>checker.py</code> 接收到的业务参数</td>
+<td><code>[&#39;docs/guide&#39;, &#39;draft.md&#39;]</code></td>
+<td>参数边界在进入子程序前已经改变</td>
+</tr>
+</tbody></table></div>
+<p>工具适配器（Tool Adapter）在这里是把调用接到项目函数的连接程序，按题设原样转交路径。读取 <code>runner.py</code> 又发现：它把解释器、脚本名和路径直接拼成文本，交给命令解释器（Shell）执行；后者会按语法解释空格等字符。于是，观察结果（Observation）与代码机制相互吻合：当前错误首先位于项目包装函数的参数传递。</p>
+<p>这里有两个不同问题。<strong>项目为什么处理不了空格路径？</strong> 现有证据已指向包装函数。<strong>智能代理（Agent）为什么没有修好它？</strong> 还要继续看后续实际输入和决策。本例给定它没有比较沿途记录，又发了一次相同请求，仍然失败；这说明本次调查没有推进，尚不能推出模型（Model）普遍不懂 Python。</p>
+<h3 id="先把改变对象放回职责图">先把改变对象放回职责图</h3>
+<p>图中实线表示本例的调用关系，框表示对象归属；返回结果的箭头省略了包装函数与适配器的逐层回传。标为“可研究”的位置表示其他实验可以选择的干预（Intervention），不是本题已经取得的修改权限（Permission）。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="先把改变对象放回职责图"><a href="figures/01-what-actually-improves-figure-1.svg" target="_blank" rel="noopener"><img src="figures/01-what-actually-improves-figure-1.svg" alt="先把改变对象放回职责图" width="720" height="1385"></a></div><figcaption>图 1：先把改变对象放回职责图。宽图可横向滚动，点击可查看独立 SVG。</figcaption></figure><p>修 <code>runner.py</code> 改变的是这份项目产物（Artifact），没有改变图中上半部的模型（Model）或运行支撑（Agent Harness）。若明天换到另一个仍有缺陷的项目，这份记录修改内容的补丁（Patch）不会自动教会模型（Model）如何修复它。这个归属区别决定了我们下一步究竟在验证“项目修好”，还是在研究“解题方法更好”。</p>
+<h2 id="固定同一输入只改变参数传递方式">固定同一输入，只改变参数传递方式</h2>
+<p>干预（Intervention）比继续看报错多做了一件事：<strong>让两个过程保持需要比较的条件相同，有意改变可疑环节，观察差异。</strong> 本例固定同一解释器、同一路径与同一段子程序，只比较“文本交给命令解释器（Shell）”和“直接传参数数组（Argument Vector）”。后者是有顺序的参数列表，每个元素表示一个参数。</p>
+<p>为了隔开文档内容的影响，先把真实检查器换成固定探针（Probe）：一个只打印收到哪些参数的小程序。这样得到的差异只回答传参问题，不依赖 Markdown 是否合格，也不要求重新调用模型（Model）。下面三段 Python 按顺序组成完整可执行参考程序。</p>
+<h3 id="第一步让接收者把收到的内容显示出来">第一步：让接收者把收到的内容显示出来</h3>
+<p><code>-c</code> 要求 Python 执行其后的一段代码文本；在这种启动方式中，<code>sys.argv[0]</code> 是 <code>-c</code>，<code>sys.argv[1:]</code> 才是后面传入的业务参数。探针（Probe）用 JavaScript 对象表示法（JavaScript Object Notation，JSON）打印这个列表，父程序随后把它还原为列表比较。</p>
 <pre><code class="language-python">import json
 import shlex
 import subprocess
@@ -31,150 +57,147 @@ import sys
 
 probe = &quot;import json,sys; print(json.dumps(sys.argv[1:]))&quot;
 path = &quot;docs/guide draft.md&quot;
-old_command = f&quot;{shlex.quote(sys.executable)} -c {shlex.quote(probe)} {path}&quot;
-
-old = subprocess.run(old_command, shell=True,
-                     capture_output=True, text=True, check=False)
-new = subprocess.run([sys.executable, &quot;-c&quot;, probe, path], shell=False,
-                     capture_output=True, text=True, check=False)
-
-print(json.loads(old.stdout))
-print(json.loads(new.stdout))
-</code></pre><p>本地探针得到：</p>
+</code></pre><p>这里的 <code>path</code> 是固定教学字符串。文件是否存在不会影响打印，因此这个探针（Probe）不能验证检查器是否真的读取了文档。</p>
+<h3 id="第二步重现旧方式再换成参数数组argument-vector">第二步：重现旧方式，再换成参数数组（Argument Vector）</h3>
+<p>下面的旧方式故意不引用路径，保留待解释的缺陷。<code>shlex.quote</code> 只保护解释器路径和固定代码文本，使它们不成为第二处意外分词原因；这段旧方式仅用于本例固定字符串的 POSIX 命令解释器（Shell）对照。</p>
+<pre><code class="language-python">old_command = f&quot;{shlex.quote(sys.executable)} -c {shlex.quote(probe)} {path}&quot;
+old = subprocess.run(
+    old_command, shell=True,
+    capture_output=True, text=True, check=False,
+)
+new = subprocess.run(
+    [sys.executable, &quot;-c&quot;, probe, path], shell=False,
+    capture_output=True, text=True, check=False,
+)
+</code></pre><p><code>old_command</code> 只有一段文本，空格需要由命令解释器（Shell）重新解释。新方式则已经给出四个元素：解释器、<code>-c</code>、代码文本、完整路径；最后一个元素内部的空格不再用来划分参数。两边的接收者相同，改变的是抵达它的传递路线。</p>
+<h3 id="第三步比较接收到的值不只看退出码exit-code">第三步：比较接收到的值，不只看退出码（Exit Code）</h3>
+<p>退出码（Exit Code）是进程结束时返回的状态数字。先确认打印程序正常执行，再解析标准输出（Standard Output），分别检查参数个数和内容；不能让“打印成功”代替“传参正确”。</p>
+<pre><code class="language-python">assert old.returncode == new.returncode == 0
+old_args = json.loads(old.stdout)
+new_args = json.loads(new.stdout)
+assert old_args == [&quot;docs/guide&quot;, &quot;draft.md&quot;]
+assert new_args == [path]
+print(old_args)
+print(new_args)
+</code></pre><p>实际执行这三段参考程序得到：</p>
 <pre><code class="language-text">['docs/guide', 'draft.md']
 ['docs/guide draft.md']
-</code></pre><p>第一次在 shell 中将空格当成参数分隔，第二次由参数数组保留一个路径元素。两次打印程序都可能退出0；<strong>打印成功不等于参数正确</strong>。这个结果只验证参数传递机制，不检查 Markdown，不运行 pytest，也不评价模型选择能力。</p>
-<p>现在可以解释为什么三种候选处方不同：</p>
-<div class="table-scroll" tabindex="0"><table>
-<thead>
-<tr>
-<th>当前能看到的证据</th>
-<th>最先值得比较的干预</th>
-<th>该对照仍不能回答什么</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>路径在模型输入里就被截掉</td>
-<td>保留完整路径，核对发送给模型的输入</td>
-<td>完整输入一定会被正确使用吗</td>
-</tr>
-<tr>
-<td>模型动作已是两个路径，执行器原样转发</td>
-<td>固定工具与环境，比较动作说明或决策模型</td>
-<td>换模型是否只改善这一道题</td>
-</tr>
-<tr>
-<td>动作含一个路径，子程序收到两个</td>
-<td>固定动作，比较字符串与参数数组</td>
-<td>模型是否能自行发现并修复缺陷</td>
-</tr>
-</tbody></table></div>
-<p>本例第三行已有探针支持。它定位了待修项目的缺陷，还没有证明 Agent 的循环或工具适配器有缺陷。下一项最有区分力的工作是修正项目包装层并检查错误传播；继续重复相同命令不会提供新的区别证据。</p>
-<h2 id="从局部机制走完这项修复">从局部机制走完这项修复</h2>
-<p>在当前授权下，候选补丁把包装函数改成以下形式。它与旧课的参考方案采用同一个参数边界原理，新增的是前面的诊断对照，以及后面的能力结论范围。</p>
+</code></pre><p>两个进程都正常结束，收到的内容却不同。它直接支持“在本地 POSIX 条件与这条路径上，改用参数数组（Argument Vector）保留了边界”。前面给定的三段执行轨迹（Trajectory）才把这一机制接回项目缺陷；探针（Probe）本身没有运行真实文档检查、pytest 或智能代理（Agent）。</p>
+<p>这里也不能倒推“必须换模型（Model）”。我们固定了生成出的请求，根本没有比较生成能力。相反，如果原请求本来就含两个路径，而后面原样传递，就该回到输入与决策检查。<strong>观察在哪里分叉，决定干预（Intervention）首先放在哪里；一个对照只排除它实际控制住的解释。</strong></p>
+<a id="从局部机制走完这项修复"></a>
+<h2 id="局部机制修对还欠哪些任务条件">局部机制修对，还欠哪些任务条件</h2>
+<p>现在回到实际要交付的项目修复，补齐此时会用到的条件：用户允许修改 <code>runner.py</code> 的包装函数和 README，测试及其他文件只读；README 顶部已有用户部署笔记，需要保留。项目配置声明使用 pytest，成功还要求普通路径仍能检查、缺失文件仍会报错、相关测试确实执行以及文件差异（Diff）符合范围。没有发布要求。</p>
+<p>候选补丁（Patch）把同一个传参机制用于真实检查器。输入是路径 <code>path</code> 与可信配置给定的工作目录 <code>cwd</code>；输出是已结束子进程的结果，留给调用者判定。以下是参考实现，当前没有运行真实项目的 <code>checker.py</code>：</p>
 <pre><code class="language-python">import subprocess
 import sys
 
 def run_checker(path: str, cwd: str):
     return subprocess.run(
+        # 路径是一个元素，内容中的空格不改变参数边界。
         [sys.executable, &quot;checker.py&quot;, path],
         cwd=cwd, shell=False,
         capture_output=True, text=True, check=False,
     )
-</code></pre><p>可信配置固定 <code>cwd</code> 与 <code>checker.py</code>；<code>check=False</code> 让非零结果以 <code>returncode</code> 留给调用者，<code>stdout</code> 和 <code>stderr</code> 保存输出。调用者仍须解释这三个值。参数数组不提供文件隔离，不约束检查器内部行为，也不保护与其他写者之间的文件竞争。</p>
-<p>完整的教学处理继续如下：读取当前文件后只改包装函数；保留用户部署笔记，按配置更正 README 的 pytest 说明；在干净副本上检查普通路径、空格路径和缺失文件；再运行项目声明的相关测试，最后核对 diff。若读取后用户保存了新内容，先重读与合并，不能沿用旧文件直接覆盖。这个编辑条件属于任务合同，不由模型信心决定。</p>
+</code></pre><p>可信配置固定 <code>cwd</code> 和允许调用的 <code>checker.py</code>。<code>check=False</code> 不因子程序非零退出而抛出对应异常，而是把退出码（Exit Code）留在 <code>returncode</code>；<code>stdout</code> 与 <code>stderr</code> 分别保存标准输出（Standard Output）和标准错误（Standard Error）。调用者仍要读取并解释它们；进程无法启动等异常也仍可能发生。这个接口语义来自 <a href="https://docs.python.org/3/library/subprocess.html#subprocess.run">Python 的子进程文档</a>。</p>
+<p>完整过程是：读取当前文件，形成仅覆盖包装函数的补丁（Patch）；保留用户笔记，按配置修正 README 的测试说明；检查三种路径，再运行相关测试并核对文件差异（Diff）。读取之后若用户又保存了文件，就先重读当前内容再合并；传参修复不提供并发写入保护，也不提供沙箱（Sandbox）隔离。</p>
 <div class="table-scroll" tabindex="0"><table>
 <thead>
 <tr>
-<th>检查</th>
-<th>本例给定的修复后观察</th>
-<th>可交付的判断</th>
+<th>本次要检查什么</th>
+<th>教学给定的修复后结果</th>
+<th>结果支持的范围</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>普通路径</td>
-<td>检查器收到一个路径，完成文档检查</td>
-<td>原正常行为保留</td>
+<td>收到一个路径并完成文档检查</td>
+<td>原正常行为保持</td>
 </tr>
 <tr>
 <td>空格路径</td>
-<td>检查器收到完整路径，完成文档检查</td>
-<td>本次路径问题解决</td>
+<td>收到完整路径并完成文档检查</td>
+<td>本例缺陷解决</td>
 </tr>
 <tr>
-<td>不存在的路径</td>
-<td>检查器返回非零及缺失诊断</td>
-<td>包装层没有吞掉错误</td>
+<td>缺失文件</td>
+<td>非零退出，保留缺失诊断</td>
+<td>没有吞掉错误</td>
 </tr>
 <tr>
-<td>pytest 与 diff</td>
-<td>相关用例被发现且通过；仅两份允许文件变化</td>
-<td>受测行为与修改范围符合任务</td>
+<td>pytest 与文件差异（Diff）</td>
+<td>相关用例被发现并通过；仅两份允许文件变化，用户笔记不变</td>
+<td>受测行为与修改范围符合要求</td>
 </tr>
 </tbody></table></div>
-<p>这张表是完整教学验收，只有前面的参数探针属于本章真实运行。对表中条件的参考交付是：“包装层改为参数数组；相关行为与修改范围符合本例验收条件，用户笔记保留。”没有检查的操作系统和文档规则不在结论内。</p>
-<p>一个关键反例是把包装函数改为“任何错误都返回成功”。界面上的红色提示消失，缺失文件却也被当成有效文档。它改变了反馈的真实性，没有完成用户合同；因此必须保留第三行，不能只回测最初的空格路径。</p>
-<h2 id="同一个改善可能留在四个不同位置">同一个改善，可能留在四个不同位置</h2>
-<p>现在假设本题结束，明天到来的是另一个项目。是否受益，取决于今天改变的内容是否进入明天的执行。</p>
-<p><strong>任务内改善</strong>只保留在本次工作状态中，例如读到了正确配置或多试了一条命令。新会话清空这些状态后，不能假定改善还在。旧课第36章的 RLM（递归语言模型）选读用外部材料和模型子调用处理大任务；它说明一种输入与计算组织方式，不要求先更改模型参数。本章只用这一最短区分，具体机制在主动取证路线再展开。</p>
-<p><strong>跨任务外部经验</strong>可以是有适用条件的方法条目：“启动程序时保留路径参数边界；按当前项目配置找测试入口。”它需要被保存、按作用域读回、加入实际输入并影响行动。只在磁盘留下 <code>lessons.md</code>，而新请求没有读它，尚无消费。若经验被写成“所有项目都运行 pytest”，迁移到其他测试体系时还会带来错误。</p>
-<p><strong>参数更新</strong>改变模型内部参与预测的数值。训练程序读取合适的数据，按明确目标更新这些数值，部署端装载更新后的模型，再测试未来任务。把修复轨迹存成 JSON 只完成数据保存；它不会自动触发训练，更不会保证新模型更可靠。旧46章已给局部目标，训练基础会把概率、损失和一次更新真正算出来。</p>
-<p><strong>程序更新</strong>要先区分项目产物和解题程序。上述 <code>runner.py</code> 补丁修好了这个项目；把它交付给用户，并没有改造 Agent 在别的项目中的解题方式。若另一个实验允许修改 Agent 自身的共享工具适配器，且后续启动器实际装载了新适配器，才是 Harness 程序的更新。这个新实验有不同的可写范围与消费者，不能从当前项目授权直接推出。程序优化可以保持底模固定；“自动生成过一个补丁”也不等于已经证明改进器本身变强。</p>
+<p>表中是完整教学预期，不能和前面的实际探针（Probe）输出合并成新项目运行报告。按这些给定结果，参考交付可以说：“包装函数改用参数数组（Argument Vector），相关行为和修改范围满足上述条件。”没有检查的文档规则、平台与并发情况仍不能一并宣布通过。</p>
+<p><strong>反例：把所有错误都改成成功。</strong> 这样空格路径的红色提示也会消失，但不存在的文件会被当成有效文档。它改的是反馈，未满足检查文档的要求。缺失文件这一项使“真的保留了正确行为”与“只是隐藏失败”出现可观察差异；只回测原报错就会遗漏它。</p>
+<a id="同一个改善可能留在四个不同位置"></a>
+<h2 id="改变留在哪里决定未来谁可能受益">改变留在哪里，决定未来谁可能受益</h2>
+<p>假设这次工作结束，明天换到另一份尚未修好的项目。消费者（Consumer）指实际读取并使用改变的部件：有文件却没有读取，就没有完成消费；装载了新内容，也还要观察是否改善行为。</p>
+<p>先看同一条诊断方法：“比较原请求与接收者拿到的参数，再定位边界。”它可以留在不同位置，形成不同研究对象：</p>
 <div class="table-scroll" tabindex="0"><table>
 <thead>
 <tr>
-<th>干预对象</th>
-<th>下一次谁实际消费</th>
-<th>必须新增的比较</th>
+<th>改变留在哪里</th>
+<th>未来的消费者（Consumer）</th>
+<th>还需要什么证据</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>当前输入</td>
-<td>下一模型请求</td>
-<td>同模型、工具和预算下，补入缺失信息是否改变结果</td>
+<td>当前输入（Input）</td>
+<td>本次后续模型请求（Model Request）</td>
+<td>方法确实进入请求，后续调查改变了什么</td>
 </tr>
 <tr>
-<td>推理计算与候选选择</td>
-<td>本次搜索与选择程序</td>
-<td>等总预算比较候选覆盖、选择质量和交付</td>
+<td>外部记忆（Memory）或技能说明包（Skill）</td>
+<td>新任务的检索与输入组织（Input Composition）</td>
+<td>适用时被读回，实际采用，额外成本也入账</td>
 </tr>
 <tr>
-<td>外部经验</td>
-<td>新任务的检索与输入组装</td>
-<td>保留/重置，以及相近输入长度和读取成本的对照</td>
+<td>模型参数（Model Parameters）</td>
+<td>装载新数值的推理程序</td>
+<td>在固定运行支撑（Agent Harness）下，未来任务表现如何</td>
 </tr>
 <tr>
-<td>模型参数</td>
-<td>装载新参数的推理端</td>
-<td>固定运行支撑，在未用于更新与选优的任务上比较</td>
-</tr>
-<tr>
-<td>工具或 Harness 程序</td>
+<td>任务程序（Task Program）</td>
 <td>后续启动器与执行器</td>
-<td>确认新程序运行，再比较功能、失败分支与总成本</td>
+<td>新程序真的运行，待修项目仍保持共同初态</td>
 </tr>
 <tr>
-<td>产生改进的程序</td>
-<td>下一轮候选生成过程</td>
-<td>相同起点与生成预算下，比较实际选出的后继</td>
+<td>改进程序（Meta Program）</td>
+<td>下一轮提出与选择后继的过程</td>
+<td>相同起点与生成预算（Budget）下，能否更有效地产生可用后继</td>
 </tr>
 </tbody></table></div>
-<p>最后一行通向递归自我改进（RSI）。最低需要追踪“这一代改善了什么，下一代实际继承了什么”，再区分任务程序收益和产生更好后继的能力。旧46章已有有限 task/meta 示例；本册后续会展开候选生成与多代对照。这里没有把这些干预排成必经升级阶梯。</p>
-<p>这些变化仍可放回六组 Harness 职责：补材料影响输入组织，修改共享工具适配器影响模型与工具循环，经验保存影响状态，准入保护权限，候选调度影响任务推进，判定影响观察与评价。六组是定位责任的教学坐标，一个机制可以跨组；修好某组不能自动替代其余组的保证。</p>
-<h2 id="从一道空格题走向任务集合">从一道空格题走向任务集合</h2>
-<p>“以后也少犯错”需要另定义任务族。后续 K-A 表示<strong>课程构造的代码维护任务族</strong>，不是从公开 benchmark 下载的成绩集。它包含路径边界、测试入口发现、错误状态传播、文档修改范围四类机制；每个任务有自己的初始文件和合同。同一模板换十个文件名是十个变体，却仍共享一个来源组，不能据此宣称有十份独立机制证据。</p>
-<p>本章的空格题已用于诊断与开发。下一章的统计小表会另外定义任务与试次，数字也是教学数据。真实研究则应先确定要覆盖的项目范围，从中取得足够独立的任务，并记录重复题、派生变体和未取得评分的情况。</p>
-<p>底模能力约束可选干预，但这需要通过具体失败认识。若模型不能解释正确提供的短代码，补更多不相关材料可能无效；若完整路径是在被调用的程序内部拆开的，换更强模型后这份缺陷仍存在，只是新模型可能更善于诊断和修复它。官方的环境资源对照也表明，保持模型和 Harness 不变，仅改变运行资源就可能改变任务成绩；它支持“把环境列为干预对象”，不替本例给出收益数字。</p>
-<p>参考下一项 Agent 改进实验是：保留 M0 和固定工具，比较两种输入政策 Q0/Q1。Q0 使用原有说明；Q1 在第一次执行失败后追加一条固定的诊断方法：“比较原动作与子程序收到的参数，再定位边界。”该提示由本题开发得到，不含未来题答案。两个方案都从同样尚未修好的项目副本开始，在相同权限和预算下完成任务，记录实际输入、动作、结果与成本。Q1需要读取更多材料时，这些开销也占同一预算；若只在路径任务受益，结论就限定为这一机制。</p>
-<p>这比“把 Q1 一侧的项目预先修好”多守住一个关键条件：两边面临相同难题。预先修好的项目可以检验产物回归，却不能用来证明解题 Agent 更会修代码。后续评价章将进一步区分提示中的信息、长度与步骤指导分别贡献了多少。</p>
-<h2 id="从失败证据作出参考判断">从失败证据作出参考判断</h2>
-<p><strong>问题。</strong> 新模型在这道题上成功，旧模型失败，就能确定需要换模型吗？</p>
-<p><strong>答案。</strong> 还不能。先核对两者是否使用同一包装层、实际输入与总预算；本例已经发现项目包装函数会拆路径，新模型也可能通过额外引用临时绕开缺陷。下一项对照应先固定动作检查执行边界，再在已确认的条件下比较模型。一次成功提供可行路径，任务集合才支持更广的收益判断。</p>
-<p><strong>问题。</strong> 参数探针已通过，为什么还要保留缺失文件检查？</p>
-<p><strong>答案。</strong> 探针只检验子程序收到几个参数。一个返回常量成功的包装层也可能不再报空格错误，但会掩盖文档不存在。检查错误传播和实际文档行为，才能排除这个反例。</p>
-<p><strong>问题。</strong> 保存方法、安装程序、更新模型，哪一个一定算学习成功？</p>
-<p><strong>答案。</strong> 都没有这种自动保证。先指出哪个后续消费者用到了变化，再在明确任务、预算和反馈条件下比较未来行为。保存、安装、更新是状态变化；收益是另一个需要评价的结论。</p>
+<p>外部记忆（Memory）是在模型（Model）之外保留、供未来读取的经验；技能说明包（Skill）组织可复用的方法说明。把方法写进 <code>lessons.md</code>，新任务却不读它，只能证明保存。若把经验过度写成“所有项目都用 pytest”，新项目只有别的测试入口时，它还可能妨碍修复。需要保留的是适用条件和诊断方法，不能把某题答案当通用规则。</p>
+<p>模型参数（Model Parameters）则是参与预测的内部数值。训练（Training）必须让数据按明确目标改变这些数值，部署端再实际装载，才能影响后续预测。基础第46章已给“输出概率（Probability）提高会怎样改变局部目标”的例算，但保存执行轨迹（Trajectory）不会自动触发训练（Training），局部数值下降也不证明未来任务更好。<a href="07-probabilities-and-tensors.html">本册第07、08章</a>会给从预测到更新的完整小模型（Model）过程；首次进入时会重新补所需数学，不要求已读基础第46章的选读推导。</p>
+<p>任务程序（Task Program）规定怎样调查、修改与检查；改进程序（Meta Program）产生并选择这些方法的后继。本例项目中的 <code>runner.py</code> 是被解题者修改的产物（Artifact），不因文件里也有程序就自动成为上述任务程序（Task Program）。研究共享工具适配器（Tool Adapter）的更新，则要另外允许修改它，并确认后续启动器使用了新实现；本题项目权限（Permission）不会自动扩展到那里。</p>
+<p>若新一代还参与产生后续改进，就进入递归自我改进（Recursive Self-Improvement，RSI）的研究问题。基础第46章已给有限的任务程序（Task Program）与改进程序（Meta Program）对照；这里先记住要比较的对象：<strong>后继更会解题，和产生更好后继的过程更有效，是两份结论。</strong> 后续多代章节会展开实际继承与对照，不能从一次自动补丁（Patch）生成推断长期增长。</p>
+<p>还有一种改变只多花本次计算：读取更多证据、重新生成候选（Candidate），或比较多个可能答案。候选（Candidate）就是尚待选择和检查的方案。它可以保持模型参数（Model Parameters）不变，也不留下跨任务经验。是否值得，需把生成、检查、选择的总成本（Total Cost）一起比较；存在正确候选（Candidate）不保证最终选中它。第06章先讲下一次读取如何补证据，完整搜索与选择仍是计划内容。</p>
+<p>这些干预（Intervention）可以放回基础六组职责：输入组织（Input Composition）、模型与工具循环（Model / Tool Loop）、状态与恢复（State / Recovery）、权限与隔离（Permissions / Isolation）、任务推进与协作（Task Progress / Collaboration）、观察与评价（Observation / Evaluation）。它们是一组教学坐标，不是唯一分类；例如外部记忆（Memory）既涉及保存，也涉及输入组织（Input Composition）和评价。当前章节只定位改变，后面的路线分别深入。</p>
+<a id="从一道空格题走向任务集合"></a>
+<h2 id="从修好一道题走向比较两种解题方法">从修好一道题，走向比较两种解题方法</h2>
+<p>要问“以后也少犯错”，先定义未来任务。K-A 是本册构造的代码维护任务族（Task Family），即围绕相近工作要求组织的一组题；包括路径边界、测试入口发现、错误状态传播与文档修改范围。每题有自己的初始文件和成功条件，不是本次下载或运行的公开成绩集。同一模板换十个文件名，仍共享来源组（Source Group），不能当成十份独立机制证据。</p>
+<p>本题已经被用于诊断和开发，后面不能再拿它充当未见检验。下一步比较两种固定策略（Policy），也就是事先约定的处理规则：</p>
+<ul>
+<li>Q0：使用原有说明，按原流程处理失败。</li>
+<li>Q1：在第一次执行失败后，追加固定诊断说明“比较原动作与子程序收到的参数，再定位边界”；每个试次（Trial）只追加一次。试次（Trial）是在规定初态和预算（Budget）下的一次完整解题机会，可以包含多次调用。</li>
+</ul>
+<p>这里 Q1 是改变当前输入的方法，没有更新模型参数（Model Parameters）。真实消费者（Consumer）是第一次失败后的下一次模型请求（Model Request）；若预算（Budget）已耗尽，没有下一请求，就不能说方法被使用。Q1 是否值得，还要看它能否帮助当前问题：失败来自缺少依赖时，参数诊断也可能只增加无关读取。</p>
+<p>比较前再固定共同条件：两边采用同一模型（Model）M0、同一运行支撑（Agent Harness）H0；每个试次（Trial）最多6次模型调用（Model Query）、8次工具调用（Tool Call）、120秒；跨任务记忆（Memory）初始为空，不继承上一题补丁（Patch）和过程记录。两边从<strong>相同、尚未修好的项目副本</strong>开始，权限（Permission）和检查要求相同。额外说明、读取和失败调用都占同一预算（Budget），不是给 Q1 免费增加操作。</p>
+<p>Q0/Q1比较的是整套策略（Policy）。如果 Q1 胜出，暂时还没分开新增文字的长度、信息与步骤指导分别贡献多少；可以再加长度相近但不含诊断方法的对照材料。这是下一层归因（Attribution），不能直接从总分推断具体机制。</p>
+<p>若先把 Q1 一侧项目修好，再让两边做题，难度就已经不同。这个设计可以检查修复后产物（Artifact），不能证明智能代理（Agent）更会修复。反过来，两边任务初态相同，但运行资源不同，也会留下另一种解释。原作者的<a href="https://www.anthropic.com/engineering/infrastructure-noise">基础设施对照</a>报告了保持模型（Model）与运行支撑（Agent Harness）不变时的资源影响；这里只用它说明需要控制环境，不借用其成绩作为本课收益。</p>
+<p>下一章另给教学任务与试次（Trial）表，沿上述共同条件计算逐题差值与不确定性。本章已经选出了值得研究的方法，还没有取得 Q1 在未来任务上更好的真实成绩。</p>
+<a id="从失败证据作出参考判断"></a>
+<h2 id="改变一个条件再作判断">改变一个条件，再作判断</h2>
+<p><strong>问题。</strong> 新模型（Model）在空格题上成功，旧模型（Model）失败，能确定必须换模型（Model）吗？</p>
+<p><strong>参考答案。</strong> 先核对实际输入、包装函数、运行资源与总预算（Budget）是否相同；还要看成功来自修复缺陷，还是临时绕过。固定请求的探针（Probe）先查执行边界，未来任务的同条件比较再查解题能力。一条成功路径不足以给出普遍采用结论。</p>
+<p><strong>问题。</strong> 传参探针（Probe）已通过，为什么仍保留缺失文件检查？</p>
+<p><strong>参考答案。</strong> 它只显示收到几个参数。吞掉所有错误的包装函数也可能消除原报错，却不满足文档检查合同。缺失文件检查约束错误传播，实际文档与测试再约束受测行为。</p>
+<p><strong>问题。</strong> 方法保存、程序安装、参数更新（Parameter Update），哪个一定算学习成功？</p>
+<p><strong>参考答案。</strong> 三者都先表示对象发生变化。还需指出后续消费者（Consumer）实际用了什么，再比较未来任务的行为、成本（Cost）与失败。相同内容写进文件、出现在输入、被行动采用，仍是三种不同观察。</p>
 <h2 id="相关阅读与衔接">相关阅读与衔接</h2>
-<p>基础回读：<a href="../notes/maka/learning/01-agent-components.html">旧01：Agent 与 Harness</a>、<a href="../notes/maka/learning/26-evaluation-and-design.html">旧26：主张与证据</a>、<a href="../notes/maka/learning/46-trajectories-and-learning.html">旧46：局部训练与有限自修改</a>、<a href="../notes/maka/learning/62-complete-design-cases.html">旧62：三组案例</a>。本章是新册入口，无新册硬前置。</p>
-<p><a href="02-paired-experiments.html">下一章：多做了几题，能确定Agent改好了吗</a>。训练数学也可从本章直接进入<a href="07-probabilities-and-tensors.html">概率与张量</a>。</p>
+<p>本章是新册入口，没有新册硬前置。基础回读：<a href="../notes/maka/learning/01-agent-components.html">第01章：智能代理（Agent）与运行支撑（Agent Harness）</a>、<a href="../notes/maka/learning/26-evaluation-and-design.html">第26章：任务评价（Task Evaluation）</a>、<a href="../notes/maka/learning/46-trajectories-and-learning.html">第46章：执行轨迹（Trajectory）与学习信号（Learning Signal）</a>、<a href="../notes/maka/learning/62-complete-design-cases.html">第62章：完整案例</a>。这些入口供按问题回查，不要求先通读全部基础章节。</p>
+<p><a href="02-paired-experiments.html">下一章：第02章｜多做了几题，能确定智能代理（Agent）改好了吗</a> · <a href="index.html">课程导航</a></p>
+<p>参数路线也可直接进入<a href="07-probabilities-and-tensors.html">第07章：概率（Probability）与张量（Tensor）</a>，再读<a href="08-loss-and-update.html">第08章：损失（Loss）与更新</a>；经验消费的完整过程见<a href="05-experience-and-consumers.html">第05章</a>，须先具备第02–04章的比较与反馈定义。</p>
 <footer>Agent 前沿进阶 · 在线阅读</footer></main></body></html>

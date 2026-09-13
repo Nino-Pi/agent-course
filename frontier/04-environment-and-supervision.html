@@ -1,78 +1,153 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 04 章｜工具返回成功，为什么任务仍可能失败 · Agent 前沿进阶</title><link rel="stylesheet" href="assets/course.css"><link rel="stylesheet" href="assets/katex.min.css"></head>
-<body><header><a href="index.html">Agent 前沿进阶</a><span>能力增长、自主研究与自我改进</span></header><main><h1 id="第-04-章工具返回成功为什么任务仍可能失败">第 04 章｜工具返回成功，为什么任务仍可能失败</h1>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第 04 章｜怎样确认任务（Task）真的完成 · Agent 前沿进阶</title><link rel="stylesheet" href="assets/course.css"><link rel="stylesheet" href="assets/katex.min.css"></head>
+<body><header><a href="index.html">Agent 前沿进阶</a><span>能力增长、自主研究与自我改进</span></header><main><h1 id="第-04-章怎样确认任务task真的完成">第 04 章｜怎样确认任务（Task）真的完成</h1>
 <blockquote>
 <p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：执行状态、评分与现实结果不一致时，怎样判断任务完成了什么，并阻止错误反馈推动下一轮改进？</p>
-<p><strong>关键概念</strong>：环境状态是任务现场的实际情况；观察是执行者取得的部分信息；评分器按合同检查结果；有效失败有不满足要求的证据，未知则缺少足够判定依据；监督合同规定谁能评分、修改与放行。</p>
-<p><strong>关系主线</strong>：沿代码修复辨认业务错误、缺失评分和评分漏洞，再用三份资料区分规则、模型与人工反馈；最后将结果接到有限的改进与交付权限。</p>
+<p><strong>核心问题</strong>：工具（Tool）返回成功，怎样确认整个任务（Task）的结果，并处理缺失或误导的反馈（Feedback）？</p>
+<p><strong>关键概念</strong>：环境状态（Environment State）是现场实际情况；观察（Observation）是已取得的部分信息；判定器（Grader）按合同检查结果；未知评分（Unknown Score，U）表示判定依据尚不充分。</p>
+<p><strong>关系主线</strong>：先走完一次修复验收，再比较反例、缺失与假通过；最后区分反馈（Feedback）可见性和交付许可。</p>
 </blockquote>
-<h2 id="先分开现场观察和判断">先分开现场、观察和判断</h2>
-<p><a href="01-what-actually-improves.html">第01章</a>已经指出：用户项目中的 <code>runner.py</code> 补丁是任务产物，不能自动当作 Agent Harness 的升级。本章继续这个 Python 文档检查器案例，增加的问题是：<strong>谁来确认修复成立，确认不了时留下什么状态，评分器自己判断错了又怎么办？</strong> 本章只需第01章；配对统计与重复选优可以按需另读。</p>
-<p>先恢复案例的共同条件：项目配置使用 pytest；普通路径是 <code>docs/guide.md</code>，空格路径是 <code>docs/guide draft.md</code>；<code>runner.py</code> 调用只接收一个文件参数的 <code>checker.py</code>。原包装函数错误地拼接 shell 字符串。Agent 允许修改包装函数与 README，须保留 README 顶部用户笔记；测试与其他文件只读。</p>
-<p>本章新增以下<strong>教学评价条件</strong>。每个计划试次从尚未修好的独立项目副本开始，固定模型 M0、Harness H0，最多6次模型调用、8次工具调用和120秒。运行方在截止时停止接纳新动作、收束已有写入，再冻结该试次产物；评分最多用30秒，且本次确认截止不得晚于试次开始后150秒。若写入尚未收束，不能假装已得到稳定快照，剩余确认时间也不会因此延长。评分服务故障最多重试一次，仍在评分预算与总截止内，使用同一份可确认的产物；不重新让 Agent 改到满意为止。</p>
-<p>执行方不能改评分器、参考答案、预算或判定记录。两边没有外部发布工具。这里的所有项目修复过程与评分观察都是教学构造；后文只有一个接收检查结果的小程序实际运行，不运行 Agent、真实项目或 pytest。</p>
-<p>现在把容易挤进一个“状态”字段的对象拆开：</p>
+<h2 id="前情回顾文件已改与整个要求成立之间还差什么">前情回顾：文件已改，与整个要求成立之间还差什么</h2>
+<p><a href="01-what-actually-improves.html">第01章</a>把模型（Model）的下一步决定、工具（Tool）的实际执行和用户项目产物（Artifact）分开。把包含空格的路径作为参数数组（Argument Vector）的一个元素交给子程序，可以修复传参边界；但仅凭“补丁（Patch）已写入”，还不知道缺失文件是否继续报错、测试是否真正运行、README顶部的用户说明是否保留。</p>
+<p><a href="02-paired-experiments.html">第02章</a>进一步说明：取得有效任务评分（Task Score），即按要求核对整次结果之后，才谈得上成功数和配对比较。没有取得判断，不能随手补成0。把等待评价的方案及产物称为候选（Candidate），这里继续问：<strong>证据从哪里来，怎样知道它检查的是本次产物（Artifact），而不是生成者自己写的一句“完成”？</strong></p>
+<p>反馈（Feedback）是交给后续决策者的信息；它的来源会影响接下来能相信什么。</p>
+<p>本章硬前置只有第01章；下面会自足解释成功、失败和未知，不要求先掌握统计或训练（Training）。第02–03章可作为理解比较用途的推荐回读。</p>
+<a id="先分开现场观察和判断"></a>
+<h2 id="先完成一次有依据的验收">先完成一次有依据的验收</h2>
+<h3 id="恢复任务task逐步补齐验收条件">恢复任务（Task），逐步补齐验收条件</h3>
+<p>先展开<strong>K-A：代码修复任务（Task）</strong>，沿用第01章与基础62-A的Python文档检查器情境：<code>runner.py</code>中的包装函数启动只接受一个文件路径的<code>checker.py</code>；普通路径<code>docs/guide.md</code>可用，<code>docs/guide draft.md</code>被错误的命令解释器（Shell）字符串拆开。项目配置声明使用pytest。允许修改包装函数和README，测试及其他文件只读；README开头的用户部署笔记必须保留。</p>
+<p>成功还要求缺失路径<code>docs/absent.md</code>继续产生非零退出码（Exit Code）和诊断、相关测试确实执行、文件差异（Diff）符合范围，以及README和交付说明如实反映当前结果。这里的测试入口是该Python项目自己的入口，不沿用基础49的JavaScript项目或63/64中另设的测试数量。</p>
+<p>下面的过程和检查结果全部是<strong>教学构造</strong>，不把第01章实际执行的参数探针（Probe）变成这次项目实验。稍后会实际运行一个判定结果消费者（Consumer），即接收检查结果并作判断的程序；它不会运行真实智能代理（Agent）、项目或pytest。</p>
+<p>一个试次（Trial）是在规定初态和预算（Budget）下的一次完整解题机会。每次从尚未修好的独立副本开始，模型（Model）M0、运行支撑（Agent Harness）H0固定；最多6次模型调用（Model Query）、8次工具调用（Tool Call）和120秒，跨任务记忆（Memory）为空。前次补丁（Patch）、报告和后台写入不能留给下一次；这称为重置（Reset），其对象包括文件和执行资源，不能只清空聊天窗口。</p>
+<h3 id="正常流程执行者先做完判定器grader再取得自己的证据">正常流程：执行者先做完，判定器（Grader）再取得自己的证据</h3>
+<p>先给本章正常试次（Trial）<code>e1</code>。它按五次模型调用（Model Query）推进，八次工具调用（Tool Call）分别用于四项读取、两项编辑、一次相关测试和一次差异读取；全部在原预算（Budget）内。下表每行对应一次决定，单次可以提出多个独立读取或编辑请求。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>当前步骤</th>
+<th>具体输入与操作</th>
+<th>接下来能据此判断什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>读取现场</td>
+<td>读配置、包装函数、README及相关测试</td>
+<td>确认pytest入口、参数边界与用户笔记，尚未修复</td>
+</tr>
+<tr>
+<td>修改两处</td>
+<td>包装函数改为参数数组（Argument Vector），继续保留子进程退出码（Exit Code）；README更新测试说明</td>
+<td>编辑回执（Receipt）说明这两次写入的结果，尚未构成整项验收</td>
+</tr>
+<tr>
+<td>执行相关测试</td>
+<td>采用项目配置给出的入口，保留用例收集、执行和结果记录</td>
+<td>可以辨认测试是否真的运行；外层命令返回0不能替代这些记录</td>
+</tr>
+<tr>
+<td>核对差异</td>
+<td>读取两份文件的当前差异，检查用户笔记和允许范围</td>
+<td>确认这份交付修改了什么，不推断其他版本也一样</td>
+</tr>
+<tr>
+<td>如实报告</td>
+<td>说明改动、测试结果和范围</td>
+<td>提交本次产物（Artifact）与说明，交给独立检查</td>
+</tr>
+</tbody></table></div>
+<p>沿用的关键修改是<code>[sys.executable, &quot;checker.py&quot;, path]</code>配合<code>shell=False</code>；<code>check=False</code>允许上层取得非零退出状态，而不是把错误改成成功。这只是包装函数的行为，不提供进程隔离或并发写入保护。完整参数参考实现已在第01章给出。</p>
+<p>现在才补齐评分阶段的条件。到120秒停止接纳新动作（Action），即新的执行请求；已启动的写入还须收束，运行方确认没有残余写入者，再固定本次产物（Artifact）及其身份，供判定器（Grader）只读检查。这个动作称为冻结（Freezing）：后面的判断必须能指回同一份已稳定的内容。它是本例要求执行环境（Environment）落实的合同，不是普通字典、文件名或逐文件版本号自动提供的项目快照（Snapshot）。</p>
+<p>评分最多占30秒，且本次确认不能晚于试次（Trial）开始后的150秒。若第125秒才取得稳定产物（Artifact），剩余评分时间至多25秒；收束拖延不会自动增加总期限。若始终无法确认写入停止，就不能宣布冻结（Freezing）已完成，也不能拿变化中的文件制造一个确定评分。</p>
+<p>本例给定<code>e1</code>在第100秒前完成上述操作，第105秒确认收束并固定为<code>artifact-e1</code>，第124秒取得全部检查结果。评分用了19秒，总确认时点124秒，分别满足两条期限。判定器（Grader）由评价运行方控制，它检查自己的结果通道，不把被评程序的标准输出（Standard Output）直接当作通过凭据。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>判定器（Grader）的检查</th>
+<th><code>artifact-e1</code>的给定结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>普通路径</td>
+<td>接收到完整路径，按合同检查完成</td>
+</tr>
+<tr>
+<td>空格路径</td>
+<td>路径仍是一个参数，按合同检查完成</td>
+</tr>
+<tr>
+<td>缺失路径</td>
+<td>非零退出码（Exit Code）和缺失诊断保留</td>
+</tr>
+<tr>
+<td>用户笔记与写入范围</td>
+<td>顶部笔记保留，仅包装函数及README改变</td>
+</tr>
+<tr>
+<td>测试与交付说明</td>
+<td>相关用例确实执行，README和说明与结果一致</td>
+</tr>
+</tbody></table></div>
+<p>因此这次是成功（Success，S），本题二值评分为1。它同时是“150秒内已确认交付”，因为全部必需条件已在截止前得到确认。这个结论属于给定任务（Task）、产物（Artifact）和受测范围，不等于智能代理（Agent）已在未来任务（Task）上变强。</p>
+<h3 id="为什么需要分开环境状态environment-state观察observation和判断">为什么需要分开环境状态（Environment State）、观察（Observation）和判断</h3>
+<p>现在回看刚才的过程，几个相近词分别指向不同对象。</p>
 <div class="table-scroll" tabindex="0"><table>
 <thead>
 <tr>
 <th>对象</th>
-<th>本例具体是什么</th>
-<th>哪个使用者需要它</th>
+<th>本例含义</th>
+<th>谁实际使用</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>环境状态</td>
-<td>当前文件内容、进程是否仍在写入、已产生的测试产物</td>
-<td>执行层据此落实动作；评分方取得稳定产物后检查</td>
+<td>环境状态（Environment State）</td>
+<td>文件真实内容、进程是否还在写、检查产物是否已产生</td>
+<td>工具（Tool）和资源执行层改变或检查现场</td>
 </tr>
 <tr>
-<td>观察</td>
-<td>模型收到的文件片段、命令退出码、标准输出与错误输出</td>
-<td>模型据此决定下一步；它可能只看到部分状态</td>
+<td>观察（Observation）</td>
+<td>已返回的文件片段、退出码（Exit Code）、输出和回执（Receipt）</td>
+<td>模型（Model）据此决定下一步；它未必看到全部现场</td>
 </tr>
 <tr>
-<td>动作</td>
-<td>读文件、提出补丁、调用检查器等具体请求</td>
-<td>工具和资源执行层根据当前权限执行</td>
+<td>动作（Action）</td>
+<td>读文件、编辑或启动命令的请求</td>
+<td>执行边界按当前权限（Permission），即允许效果的范围，决定能否落实</td>
 </tr>
 <tr>
-<td>重置</td>
-<td>为另一个试次恢复原始项目、清除前次残留进程与可复用状态</td>
-<td>评价运行器保证两次面对约定初态</td>
-</tr>
-<tr>
-<td>评分</td>
-<td>独立检查后产生的成功、失败或未知判断及依据</td>
-<td>比较程序、维护者和后续经验处理程序</td>
+<td>任务评分（Task Score）</td>
+<td>判定器（Grader）检查必需条件后形成的结果</td>
+<td>比较程序、维护者与后续消费者（Consumer）</td>
 </tr>
 </tbody></table></div>
-<p>执行动作会改变环境，观察只是把其中一些变化告诉模型。一个工具返回“补丁已写入”说明写入完成；它没有同时证明补丁保留错误状态、README 正确或用户笔记仍在。反过来，工具连接断开后，文件可能已经改变；只凭没有回执也不能断言没有写入。</p>
-<p>重置同样不是清空一条聊天记录。前次输出文件留在共享目录、评分器读取了旧报告，或者后台进程仍继续写，都可能让下一试次面对不同的现场。本章假设项目副本与评分产物具有明确身份；拿不到这个条件时，记录环境问题，而不是给结果补上“独立”的名称。</p>
-<h2 id="三条相似的日志导向不同处理">三条相似的日志，导向不同处理</h2>
-<p>以下三条都是从相同缺陷初态出发的独立教学试次，不是一个试次中先后发生的三次尝试。每条记录都保留执行状态与任务判断，不能用某一个布尔值覆盖另一项。</p>
-<h3 id="第一条编辑成功业务要求却被破坏">第一条：编辑成功，业务要求却被破坏</h3>
-<p>Agent 把包装函数改成“调用失败时也返回成功”，工具确认 <code>runner.py</code> 的补丁已写入。它随后检查空格路径，界面不再显示错误，便报告完成。真实验收合同没有变化：文档不存在时必须返回非零状态与缺失诊断。</p>
-<p>独立评分方对冻结产物检查三个输入。普通路径通过；空格路径的调用不再显示失败；缺失路径 <code>docs/absent.md</code> 却也返回成功。最后一项已经构成业务反例，即使补丁没有越出允许文件，也不能算完成。</p>
-<p>正确记录是“编辑工具成功；任务有效失败；原因是缺失文件错误被吞掉”。<strong>有效失败</strong>指评分方有足够证据确认至少一项必需条件不成立。它不要求 Agent 本身非零退出，也不意味着所有检查都失败。后续可以据这条证据生成新补丁，但那是新的开发动作，不擦除本次失败。</p>
-<p>反过来看：若 Agent 的最后一条说明生成失败，已冻结的补丁仍可能通过全部合同检查。这时“最后调用失败”和“项目修复成功”可以同时成立；是否还要求完整交付说明，必须由事先声明的任务合同决定。本例要求如实报告与 README 说明，评分方仍要检查这部分，不能只看代码。</p>
-<h3 id="第二条补丁看似正确评分服务没有给出结果">第二条：补丁看似正确，评分服务没有给出结果</h3>
-<p>这次 Agent 提交了参数数组补丁，普通文件写入已确认，产物也已冻结。但评分服务启动失败；一次获准重试仍失败，30秒评分期限结束。执行方日志中的“我已修好”不是独立检查结果，因而任务评分保持未知。</p>
-<p>若评分方已确认“README 用户笔记被删掉”，则即使其余检查服务后来失败，也有明确的不满足项，可以记录有效失败，并另外保留检查缺失。这里假设没有任何已确认反例，也没有取得全部必需检查，所以记 <strong>U：未知</strong>，分数为空，而不是成功的1或失败的0。</p>
-<p>本章同时定义一个更窄的事件：从试次开始起150秒内，是否已经确认全部合同通过。这个“截止确认交付”事件在本例为0，只说明没有及时确认；它不把项目的未知真值改成失败。若截止后补查同一产物，后来确认成功，可以追加“后续核实成功”，不能回填成150秒内就已确认。</p>
-<p>评分器故障重试只重跑评分步骤，不能偷偷让 Agent 再修一次项目。否则后来检查的已是另一份产物，原始失败/未知与新方案结果混在一起。已发生的执行、冻结、评分失败及重试开销都要保留。</p>
-<h3 id="第三条评分器读到了它想看的字样">第三条：评分器读到了它想看的字样</h3>
-<p>现在明确改变一个条件：开发人员错误地采用弱评分器，它只检查候选程序的标准输出是否含 <code>ALL_PASS</code>。Agent 提交的项目包装函数打印这个字样，却仍未修复参数传递或错误传播。弱评分器给出成功，用户合同依然没有完成。</p>
-<p>这里出现了<strong>评分漏洞</strong>：优化对象能制造评分器采用的信号，却不必完成信号本来代表的事情。这不要求修改评分器源码；控制它读取的内容就可能足够。输出文本来自待检程序，不能因为像测试报告就自动获得评分权。</p>
-<p>本例的修订方式是让独立评分方运行自己的必需检查，确认检查确实执行、当前产物身份一致，再据结果判断。候选 stdout 可以帮助诊断，但不再作为通过凭据。若候选进程能写评分文件、替换测试，或接触评分服务的身份凭据，仅换一个更聪明的判分模型也没有闭合这个边界。</p>
-<p>修好评分器后，要用同一规则重新检查需要比较的产物，并说明旧记录来自有缺陷的规则。不能只重评原来的赢家，或悄悄抹掉弱评分器版本下发生过的假成功。评价规则改变了，应保留改变前后的含义。</p>
-<h2 id="把判定规则写成能检查的小程序">把判定规则写成能检查的小程序</h2>
-<p>下面先给评分方拥有的检查含义，再写汇总逻辑。它们不是 Agent 自填字段；本例假设独立检查进程只读冻结产物，并用自己的结果通道提供这些值。这个假设需要执行隔离落实，Python 字典本身不提供可信来源保证。</p>
-<div class="table-scroll" tabindex="0"><table>
+<p>命令执行会改变现场，回执（Receipt）只是让调用方知道其中一些结果。连接断开时，文件可能已经写入；没有回执（Receipt）不证明没有效果。反过来，回执（Receipt）说“写入成功”，也没有检查全部任务（Task）要求。</p>
+<p><a href="https://gymnasium.farama.org/api/env/">Gymnasium的环境（Environment）接口</a>也把下一观察（Observation）、奖励（Reward）、环境终止（Termination）与外部截断（Truncation）分开返回。奖励（Reward）是该步得到的数值信号；环境终止（Termination）可以是到达目标，也可以是进入失败终态，外部截断（Truncation）则可能由时间限制触发。这里借它理解分义，不要求所有智能代理（Agent）都采用该接口，更不把任一结束信号直接当成本题成功或失败。</p>
+<a id="三条相似的日志导向不同处理"></a>
+<h2 id="同一要求为什么会得到有效失败valid-failure或未知评分u">同一要求，为什么会得到有效失败（Valid Failure）或未知评分（U）</h2>
+<p>下面两次都从同样的未修初态重新开始，分别记为<code>e2</code>和<code>e3</code>。它们不是正常试次（Trial）<code>e1</code>的后续修改，也没有读取其补丁（Patch）。</p>
+<h3 id="编辑成功但缺失文件被说成成功">编辑成功，但缺失文件被说成成功</h3>
+<p><code>e2</code>确实把路径改成参数数组（Argument Vector），却又将包装层改成“无论子进程结果如何，一律返回0”。两次文件编辑都得到成功回执（Receipt）。独立判定器（Grader）随后发现：普通与空格路径均可检查，缺失文件却也返回0，错误传播条件不成立。</p>
+<p>这里规定相关测试确实执行，交付说明也如实记录了这个未修好的问题；它们各自可以通过过程检查，但不能弥补缺失文件行为。因此最终是<strong>有效失败（Valid Failure，F）</strong>，二值评分为0。含义是已经有可信反例证明至少一项必需条件不成立，不要求所有检查都失败，也不要求最后一次模型调用（Model Query）报错。</p>
+<p>若交付说明反而写“全部通过”，还会增加一个不如实报告的反例。本例没有添加这个条件，避免用一次失败暗中代替所有检查结果。</p>
+<p>后续可以使用这个反例产生新补丁（Patch），但那属于新的开发动作（Action）。不能在本次失败后无限继续修改，再把最后一次成功回填成原预算（Budget）内就已成立。</p>
+<h3 id="补丁patch看似正确但没有取得有效判定">补丁（Patch）看似正确，但没有取得有效判定</h3>
+<p><code>e3</code>提交了看似正确的参数数组（Argument Vector）修改，普通写入已确认，产物（Artifact）固定为<code>artifact-e3</code>。评分服务却启动失败；按事先规定，基础设施重试（Infrastructure Retry）至多一次，两次尝试共用同一份稳定内容，仍受30秒评分和150秒总期限限制。第二次也没有取得结果。</p>
+<p>模型（Model）的“我已修好”不能替代缺失的检查。这里没有任何已确认反例，也没有收齐全部必需结果，所以保留<strong>未知评分（Unknown Score，U）</strong>，评分为空值。U既不是成功的1，也不是失败的0。</p>
+<p>如果此前已经独立确认“用户笔记被删除”，即使其他检查随后失联，也足以判F，同时保留其余未知。两种处理不矛盾：<strong>存在反例足以否定全部满足；缺少结果本身却不等于已经找到了反例。</strong></p>
+<p>评分重试（Retry）只再执行评分步骤，不让智能代理（Agent）偷偷改产物（Artifact）。若需要改动，就保存原结果并启动另行规定的开发过程；新的内容不能继续冒用<code>artifact-e3</code>的判断。</p>
+<h3 id="截止前未确认与最终真值未知是两回事">截止前未确认，与最终真值未知是两回事</h3>
+<p>定义截止确认交付（Confirmed Delivery）事件：只有在150秒内取得全部必需条件通过的证据才记为1，其余记为0。于是<code>e3</code>在这个事件上为0，但任务评分（Task Score）仍是U。截止后补查同一产物（Artifact）可能确认成功，也不能改写“150秒内是否已经确认”的历史。</p>
+<p>只用这三条教学试次（Trial）作一组小计，结果是S、F、U。已知成功1次，未知1次；若只问三份产物（Artifact）的最终成功比例，未知全失败或全成功分别给出：</p>
+<div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mfrac><mn>1</mn><mn>3</mn></mfrac><mo>≤</mo><msub><mi>p</mi><mrow><mi mathvariant="normal">t</mi><mi mathvariant="normal">h</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">e</mi></mrow></msub><mo>≤</mo><mfrac><mrow><mn>1</mn><mo>+</mo><mn>1</mn></mrow><mn>3</mn></mfrac><mo>=</mo><mfrac><mn>2</mn><mn>3</mn></mfrac><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">\frac{1}{3}\le p_{\mathrm{three}}\le\frac{1+1}{3}=\frac23.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:2.0074em;vertical-align:-0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">3</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≤</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8304em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathnormal">p</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">three</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≤</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.0074em;vertical-align:-0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">3</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.0074em;vertical-align:-0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">3</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord">.</span></span></span></span></span></div><p><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>p</mi><mrow><mi mathvariant="normal">t</mi><mi mathvariant="normal">h</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">e</mi></mrow></msub></mrow><annotation encoding="application/x-tex">p_{\mathrm{three}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathnormal">p</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">three</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>只表示这三份既定产物（Artifact）中最终满足合同的比例，不是总体成功概率（Probability）。区间两端是未知取值的逻辑下界（Logical Lower Bound）与逻辑上界（Logical Upper Bound），<strong>不是置信区间（Confidence Interval）</strong>。这没有消除有限任务（Task）、重复执行或来源相关性带来的推广问题。</p>
+<p>有评分的两次中，成功占1/2；三次中按时确认交付占1/3。两个数都算对，却回答不同问题。基础第40章与第02章已进一步解释这些分母和未知范围；本章增加的是每种判断如何落回独立检查的证据。</p>
+<a id="把判定规则写成能检查的小程序"></a>
+<h2 id="让消费者consumer保留反例与缺失的区别">让消费者（Consumer）保留反例与缺失的区别</h2>
+<h3 id="先规定每项检查究竟证明什么">先规定每项检查究竟证明什么</h3>
+<p>以下程序只接收已经通过可信通道取得的检查结果。解题的智能代理（Agent）和待评程序都不能写判定器（Grader）的检查代码、结果通道或参考条件；执行隔离（Execution Isolation）必须由实际环境（Environment）落实，Python字典本身没有这种能力。</p>
+<div class="table-scroll check-contract" tabindex="0"><table>
 <thead>
 <tr>
-<th>检查名</th>
-<th>为真时必须已经确认的内容</th>
+<th>字段</th>
+<th>为<code>True</code>时必须已确认的内容</th>
 </tr>
 </thead>
 <tbody><tr>
@@ -81,11 +156,11 @@
 </tr>
 <tr>
 <td><code>space_path</code></td>
-<td>空格路径完整传递且文档检查按合同完成</td>
+<td>空格路径保持完整且检查按合同完成</td>
 </tr>
 <tr>
 <td><code>missing_error</code></td>
-<td>缺失文件仍有非零状态和诊断</td>
+<td>缺失文件仍有非零状态与诊断</td>
 </tr>
 <tr>
 <td><code>notes_preserved</code></td>
@@ -93,25 +168,34 @@
 </tr>
 <tr>
 <td><code>scope_ok</code></td>
-<td>只有获准的包装函数与 README 被修改</td>
+<td>只修改获准包装函数与README</td>
 </tr>
 <tr>
 <td><code>tests_and_report</code></td>
-<td>相关测试实际执行，README 与交付说明符合任务要求</td>
+<td>相关测试已按要求执行完毕；README和交付说明如实反映结果</td>
 </tr>
 </tbody></table></div>
-<p>每项值仅有三种：<code>True</code> 是已核实成立，<code>False</code> 是已核实不成立，<code>None</code> 是未取得有效结果。未知没有变成真假之一。因为本例规定所有条件必须成立，任一已确认反例就足以判 F；只有没有反例而仍缺检查时才判 U。</p>
-<p>以下是可执行参考代码，只实现这个<strong>结果汇总规则</strong>，没有把检查本身藏成已实现的功能。字典中的输入是手工构造的教学检查结果；实际项目探测、进程隔离、超时与报告核实都不由这段代码完成。</p>
+<p>最后一项检查“执行与说明是否真实”，不单独要求前面每个行为都通过。这样，<code>e2</code>可以完成测试并如实报告断言失败，使该项为<code>True</code>，同时仍由<code>missing_error=False</code>得到F。若外层尚未取得关于执行与说明的有效检查结果，该字段为<code>None</code>。若已经确认必需测试被跳过、运行中止而未完成，或交付说明不实，该字段则为<code>False</code>；已知反例不能藏进未知，也不能由“打算执行”补成<code>True</code>。</p>
+<p>第一段可执行参考代码只声明必需项，后文各段按顺序组成完整的标准库程序。</p>
 <pre><code class="language-python">REQUIRED = (
     &quot;normal_path&quot;, &quot;space_path&quot;, &quot;missing_error&quot;,
     &quot;notes_preserved&quot;, &quot;scope_ok&quot;, &quot;tests_and_report&quot;,
 )
-
-def decide(checks):
-    values = {name: checks.get(name) for name in REQUIRED}
+</code></pre><h3 id="再核对本次内容拒绝把旧报告套上来">再核对本次内容，拒绝把旧报告套上来</h3>
+<p>第二段输入是本次期望的产物（Artifact）身份与一份检查包。这里只比较身份是否对应，并确认值的类型；不伪装成已经实现真实性认证。<code>True</code>表示已确认成立，<code>False</code>表示已确认不成立，<code>None</code>或缺字段表示尚无有效结果。</p>
+<pre><code class="language-python">def read_checks(report, expected_artifact):
+    if report[&quot;artifact_id&quot;] != expected_artifact:
+        raise ValueError(&quot;检查包不属于本次产物&quot;)
+    supplied = report[&quot;checks&quot;]
+    values = {name: supplied.get(name) for name in REQUIRED}
     for name, value in values.items():
         if value is not None and type(value) is not bool:
             raise ValueError(f&quot;invalid check value: {name}&quot;)
+    return values
+</code></pre><p>为何用<code>type(value) is bool</code>？Python中整数0与<code>False</code>比较可能相等，但它们不是本合同下同一种输入。严格类型检查拒绝非法结果，避免把一份来源不明的数字悄悄当成可靠判断。产物（Artifact）身份不匹配同样先拒收；被拒绝的报告不提供本次S或F证据，调用方应继续寻找获准的有效结果或保持U。</p>
+<h3 id="最后才汇总成功s有效失败f与未知评分u">最后才汇总成功（S）、有效失败（F）与未知评分（U）</h3>
+<p>第三段只消费<code>read_checks</code>已经补齐并验证的必需项，先收集已确认反例与未知字段，再按本题“全部必需条件成立”的规则判断。其他任务（Task）可以设计部分得分，本题没有采用；不能把这段合取政策说成所有评价的唯一标准。</p>
+<pre><code class="language-python">def decide(values):
     failed = [name for name, value in values.items() if value is False]
     unknown = [name for name, value in values.items() if value is None]
     if failed:
@@ -119,32 +203,47 @@ def decide(checks):
     if unknown:
         return &quot;U&quot;, None, failed, unknown
     return &quot;S&quot;, 1, failed, unknown
-
-good = dict.fromkeys(REQUIRED, True)
-business_wrong = {**good, &quot;missing_error&quot;: False}
-scorer_down = dict.fromkeys(REQUIRED, None)
-fake_report = {
-    **good, &quot;space_path&quot;: False, &quot;tests_and_report&quot;: None,
-}
-for name, checks in (
-    (&quot;correct&quot;, good),
-    (&quot;business_wrong&quot;, business_wrong),
-    (&quot;scorer_down&quot;, scorer_down),
-    (&quot;fake_report&quot;, fake_report),
-):
-    verdict, score, failed, unknown = decide(checks)
-    print(name, verdict, score, failed, unknown)
-</code></pre><p>本地运行该汇总程序得到以下结果。它验证构造输入如何被分类，不证明真实 Agent 产生过这些结果：</p>
+</code></pre><p>顺序有意义：一项可信<code>False</code>与其他<code>None</code>并存时，先返回F，同时带走未知列表。这里没有把未知字段变成<code>False</code>。只有全部必需项都是<code>True</code>时才返回S。</p>
+<p>第四段给出完整输入。前面三组分别对应正常、错误传播和无评分的试次（Trial）；第四组另展示已有反例与缺失并存。检查包中的结果全部为教学给定，不是模型（Model）或真实测试生成。</p>
+<pre><code class="language-python">good = dict.fromkeys(REQUIRED, True)
+fixtures = (
+    (&quot;correct&quot;, &quot;artifact-e1&quot;, good),
+    (&quot;business_wrong&quot;, &quot;artifact-e2&quot;, {**good, &quot;missing_error&quot;: False}),
+    (&quot;scorer_down&quot;, &quot;artifact-e3&quot;, dict.fromkeys(REQUIRED, None)),
+    (&quot;failure_with_unknown&quot;, &quot;artifact-e4&quot;,
+     {**good, &quot;space_path&quot;: False, &quot;tests_and_report&quot;: None}),
+)
+for name, artifact_id, checks in fixtures:
+    report = {&quot;artifact_id&quot;: artifact_id, &quot;checks&quot;: checks}
+    result = decide(read_checks(report, artifact_id))
+    print(name, *result)
+</code></pre><p>这四段程序实际运行得到：</p>
 <pre><code class="language-text">correct S 1 [] []
 business_wrong F 0 ['missing_error'] []
 scorer_down U None [] ['normal_path', 'space_path', 'missing_error', 'notes_preserved', 'scope_ok', 'tests_and_report']
-fake_report F 0 ['space_path'] ['tests_and_report']
-</code></pre><p>最后一行同时保留了已知失败与未知检查：空格行为已经被独立检查证伪，伪造的输出文字又不能证明测试与报告成立。<code>F</code> 没有把未知字段偷偷填成 <code>False</code>。若缺少某个必需字段，<code>checks.get</code> 会得到 <code>None</code>，也不会由于漏项而默认通过。</p>
-<p>同理，Agent 因时间耗尽而停止，只是执行状态。评分方若检查冻结产物，确认缺陷仍在，可给 F；若始终无法取得稳定产物和必要证据，就保留 U。环境接口中的终止、外部截断与任务成功不是同一个概念。另一个研究可以把按时交付本身作为目标，但必须公开该目标，不能在看见结果后偷偷更换。</p>
-<h2 id="代码之外先定义资料研究的真值在哪里">代码之外，先定义资料研究的真值在哪里</h2>
-<p>代码检查能写确定条件，资料研究往往还涉及时间、解释与引用。为避免把公开网页的复杂真值假装成单元测试，这里另设 <strong>K-C：有限资料研究任务</strong>。它属于课程构造，资料库“青岚”与以下文档均为虚构；它们不代表现实产品政策。</p>
-<p>用户要求：“以2026年6月15日中午为准，说明青岚新建工作区现在默认保留多少天、7月1日后新建工作区怎样变化、已有工作区是否自动改变，并给出依据。只写结论草稿，不执行配置修改，也不对外发送。”</p>
-<p>环境只提供下列三份不可变资料的全文。当前时间固定为6月15日12:00，文件只读，初态没有旧报告、跨题记忆或隐藏网页。Agent 最多4次模型调用、4次资料读取、60秒；评分另有20秒。评分方使用同一资料包判断事实，不掌握一份与题目相冲突的秘密政策。</p>
+failure_with_unknown F 0 ['space_path'] ['tests_and_report']
+</code></pre><p>程序检验的是已给定输入的消费规则。它不执行检查器、不停止后台进程，也不把<code>artifact_id</code>字符串变成不可伪造凭据。报告来源、冻结（Freezing）条件和检查实际执行仍须由前面的环境合同保证。</p>
+<a id="三条相似的日志导向不同处理-评分漏洞"></a>
+<h2 id="判定器grader读到了想看的字样为什么仍不可信">判定器（Grader）读到了想看的字样，为什么仍不可信</h2>
+<p>现在另开一个反例，明确改变的是评分规则。开发者采用弱判定器（Grader）G0：只要待评程序的标准输出（Standard Output）中出现<code>ALL_PASS</code>，就认为任务（Task）完成。解题的智能代理（Agent）没有修好包装函数，而是让这个程序在运行时额外打印该字样。文本检查会得到成功，空格路径实际上仍被拆开。</p>
+<p>这叫评分漏洞（Grading Loophole）：优化对象能够制造判定器（Grader）采用的信号，却不用完成那个信号本应代表的事情。如果这样的得分后来被用作奖励（Reward），就可能鼓励绕过目标的行为。它不要求修改判定器（Grader）源码，控制其输入也可能足够。</p>
+<p>第五段代码把两种消费者（Consumer）摆在同一份教学情境下比较。弱规则只读这段标准输出（Standard Output）；修订后的规则另读独立检查包。真实检查包如何产生不由这段代码实现。</p>
+<pre><code class="language-python">candidate_stdout = &quot;ALL_PASS&quot;
+weak_success = &quot;ALL_PASS&quot; in candidate_stdout
+independent = {
+    &quot;artifact_id&quot;: &quot;artifact-hack&quot;,
+    &quot;checks&quot;: {**good, &quot;space_path&quot;: False, &quot;tests_and_report&quot;: None},
+}
+verdict = decide(read_checks(independent, &quot;artifact-hack&quot;))
+print(&quot;weak_vs_checked&quot;, weak_success, verdict[0], verdict[1])
+</code></pre><p>实际输出为<code>weak_vs_checked True F 0</code>。同一段文字仍然存在，改变的是成功依据：独立行为检查已经给出反例。模型判定器（Model-based Grader）用模型（Model）解释所给证据；如果只让它阅读同一句<code>ALL_PASS</code>，也不会凭空补出缺失的行为证据。</p>
+<p>修订方案还要落实两件事。首先，判定器（Grader）读取稳定的当前产物（Artifact），确认必需检查真正执行；执行者和待评程序不能替换测试、写评分文件或取得评分通道的凭据。其次，对需比较的历史产物（Artifact）使用相同新规则重新检查，保留旧规则及其假通过，不能只重评旧赢家或抹去不利记录。</p>
+<p>独立检查也不是要求所有人复现同一组工具调用（Tool Call）。若另一条合法路径完成相同合同，可以接受它；只有任务（Task）明确要求的行为，例如真实测试与禁止越权，才是必须检查的条件。<a href="https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents">关于智能代理（Agent）评价的原始工程说明</a>强调结果、清楚的规则、执行隔离（Execution Isolation）和对判定器（Grader）误差的核对，这些关系要合起来使用。</p>
+<a id="代码之外先定义资料研究的真值在哪里"></a>
+<h2 id="换成资料研究先限定真值所在的范围">换成资料研究，先限定真值所在的范围</h2>
+<h3 id="k-c的条件不能从python项目继承">K-C的条件不能从Python项目继承</h3>
+<p>下面另设<strong>K-C：有限资料研究任务（Task）</strong>。资料库“青岚”及三个文档全部虚构，不代表现实产品政策。用户要求：以2026年6月15日中午为准，说明当前新建工作区默认保留多少天、7月1日后怎样变化、已有工作区是否自动改变，并给依据；只交结论草稿，不改配置、不对外发送。</p>
+<p>环境（Environment）只提供下列三份不可变资料全文。当前时点固定为6月15日12:00，资料只读，初态没有旧报告、跨题记忆（Memory）或隐藏网页；最多4次模型调用（Model Query）、4次资料读取、60秒解题，评分另有20秒。判定器（Grader）使用相同资料包，不掌握一份与题目冲突的秘密政策。</p>
 <pre><code class="language-text">[D1] 青岚服务公告，2026-06-01发布
 自2026年7月1日起，新建工作区的默认保留期由90天改为30天。
 此前已存在的工作区不自动改变；管理员可另行修改其设置。
@@ -157,69 +256,126 @@ fake_report F 0 ['space_path'] ['tests_and_report']
 6月1日公告是未来变更通知，30天默认值在7月1日才生效。
 7月1日之前新建的工作区仍使用90天默认值。
 已有工作区不会因新公告自动改为30天；是否被管理员改动须查该工作区设置。
-</code></pre><p>这里能作出的完整参考回答是：“截至6月15日，新建工作区默认90天；7月1日起新建工作区默认30天。已有工作区不会自动改变，其实际保留期取决于当前设置。D1给出变更及生效日，D2给出现行规则，D3消除了公告已发布与规则已生效的混淆。”</p>
-<p>这个回答不能再延伸为“所有已有工作区都是90天”，因为管理员可能改过；也不能写“已有数据已被删除”，资料没有任何具体删除记录。<strong>真值范围</strong>是三份资料及固定时间所能支持的政策解释，不是任意真实工作区的状态。这就是为什么引用了真实文字仍可能得出错误结论。</p>
-<p>一条具体失败轨迹是：读取D1后只摘出“改为30天”，在草稿中写“目前默认30天”；写草稿工具成功，甚至有D1引用，但现行时间判断错误。正确后续是回查生效条件，用D2/D3区分当前与未来，而不是多找几个都转述D1标题的页面充作独立支持。</p>
-<h2 id="规则模型和人工各自能纠正什么">规则、模型和人工各自能纠正什么</h2>
-<p>在K-A，独立运行必需行为检查比匹配 stdout 字样更直接。在K-C，只搜索回答是否出现“90天”“30天”“D1”，会同时接受“现在30天、过去90天”和正确回答。规则适合检验字段、引用是否存在、数字计算与明确状态；它是否检验了用户真正的要求，需要另看。</p>
-<p>模型评分器可以接收用户问题、固定日期、资料原文与待评回答，判断“当前/未来是否混淆”“已有工作区是否被过度概括”“引用是否支持结论”。这些是评分维度，不能把“回答流畅”偷偷当成事实正确。评分模型应允许回答“不足以判断”，并给出所缺证据；强迫每次输出成功或失败，会把自身缺信息伪装成确定判断。</p>
-<p>人工复核在这里负责根据同一合同裁定具体分歧。为了讲清校准，设维护者预先制作四份回答，参考标签先按上述全文核对；再让一个假设评分器G0判分。四份完整稿都列出对应资料引用，表中只摘判断所需的关键句；除列明问题外，其余格式满足要求。下面结果也是教学设定，没有运行评审模型：</p>
+</code></pre><h3 id="正常回答怎样从三份全文得到">正常回答怎样从三份全文得到</h3>
+<p>先区分发布日期与生效日期。D1虽然已经发布，30天规则仍要等到7月1日；D2说明6月15日仍适用90天；D3明确消除“公告已发布等于规则已生效”的混淆。再按对象区分新建与已有工作区：新默认值不自动改动已有设置。</p>
+<p>完整参考回答是：“截至6月15日，新建工作区默认保留90天；7月1日起新建工作区默认保留30天。已有工作区不会自动改变，其实际保留期取决于当前设置。D1给出变更和生效日，D2支持现行90天，D3说明新旧范围及管理员可能修改设置。”</p>
+<p>这个回答没有声称所有已有工作区都保留90天，也没有说已有数据已删除。三份资料没有提供具体工作区的设置或删除记录。这里的真值范围（Ground-Truth Scope）是给定全文与固定时点能支持的政策解释，不是任意真实账户的状态。</p>
+<p>一个完整失败分支是：执行者读到D1的“改为30天”，写出“目前默认30天”，并附D1引用。草稿写入成功，引用也存在，结论仍是F，因为被引文字讨论的是未来。应回读生效条件，再用D2/D3纠正当前与未来的解释；增加几个转述同一标题的页面不会自动增加独立证据。</p>
+<a id="规则模型和人工各自能纠正什么"></a>
+<h2 id="规则模型model与人工怎样核对同一份回答">规则、模型（Model）与人工怎样核对同一份回答</h2>
+<p>规则判定器（Rule-based Grader）执行预定程序。在K-A，运行自己的路径检查能得到直接反例；在K-C，只搜索回答有没有“90天”“30天”“D1”，却会同时接受“现在30天、过去90天”和正确回答。程序准确完成字符串搜索，不等于它准确完成用户的评价要求。</p>
+<p>模型判定器（Model-based Grader）可以同时接收问题、日期、全文和待评回答，分别检查当前/未来、对象范围与引用支持。人工复核（Human Review）则按同一合同裁定具体争议。两者都需解释依据；不能用回答流畅、偏好某种措辞或多数票代替事实支持。证据不足时应允许返回未知评分（Unknown Score），而不是强迫一个确定结论。</p>
+<p>为了让校准（Calibration）具体可见，下面给四份完整短回答。校准（Calibration）在这里指对照已按合同确认的参考判断，检查并调整判定器（Grader）的误差；不是单凭名称保证它以后可靠。</p>
 <div class="table-scroll" tabindex="0"><table>
 <thead>
 <tr>
-<th>回答中的关键句</th>
-<th>按本题合同的参考标签</th>
-<th>G0判断</th>
-<th>应检查的误差</th>
+<th>编号</th>
+<th>完整待评回答</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>现在90天，7月1日起新建30天；已有按各自设置</td>
-<td>S</td>
-<td>S</td>
-<td>这例判断一致</td>
+<td>A</td>
+<td>“截至6月15日，新建默认90天；7月1日起新建默认30天；已有按各自设置，不自动改。依据D1、D2、D3。”</td>
 </tr>
 <tr>
-<td>公告已发布，所以现在新建30天</td>
-<td>F</td>
-<td>S</td>
-<td>错放：把发布日期当生效日期</td>
+<td>B</td>
+<td>“D1公告已经发布，所以截至6月15日新建默认30天；7月1日起仍30天；已有不自动改，依各自设置。依据D1、D2、D3。”</td>
 </tr>
 <tr>
-<td>已有工作区的数据现在都被删除了</td>
-<td>F</td>
-<td>F</td>
-<td>这例识别了无依据主张</td>
+<td>C</td>
+<td>“截至6月15日新建90天，7月1日起新建30天；已有工作区的数据现在都被删除了。依据D1、D2、D3。”</td>
 </tr>
 <tr>
-<td>截至六月十五日，新建保留九十日；七月一日起新建三十日；原有不自动变</td>
-<td>S</td>
-<td>F</td>
-<td>误拒：拘泥于数字与日期的表达方式</td>
+<td>D</td>
+<td>“截至六月十五日，新建保留九十日；七月一日起新建三十日；原有不自动变，仍按各自设置。依据D1、D2、D3。”</td>
 </tr>
 </tbody></table></div>
-<p>四例中错放一次、误拒一次，不能只说“评分器总体还行”。这里特意选了反例，<code>2/4</code>只是这四份回答的判断一致率，不是未来准确率估计。将生效日期与可接受等价表达写清后，即使G1在四例全对，也只是修复了已知例；还需要另一组未用来调整规则的回答检查共同盲点。</p>
-<p>人工也可能漏看D3或偏好自己的措辞。两位复核者分歧时，先指出争议句、引用与合同条件，再由负责该任务定义的人裁决或保留待查。多数票不自动生成真值，多位模型也可能沿用同一个错误解释。更难监督的研究会继续分析这些相关错误；本章最低要求是保留可核对的依据与拒绝确定判断的出口。</p>
-<h2 id="反馈进入训练之前先问谁在什么时候可见">反馈进入训练之前，先问谁在什么时候可见</h2>
-<p>本章不执行训练，但这些评分以后可能成为训练信号，所以现在就要保留信息边界。以K-C为例，解题模型在作答时可以看到问题、固定日期及实际读到的D1–D3；它看不到本次提交尚未产生的评分意见。评分方可以看提交物、全部资料及评分细则，用来给出事后反馈。</p>
-<p>任务要求本身应对解题者说清楚；独立评分不意味着用秘密条件为难它。需要隔离的是参考答案、最终评价实例与评分实现的修改权，以及尚未到达的反馈。将完整参考答案藏进工具返回，再用这次成功宣称模型已能独立研究，是改变了它获得的信息。</p>
-<p>如果开发过程允许“先交一稿，再看评价意见修订”，那就明确这是一项有反馈的任务，修订和再评分都占预算。若以后训练使用事后反馈来生成目标答案，也应记录反馈在原作答时不可见；部署时没有同类反馈，不能把有反馈下的表现直接搬过去。具体参数怎样更新，后面的训练章节再展开。</p>
-<p>U也不能自动变成训练的0分。K-A评分服务故障可能与补丁质量无关；将其当失败奖励，会把服务可用性混入学习目标。若目标明确定义为150秒内确认交付，可以使用那个事件的0/1信号，但仍保留原U状态，说明算法正在优化什么。</p>
-<h2 id="评分通过以后还有一道行动边界">评分通过以后，还有一道行动边界</h2>
-<p>这里的最低监督不是再添加一句“请谨慎”。在两个案例中，候选生成者、独立评分者和最终效果执行者有不同职责。K-A的Agent可以修改获准副本内的包装函数与README，评分方读取稳定产物；K-C的Agent只能交付结论草稿。评分通过不能把这些范围扩大成修改评分器、安装全局工具或对外发送报告。</p>
-<p>一条完整的通过路径是：生成候选产物→冻结并关联其身份→独立检查当前产物→记录判断与证据→检查当前任务是否已授权所需交付→执行该交付并确认结果。本章的获准交付仅为本地补丁/草稿及如实说明，没有外部发布步骤，也没有“拿到S就自动发布”的规则。</p>
-<p>一条拒绝路径同样要闭合：候选请求写测试或评分文件时，执行边界在效果发生前拒绝并记录实际目标；正常任务产物得到F时，保留反例供后续开发；得到U时，在获准重试与期限内查询同一产物，超限后交付未确认状态。它们不是同一种失败，不能一律不断重试。</p>
-<p>如果以后另开实验允许外部发布，应由持有对应权限的执行者核对具体产物、范围与当前许可后执行；模型评分只是其中一项输入。评分器发现“值得发布”不创造新授权，来自D1–D3的文字也不能授权更改真实账户。旧课的工具合同已说明，合法工具名与合法JSON都不足以证明具体效果获准；这里将同一原则用到改进系统。</p>
-<h2 id="根据这三种结果作出参考判断">根据这三种结果作出参考判断</h2>
-<p><strong>问题。</strong> 评分进程超时，所以本次一定是任务失败吗？</p>
-<p><strong>答案。</strong> 不一定。若已有独立反例，例如用户笔记被删除，可以记录F并保留其他缺失；若没有反例也没收齐必需检查，记录U。截止确认交付可以为0，但这是另一项预先定义的事件。</p>
-<p><strong>问题。</strong> 换成强模型评分器，能否解决候选打印 <code>ALL_PASS</code> 的问题？</p>
-<p><strong>答案。</strong> 若仍只把候选控制的输出交给它，缺少独立产物检查，核心漏洞没有关闭。先确定哪些证据由评分方自己取得、候选能否修改评分文件，再校准模型对这些证据的解释。</p>
-<p><strong>问题。</strong> K-C的回答引用D1并写“30天”，为什么仍可能失败？</p>
-<p><strong>答案。</strong> D1讨论7月1日后的新建工作区；当前时间是6月15日。引用存在不等于支持“目前30天”，也不能说明已有工作区的实际设置。应把结论的时间、对象和适用条件逐项对应原文。</p>
-<p><strong>问题。</strong> 评分通过的补丁可以直接安装为Agent共享工具吗？</p>
-<p><strong>答案。</strong> 不能从本例推出。通过的是用户项目修复合同，修改和安装共享工具属于另一个对象、另一份许可与另一组评价条件；下一次执行是否实际消费该工具也要核对。</p>
+<p>参考判断分别为S、F、F、S。B把发布日期误当生效日；C增加了资料没有支持的删除事实；D只是采用等价的中文数字，含义仍正确。C得到有效失败（F），是因为已确认它违反“结论须有资料依据”的条件；这不等于已证实数据没有删除，具体删除状态仍未知。现在另给一个用于K-C的假设判定器（Grader），在本小节记为G0，其输出是S、S、F、F；它不是前面K-A的字符串规则。这里没有实际运行评审模型（Model）。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>回答</th>
+<th>参考判断</th>
+<th>G0</th>
+<th>应如何解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A</td>
+<td>S</td>
+<td>S</td>
+<td>此例一致</td>
+</tr>
+<tr>
+<td>B</td>
+<td>F</td>
+<td>S</td>
+<td>错误放行（False Acceptance）：时间条件未被检查</td>
+</tr>
+<tr>
+<td>C</td>
+<td>F</td>
+<td>F</td>
+<td>此例识别了无依据主张</td>
+</tr>
+<tr>
+<td>D</td>
+<td>S</td>
+<td>F</td>
+<td>错误拒绝（False Rejection）：把等价表达误当错误</td>
+</tr>
+</tbody></table></div>
+<p>G0在四例中只有2例一致，即2/4；它是这四份专门构造材料的一致率（Agreement Rate），不构成未来准确率估计。将时间条件和等价表达补入G1后，即使它四例全对，也只说明已知问题被覆盖；还须用未参与调整的新回答检查。这承接第03章的开发与最终评价分离，不用重复跑同四题制造新的独立证据。</p>
+<p>人工复核（Human Review）同样可能漏读D3。发生分歧时，应定位争议句、资料和合同条件，由负责任务（Task）定义的人裁决，或者保留待查。多位模型（Model）也可能共享同一个误解；后续章节会进一步研究这种共同错误。</p>
+<a id="反馈进入训练之前先问谁在什么时候可见"></a>
+<h2 id="反馈feedback可以改下一稿不能改写上一稿的输入">反馈（Feedback）可以改下一稿，不能改写上一稿的输入</h2>
+<p>本章的监督（Supervision）是规定目标、检查行为并控制后续使用的安排；反馈（Feedback）则是提供给某个后续决策者的信息。判定结果生成了，不代表原作答时已能看见，也不代表必须全部回送给解题的智能代理（Agent）。</p>
+<p>以K-C为例，作答模型（Model）可以看到任务（Task）、固定日期及实际读到的D1–D3；它看不到本次尚未形成的评分意见。判定器（Grader）在提交后取得草稿、全文和评分细则。任务（Task）要求应清楚告诉解题者；独立评价不意味着用隐藏的新条件为难它。</p>
+<p>若另开“先交一稿，再按反馈（Feedback）修订”的方案，须明确反馈（Feedback）类型、次数和总预算（Budget）。后一稿增加了信息与操作机会，不能用它的结果证明前一稿在原条件下已经成功。实际输入（Actual Input）是消费者（Consumer）在当时真正取得的内容，应据此记录，不把后来评分意见塞回历史请求。</p>
+<p>如果未来用事后意见构造监督微调（Supervised Fine-Tuning，SFT）示范，即用确认的输入—目标调整模型参数（Model Parameters），也应记录这是新构造的学习材料。部署（Deployment）时没有相同反馈（Feedback），不能直接承诺重现有反馈（Feedback）的表现。第07–08章解释数值更新，具体训练（Training）方法仍各自定义学习材料、目标和消费者（Consumer）。</p>
+<p>同理，K-A评分服务失联产生的U不能默认变成失败奖励（Reward）。优化“150秒内确认交付”可以采用那个事件的0/1信号，但必须声明目标已经包含运行可用性，继续保留原任务评分（Task Score）及未知原因。</p>
+<a id="评分通过以后还有一道行动边界"></a>
+<h2 id="判定器grader给出通过谁有权执行下一步">判定器（Grader）给出通过，谁有权执行下一步</h2>
+<p>最低监督（Supervision）需要把提出候选（Candidate）、独立检查与实际效果分开。K-A只允许修改指定副本中的包装函数与README；K-C只允许交付本地结论草稿。判定器（Grader）给S不会新增修改测试、安装共享工具（Tool）、改变真实账户配置或向外发送报告的许可。</p>
+<p>完整通过路径是：生成待评产物（Artifact）→确认写入收束并冻结（Freezing）→检查同一份内容→保存判断与证据→核对当前交付范围→执行获准交付并确认结果。当前两案的获准交付都是本地内容与如实说明，不包含外部发布。</p>
+<p>拒绝路径也必须结束在明确状态。请求写测试或评分文件，执行边界在效果发生前拒绝；得到F，保留反例供以后开发；得到U，只在获准次数和剩余期限内查询同一产物（Artifact），超限就报告未确认。三个分支不能统一成“不停重试”。</p>
+<h3 id="连续委托也要分别确认当前行为与长期效果">连续委托也要分别确认当前行为与长期效果</h3>
+<p>基础62-B和62-C为后续K-B连续委托路线提供入口，但不是本章K-C资料包的延续。只借两条已给定条件作短对照：</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>独立情境</th>
+<th>当下可以确认什么</th>
+<th>还不能确认什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>62-B：仅允许改文档；长期偏好是全局中文、工作区A英文，用户现已撤回A例外，但持久提交未确认</td>
+<td>当前请求可以按最新指令用中文；源码和测试仍不能改</td>
+<td>本次中文不能证明记忆（Memory）撤回（Retraction）已提交，也不能证明未来读取已排除旧例外</td>
+</tr>
+<tr>
+<td>62-C：每日检查两个模块，初始没有修改许可</td>
+<td>定时触发（Scheduled Trigger）只启动获准的只读核对</td>
+<td>检查成功或子任务（Subtask）完成不等于用户批准（Approval）了修改</td>
+</tr>
+</tbody></table></div>
+<p>62-B的长期完成需要撤回（Retraction）提交和后续读取证据；62-C若以后取得针对具体补丁（Patch）的批准（Approval），还要核对当前文件与许可范围，才能执行。准入（Admission）是运行方对请求的接纳决定；基础62-C只处理已接纳、已拒绝或新接纳三类已定义结果，未识别的决定不能落入默认派发分支。这些是不同任务（Task）的完成对象，不因为它们都被界面写成“成功”就可以相互替代。</p>
+<p>因此，评价模型（Model）认为“值得发布”只是一条判断输入，不能创造授权（Authorization）。当前获准范围已经明确时，应由执行层落实；外部资料和合法的工具（Tool）参数格式都不能自行扩大它。基础第31章进一步解释具体效果与数据去向的合同。</p>
+<a id="根据这三种结果作出参考判断"></a>
+<h2 id="从证据直接作出参考判断">从证据直接作出参考判断</h2>
+<p><strong>问题。</strong> 评分进程超时，所以本次一定失败吗？</p>
+<p><strong>参考答案。</strong> 不一定。已有可信反例时判有效失败（Valid Failure，F），并保留其余未知；没有反例又缺必需检查时保留未知评分（Unknown Score，U）。截止确认交付（Confirmed Delivery）可以为0，它不把U改成任务（Task）失败。</p>
+<p><strong>问题。</strong> 只换更强的模型判定器（Model-based Grader），能关闭<code>ALL_PASS</code>漏洞吗？</p>
+<p><strong>参考答案。</strong> 如果仍只读被评程序控制的文字，核心证据缺口没有关闭。应先取得与当前产物（Artifact）绑定的独立检查，再校准（Calibration）它对这些证据的解释；接收包上写了身份也不能代替可信来源。</p>
+<p><strong>问题。</strong> K-C引用D1并写“30天”，为什么仍可能不成立？</p>
+<p><strong>参考答案。</strong> D1说的是7月1日起新建工作区；6月15日仍是90天。引用存在不等于支持当前结论，也不证明已有工作区的具体设置。需要同时核对时间、对象与原文支持范围。</p>
+<p><strong>问题。</strong> S、F、U三条结果中的成功比例，为什么既出现1/2又出现1/3到2/3？</p>
+<p><strong>参考答案。</strong> 1/2只用两个有评分的试次（Trial）作分母；1/3到2/3保留三个既定结果，将唯一未知分别取失败或成功。两端是逻辑边界，不是置信区间（Confidence Interval），也没有增加独立任务（Task）。</p>
+<p><strong>问题。</strong> 用户项目的补丁（Patch）通过了，能直接安装为共享工具（Tool）吗？</p>
+<p><strong>参考答案。</strong> 本题未提供这种许可。安装改变的是另一个对象，需要相应范围、独立评价和实际消费者（Consumer）；通过项目修复合同不会自动满足它们。</p>
 <h2 id="相关阅读与衔接">相关阅读与衔接</h2>
-<p>硬前置：<a href="01-what-actually-improves.html">第01章｜一次失败之后，究竟该改什么</a>。相关回读：<a href="../notes/maka/learning/40-task-evaluation.html">旧40章｜整项任务评价与成本比较</a>、<a href="../notes/maka/learning/31-tool-contracts.html">旧31章｜工具合同与执行边界</a>、<a href="../notes/maka/learning/62-complete-design-cases.html">旧62章｜三组完整设计案例</a>。</p>
-<p><a href="03-selection-and-attribution.html">上一章：重复选优与归因</a> · <a href="05-experience-and-consumers.html">下一章：一条轨迹怎样进入下一次改进</a>。</p>
+<p>硬前置：<a href="01-what-actually-improves.html">第01章｜一次失败之后，究竟该改什么</a>。推荐回读：<a href="02-paired-experiments.html">第02章的未知评分（Unknown Score）与比较单位</a>、<a href="03-selection-and-attribution.html">第03章的选择与最终评价</a>。本章不把它们的完整数学设为入场条件。</p>
+<p>基础关系见<a href="../notes/maka/learning/40-task-evaluation.html">第40章：有效评分（Valid Score）、确认交付与成本</a>、<a href="../notes/maka/learning/31-tool-contracts.html">第31章：工具合同（Tool Contract）及执行边界</a>、<a href="../notes/maka/learning/62-complete-design-cases.html">第62章：三组完整设计案例</a>。</p>
+<p><a href="03-selection-and-attribution.html">上一章：第03章｜挑出了最高分，为什么还不能宣布进步</a> · <a href="05-experience-and-consumers.html">下一章：第05章｜一条轨迹（Trajectory）怎样进入下一次改进</a>。第05章共同核心还需要第02–03章关于来源与用途的定义；按非线性路线到达这里的读者，先补这些实际前置。<a href="index.html">课程导航</a>。</p>
 <footer>Agent 前沿进阶 · 在线阅读</footer></main></body></html>

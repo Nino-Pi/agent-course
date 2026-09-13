@@ -3,162 +3,291 @@
 <body><header><a href="index.html">Agent 前沿进阶</a><span>能力增长、自主研究与自我改进</span></header><main><h1 id="第-06-章下一次读取怎样改变判断">第 06 章｜下一次读取怎样改变判断</h1>
 <blockquote>
 <p><strong>本章概览</strong></p>
-<p><strong>核心问题</strong>：资料互相矛盾、读取也有成本时，Agent应该先查什么，怎样知道已经足以回答？</p>
-<p><strong>关键概念</strong>：主动取证：根据当前缺口选择下一观察；信息价值：新观察对决策的预期帮助；证据状态：区分已支持、已否定和仍未知；新鲜度：材料是否适用于当前时点；停止规则：根据证据、权限和预算结束查询。</p>
-<p><strong>关系主线</strong>：以同一资料研究任务比较顺着排名读与按缺口取证，追踪查询、回读、上下文和最终回答；再用缓存失效与服务故障说明，读得更多不保证证据更完整。</p>
+<p><strong>核心问题</strong>：资料互相矛盾、读取也有成本时，智能代理（Agent）应先查什么，何时停止？</p>
+<p><strong>关键概念</strong>：主动取证（Active Evidence Gathering）按当前缺口选择观察（Observation），即新的可用返回；证据状态（Evidence State）区分支持、否定与未知；信息价值（Value of Information，VOI）衡量新返回对后续决策的帮助。</p>
+<p><strong>关系主线</strong>：沿同一资料任务比较两种读取顺序，再算观察（Observation）的价值，展开输入消费、完整预算（Budget）与失败后的停止条件。</p>
 </blockquote>
-<h2 id="先把还不知道什么写成能改变行动的问题">先把“还不知道什么”写成能改变行动的问题</h2>
-<p>本章硬前置是<a href="05-experience-and-consumers.html">第05章的共同核心</a>。沿用其中“材料必须被实际消费者读取”的定义，本章只改变单次任务中的查询与输入组织，模型参数和跨任务记忆保持不变。这里的资料研究指查找、核对和综合已有资料；找到了可靠答案，不因此成为原创科研。</p>
-<p>另设K-C的一项独立任务。青岚是虚构的笔记服务，本次查询时点改为<strong>2026年7月2日12:00</strong>，资料与站点副本按下表重新给定；第04章6月15日的当前状态不延用。用户问：“青岚现在给新工作区设置多少天的默认留存？既有工作区会被统一改成这个数吗？我们的河岸工作区目前是多少天？”河岸在5月建立，用户没有提供管理员配置。</p>
-<p>本次授权只允许读公共资料并生成答复草稿，不允许登录管理员页、修改留存或发送公告。两种策略从同一冻结站点副本、同一初始缓存和空的任务工作记录开始；固定同一模型M0、工具接口、输入格式和输出规则。差别只有下一次查询选择，不给主动取证方额外资料。</p>
-<p>每个试次最多6次模型决策、5次工具调用、120秒行动时间。最终报告也算一次模型决策；独立评分最多再用20秒。总费用上限为20个教学费用点，含评分的2点。失败读取和重试照常计数。以下模型决策与网页行为是完整给定的教学过程；本章后面的普通Python程序只运行策略与账本模拟，没有运行模型或访问真实青岚服务。</p>
-<p>判定合同提前固定：答案应给出有当前公共依据的新工作区默认值、既有工作区是否自动改变，并明确河岸当前值的证据缺口。前两项未回答，或把河岸当前值猜成默认值，均为有效F；三项满足则为S。外层评分器持有冻结资料的真值，若它自己无法工作才是评分U。准确报告查询失败仍有价值，但不自动满足完整交付要求。</p>
-<h2 id="资料都在站点里不等于都已进入输入">资料都在站点里，不等于都已进入输入</h2>
-<p>下面给读者列出这个微型环境的全部相关原文。模型初始知道任务、公共读取范围，以及搜索、缓存读取和公共页面刷新的工具合同；<strong>原文在被调用返回之前不会出现在它的输入中</strong>。</p>
+<h2 id="前情回顾读到了材料下一次判断为什么还可能不变">前情回顾：读到了材料，下一次判断为什么还可能不变</h2>
+<p>第05章把保存经验（Experience）与消费它分开：条目已存在，还要被筛选、加入实际输入（Actual Input），并被后续决策使用。配置不匹配时，参考消费者（Consumer）会重新读取；它没有因为一条旧笔记写得肯定，就把旧命令当成当前事实。</p>
+<p>这个关系也适用于一次任务内部。搜索发现一篇公告，意味着多了一个读取入口；原文尚未进入输入，当前生效条件也可能还没核实。基础第16/37章已经说明，剩余预算（Budget）应花在能改变下一步判断的观察（Observation）上。本章把“可能改变”展开为一个完整案例：<strong>面对30天与90天两种说法，下一次到底读哪份材料，返回以后怎样决定继续还是停止？</strong></p>
+<p>硬前置是<a href="05-experience-and-consumers.html">第05章共同核心</a>。这里固定模型参数（Model Parameters）与跨任务记忆（Memory），只比较查询（Query）和输入组织（Input Composition）；不要求训练（Training）深化。资料研究指查找、核对与综合已有内容，得到可靠答复还不等于产生原创科研发现。</p>
+<a id="先把还不知道什么写成能改变行动的问题"></a>
+<h2 id="同一个问题实际包含三个不同的未知">同一个问题，实际包含三个不同的未知</h2>
+<p>青岚是本章虚构的笔记服务。用户在<strong>2026年7月2日12:00</strong>提出：</p>
+<blockquote>
+<p>青岚现在给新工作区设置多少天的默认留存？既有工作区会被统一改成这个数吗？我们的河岸工作区目前是多少天？</p>
+</blockquote>
+<p>河岸在5月建立，用户没有提供管理员配置。本次只允许读取公共资料、形成答复草稿，不允许登录管理员页面、修改留存或发送公告。这是第04章K-C任务族（Task Family）的另一份教学初态：查询时点与站点副本都重新给定，不沿用该章6月15日的状态。</p>
+<p>先把需要回答的内容分开。证据状态（Evidence State）是“当前观察（Observation）能支持什么”的记录，不是外部世界本身。</p>
 <div class="table-scroll" tabindex="0"><table>
 <thead>
 <tr>
-<th>资料身份与来源</th>
-<th>本例原始正文或返回内容</th>
-<th>时间与适用范围</th>
+<th>问题格</th>
+<th>需要什么依据</th>
+<th>初始证据状态（Evidence State）</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>B：一篇转述博客</td>
-<td>“青岚进入30天留存时代。切换即将开始，团队可以据此安排资料整理。”</td>
-<td>6月18日发布；没有交代既有工作区规则，不是当前策略页</td>
+<td>G1：新工作区现在的默认值</td>
+<td>适用于7月2日的当前政策</td>
+<td>未知</td>
 </tr>
 <tr>
-<td>N：官方调整公告 <code>/notice</code></td>
-<td>“计划自7月1日启动新工作区默认30天的调整。实际生效情况以当前策略页 <code>/defaults</code> 为准；既有工作区规则见 <code>/faq</code>。”</td>
-<td>6月1日发布；宣布计划，不单独确认7月2日已经生效</td>
+<td>G2：既有工作区是否自动变化</td>
+<td>这次调整对既有对象的明确规则</td>
+<td>未知</td>
 </tr>
 <tr>
-<td>P旧：<code>/defaults</code> 的缓存副本</td>
-<td>“当前新工作区默认留存90天。”</td>
-<td>最后核验于5月15日；正文版本为5月1日版，没有7月2日的重新核验结果</td>
-</tr>
-<tr>
-<td>P新：官方当前策略页 <code>/defaults</code></td>
-<td>“7月1日调整已生效；当前创建的新工作区默认留存30天。”</td>
-<td>本例站点副本核验时点为7月2日12:00；这是刷新后才返回的版本</td>
-</tr>
-<tr>
-<td>FAQ：官方常见问题 <code>/faq</code></td>
-<td>“既有工作区不会随本次调整自动改成30天，继续采用各自当前配置。管理员可以另行调整；某个工作区当前值须查其管理设置。”</td>
-<td>当前站点副本中的有效说明</td>
-</tr>
-<tr>
-<td>初次搜索回执</td>
-<td>按B、N、P旧给出三个候选及上述标题、日期、路径；明确<code>truncated=true</code></td>
-<td>只返回排名前3项，不承诺站点只有3篇材料</td>
+<td>G3：河岸的当前值</td>
+<td>河岸自身的配置观察（Observation）</td>
+<td>未知，当前未提供管理员读取权限（Permission）</td>
 </tr>
 </tbody></table></div>
-<p>搜索返回的P旧是缓存候选。普通缓存读取只取得P旧；显式刷新<code>/defaults</code>才向本例的当前站点副本核验，并返回P新。公告中的<code>/faq</code>路径是新发现的读取入口，不能因为初始搜索没返回FAQ就说它不存在。</p>
-<p>读完搜索回执后，当前问题可以分成三格：<strong>G1：新工作区现在的默认值；G2：既有工作区是否自动变化；G3：河岸的实际配置。</strong> G1需要当前政策，G2需要适用范围，G3需要该工作区的配置观察。这种分解的用处是让每次读取有明确消费者：准备回答哪一格，哪种返回会改变下一动作。</p>
-<p>G3已暴露权限限制：任务没有提供管理员配置，也没有管理员读取权限。此时尚未取得河岸当前值；策略不能搜索十次“河岸30天”就把公共默认值当作私人配置。后续回读还要确认公共政策是否允许对这个既有工作区作进一步判断。</p>
-<h2 id="先跟着排名读会在哪里耗尽机会">先跟着排名读，会在哪里耗尽机会</h2>
-<p>设策略R为“搜索，依排名读取前三个候选，再用同一关键词搜索一次”；遇到时间冲突仍不刷新，最后按实际取得的证据回答。它不是所有排序检索器的代表，只是本题固定的比较策略。</p>
+<p>G1的公共默认值不能代填G3。即使查到了“新工作区30天”，也没有观察河岸的设置；用户提供的建立时间还表明它是既有对象。G2则可能得到明确的否定，那与“没读到答案”不同。</p>
+<p>判定器（Grader）是按既定要求检查交付的外层程序。本题要求G1/G2有适用依据，并要求G3如实说明缺口；满足这些条件为成功（Success，S）。未回答前两项或猜填河岸当前值，是有效失败（Valid Failure，F）。若外层本身无法取得可靠判定，才记未知评分（Unknown Score，U）。因此，G3保留未知可以是正确答复的一部分；它不自动使整次任务成为未知评分（U）。</p>
+<a id="资料都在站点里不等于都已进入输入"></a>
+<h2 id="先看到入口再看到正文最后判断它支持哪一格">先看到入口，再看到正文，最后判断它支持哪一格</h2>
+<p>两种策略（Policy）从相同的冻结站点副本、初始缓存（Cache）和空工作记录开始，固定同一模型（Model）M0、工具（Tool）接口、输入格式及报告规则。它们只改变下一次读取的选择，不能给其中一方提前透露答案。下面给读者展示全部教学资料；模型（Model）只有在相应工具结果（Tool Result）返回后才取得正文。</p>
 <div class="table-scroll" tabindex="0"><table>
 <thead>
 <tr>
-<th>工具次序</th>
-<th>R实际取得什么</th>
-<th>当时仍缺什么</th>
+<th>身份与入口</th>
+<th>本例给定的正文</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>B：转述博客</td>
+<td>“青岚进入30天留存时代。切换即将开始，团队可以据此安排资料整理。”</td>
+</tr>
+<tr>
+<td>N：官方公告 <code>/notice</code></td>
+<td>“计划自7月1日启动新工作区默认30天的调整。实际生效情况以当前策略页 <code>/defaults</code> 为准；既有工作区规则见 <code>/faq</code>。”</td>
+</tr>
+<tr>
+<td>P旧：<code>/defaults</code>的缓存（Cache）</td>
+<td>“当前新工作区默认留存90天。”</td>
+</tr>
+<tr>
+<td>P新：刷新 <code>/defaults</code> 后的当前页</td>
+<td>“7月1日调整已生效；当前创建的新工作区默认留存30天。”</td>
+</tr>
+<tr>
+<td>FAQ：<code>/faq</code>的常见问题说明</td>
+<td>“既有工作区不会随本次调整自动改成30天，继续采用各自当前配置。管理员可以另行调整；某个工作区当前值须查其管理设置。”</td>
+</tr>
+</tbody></table></div>
+<p>这些文字的时间不能省略。B发布于6月18日；N发布于6月1日，宣布的是计划。P旧正文是5月1日版，最后核验于5月15日；没有7月2日核验结果。P新与FAQ则是本题在7月2日12:00固定的有效站点内容。新鲜度（Freshness）关心观察（Observation）或表示是否仍适合当前使用；新发布日期、最近抓取与“计划已经生效”不能直接画等号。</p>
+<p>第一次搜索只返回B、N、P旧三个候选的标题、日期和路径，并标明<code>truncated=true</code>，即结果被截断（Truncation）。它不返回三篇完整正文，也不保证站点只有三篇。普通读取P旧仍拿到旧正文；显式刷新才取得本题P新。FAQ的入口要从已经读到的N中发现，不能从读者的全资料表偷渡进模型（Model）初始输入。</p>
+<p>现在引入预算（Budget）。每个计划试次（Trial）从上述初态开始，最多6次模型（Model）决策、5次工具调用（Tool Call）、120秒行动时间；最终报告占一次模型（Model）决策。独立判定另预留20秒，总费用上限20个教学费用点，其中2点属于判定。失败读取与重试（Retry）同样计数。这些是给定的教学资源，不是测得的模型（Model）或网络耗时。</p>
+<a id="先跟着排名读会在哪里耗尽机会"></a>
+<h2 id="跟着排名读为什么五次调用仍没回答完整">跟着排名读，为什么五次调用仍没回答完整</h2>
+<p>策略（Policy）R规定：搜索、依排名读前三个候选、重复一次原搜索，再按已有证据（Evidence）报告。它即使遇到时间冲突也不刷新。这是本题一个明确的比较基线（Baseline），不代表所有排序检索（Ranked Retrieval）方法。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>工具（Tool）次序</th>
+<th>实际取得的观察（Observation）</th>
+<th>仍不能推出什么</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>1：搜索“青岚 留存”</td>
-<td>B、N、P旧三个候选</td>
-<td>G1–G3均未闭合</td>
+<td>B、N、P旧的候选入口</td>
+<td>三格都没有正文支持</td>
 </tr>
 <tr>
 <td>2：读B</td>
-<td>看到了30天的转述</td>
-<td>不能确认实际生效与既有范围</td>
+<td>30天的转述</td>
+<td>不能确认已生效，也未给既有范围</td>
 </tr>
 <tr>
 <td>3：读N</td>
-<td>看到了计划日期及<code>/defaults</code>、<code>/faq</code>入口</td>
-<td>仍需当前政策和既有规则</td>
+<td>计划日期，以及当前页和FAQ入口</td>
+<td>仍需检查实际生效与既有规则</td>
 </tr>
 <tr>
 <td>4：读P旧</td>
-<td>取得5月核验的90天正文</td>
-<td>旧观察与新计划并置，不足以确认当前值</td>
+<td>5月核验的90天正文</td>
+<td>不能把旧观察（Observation）当成7月2日当前值</td>
 </tr>
 <tr>
 <td>5：重复原搜索</td>
-<td>仍是相同前三项，仍被截断</td>
-<td>没有新增证据；工具预算耗尽</td>
+<td>相同的前三个入口</td>
+<td>没有消解冲突；工具（Tool）预算（Budget）用完</td>
 </tr>
 </tbody></table></div>
-<p>R的诚实答复是：“公告计划改为30天，但当前缓存仍写90天，尚未确认现在的默认值；既有工作区规则和河岸实际配置也未核对。”它正确保留了未知，却没有完成前两项要求，外层给F。若改为按两篇含30天的文字对一篇90天的文字投票，也不能补上生效与适用范围；重复转述不是独立政策证据。</p>
-<p>这个失败没有发生在“资料总量不足”。FAQ由已经读到的N直接指向，P新也有明确刷新入口；真正浪费的是冲突出现以后没有改变读取动作。</p>
-<h2 id="按缺口取证观察会怎样推动下一步">按缺口取证，观察会怎样推动下一步</h2>
-<p>策略Q同样先搜索，但优先回读官方公告，再根据公告指出的缺口行动。以下每行的依据只来自该行之前已经取得的观察。</p>
+<p>R的参考草稿是：“公告计划改为30天，但缓存（Cache）仍写90天，尚未确认现在的默认值；既有工作区规则和河岸当前配置也未核对。”这份草稿诚实保留缺口，却没有完成G1/G2，因此判为有效失败（F）。</p>
+<p>把B与N当成两票“30天”、P旧当成一票“90天”，也不能得到当前政策。两份材料可能都源于同一公告；相同数字没有新增独立支持，更没有把未来计划变成生效事实。问题出在观察（Observation）出现矛盾后，下一动作（Action）仍未改变，而非公开资料必定不足。</p>
+<a id="按缺口取证观察会怎样推动下一步"></a>
+<h2 id="按缺口取证每份返回具体改变哪一步">按缺口取证，每份返回具体改变哪一步</h2>
+<p>主动取证（Active Evidence Gathering）根据当前缺口选择接下来的观察（Observation）。本题策略（Policy）Q同样先搜索，再读原始公告，随后依据它提供的入口继续。</p>
 <div class="table-scroll" tabindex="0"><table>
 <thead>
 <tr>
-<th>工具次序</th>
-<th>下一动作及其依据</th>
-<th>新观察怎样改变状态</th>
+<th>工具（Tool）次序</th>
+<th>此前的理由</th>
+<th>返回后的变化</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>1：搜索</td>
-<td>用任务关键词发现候选</td>
-<td>N具有原始公告身份，P旧核验时间较早；决定先读N</td>
+<td>需要发现可用入口</td>
+<td>N有官方公告身份；决定读其正文</td>
 </tr>
 <tr>
 <td>2：读N</td>
-<td>需要区分“计划”与“当前”</td>
-<td>N明确把实际生效交给<code>/defaults</code>，并提供<code>/faq</code>；形成两个具体回读入口</td>
+<td>需要区分计划和当前状态</td>
+<td>正文明确提供刷新当前页及FAQ两个入口</td>
 </tr>
 <tr>
-<td>3：刷新<code>/defaults</code></td>
-<td>P旧不足以回答7月2日的G1</td>
-<td>P新写明已生效、当前30天；G1从未知变成有来源的30天</td>
+<td>3：刷新 <code>/defaults</code></td>
+<td>P旧不能支持7月2日的G1</td>
+<td>P新确认当前30天；G1有适用来源（Source）</td>
 </tr>
 <tr>
-<td>4：读<code>/faq</code></td>
-<td>还缺G2的既有范围</td>
-<td>明确“不会自动改”；G2变成有来源的否定，G3仍无配置观察</td>
+<td>4：读 <code>/faq</code></td>
+<td>G2仍未回答</td>
+<td>G2得到“不自动改变”；G3仍没有配置观察（Observation）</td>
 </tr>
 <tr>
 <td>最终报告</td>
-<td>G1/G2已有所需证据，G3超出本次可取得的信息范围</td>
-<td>停止查询，给结论、来源和未核项</td>
+<td>公共问题已闭合，私人配置未授权读取</td>
+<td>停止并给出有范围的草稿</td>
 </tr>
 </tbody></table></div>
-<p>Q最终草稿为：“截至7月2日12:00，新工作区默认留存30天，当前策略页已确认生效。既有工作区不会因这次调整自动变成30天，仍按各自当前配置。河岸在5月建立，属于既有工作区；我们没有读取它的管理设置，不能据公共默认值判定它当前是多少天。”前两句分别引用P新与FAQ，最后一句依据用户给定的建立时间、FAQ的范围和本次未读取配置这一事实。外层给S。</p>
-<p>本例的候选答案也能直接比较：答“所有工作区都是30天”与FAQ冲突；答“当前仍是90天”只使用了过期观察；上述Q草稿能让每个确定结论落到适用证据。选择器检查的是<strong>主张、时点、对象和出处是否对应</strong>，不是哪份答案更肯定或哪一个数字出现更多次。</p>
-<p>这种观察与行动交替的做法与ReAct原方法相通：新观察参与后续查询和答案组织，查询不再是开头一次性的材料准备。原方法也分析了无用搜索和重复行动的失败，不能把这种循环形式当作可靠性的保证。这里没有复现其模型或基准成绩。<a href="https://arxiv.org/html/2210.03629v3">ReAct原论文</a></p>
-<h2 id="一次读取值得付出多少先算它能改变什么">一次读取值得付出多少：先算它能改变什么</h2>
-<p>只取G1做一个独立数值例子。假设当前30天和90天两个可能状态各占0.5，这是教学给定的不确定性，不是模型置信度测量。答错损失10分，暂不确定损失4分，答对损失0分；这里的损失是为决策设定的代价，不等于前面费用账本的货币。</p>
-<p>直接答30或90的平均损失都是<code>0.5×0+0.5×10=5</code>，暂不确定的损失是4，所以还没取证时选择暂不确定。再假设读取当前策略页成功时能完全区分这两个状态，成功率为0.8；失败时没有新增信息，仍选择暂不确定。读取后的预期答题损失为<code>0.8×0+0.2×4=0.8</code>。</p>
-<p>若时间和费用已按本题预先选择的尺度折成1分，则这次读取的净价值是<code>4−0.8−1=2.2</code>分。再读一份已知只重复旧公告的副本，不改变这两个状态的相对可能性，其净价值为<code>4−4−1=−1</code>。信息价值比较的是<strong>观察之后能否选择更好的动作</strong>，不是新增加了多少文字。</p>
-<p>更一般地，先按当前证据选择预期损失最小的动作；对某个候选查询，把每种可能返回及其概率列出，在每种返回下重新选动作，再求平均，最后加查询成本。不能先假定会得到想要的结果，再决定去查。这个决策顺序对应信息价值的基本推导；概率、损失和观察可靠性必须有适用条件。<a href="https://inst.eecs.berkeley.edu/~cs188/textbook/vpis/vpi.html">信息价值的公式与推导</a></p>
-<p>实际网页会有解析错误、含糊措辞和不可用服务。上述0.8、完全区分和损失权重不是通用常数；如果无法估计，先用“能区分哪两个候选解释、成本多少、失败后怎么办”这三个问题排序，也比把读满预算当目标更明确。一个查询可能只有与另一份材料合起来才有价值，逐篇相关性分数不能自动代表整条证据链的价值。</p>
-<h2 id="让下一请求看见结论的条件而非只剩数字">让下一请求看见结论的条件，而非只剩数字</h2>
-<p>Q在刷新以后可以整理出以下任务内工作记录；它不跨任务存为长期Memory。</p>
+<p>完整参考答复如下：</p>
+<blockquote>
+<p>截至7月2日12:00，新工作区默认留存30天，当前策略页已确认生效。既有工作区不会因本次调整自动变为30天，继续采用各自当前配置。河岸在5月建立，属于既有工作区；我们没有读取其管理设置，不能据公共默认值判断它现在是多少天。</p>
+</blockquote>
+<p>第一句由P新支持，第二句由FAQ支持，第三句结合用户给定的建立时间、FAQ的范围与本次未读取设置的事实。这满足本题要求，判为成功（S）。如果答“所有工作区都是30天”，则直接与FAQ冲突。</p>
+<p>这里的判断要对应<strong>主张（Claim）、对象、时点和来源（Source）</strong>：主张（Claim）是准备在答复中断言的内容，来源（Source）是支持它的可定位材料。措辞更肯定或出现次数更多，都不能代替这个对应关系。</p>
+<p><a href="https://arxiv.org/html/2210.03629v3">ReAct原方法</a>把后续行动与新观察（Observation）相连，也分析了无用搜索和重复行动的失败。本章采用的是公开规则的教学对照，没有复现论文模型（Model）或基准成绩。循环形式本身不保证查询（Query）能消除缺口。</p>
+<a id="一次读取值得付出多少先算它能改变什么"></a>
+<h2 id="一次读取值多少要在每种返回后重新选择">一次读取值多少，要在每种返回后重新选择</h2>
+<h3 id="先给一个可以逐项计算的小问题">先给一个可以逐项计算的小问题</h3>
+<p>只取G1另设一个数值例。状态（State）<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi></mrow><annotation encoding="application/x-tex">\theta</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span></span></span></span>只有30天与90天两种；当前证据（Evidence）记为<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi></mrow><annotation encoding="application/x-tex">E</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span></span></span></span>，表示已经取得的相关材料。假设在这些条件下，两种可能的概率（Probability）各为0.5。这是教学给定的信念分布（Belief Distribution），不是测量出的模型（Model）信心，也不是前面站点案例新增了一次随机实验。</p>
+<p>答复动作（Action）<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>a</mi></mrow><annotation encoding="application/x-tex">a</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">a</span></span></span></span>有三种：答30、答90、暂不确定。损失（Loss）<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>L</mi><mo stretchy="false">(</mo><mi>a</mi><mo separator="true">,</mo><mi>θ</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">L(a,\theta)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">L</span><span class="mopen">(</span><span class="mord mathnormal">a</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mclose">)</span></span></span></span>是作出答复的决策代价，单位为本节的“代价分”；答错10、暂不确定4、答对0。它不是训练损失（Training Loss），也不同于前面的教学费用点。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>答复动作（Action）</th>
+<th align="right">真状态（State）为30</th>
+<th align="right">真状态（State）为90</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>答30</td>
+<td align="right" class="numeric-cell">0</td>
+<td align="right" class="numeric-cell">10</td>
+</tr>
+<tr>
+<td>答90</td>
+<td align="right" class="numeric-cell">10</td>
+<td align="right" class="numeric-cell">0</td>
+</tr>
+<tr>
+<td>暂不确定</td>
+<td align="right" class="numeric-cell">4</td>
+<td align="right" class="numeric-cell">4</td>
+</tr>
+</tbody></table></div>
+<p>期望损失（Expected Loss）按各状态（State）的概率（Probability）加权。直接答30得到<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0.5</mn><mo>×</mo><mn>0</mn><mo>+</mo><mn>0.5</mn><mo>×</mo><mn>10</mn><mo>=</mo><mn>5</mn></mrow><annotation encoding="application/x-tex">0.5\times0+0.5\times10=5</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">10</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">5</span></span></span></span>分；答90也为5分；暂不确定为4分。因此当前最小值为：</p>
+<div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>R</mi><mo stretchy="false">(</mo><mi>E</mi><mo stretchy="false">)</mo><mo>=</mo><munder><mrow><mi>min</mi><mo>⁡</mo></mrow><mi>a</mi></munder><munder><mo>∑</mo><mrow><mi>θ</mi><mo>∈</mo><mo stretchy="false">{</mo><mn>30</mn><mo separator="true">,</mo><mn>90</mn><mo stretchy="false">}</mo></mrow></munder><mi>P</mi><mo stretchy="false">(</mo><mi>θ</mi><mo>∣</mo><mi>E</mi><mo stretchy="false">)</mo><mi>L</mi><mo stretchy="false">(</mo><mi>a</mi><mo separator="true">,</mo><mi>θ</mi><mo stretchy="false">)</mo><mo>=</mo><mi>min</mi><mo>⁡</mo><mo stretchy="false">{</mo><mn>5</mn><mo separator="true">,</mo><mn>5</mn><mo separator="true">,</mo><mn>4</mn><mo stretchy="false">}</mo><mo>=</mo><mn>4.</mn></mrow><annotation encoding="application/x-tex">R(E)=\min_a\sum_{\theta\in\{30,90\}}
+P(\theta\mid E)L(a,\theta)=\min\{5,5,4\}=4.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.566em;vertical-align:-1.516em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.6679em;"><span style="top:-2.4em;margin-left:0em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">a</span></span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span><span class="mop">min</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.7em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.05em;"><span style="top:-1.809em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.0278em;">θ</span><span class="mrel mtight">∈</span><span class="mopen mtight">{</span><span class="mord mtight">30</span><span class="mpunct mtight">,</span><span class="mord mtight">90</span><span class="mclose mtight">}</span></span></span></span><span style="top:-3.05em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.516em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span><span class="mord mathnormal">L</span><span class="mopen">(</span><span class="mord mathnormal">a</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop">min</span><span class="mopen">{</span><span class="mord">5</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">5</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">4</span><span class="mclose">}</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">4.</span></span></span></span></span></div><p><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>θ</mi><mo>∣</mo><mi>E</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">P(\theta\mid E)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span></span></span></span>表示给定现有证据（Evidence）时的条件概率（Conditional Probability）；求和遍历两个状态（State），<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow><mi>min</mi><mo>⁡</mo></mrow><mi>a</mi></msub></mrow><annotation encoding="application/x-tex">\min_a</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8179em;vertical-align:-0.15em;"></span><span class="mop"><span class="mop">min</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">a</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>表示比较三种答复再选择最小值。<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo stretchy="false">(</mo><mi>E</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">R(E)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span></span></span></span>是最优答复仍须承担的期望损失（Expected Loss），不是对答案确定程度的打分；它是本节的风险函数，与前面读取顺序的R标签分开。</p>
+<h3 id="读取成功与失败怎样分别改变概率probability">读取成功与失败，怎样分别改变概率（Probability）</h3>
+<p>令查询（Query）<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>q</mi></mrow><annotation encoding="application/x-tex">q</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span></span></span></span>为读取当前页，返回<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>y</mi></mrow><annotation encoding="application/x-tex">y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span></span></span></span>可能是30、90或<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">⊥</mi></mrow><annotation encoding="application/x-tex">\bot</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord">⊥</span></span></span></span>；<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">⊥</mi></mrow><annotation encoding="application/x-tex">\bot</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord">⊥</span></span></span></span>表示没有新增信息。假设读取成功率在两种状态（State）下都为0.8，成功时完全辨认状态（State），失败概率（Probability）均为0.2且不偏向任一状态（State）。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>真状态（State）</th>
+<th align="right">返回30</th>
+<th align="right">返回90</th>
+<th align="right">返回<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">⊥</mi></mrow><annotation encoding="application/x-tex">\bot</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord">⊥</span></span></span></span></th>
+</tr>
+</thead>
+<tbody><tr>
+<td class="numeric-cell">30</td>
+<td align="right" class="numeric-cell">0.8</td>
+<td align="right" class="numeric-cell">0</td>
+<td align="right" class="numeric-cell">0.2</td>
+</tr>
+<tr>
+<td class="numeric-cell">90</td>
+<td align="right" class="numeric-cell">0</td>
+<td align="right" class="numeric-cell">0.8</td>
+<td align="right" class="numeric-cell">0.2</td>
+</tr>
+</tbody></table></div>
+<p>每一行是给定状态（State）下的返回分布，合计为1；不是三个答复的评分。读取之前还不知道实际得到哪一列，因此先算各种返回的概率（Probability）：</p>
+<div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mtable rowspacing="0.25em" columnalign="right left" columnspacing="0em"><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>y</mi><mo>=</mo><mn>30</mn><mo>∣</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo stretchy="false">)</mo></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mn>0.5</mn><mo>×</mo><mn>0.8</mn><mo>+</mo><mn>0.5</mn><mo>×</mo><mn>0</mn><mo>=</mo><mn>0.4</mn><mo separator="true">,</mo></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>y</mi><mo>=</mo><mn>90</mn><mo>∣</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo stretchy="false">)</mo></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mn>0.5</mn><mo>×</mo><mn>0</mn><mo>+</mo><mn>0.5</mn><mo>×</mo><mn>0.8</mn><mo>=</mo><mn>0.4</mn><mo separator="true">,</mo></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>y</mi><mo>=</mo><mi mathvariant="normal">⊥</mi><mo>∣</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo stretchy="false">)</mo></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mn>0.5</mn><mo>×</mo><mn>0.2</mn><mo>+</mo><mn>0.5</mn><mo>×</mo><mn>0.2</mn><mo>=</mo><mn>0.2.</mn></mrow></mstyle></mtd></mtr></mtable><annotation encoding="application/x-tex">\begin{aligned}
+P(y=30\mid E,q)&amp;=0.5\times0.8+0.5\times0=0.4,\\
+P(y=90\mid E,q)&amp;=0.5\times0+0.5\times0.8=0.4,\\
+P(y=\bot\mid E,q)&amp;=0.5\times0.2+0.5\times0.2=0.2.
+\end{aligned}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:4.2em;vertical-align:-1.85em;"></span><span class="mord"><span class="mtable"><span class="col-align-r"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:2.35em;"><span style="top:-4.51em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">30</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span></span></span><span style="top:-3.01em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">90</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span></span></span><span style="top:-1.51em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">⊥</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.85em;"><span></span></span></span></span></span><span class="col-align-l"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:2.35em;"><span style="top:-4.51em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0.8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">0.4</span><span class="mpunct">,</span></span></span><span style="top:-3.01em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0.8</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">0.4</span><span class="mpunct">,</span></span></span><span style="top:-1.51em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0.2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0.2</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord">0.2.</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.85em;"><span></span></span></span></span></span></span></span></span></span></span></span></div><p>收到30后，把“<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi><mo>=</mo><mn>30</mn></mrow><annotation encoding="application/x-tex">\theta=30</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">30</span></span></span></span>且返回30”的概率（Probability）除以“返回30”的总概率（Probability），得到后验概率（Posterior Probability），也就是结合新观察（Observation）后的分布。具体采用贝叶斯公式（Bayes&#39; Rule）：</p>
+<div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>θ</mi><mo>∣</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo separator="true">,</mo><mi>y</mi><mo stretchy="false">)</mo><mo>=</mo><mfrac><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>y</mi><mo>∣</mo><mi>θ</mi><mo separator="true">,</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo stretchy="false">)</mo><mi>P</mi><mo stretchy="false">(</mo><mi>θ</mi><mo>∣</mo><mi>E</mi><mo stretchy="false">)</mo></mrow><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>y</mi><mo>∣</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo stretchy="false">)</mo></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"/><mi>P</mi><mo stretchy="false">(</mo><mi>θ</mi><mo>=</mo><mn>30</mn><mo>∣</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo separator="true">,</mo><mi>y</mi><mo>=</mo><mn>30</mn><mo stretchy="false">)</mo><mo>=</mo><mfrac><mrow><mn>0.8</mn><mo>×</mo><mn>0.5</mn></mrow><mn>0.4</mn></mfrac><mo>=</mo><mn>1.</mn></mrow><annotation encoding="application/x-tex">P(\theta\mid E,q,y)=
+\frac{P(y\mid\theta,E,q)P(\theta\mid E)}{P(y\mid E,q)},
+\qquad
+P(\theta=30\mid E,q,y=30)=\frac{0.8\times0.5}{0.4}=1.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.363em;vertical-align:-0.936em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.427em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.936em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">30</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">30</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.0074em;vertical-align:-0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">0.4</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">0.8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">0.5</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1.</span></span></span></span></span></div><p>这里分母非零；若某个返回在设定中概率（Probability）为0，它不参与预先求期望，不能直接做除零。收到90时，90的后验概率（Posterior Probability）同样为1；收到<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">⊥</mi></mrow><annotation encoding="application/x-tex">\bot</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord">⊥</span></span></span></span>时，两种状态（State）都仍为<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0.2</mn><mo>×</mo><mn>0.5</mn><mi mathvariant="normal">/</mi><mn>0.2</mn><mo>=</mo><mn>0.5</mn></mrow><annotation encoding="application/x-tex">0.2\times0.5/0.2=0.5</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">0.5/0.2</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0.5</span></span></span></span>。失败不改变该分布，依赖的是本例两边相同的失败通道；若一种状态（State）更容易导致失败，失败本身也可能携带信息。</p>
+<p>在30或90返回下，选择对应答案，最小损失（Loss）为0；在<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">⊥</mi></mrow><annotation encoding="application/x-tex">\bot</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord">⊥</span></span></span></span>下，仍选暂不确定，保留4分。读取后的预期最小代价因而是：</p>
+<div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mover accent="true"><mi>R</mi><mo stretchy="true">‾</mo></mover><mo stretchy="false">(</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo stretchy="false">)</mo><mo>=</mo><mn>0.4</mn><mo>×</mo><mn>0</mn><mo>+</mo><mn>0.4</mn><mo>×</mo><mn>0</mn><mo>+</mo><mn>0.2</mn><mo>×</mo><mn>4</mn><mo>=</mo><mn>0.8.</mn></mrow><annotation encoding="application/x-tex">\overline R(E,q)
+=0.4\times0+0.4\times0+0.2\times4=0.8.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.1333em;vertical-align:-0.25em;"></span><span class="mord overline"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8833em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0077em;">R</span></span></span><span style="top:-3.8033em;"><span class="pstrut" style="height:3em;"></span><span class="overline-line" style="border-bottom-width:0.04em;"></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.4</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.4</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">4</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0.8.</span></span></span></span></span></div><p>注意重选动作（Action）发生在每种返回内部。不能在读取前固定“无论回来什么都答30”，又期待得到上述0.8。</p>
+<h3 id="把成本放回同一单位才得到净值">把成本放回同一单位，才得到净值</h3>
+<p>假设时间与费用已经按本题预先选定的尺度折成查询成本（Query Cost）<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>c</mi><mo stretchy="false">(</mo><mi>q</mi><mo stretchy="false">)</mo><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">c(q)=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">c</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span>代价分。净信息价值（Net Value of Information）为：</p>
+<div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>V</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">t</mi></mrow></msub><mo stretchy="false">(</mo><mi>q</mi><mo>∣</mo><mi>E</mi><mo stretchy="false">)</mo><mo>=</mo><mi>R</mi><mo stretchy="false">(</mo><mi>E</mi><mo stretchy="false">)</mo><mo>−</mo><mover accent="true"><mi>R</mi><mo stretchy="true">‾</mo></mover><mo stretchy="false">(</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo stretchy="false">)</mo><mo>−</mo><mi>c</mi><mo stretchy="false">(</mo><mi>q</mi><mo stretchy="false">)</mo><mo>=</mo><mn>4</mn><mo>−</mo><mn>0.8</mn><mo>−</mo><mn>1</mn><mo>=</mo><mn>2.2</mn><mtext> 代价分</mtext><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">V_{\mathrm{net}}(q\mid E)=R(E)-\overline R(E,q)-c(q)
+=4-0.8-1=2.2\ \text{代价分}.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.2222em;">V</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.2222em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">net</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1.1333em;vertical-align:-0.25em;"></span><span class="mord overline"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8833em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0077em;">R</span></span></span><span style="top:-3.8033em;"><span class="pstrut" style="height:3em;"></span><span class="overline-line" style="border-bottom-width:0.04em;"></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">c</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">4</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord">2.2</span><span class="mspace"> </span><span class="mord text"><span class="mord cjk_fallback">代价分</span></span><span class="mord">.</span></span></span></span></span></div><p>一般有限状态（State）的例子中，先为每个可能返回重新求最小值，再按返回的概率（Probability）加权：</p>
+<div class="math-scroll"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>V</mi><mrow><mi mathvariant="normal">n</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">t</mi></mrow></msub><mo stretchy="false">(</mo><mi>q</mi><mo>∣</mo><mi>E</mi><mo stretchy="false">)</mo><mo>=</mo><mi>R</mi><mo stretchy="false">(</mo><mi>E</mi><mo stretchy="false">)</mo><mo>−</mo><munder><mo>∑</mo><mi>y</mi></munder><mi>P</mi><mo stretchy="false">(</mo><mi>y</mi><mo>∣</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo stretchy="false">)</mo><mrow><mo fence="true">[</mo><munder><mrow><mi>min</mi><mo>⁡</mo></mrow><mi>a</mi></munder><munder><mo>∑</mo><mi>θ</mi></munder><mi>P</mi><mo stretchy="false">(</mo><mi>θ</mi><mo>∣</mo><mi>E</mi><mo separator="true">,</mo><mi>q</mi><mo separator="true">,</mo><mi>y</mi><mo stretchy="false">)</mo><mi>L</mi><mo stretchy="false">(</mo><mi>a</mi><mo separator="true">,</mo><mi>θ</mi><mo stretchy="false">)</mo><mo fence="true">]</mo></mrow><mo>−</mo><mi>c</mi><mo stretchy="false">(</mo><mi>q</mi><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">V_{\mathrm{net}}(q\mid E)
+=R(E)-\sum_yP(y\mid E,q)
+\left[\min_a\sum_\theta P(\theta\mid E,q,y)L(a,\theta)\right]-c(q).</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.2222em;">V</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.2222em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathrm mtight">net</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:2.4361em;vertical-align:-1.3861em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.05em;"><span style="top:-1.9em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.0359em;">y</span></span></span><span style="top:-3.05em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.3861em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:3.0521em;vertical-align:-1.3021em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;"><span class="delimsizing size4">[</span></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.6679em;"><span style="top:-2.4em;margin-left:0em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">a</span></span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span><span class="mop">min</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.7em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.05em;"><span style="top:-1.8479em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.0278em;">θ</span></span></span><span style="top:-3.05em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.3021em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mclose">)</span><span class="mord mathnormal">L</span><span class="mopen">(</span><span class="mord mathnormal">a</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mclose">)</span><span class="mclose delimcenter" style="top:0em;"><span class="delimsizing size4">]</span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">c</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0359em;">q</span><span class="mclose">)</span><span class="mord">.</span></span></span></span></span></div><p>外层<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>y</mi></mrow><annotation encoding="application/x-tex">y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span></span></span></span>遍历返回，内层<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi></mrow><annotation encoding="application/x-tex">\theta</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span></span></span></span>遍历真实状态（State），方括号中才选择答复动作（Action）。本节所有量都是标量，使用同一种代价分；不能把秒直接减在成功率上。这个顺序与<a href="https://inst.eecs.berkeley.edu/~cs188/textbook/vpis/vpi.html">信息价值（VOI）的标准决策推导</a>相符；本题增加了失败无信息的通道与费用，并非每次都获得完美信息。</p>
+<p>再读一份已知只重复原公告的副本，不改变两种状态（State）的相对概率（Probability）。其读取后最小损失（Loss）仍为4，净值为<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>4</mn><mo>−</mo><mn>4</mn><mo>−</mo><mn>1</mn><mo>=</mo><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">4-4-1=-1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">4</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">4</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">−</span><span class="mord">1</span></span></span></span>。文本增长了，决策没有改善。反过来，两份材料也可能只有合用才足以辨认状态（State），逐篇相关性不能替代整条取证过程的价值。</p>
+<p>下面独立的可执行参考直接按返回计算后验概率（Posterior Probability）与最优答复。<code>losses</code>的每行依次对应真值30/90；<code>channel</code>的每行对应一种返回在两种真值下的可能性，与上表按列相同。<code>best_risk</code>逐项加权并取最小，没有藏入额外评分模型（Model）。</p>
+<pre><code class="language-python">prior = [0.5, 0.5]
+losses = [[0, 10], [10, 0], [4, 4]]
+channel = {&quot;30&quot;: [0.8, 0.0], &quot;90&quot;: [0.0, 0.8], &quot;empty&quot;: [0.2, 0.2]}
+
+def best_risk(belief):
+    return min(sum(p * v for p, v in zip(belief, row)) for row in losses)
+
+expected_after = 0.0
+for outcome, likelihood in channel.items():
+    joint = [p * l for p, l in zip(prior, likelihood)]
+    outcome_probability = sum(joint)
+    if outcome_probability == 0:
+        continue
+    posterior = [v / outcome_probability for v in joint]
+    risk = best_risk(posterior)
+    expected_after += outcome_probability * risk
+    print(outcome, outcome_probability, posterior, risk)
+print(&quot;before_after_net&quot;, best_risk(prior), round(expected_after, 6),
+      round(best_risk(prior) - expected_after - 1, 6))
+</code></pre><p>实际输出为：</p>
+<pre><code class="language-text">30 0.4 [1.0, 0.0] 0.0
+90 0.4 [0.0, 1.0] 0.0
+empty 0.2 [0.5, 0.5] 4.0
+before_after_net 4.0 0.8 2.2
+</code></pre><p>真实网页还可能解析错误、措辞含糊或带来误导。0.8、完全辨认、代价权重都不是通用常数；若当前估计不可信，就不能给查询（Query）伪造精确净值。仍可明确它能区分哪两个解释、需要哪些条件、失败后怎么办，再在共同任务与完整成本（Total Cost）下比较。</p>
+<a id="让下一请求看见结论的条件而非只剩数字"></a>
+<h2 id="下一请求需要的是哪些条件怎样保留它们">下一请求需要的是哪些条件，怎样保留它们</h2>
+<p>回到Q的确定性教学过程。刷新完成、FAQ尚未读取时，任务内工作记录可以是：</p>
 <pre><code class="language-text">任务时点：7月2日12:00；只读公共资料；不得修改或发布。
 G1：当前新工作区30天；来源P新，当前副本核验，已确认生效。
-G2：未核；N指向/faq，下一步读取它。
-G3：河岸当前值未知；未授权读取管理员设置，不可用默认值代填。
-冲突解释：P旧90天是5月观察；N是计划；两者不覆盖P新的当前声明。
-来源仍可回读；已用3次工具；最终报告需保留一次模型决策。
-</code></pre><p>最终组装还要带上原始用户目标、适用权限和必要的原文片段。将这份记录缩成“已确认30天，继续完成”会丢失G2/G3与对象范围，后续模型可能把所有工作区都写成30天。节省了输入字数，任务条件却改变了。</p>
-<p>在这个小例子中，相关原文很短，可以直接保留。若材料变长，可把长文留在外部，仅将问题、证据摘录、出处、冲突和未完成项送入下一请求；有争议的结论再按出处回读。旧36章的RLM例也把原文和中间结果留在程序环境里，但本题没有需要子模型解释的大批片段，不必添加递归调用。按需读取本身有调用与延迟成本，预先读入少量稳定公共材料和后续定向查找可以组合。<a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">上下文检索与按需读取的工程说明</a></p>
-<p>长轨迹采用摘要时，也应保留这些消费条件。ReSum的原方法会保留问题、生成目标相关摘要，再从压缩状态继续；它仍设置实际工具预算。摘要释放窗口空间不会扩大本次读取权限，也不会把已经花掉的查询次数归零。本章没有运行摘要模型，更不把程序整理的一份记录当成ReSum训练效果。<a href="https://arxiv.org/html/2509.13313v3">ReSum的方法说明</a></p>
-<h2 id="缓存的新鲜度不能替代主张的时点核对">缓存的新鲜度，不能替代主张的时点核对</h2>
-<p>P旧的90天未必曾经错误；它是另一个时点的正确观察。问题在于用它回答7月2日的当前值。刷新还可能确认内容没有改变，因此“旧副本”也不能反向等于“内容为假”。</p>
-<p>缓存读取至少要保留资源身份、表示范围、原版本与核验信息，并遵守当前读取权限。同一路径的不同语言、不同账户或不同工作区表示不能因路径相同就互用。HTTP缓存把可直接复用的新鲜响应和需要重新验证的响应区分开；重新验证可以复用未改变的内容，也可能返回新正文。这种协议上的可复用性，不替研究者判断正文中的“计划日期”是否等于“已经生效”。<a href="https://www.rfc-editor.org/rfc/rfc9111.html#name-freshness">HTTP缓存的新鲜度与重新验证</a></p>
-<p>本例冻结了7月2日站点，故一次有效回读后可以在本次任务中复用。如果换成真实会变化的网站，必须另外规定哪些主张需要在答复前重新核验，以及如何保留回答的截至时点。即使刚刷新，也没有锁住随后可能发生的页面变化。</p>
-<h2 id="可执行参考观察进入状态以后才决定下一动作">可执行参考：观察进入状态以后才决定下一动作</h2>
-<p>下面用普通Python模拟两种策略。<code>RESPONSES</code>是上表资料的人工结构化转写，用于检查调度、状态和费用；程序没有从网页自动理解自然语言。字段值是各份资料自己的声明，旧90天与新30天都保留，不能将这套小接口冒充通用网页解析器。</p>
-<p><code>current</code>只有在读取的策略页属于本题当前副本时才被接受。<code>False</code>专门表示FAQ正文明确否定自动改变，<code>None</code>表示尚未得到证据；二者不合并。可选页面由搜索命中或已读公告的链接逐步加入，<code>choose</code>不能从整个资料字典偷看答案。<code>refresh</code>故障可以按固定合同重试一次，并优先完成另一个仍可读取的缺口。</p>
-<p>代码把拟选动作与资源核对放在同一次决策里：<code>choose</code>先给候选，支付不起时，本轮直接选择最终报告，已计的1点和8秒就是报告成本；没有先发出工具请求再免费追加一次模型报告。真实实现若需要另外调用模型解释被拒绝的动作，必须为那次调用另留预算。</p>
+G2：未核；已读公告N提供/faq，下一步可读取。
+G3：河岸当前值未知；没有管理员配置观察，不可用默认值代填。
+冲突：P旧90天是5月观察；N描述计划；两者没有否定P新的当前声明。
+已用3次工具；最终报告还需一次模型决策；来源原文仍可回读。
+</code></pre><p>实际输入（Actual Input）还要包含原始目标、适用权限（Permission）与必要原文。若压成“已经确认30天，继续完成”，就丢了G2/G3、时点和对象范围，后续可能把所有工作区写成30天。较短的摘要（Summary）并不自动保持证据状态（Evidence State）。</p>
+<p>这里几份原文很短，直接保留即可。较大材料可以留在外部，只送入相关摘录、来源（Source）、冲突和未完成项；需要时再读取原文。基础36的递归语言模型（Recursive Language Model，RLM）案例还用程序变量保存原文与中间结果，并让子模型（Submodel）解释所选片段。本题没有必须交给子模型（Submodel）的大批片段；新增递归调用会另花时间和费用，不能仅因外部保存就宣称采用了递归语言模型（RLM）。</p>
+<p>基础64的会话树（Session Tree）是保存不同路径并选出本次输入材料的结构。选择记录路径不撤销环境效果，也没有自动产生和评分候选路径。本题工作记录可以帮助下一请求恢复缺口，但自动搜索（Search）的生成、选择与预算（Budget）分配仍需另外说明，不能从“记录成树”推得“已经自动树搜索”。</p>
+<p><a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">按需检索的工程说明</a>讨论了逐步发现与调用延迟的取舍；预先装入少量稳定材料和后续定向读取可以组合。采用上下文压缩（Context Compaction），即为后续请求缩短已有输入材料时，<a href="https://arxiv.org/html/2509.13313v3">ReSum的方法</a>保留问题与目标相关摘要（Summary），再继续工作历史；实际工具（Tool）预算（Budget）仍存在。窗口腾出空间不增加读取权限（Permission），也不清零已用次数。本章没有运行摘要模型（Model）。</p>
+<a id="缓存的新鲜度不能替代主张的时点核对"></a>
+<h3 id="刚刷新过也要核对正文说的是哪个时点">刚刷新过，也要核对正文说的是哪个时点</h3>
+<p>P旧的90天可能曾经正确。问题在于把5月的观察（Observation）拿来回答7月2日；“旧副本”不能反过来等于“内容为假”。刷新也可能确认原正文未变。</p>
+<p>超文本传输协议（Hypertext Transfer Protocol，HTTP）的<a href="https://www.rfc-editor.org/rfc/rfc9111.html#name-freshness">缓存规范</a>区分可直接复用的新鲜响应与需要重新验证（Revalidation）的响应。重新验证（Revalidation）可能确认旧内容未变，也可能取得新正文。协议上的新鲜度（Freshness）不替研究者判断“计划自某日开始”是否等于“已经生效”。</p>
+<p>复用时还须保留资源身份、表示范围和核验信息；同一路径下的不同语言、账户或工作区表示不能任意互换。本题冻结站点，所以有效回读后可在本次任务内复用；真实页面仍可能随后变化，应另行规定答复前哪些主张（Claim）需要再核验，并保留截至时点。</p>
+<a id="可执行参考观察进入状态以后才决定下一动作"></a>
+<h2 id="把完整过程拆成能看见消费者consumer的程序">把完整过程拆成能看见消费者（Consumer）的程序</h2>
+<p>下面六段Python按顺序组成独立的参考控制器（Controller），即按照已有证据状态（Evidence State）选择和推进步骤的程序。它不调用前节的概率（Probability）例；R/Q本身不使用已知0.8数值。它也没有运行M0或解析真实网页：返回值是把本章自然语言资料人工转成受信夹具（Fixture），用于确定性检查。字段身份可信是这次构造的前提，字符串相等不是现实来源（Source）的真实性证明。</p>
+<h3 id="先提供资料与费用不能让选择程序提前读取全部答案">先提供资料与费用，不能让选择程序提前读取全部答案</h3>
+<p><code>RESPONSES</code>保存返回夹具（Fixture），<code>COST</code>每项为“教学费用点、给定秒数”。本题每次模型（Model）决策另外花1点、8秒，最终判定花2点、20秒。<code>RANKED</code>是R固定的工具（Tool）顺序。</p>
 <pre><code class="language-python">SNAPSHOT = &quot;2026-07-02T12:00&quot;
 RESPONSES = {
     &quot;search&quot;: {&quot;hits&quot;: [&quot;blog&quot;, &quot;notice&quot;, &quot;cached&quot;], &quot;truncated&quot;: True},
@@ -169,14 +298,14 @@ RESPONSES = {
     &quot;refresh&quot;: {&quot;current&quot;: 30, &quot;snapshot&quot;: SNAPSHOT, &quot;source&quot;: &quot;defaults&quot;},
     &quot;faq&quot;: {&quot;existing_auto&quot;: False, &quot;source&quot;: &quot;faq&quot;, &quot;snapshot&quot;: SNAPSHOT},
 }
-# 教学费用点、给定工具秒数；不是测得的网络延迟。
 COST = {&quot;search&quot;: (2, 8), &quot;blog&quot;: (2, 5), &quot;notice&quot;: (2, 5),
         &quot;cached&quot;: (1, 1), &quot;refresh&quot;: (3, 8), &quot;faq&quot;: (2, 5)}
 RANKED = [&quot;search&quot;, &quot;blog&quot;, &quot;notice&quot;, &quot;cached&quot;, &quot;search&quot;]
-
-def choose(state):
-    seen = state[&quot;seen&quot;]
-    available = state[&quot;available&quot;]
+</code></pre><p><code>SNAPSHOT</code>只是本例冻结副本的教学时间标识，不是工程中自动保证整个网站原子快照（Atomic Snapshot）的功能。外层程序拥有完整资料；下面的选择函数只接收已经更新的<code>state</code>，不会查看<code>RESPONSES</code>。</p>
+<h3 id="下一动作action只依赖已发现的入口与缺口">下一动作（Action）只依赖已发现的入口与缺口</h3>
+<p><code>available</code>保存可用入口，最初只有搜索；<code>seen</code>记录调用过什么。刷新失败也计入<code>refreshes</code>，不能因失败就把次数抹掉。Q第一次刷新后先处理仍可读的FAQ，若G1还未知，才允许最后一次刷新重试（Retry）。</p>
+<pre><code class="language-python">def choose(state):
+    seen, available = state[&quot;seen&quot;], state[&quot;available&quot;]
     if &quot;search&quot; not in seen:
         return &quot;search&quot;
     if &quot;notice&quot; in available and &quot;notice&quot; not in seen:
@@ -186,28 +315,50 @@ def choose(state):
     if &quot;faq&quot; in available and &quot;faq&quot; not in seen:
         return &quot;faq&quot;
     if &quot;refresh&quot; in available and state[&quot;current&quot;] is None and state[&quot;refreshes&quot;] == 1:
-        return &quot;refresh&quot;       # 最多一次重试；失败也消耗预算
+        return &quot;refresh&quot;
     return None
-
-def run(active, unavailable=False):
+</code></pre><p><code>None</code>表示没有更多按本策略（Policy）需要且可用的查询（Query），交给本轮报告。若公告没有给出FAQ或刷新入口，这个函数不能靠预先知道名字就读取它们。它是确定的参考选择规则；同一个函数名不能证明真实模型（Model）已经学会这项策略（Policy）。</p>
+<h3 id="返回以后更新什么明确否定怎样留下来">返回以后更新什么，明确否定怎样留下来</h3>
+<p><code>observe</code>把已返回的命中与链接加入可用入口，再仅将当前副本的相应声明放进G1/G2。<code>False</code>表示FAQ明确否定自动改变；<code>None</code>才表示尚无证据（Evidence）。因此这里检查<code>is not None</code>，不能用“是否为真”来判断问题是否已回答。</p>
+<pre><code class="language-python">def observe(state, action, response):
+    state[&quot;seen&quot;].add(action)
+    state[&quot;available&quot;].update(response.get(&quot;hits&quot;, []))
+    state[&quot;available&quot;].update(response.get(&quot;links&quot;, []))
+    current_copy = response.get(&quot;snapshot&quot;) == SNAPSHOT
+    if response.get(&quot;source&quot;) == &quot;defaults&quot; and current_copy:
+        state[&quot;current&quot;] = response[&quot;current&quot;]
+        state[&quot;evidence&quot;][&quot;current&quot;] = (action, SNAPSHOT)
+    if response.get(&quot;source&quot;) == &quot;faq&quot; and current_copy:
+        state[&quot;existing_auto&quot;] = response[&quot;existing_auto&quot;]
+        state[&quot;evidence&quot;][&quot;existing_auto&quot;] = (action, SNAPSHOT)
+</code></pre><p>读P旧会保留在完整返回记录中，但它没有当前核验标识，不进入<code>state[&quot;current&quot;]</code>。503只有错误字段，没有政策声明，所以不会把G1填成0、90或“政策不存在”。本例不实现任意自然语言理解或对冲突的多个来源（Source）自动裁决。</p>
+<h3 id="发起之前核对资源同时给报告留位置">发起之前核对资源，同时给报告留位置</h3>
+<p>准入（Admission）是在动作（Action）真正发出前判断它能否执行。下面的函数只处理本例已获准的公共入口及资源上限；私人配置根本不在可用动作（Action）中。</p>
+<pre><code class="language-python">def can_issue(state, action, spent, seconds, decisions, tool_count):
+    if action not in state[&quot;available&quot;]:
+        return False
+    fee, delay = COST[action]
+    return (tool_count &lt; 5 and decisions &lt; 6
+            and spent + fee + 1 + 2 &lt;= 20
+            and seconds + delay + 8 &lt;= 120)
+</code></pre><p>调用它时，本轮决策的1点和8秒已经支付；<code>+1</code>与<code>+8</code>为下一次最终报告预留，<code>+2</code>给外层判定。第6次决策已经没有后续报告槽位，只能结束。若本轮拟选动作（Action）付不起，本轮直接形成报告，不能先白花一次“拒绝决策”，再免费补一次模型调用（Model Query）。真实实现若还要再次调用模型（Model）解释拒绝，就必须为它另留额度。</p>
+<h3 id="执行观察observation再次选择最终保留完整记录">执行、观察（Observation）、再次选择，最终保留完整记录</h3>
+<p><code>run</code>先构造独立初态，再重复“支付决策→选择→准入（Admission）→执行→观察（Observation）更新”。<code>unavailable=True</code>只把刷新返回改成503，其余资料保持相同。外层保存完整<code>observations</code>；后续选择消费的是<code>state</code>这个投影，二者职责不同。</p>
+<pre><code class="language-python">def run(active, unavailable=False):
     state = {&quot;seen&quot;: set(), &quot;current&quot;: None, &quot;existing_auto&quot;: None,
              &quot;refreshes&quot;: 0, &quot;evidence&quot;: {}, &quot;available&quot;: {&quot;search&quot;}}
     actions, observations = [], []
     spent = seconds = decisions = 0
     for _ in range(6):
         decisions += 1
-        spent += 1             # 本轮模型决策的给定成本
+        spent += 1
         seconds += 8
         action = choose(state) if active else (
             RANKED[len(actions)] if len(actions) &lt; len(RANKED) else None)
-        if action is None:
+        if action is None or not can_issue(
+                state, action, spent, seconds, decisions, len(actions)):
             break
         fee, delay = COST[action]
-        # 为最后一次报告决策预留1点/8秒，另为外层评分预留2点。
-        if len(actions) &gt;= 5 or spent + fee + 1 + 2 &gt; 20:
-            break              # 本轮改作最终报告，已计本轮费用
-        if seconds + delay + 8 &gt; 120:
-            break
         actions.append(action)
         spent += fee
         seconds += delay
@@ -216,79 +367,106 @@ def run(active, unavailable=False):
         response = ({&quot;error&quot;: &quot;503&quot;} if unavailable and action == &quot;refresh&quot;
                     else dict(RESPONSES[action]))
         observations.append((action, response))
-        state[&quot;seen&quot;].add(action)
-        state[&quot;available&quot;].update(response.get(&quot;hits&quot;, []))
-        state[&quot;available&quot;].update(response.get(&quot;links&quot;, []))
-        if response.get(&quot;source&quot;) == &quot;defaults&quot; and response.get(&quot;snapshot&quot;) == SNAPSHOT:
-            state[&quot;current&quot;] = response[&quot;current&quot;]
-            state[&quot;evidence&quot;][&quot;current&quot;] = (action, SNAPSHOT)
-        if response.get(&quot;source&quot;) == &quot;faq&quot; and response.get(&quot;snapshot&quot;) == SNAPSHOT:
-            state[&quot;existing_auto&quot;] = response[&quot;existing_auto&quot;]
-            state[&quot;evidence&quot;][&quot;existing_auto&quot;] = (action, SNAPSHOT)
+        observe(state, action, response)
     complete = state[&quot;current&quot;] is not None and state[&quot;existing_auto&quot;] is not None
     return {&quot;actions&quot;: actions, &quot;observations&quot;: observations, &quot;state&quot;: state,
             &quot;stop&quot;: &quot;enough&quot; if complete else &quot;unresolved&quot;,
             &quot;workspace_value&quot;: None, &quot;workspace_reason&quot;: &quot;settings_not_observed&quot;,
             &quot;decisions&quot;: decisions, &quot;cost&quot;: spent + 2, &quot;seconds&quot;: seconds + 20}
-
-for label, active, unavailable in [(&quot;R&quot;, False, False), (&quot;Q&quot;, True, False),
+</code></pre><p><code>stop</code>描述证据（Evidence）是否足够，不能直接当作真实自然语言答复已被判定。河岸始终保持<code>None</code>并带原因。这个参考控制器（Controller）返回结构化报告材料；前面给出的完整草稿与成功（S）/有效失败（F）判断仍依据本题冻结合同，程序没有验证模型（Model）会如实生成这些草稿。</p>
+<figure><div class="diagram-scroll" tabindex="0" role="region" aria-label="执行、观察（Observation）、再次选择，最终保留完整记录"><a href="figures/06-active-evidence-figure-1.svg" target="_blank" rel="noopener"><img src="figures/06-active-evidence-figure-1.svg" alt="执行、观察（Observation）、再次选择，最终保留完整记录" width="726" height="1549"></a></div><figcaption>图 1：执行、观察（Observation）、再次选择，最终保留完整记录。宽图可横向滚动，点击可查看独立 SVG。</figcaption></figure><p>图中回到选择器（Selector）的，是已经更新的证据状态（Evidence State）；选择器（Selector）负责按条件提出下一项，不能绕过返回去读外层所有材料。终点的独立判定（Independent Grading）还要检查实际交付，完整成本（Total Cost）则包含这一步的开销。</p>
+<h3 id="用同一预算budget核对三条完整路径">用同一预算（Budget）核对三条完整路径</h3>
+<p>最后一段依次运行R、Q和刷新不可用的Q。三个结果重新初始化，故不是先运行Q再把答案偷偷留给R。</p>
+<pre><code class="language-python">for label, active, unavailable in [(&quot;R&quot;, False, False), (&quot;Q&quot;, True, False),
                                     (&quot;Q_503&quot;, True, True)]:
-    r = run(active, unavailable)
-    s = r[&quot;state&quot;]
-    print(label, s[&quot;current&quot;], s[&quot;existing_auto&quot;], r[&quot;decisions&quot;],
-          len(r[&quot;actions&quot;]), r[&quot;cost&quot;], r[&quot;seconds&quot;], r[&quot;stop&quot;])
-</code></pre><p>本地运行的输出如下。列依次为策略、当前默认值、是否自动改既有配置、决策次数、工具次数、教学总费用、给定总秒数、停止状态；秒数由表内常数相加，<strong>不是实测模型耗时</strong>。</p>
+    result = run(active, unavailable)
+    state = result[&quot;state&quot;]
+    print(label, state[&quot;current&quot;], state[&quot;existing_auto&quot;], result[&quot;decisions&quot;],
+          len(result[&quot;actions&quot;]), result[&quot;cost&quot;], result[&quot;seconds&quot;], result[&quot;stop&quot;])
+</code></pre><p>实际输出为：</p>
 <pre><code class="language-text">R None None 6 5 17 95 unresolved
 Q 30 False 5 4 16 86 enough
 Q_503 None False 6 5 20 102 unresolved
-</code></pre><p>程序证明这些明确规则会按观察选动作，并在同样上限内得到不同证据覆盖。它没有证明一个真实模型能够正确识别所有缺口，或总会遵循<code>choose</code>策略。将策略交给模型时，仍要保留真实请求、工具观察和最后答案，按第02、03章在独立任务上比较；不能拿这三行模拟结果当性能提升测量。</p>
-<h2 id="失败之后还查不查要看缺的究竟是哪一种证据">失败之后还查不查，要看缺的究竟是哪一种证据</h2>
-<p>Q_503的具体序列是“搜索→公告→刷新失败→FAQ→再次刷新失败→最终报告”。两次失败都保留为503，没有变成空正文，也没有据此说30天政策不存在。G2仍有明确否定，G1未知，河岸当前值仍未观察。它应如实给出已知范围与服务不可用；由于未完成G1，按本题合同是F，不能把读取服务故障自动写成评分U。</p>
+</code></pre><p>列依次是名称、G1、G2、决策数、工具（Tool）数、总费用、给定总秒数、证据状态（Evidence State）的完成标记。<code>False</code>是明确的“不自动变化”，不是有效失败（F）标记。最后的秒数包括判定，行动部分仍单独受120秒限制。</p>
+<p>完整账本也能直接复算：</p>
 <div class="table-scroll" tabindex="0"><table>
 <thead>
 <tr>
-<th>当时的观察</th>
-<th>能支持的判断</th>
-<th>合理的下一步或停止理由</th>
+<th>路径</th>
+<th>决策费＋工具（Tool）费＋判定费</th>
+<th>决策时间＋工具（Tool）时间＋判定时间</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>搜索为空，但范围正确性未核对</td>
-<td>此次查询没有命中</td>
-<td>检查关键词、过滤和截断；不能直接写“没有这项政策”</td>
+<td>R</td>
+<td><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>6</mn><mo>+</mo><mo stretchy="false">(</mo><mn>2</mn><mo>+</mo><mn>2</mn><mo>+</mo><mn>2</mn><mo>+</mo><mn>1</mn><mo>+</mo><mn>2</mn><mo stretchy="false">)</mo><mo>+</mo><mn>2</mn><mo>=</mo><mn>17</mn></mrow><annotation encoding="application/x-tex">6+(2+2+2+1+2)+2=17</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">6</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">2</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">17</span></span></span></span>点</td>
+<td><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>6</mn><mo>×</mo><mn>8</mn><mo>+</mo><mo stretchy="false">(</mo><mn>8</mn><mo>+</mo><mn>5</mn><mo>+</mo><mn>5</mn><mo>+</mo><mn>1</mn><mo>+</mo><mn>8</mn><mo stretchy="false">)</mo><mo>+</mo><mn>20</mn><mo>=</mo><mn>95</mn></mrow><annotation encoding="application/x-tex">6\times8+(8+5+5+1+8)+20=95</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">6</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">8</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">20</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">95</span></span></span></span>秒</td>
 </tr>
 <tr>
-<td>FAQ明确说“不会自动改”</td>
-<td>对既有工作区自动变化的否定</td>
-<td>记录False与出处，不继续把它当缺失</td>
+<td>Q</td>
+<td><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>5</mn><mo>+</mo><mo stretchy="false">(</mo><mn>2</mn><mo>+</mo><mn>2</mn><mo>+</mo><mn>3</mn><mo>+</mo><mn>2</mn><mo stretchy="false">)</mo><mo>+</mo><mn>2</mn><mo>=</mo><mn>16</mn></mrow><annotation encoding="application/x-tex">5+(2+2+3+2)+2=16</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">3</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">2</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">16</span></span></span></span>点</td>
+<td><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>5</mn><mo>×</mo><mn>8</mn><mo>+</mo><mo stretchy="false">(</mo><mn>8</mn><mo>+</mo><mn>5</mn><mo>+</mo><mn>8</mn><mo>+</mo><mn>5</mn><mo stretchy="false">)</mo><mo>+</mo><mn>20</mn><mo>=</mo><mn>86</mn></mrow><annotation encoding="application/x-tex">5\times8+(8+5+8+5)+20=86</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">5</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">20</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">86</span></span></span></span>秒</td>
+</tr>
+<tr>
+<td>Q不可用</td>
+<td><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>6</mn><mo>+</mo><mo stretchy="false">(</mo><mn>2</mn><mo>+</mo><mn>2</mn><mo>+</mo><mn>3</mn><mo>+</mo><mn>2</mn><mo>+</mo><mn>3</mn><mo stretchy="false">)</mo><mo>+</mo><mn>2</mn><mo>=</mo><mn>20</mn></mrow><annotation encoding="application/x-tex">6+(2+2+3+2+3)+2=20</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">6</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">3</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">20</span></span></span></span>点</td>
+<td><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>6</mn><mo>×</mo><mn>8</mn><mo>+</mo><mo stretchy="false">(</mo><mn>8</mn><mo>+</mo><mn>5</mn><mo>+</mo><mn>8</mn><mo>+</mo><mn>5</mn><mo>+</mo><mn>8</mn><mo stretchy="false">)</mo><mo>+</mo><mn>20</mn><mo>=</mo><mn>102</mn></mrow><annotation encoding="application/x-tex">6\times8+(8+5+8+5+8)+20=102</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">6</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">8</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">20</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">102</span></span></span></span>秒</td>
+</tr>
+</tbody></table></div>
+<p>这是给定常数的求和，<strong>不是模型（Model）实测耗时</strong>。Q少一次读取且公共问题完整，只支持这个构造案例下的有限比较；它没有任务分布、随机重复试次（Trial）或真实模型（Model）成本，不能据一点费用差宣布生产收益。</p>
+<a id="失败之后还查不查要看缺的究竟是哪一种证据"></a>
+<h2 id="失败以后先分清服务不可用还是已经得到否定">失败以后，先分清服务不可用还是已经得到否定</h2>
+<p>Q不可用的完整序列是“搜索→公告→刷新失败→FAQ→再次刷新失败→最终报告”。两次503都保留，G2仍有明确否定，G1尚未知，河岸配置未观察。它应报告已经知道的既有范围及当前核验失败；未完成G1，所以依据合同仍是有效失败（F），而非把查询（Query）故障改名为未知评分（U）。</p>
+<div class="table-scroll" tabindex="0"><table>
+<thead>
+<tr>
+<th>观察（Observation）</th>
+<th>当前能支持什么</th>
+<th>下一步或停止条件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>搜索为空，范围完整性未核</td>
+<td>这次未命中</td>
+<td>检查关键词、过滤和截断（Truncation）；不能推出“政策不存在”</td>
+</tr>
+<tr>
+<td>FAQ明确不自动改</td>
+<td>G2的否定已回答</td>
+<td>保留<code>False</code>与来源（Source），不用继续把它当缺失</td>
 </tr>
 <tr>
 <td>刷新503</td>
-<td>当前核验未取得</td>
-<td>在预留额度内重试一次；仍失败就带未知结束</td>
+<td>本次没有取得当前核验</td>
+<td>先取仍可用材料，在预留额度内重试（Retry）一次</td>
 </tr>
 <tr>
-<td>当前页和FAQ齐全，河岸设置无权限</td>
+<td>G1/G2完整，G3没有权限（Permission）</td>
 <td>公共问题已闭合，私人当前值未观察</td>
-<td>给范围明确的答复；不得用继续搜索替代管理员授权</td>
+<td>如实交付，不能靠扩大搜索替代授权</td>
 </tr>
 <tr>
-<td>两份当前官方正文在同一对象和时点仍冲突</td>
-<td>冲突尚未消解</td>
-<td>若有可用的更高依据且预算足够则回读，否则保留冲突，不按文风投票</td>
+<td>当前官方材料在同一对象和时点仍冲突</td>
+<td>缺口尚未消解</td>
+<td>有可用更高依据且额度足够时回读，否则保留冲突</td>
 </tr>
 </tbody></table></div>
-<p>“证据已足够”与“预算已耗尽”是不同停止原因。前者可以给有范围的结论；后者必须保留尚未解决的缺口。权限不够则限制可行动范围，即使信息价值看起来很高，也不能越界读取。</p>
-<p>本例允许Q用4次工具便停止，剩余1次不是必须花掉的额度。完整账本中，R为17点、Q为16点，Q_503为20点，均包括失败、最终报告和外层评分。提前停止节省的一点不能单独证明生产收益：这里仅有一个特意构造的任务，没有任务分布、重复试次或真实模型费用。后续对照还应加入公告本身足够、当前页不可用、FAQ与现行页冲突等任务，防止只挑适合Q的样例。</p>
-<h2 id="直接问答多读少读与读错怎样分别判断">直接问答：多读、少读与读错怎样分别判断</h2>
-<p><strong>问题。</strong> 搜索结果没有FAQ，而公告给了FAQ链接，直接回读算不算改变实验输入条件？</p>
-<p><strong>答案。</strong> 两边原本都有同样的链接跟随工具和公共读取权限。Q根据实际取得的N选择了新的动作，这是策略差异；没有凭空给它额外正文。如果只有Q被预先告知FAQ答案或得到额外工具，比较条件才改变了。</p>
-<p><strong>问题。</strong> 两份资料都写30天，为什么仍需要当前策略页？</p>
-<p><strong>答案。</strong> B是转述，N是计划，而且N明确把实际生效交给当前页。两份相同数字没有闭合“现在已经生效”的条件，也没有回答既有工作区范围。资料之间共享同一公告时，数量还会高估独立支持。</p>
-<p><strong>问题。</strong> 刷新成功之后，为什么不能顺便把河岸改成30天？</p>
-<p><strong>答案。</strong> 刷新只取得公共政策证据，没有取得河岸当前配置，更没有新增修改授权。知道某个默认值与有权更改用户设置是两件事；本题的合法产物仍是草稿。</p>
-<p><strong>问题。</strong> 摘要更短、工具调用也更少，就能判定上下文策略更好吗？</p>
-<p><strong>答案。</strong> 还要检查它是否保留了时点、范围、否定与未知，并让下一请求正确消费。若少一次读取恰好遗漏FAQ，成本下降却留下错误的全体30天结论，整项任务仍失败。应连同证据覆盖、最终结果、未知比例和全部成本一起比较。</p>
-<p>本章的硬前置是<a href="05-experience-and-consumers.html">第05章共同核心</a>，不要求训练深化或梯度知识。相关回读：<a href="../notes/maka/learning/36-context-and-memory.html">旧36章的输入选择与外部工作状态</a>、<a href="../notes/maka/learning/37-code-retrieval.html">旧37章的查询改写与当前正文回读</a>。后续计划继续比较串行修订、独立候选与树式搜索的选择质量和预算分配；它们会使用这里已经闭合的证据状态。</p>
-<p><a href="05-experience-and-consumers.html">上一章：一条轨迹怎样进入下一次改进</a> · <a href="07-probabilities-and-tensors.html">下一章：概率和张量怎样描述一次预测</a>。下一章属于可选的训练路线；本章所需的证据与预算概念已在当前位置给出。固定模型路线的搜索、选择与预算深化仍是计划内容。</p>
+<p>停止规则（Stopping Rule）决定何时结束查询（Query）以及报告什么。证据（Evidence）足够与预算（Budget）耗尽是不同理由；权限（Permission）不足还限制行动范围。不能因计算出的信息价值（VOI）很高就越界读取，也不必为用完剩余额度而重复原搜索。</p>
+<p>继续比较Q时，需要另设公告本身已足够、当前页故障、FAQ矛盾等任务，并按第02/03章区分开发选择与最终评价。那会重新引入任务来源（Source）、划分与完整成本（Total Cost）；本章三个分支只是同一夹具（Fixture）的变化，不能称作三个独立真实任务。</p>
+<a id="直接问答多读少读与读错怎样分别判断"></a>
+<h2 id="根据完整过程给出参考判断">根据完整过程给出参考判断</h2>
+<p><strong>问题。</strong> 搜索未返回FAQ，Q后来回读它，是否给Q加了额外输入？</p>
+<p><strong>参考答案。</strong> 两边原本有相同公共工具（Tool）与链接跟随权限（Permission）。Q从实际读到的N取得入口，是策略（Policy）差异；若只给Q预置答案或新增工具（Tool），才改变了共同条件。</p>
+<p><strong>问题。</strong> 观察（Observation）没有新增文字，也可能有价值吗？</p>
+<p><strong>参考答案。</strong> 可以。重新验证（Revalidation）确认旧正文仍适用，可能解决新鲜度（Freshness）疑问。本节净值为−1的是预先规定完全不改变信念的重复读取，不能把它推广成所有旧文回读都无价值。</p>
+<p><strong>问题。</strong> 0.8成功率改为两种状态（State）不同，还能沿用原计算吗？</p>
+<p><strong>参考答案。</strong> 不能直接沿用。各种返回的概率（Probability）及失败后的后验概率（Posterior Probability）都可能改变，应重新按通道求和与条件化，然后在每种返回下重选答复。成功率数字、解析可靠性与决策代价必须对应实际问题。</p>
+<p><strong>问题。</strong> 刷新成功后，能否顺便把河岸改成30天？</p>
+<p><strong>参考答案。</strong> 不能。公共证据（Evidence）没有提供私人当前配置，也没有增加修改权限（Permission）。本题产物仍是草稿。</p>
+<p><strong>问题。</strong> 摘要（Summary）更短、调用更少，就可以采用新方法吗？</p>
+<p><strong>参考答案。</strong> 还要检查时点、对象、否定和未知是否被正确消费，最终答复是否完成任务，并把失败、重试（Retry）、最终报告和判定计入完整成本（Total Cost）。如果省去FAQ后错误写成所有工作区30天，费用下降也不能补回这项失败。</p>
+<h2 id="相关阅读与衔接">相关阅读与衔接</h2>
+<p>硬前置与上一章：<a href="05-experience-and-consumers.html">第05章共同核心</a>，不要求训练（Training）深化。比较单位与重复选优可回读<a href="02-paired-experiments.html">第02章</a>、<a href="03-selection-and-attribution.html">第03章</a>；成功（S）/有效失败（F）/未知评分（U）的外层判定见<a href="04-environment-and-supervision.html">第04章</a>。</p>
+<p>按需要回读<a href="../notes/maka/learning/16-tools-and-execution.html">基础16的预算（Budget）决策</a>、<a href="../notes/maka/learning/37-code-retrieval.html">基础37的查询（Query）与正文回读</a>、<a href="../notes/maka/learning/36-context-and-memory.html">基础36的外部原文与递归语言模型（RLM）</a>、<a href="../notes/maka/learning/64-pi-harness.html">基础64的会话树（Session Tree）</a>。按当前问题选择回读即可；本章已给出理解案例所需的条件。</p>
+<p><a href="07-probabilities-and-tensors.html">下一章：第07章｜概率（Probability）与张量（Tensor）怎样描述一次预测</a>属于另一条可选训练（Training）路线。本路线后续的串行修订（Sequential Revision）、独立候选（Independent Candidates）与树式搜索（Tree Search）仍为计划内容，将在已成稿后提供入口；本章没有完成这些算法。返回<a href="index.html">课程导航</a>。</p>
 <footer>Agent 前沿进阶 · 在线阅读</footer></main></body></html>
