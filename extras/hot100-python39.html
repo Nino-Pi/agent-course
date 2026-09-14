@@ -2,11 +2,11 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#e9103d"><meta name="description" content="今天三小时回顾理论；周二至周四每天按类换题，共 62 道不同核心、38 道按需加练。每题含详细讲解、完整输入输出、样例与边界，附 Hot100 完整教材。"><title>LeetCode Hot100 · Python 3.9｜理论速览与三天编码练习 · Agent 工程课程</title><link rel="stylesheet" href="../assets/site.css"><link rel="stylesheet" href="../assets/course-visual-style.css"><script defer src="../assets/site.js"></script><link rel="stylesheet" href="../assets/extra-guide.css?v=1d18f9bd191f"><script defer src="../assets/extra-guide.js?v=f40cda76924e"></script></head><body data-course-root="../index.html"><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true">A</span>Agent 工程课程</a><nav aria-label="课程导航"><a href="../index.html">全部章节</a><a href="../notes/maka/learning/README.html">学习路线</a><a href="../notes/maka/learning/glossary.html">术语表</a><a class="back-link" data-course-back href="../index.html">← 返回</a></nav></header><main class="reading-layout"><div class="reading-column"><div class="page-kicker">额外章节 · 算法与 Python</div><article id="main-content" class="extra-guide-article"><h1 id="hot100-leetcode-hot100--python-39理论速览与三天编码练习">LeetCode Hot100 · Python 3.9｜理论速览与三天编码练习</h1>
 <nav class="guide-route-nav" aria-label="Hot100 阅读路线"><a href="#quick-review">三小时速览</a><a href="#interview-rounds">三天编码练习</a><a href="#hot100-index">分轮题单</a><a href="#learning-panorama">完整教材</a><a href="#alternatives">附录查阅</a></nav>
 <p>今天用<strong>三小时系统速览</strong>回顾理论；周二、周三、周四打开各自的<strong>编码练习页</strong>，每天按类换题。三天共 62 道不同核心、38 道按需加练，全部 Hot100 主解均可在当天页展开阅读。完整教材保留第一轮 38 题、第二轮 62 题的查阅顺序。</p>
-<p><strong>开始练手：先看<a href="#program-template">统一的程序框架与输入输出模板</a>，再进入当天题目。</strong></p>
+<p><strong>今天从<a href="#quick-review">三小时系统速览</a>开始：先看程序框架与输入输出，再回顾算法；随后三天按类换题、亲手编码。</strong></p>
 <nav class="practice-day-nav" aria-label="Hot100 学习日程"><a href="hot100-python39.html#quick-review">今天 · 理论速览</a><a href="hot100-day-1.html"><span>周二 · 第 1 天</span><strong>恢复完整实现</strong><small>21 道核心 · 同类加练附后</small></a><a href="hot100-day-2.html"><span>周三 · 第 2 天</span><strong>比较约束，迁移方法</strong><small>20 道核心 · 同类加练附后</small></a><a href="hot100-day-3.html"><span>周四 · 第 3 天</span><strong>识别模型，稳定边界</strong><small>21 道核心 · 同类加练附后</small></a></nav><p><a id="start-here"></a></p>
 <h2 id="hot100-现在从哪里开始">现在从哪里开始</h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 1 · 现在从哪里开始"><table><caption>表 1 · 现在从哪里开始</caption><thead><tr><th scope="col">当前需要</th><th scope="col">直接入口</th><th scope="col">怎样阅读</th></tr></thead><tbody><tr><td>每次开始手写一道题</td><td><a href="#program-template">程序框架与常见输入输出</a></td><td>按导入模块、解题函数、main、调用 main 四段组织</td></tr>
-<tr><td>用三小时完成一轮系统速览</td><td><a href="#quick-review">三小时快速课</a></td><td>先读各类详细例题与成立依据，再看同类迁移；88 道 Easy/Medium 与 7 道必要 Hard 均在主线</td></tr>
+<tr><td>用三小时完成一轮系统速览</td><td><a href="#quick-review">三小时快速课</a></td><td>先学程序框架与输入输出，再读各类详细例题与同类迁移；88 道 Easy/Medium 与 7 道必要 Hard 均在主线</td></tr>
 <tr><td>已有基础，连续三天恢复编码与迁移</td><td><a href="#interview-rounds">三天核心总表</a> · <a href="hot100-day-1.html">周二</a> · <a href="hot100-day-2.html">周三</a> · <a href="hot100-day-3.html">周四</a></td><td>每天 18 个轮换类别和 2 道专项；完整讲解、程序、输入输出与同类加练在当天页</td></tr>
 <tr><td>从基础建立完整知识结构</td><td><a href="#round-1">第一轮：R1-01—R1-38</a></td><td>按 21 个知识单元学习 38 道骨架题；第一次遇到结构时回查前置说明</td></tr>
 <tr><td>已完成第一轮，补齐并提升</td><td><a href="#round-2">第二轮：R2-01—R2-62</a></td><td>先 46 道同型迁移，再 16 道综合题；累计完整覆盖 Hot100</td></tr>
@@ -17,10 +17,194 @@
 <section class="guide-quick-review" aria-label="三小时系统速览"><p><a id="quick-review"></a></p>
 <h2 id="hot100-三小时系统速览每类方法都有详细例题">三小时系统速览：每类方法都有详细例题</h2>
 <p>本课面向已有 Python 基础、需要系统回顾数据结构与算法的读者。按 <strong>问题与输入输出 → 状态如何变化 → 为什么成立 → 核心代码与边界 → 同类迁移</strong> 顺序直接阅读。代表题详细展开，同类题压缩重复部分，但仍交代变化的条件、解题步骤与正确性理由。先读本节推荐实现及其状态变化，再比较能改变时间、空间或输入适用范围的备选。每段讲解给出参考代码和结果，适合顺序阅读。</p>
+<p><strong>学习顺序：今天先在这里熟悉程序框架与输入输出，再回顾各类算法；周二、周三、周四进入三天编码练习。</strong> 开头先选读常用的 <code>main()</code> 写法，其余输入格式随题查阅。</p>
+<p><a id="program-template"></a></p>
+<h3 id="hot100-每次动手前先写统一的程序框架">每次动手前：先写统一的程序框架</h3>
+<p>本课本地练习统一按 <strong>导入模块 → 定义解题函数 → 定义 main → 调用 main</strong> 四段组织。Python 定义函数的关键字是 <code>def</code>；<code>main</code> 是我们约定的入口函数名。每次换题，主要替换三处：<strong>怎样读入参数、解题函数怎样计算、结果怎样输出</strong>。</p>
+<h4 id="hot100-拿到一道题先确定这三件事">拿到一道题，先确定这三件事</h4>
+<ol>
+<li><strong>输入是什么？</strong> 确定一组数据占几行，每行是整数、数组还是字符串；链表和树还要把输入构造成节点。</li>
+<li><strong>函数接收什么、返回什么？</strong> 例如 <code>two_sum(nums, target)</code> 接收数组和目标值，返回两个下标。算法写在解题函数中，用 <code>return</code> 把结果交回调用处。</li>
+<li><strong>输出长什么样？</strong> 确定是一个数、空格分隔的序列、逐行矩阵还是 JSON。<code>main()</code> 负责读入、调用解题函数，再按题目约定 <code>print</code>。</li>
+</ol>
+<h4 id="hot100-先选一个-main按输入格式直接套用">先选一个 main：按输入格式直接套用</h4>
+<p>文件顶部统一写 <code>import sys</code>，解题函数定义在 <code>main()</code> 前，文件末尾用 <code>if __name__ == &quot;__main__&quot;:</code> 判断，并在其中调用 <code>main()</code>（完整写法见后面的示例）。<strong>下面每个代码块都是一种可替换的 <code>main()</code>：每题选适合的一块。</strong> <code>solve</code> 代表你为这道题写好的解题函数，使用时把名字与参数一起换成实际接口；每块注释也注明了预期的返回值。</p>
+<p>这些模板按题面约定读取完整、合法的数据。先确认输入是否给出长度、每组占几行、总共有几组，再选择对应代码块。单组模板输出后结束；多组模板由组数或 EOF 决定结束。</p>
+<p><strong>① 一行一个整数 → 输出一个数</strong></p>
+<!-- code:program-template:one-int -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：5</span>
+    n = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
+
+    result = <span class="syntax-function">solve</span>(n)  <span class="syntax-comment"># 解题函数接收整数，返回一个数。</span>
+    <span class="syntax-function">print</span>(result)</code></pre>
+<p><strong>② 一行两个整数 → 输出一个数</strong></p>
+<!-- code:program-template:two-ints -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：3 7（例如网格的行数、列数）</span>
+    rows, cols = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())
+
+    result = <span class="syntax-function">solve</span>(rows, cols)
+    <span class="syntax-function">print</span>(result)</code></pre>
+<p><strong>③ 一行整数数组 → 输出一行序列</strong></p>
+<!-- code:program-template:array -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：0 1 0 3 12（本格式直接给数组）</span>
+    nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
+
+    result = <span class="syntax-function">solve</span>(nums)  <span class="syntax-comment"># 本模板约定返回一个列表。</span>
+    <span class="syntax-function">print</span>(*result)  <span class="syntax-comment"># 如 [1, 3, 12, 0, 0] 输出为 1 3 12 0 0。</span>
+
+    <span class="syntax-comment"># 若解题函数原地修改 nums 并返回 None，把上面两行改为：</span>
+    <span class="syntax-comment"># solve(nums)</span>
+    <span class="syntax-comment"># print(*nums)</span></code></pre>
+<p><strong>④ 第一行是长度，第二行是数组 → 输出一个数</strong></p>
+<!-- code:program-template:sized-array -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：</span>
+    <span class="syntax-comment"># 5</span>
+    <span class="syntax-comment"># -2 1 -3 4 -1</span>
+    n = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())  <span class="syntax-comment"># 题面约定下一行有 n 个整数。</span>
+    nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
+
+    result = <span class="syntax-function">solve</span>(nums)  <span class="syntax-comment"># 本模板约定返回一个数，如最大子数组和。</span>
+    <span class="syntax-function">print</span>(result)</code></pre>
+<p><strong>⑤ 第一行是长度和目标值，第二行是数组 → 输出两个下标</strong></p>
+<!-- code:program-template:target-array -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：</span>
+    <span class="syntax-comment"># 4 9</span>
+    <span class="syntax-comment"># 2 7 11 15</span>
+    n, target = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())
+    nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
+
+    result = <span class="syntax-function">solve</span>(nums, target)  <span class="syntax-comment"># 例如两数之和，返回 [0, 1]。</span>
+    <span class="syntax-function">print</span>(*result)  <span class="syntax-comment"># 输出 0 1。</span></code></pre>
+<p><strong>⑥ 一行完整字符串 → 输出一个数或字符串</strong></p>
+<!-- code:program-template:string -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：hello world</span>
+    s = sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">rstrip</span>(<span class="syntax-string">&quot;\r\n&quot;</span>)  <span class="syntax-comment"># 去掉行末换行，保留空格。</span>
+
+    result = <span class="syntax-function">solve</span>(s)  <span class="syntax-comment"># 如子串长度，或处理后的字符串。</span>
+    <span class="syntax-function">print</span>(result)
+
+    <span class="syntax-comment"># 若题面有第二行字符串，调用前再读：</span>
+    <span class="syntax-comment"># t = sys.stdin.readline().rstrip(&quot;\r\n&quot;)</span>
+    <span class="syntax-comment"># 然后把调用改为 result = solve(s, t)。</span></code></pre>
+<p><strong>⑦ 判断题：读取字符串 → 输出小写 true / false</strong></p>
+<!-- code:program-template:boolean -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：()[]{}</span>
+    s = sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">rstrip</span>(<span class="syntax-string">&quot;\r\n&quot;</span>)
+
+    result = <span class="syntax-function">solve</span>(s)  <span class="syntax-comment"># 约定返回 Python 布尔值 True 或 False。</span>
+    <span class="syntax-function">print</span>(<span class="syntax-string">&quot;true&quot;</span> <span class="syntax-keyword">if</span> result <span class="syntax-keyword">else</span> <span class="syntax-string">&quot;false&quot;</span>)  <span class="syntax-comment"># 本题输出协议要求小写。</span>
+    <span class="syntax-comment"># 若题面要求 True / False，用 print(result)；要求 1 / 0，用 print(int(result))。</span></code></pre>
+<p><strong>⑧ 一行多个单词 → 用 JSON 输出嵌套结果</strong></p>
+<!-- code:program-template:words-json -->
+<pre><code class="language-python"><span class="syntax-keyword">import</span> json  <span class="syntax-comment"># 这类输出在文件顶部额外导入 json；同时保留 import sys。</span>
+
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：eat tea tan ate</span>
+    words = sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()  <span class="syntax-comment"># 本格式的单词非空，且内部没有空白。</span>
+    <span class="syntax-comment"># 若题面用 JSON 数组输入（可含空字符串，如 [&quot;&quot;, &quot;eat&quot;]），改为：</span>
+    <span class="syntax-comment"># words = json.loads(sys.stdin.readline())</span>
+
+    result = <span class="syntax-function">solve</span>(words)  <span class="syntax-comment"># 如字母异位词分组，返回嵌套列表。</span>
+    <span class="syntax-function">print</span>(json.<span class="syntax-function">dumps</span>(result, ensure_ascii=<span class="syntax-literal">False</span>, separators=(<span class="syntax-string">&quot;,&quot;</span>, <span class="syntax-string">&quot;:&quot;</span>)))
+    <span class="syntax-comment"># JSON 保留嵌套结构与字符串引号，也会将布尔值写成小写。</span></code></pre>
+<p><strong>⑨ 第一行是行列数，随后是矩阵 → 逐行输出矩阵</strong></p>
+<!-- code:program-template:matrix -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：</span>
+    <span class="syntax-comment"># 2 3</span>
+    <span class="syntax-comment"># 1 2 3</span>
+    <span class="syntax-comment"># 4 5 6</span>
+    rows, cols = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())
+    matrix = [<span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())) <span class="syntax-keyword">for</span> _ <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(rows)]
+    <span class="syntax-comment"># 读取 rows 行；题面约定每行恰有 cols 个整数。</span>
+
+    result = <span class="syntax-function">solve</span>(matrix)  <span class="syntax-comment"># 本模板约定返回二维列表。</span>
+    <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> result:
+        <span class="syntax-function">print</span>(*row)  <span class="syntax-comment"># 每个内层列表输出一行。</span>
+
+    <span class="syntax-comment"># 若输入每行是连续字符，例如 101，把读矩阵那一行改为：</span>
+    <span class="syntax-comment"># matrix = [list(sys.stdin.readline().rstrip(&quot;\r\n&quot;)) for _ in range(rows)]</span>
+    <span class="syntax-comment"># 若算法返回的是岛屿数量等单值，把输出循环改为 print(result)。</span></code></pre>
+<p><strong>⑩ 第一行给出组数 → 每组读取长度和数组，输出一个结果</strong></p>
+<!-- code:program-template:counted-groups -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 输入示例：</span>
+    <span class="syntax-comment"># 2          ← 共 2 组；这些说明文字不属于实际输入</span>
+    <span class="syntax-comment"># 3          ← 第 1 组长度</span>
+    <span class="syntax-comment"># 1 2 3</span>
+    <span class="syntax-comment"># 2          ← 第 2 组长度</span>
+    <span class="syntax-comment"># 4 5</span>
+    test_cases = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
+    <span class="syntax-keyword">for</span> _ <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(test_cases):
+        n = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
+        nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
+
+        result = <span class="syntax-function">solve</span>(nums)  <span class="syntax-comment"># 每组独立计算，返回一个数。</span>
+        <span class="syntax-function">print</span>(result)  <span class="syntax-comment"># 有几组，就输出几行。</span></code></pre>
+<p><strong>⑪ 题面规定读到 EOF：每行一个数组 → 每行输出一个结果</strong></p>
+<!-- code:program-template:eof-groups -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    <span class="syntax-comment"># 本协议每组恰占一行，例如连续输入两行：</span>
+    <span class="syntax-comment"># 1 2 3</span>
+    <span class="syntax-comment"># 4 5</span>
+    <span class="syntax-keyword">for</span> line <span class="syntax-keyword">in</span> sys.stdin:  <span class="syntax-comment"># 到文件末尾 EOF 自动结束；文件为空时执行零次。</span>
+        nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, line.<span class="syntax-function">split</span>()))
+        result = <span class="syntax-function">solve</span>(nums)
+        <span class="syntax-function">print</span>(result)</code></pre>
+<p>这里每行就是一组；空白行会读成空数组，是否允许由题面决定。若一组占两行，应按该协议读取组头和下一行。在 macOS / Linux 终端手动输入时，可以在空行处按 Ctrl+D 表示 EOF；回车表示结束当前行。</p>
+<p>链表与树在“读入”和“调用”之间还有一步构造：整数列表要建成链表节点，层序字段要建成树节点。可直接参照<a href="hot100-python39.html#acm-lc206">链表完整程序</a>与<a href="hot100-python39.html#acm-lc102">树完整程序</a>中的构造和输出；上面的 <code>split()</code> 得到的是字符串字段。</p>
+<p><strong>记忆顺序：先读入并转换类型，再构造题目所需的结构，接着调用解题函数，最后按返回值和题面格式输出。</strong> 同一种输入可以配不同输出：选择模板时同时核对这两部分。</p>
+<h4 id="hot100-完整示例把选好的-main-放回四段框架">完整示例：把选好的 main 放回四段框架</h4>
+<p>下面用 <strong>LC1 两数之和</strong> 贯穿四段。输入第一行为 <code>n target</code>，第二行为 n 个整数；原题保证恰有一组解。输出两个原下标，以空格分隔。程序按题面约定接收一组完整、合法的输入，输出后结束。</p>
+<!-- code:program-template:two-sum -->
+<pre><code class="language-python"><span class="syntax-comment"># 1. 导入模块：sys 提供标准输入 sys.stdin。</span>
+<span class="syntax-keyword">import</span> sys
+
+
+<span class="syntax-comment"># 2. 定义解题函数：接收已经读好的参数，计算后返回结果。</span>
+<span class="syntax-keyword">def</span> <span class="syntax-function">two_sum</span>(nums, target):
+    <span class="syntax-comment"># seen 保存此前数值的下标；先查补数，再记录当前数。</span>
+    seen = {}
+    <span class="syntax-keyword">for</span> index, value <span class="syntax-keyword">in</span> <span class="syntax-function">enumerate</span>(nums):
+        complement = target - value
+        <span class="syntax-keyword">if</span> complement <span class="syntax-keyword">in</span> seen:
+            <span class="syntax-keyword">return</span> [seen[complement], index]
+        seen[value] = index
+    <span class="syntax-keyword">return</span> []  <span class="syntax-comment"># 若扩展到无解输入，用空列表表示；本题保证有解。</span>
+
+
+<span class="syntax-comment"># 3. 定义主函数：读入 → 调用算法 → 输出。</span>
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+    n, target = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())  <span class="syntax-comment"># 第一行：数组长度和目标值。</span>
+    nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))  <span class="syntax-comment"># 第二行：整数数组。</span>
+
+    result = <span class="syntax-function">two_sum</span>(nums, target)  <span class="syntax-comment"># 把参数传给解题函数，接住 return 的结果。</span>
+    <span class="syntax-function">print</span>(*result)  <span class="syntax-comment"># 将列表展开为多个参数，输出如 0 1，而不是 [0, 1]。</span>
+
+
+<span class="syntax-comment"># 4. 直接运行这个文件时，从 main() 开始处理输入。</span>
+<span class="syntax-keyword">if</span> __name__ == <span class="syntax-string">&quot;__main__&quot;</span>:
+    <span class="syntax-function">main</span>()</code></pre>
+<p><strong>保存为 <code>answer.py</code>，执行 <code>python3 answer.py</code>，输入：</strong></p>
+<pre><code class="language-text">4 9
+2 7 11 15</code></pre>
+<p><strong>输出：</strong></p>
+<pre><code class="language-text">0 1</code></pre>
+<p><strong>真正的执行顺序：</strong> Python 从上往下执行 <code>import sys</code>，遇到两个 <code>def</code> 时建立函数；到文件末尾，<code>__name__ == &quot;__main__&quot;</code> 成立，于是调用 <code>main()</code>。<code>main()</code> 读入两行后调用 <code>two_sum()</code>；解题函数的 <code>return</code> 结果成为 <code>result</code>，随后 <code>print(*result)</code> 输出。函数定义与函数调用是两步，<code>def main():</code> 负责定义，末尾的 <code>main()</code> 才负责启动。文件被 <code>import</code> 导入时，<code>__name__</code> 取模块名，因此末尾不会自动调用 <code>main()</code>；其他程序仍可调用这些函数。</p>
+<p><strong>读入语句怎样拆解：</strong> <code>readline()</code> 每次取得一行字符串；<code>split()</code> 按连续空白分隔字段；<code>map(int, ...)</code> 逐项转成整数；<code>list(...)</code> 收集为算法可访问的整数列表。第一行有两个字段，直接解包给 <code>n, target</code>；第二行有多个字段，所以收集为 <code>nums</code>。这里 n 说明输入约定中的数组长度。</p>
+<p>普通、格式固定的输入也可以使用 <code>input()</code>；例如 <code>nums = list(map(int, input().split()))</code>。本课统一使用 <code>sys.stdin.readline()</code>，方便保持各题风格一致。<strong>力扣网页判题时，使用题目给定的类、方法名和参数接口；这里的完整框架用于本地标准输入输出练习。</strong></p>
 <p>选题先看<strong>是否补上一种基础结构或重要解题模型</strong>，再看难度。本课采用<a href="https://leetcode.cn/studyplan/top-100-liked/">力扣官方热题 100</a>题单：20 道 Easy、68 道 Medium 的思路全部保留；<strong>LC41、76、84、124、239、295、51 这 7 道 Hard 也进入主线</strong>。其中原地哈希、单调队列、数据流双堆缺少其他直接代表；最短覆盖窗、矩形边界、树形动态规划、多约束回溯提供重要对照。其余 5 道 Hard 放在同型进阶，解释如何从已学模型迁移。这里按方法的代表性安排阅读顺序，难度标签帮助估计理解成本。</p>
-<p><strong>直接入口：<a href="#quick-io">输入输出</a> · <a href="#quick-model-map">模型与详细例题</a> · <a href="#quick-two-pointers">双指针</a> · <a href="#quick-lc239">单调队列</a> · <a href="#quick-lc295">双堆</a> · <a href="#quick-backtracking">回溯</a> · <a href="#quick-coverage">95 题逐题定位</a> · <a href="#quick-hard">同型进阶</a>。</strong></p>
+<p><strong>直接入口：<a href="#program-template">程序框架与输入输出</a> · <a href="#quick-model-map">模型与详细例题</a> · <a href="#quick-two-pointers">双指针</a> · <a href="#quick-lc239">单调队列</a> · <a href="#quick-lc295">双堆</a> · <a href="#quick-backtracking">回溯</a> · <a href="#quick-coverage">95 题逐题定位</a> · <a href="#quick-hard">同型进阶</a>。</strong></p>
 <h3 id="hot100-180-分钟阅读安排">180 分钟阅读安排</h3>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 · 180 分钟阅读安排"><table><caption>表 2 · 180 分钟阅读安排</caption><thead><tr><th scope="col">时间段</th><th scope="col">阅读模块</th><th scope="col">本段重点</th></tr></thead><tbody><tr><td>00–12 分钟 · 12 分钟</td><td><a href="#quick-io">输入输出</a></td><td>直接读入、分组与结束、结构构造；可选性能注释按需看</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 2 · 180 分钟阅读安排"><table><caption>表 2 · 180 分钟阅读安排</caption><thead><tr><th scope="col">时间段</th><th scope="col">阅读模块</th><th scope="col">本段重点</th></tr></thead><tbody><tr><td>00–12 分钟 · 12 分钟</td><td><a href="#program-template">程序框架与输入输出</a></td><td>先看四段框架与常用 main；其余格式、<a href="#quick-io">无解与 EOF 补充</a>及性能说明按需查阅</td></tr>
 <tr><td>12–44 分钟 · 32 分钟</td><td><a href="#quick-sequences">数组、哈希、矩阵与窗口</a></td><td>20 题：指针、前后缀、原地槽位、三种窗口；LC1 完整入口在上一段</td></tr>
 <tr><td>44–66 分钟 · 22 分钟</td><td><a href="#quick-stacks">栈与二分</a></td><td>11 题：状态栈、单调栈边界、单调队列与二分</td></tr>
 <tr><td>66–84 分钟 · 18 分钟</td><td><a href="#quick-linked">链表与缓存</a></td><td>12 题：改边、归并、复制、哈希表与双向链表 LRU</td></tr>
@@ -64,9 +248,9 @@
 <tr><td>回溯与约束搜索</td><td><a href="#quick-phone-combinations">LC17/46/78/39</a>、<a href="#quick-lc79">LC79 网格</a>、<a href="#quick-lc22">LC22/131</a>、<a href="#quick-lc51">LC51 N 皇后 · H</a></td><td>选择—递归—撤销；候选范围、复用规则和剪枝依据逐题变化</td></tr>
 <tr><td>位运算与函数图</td><td><a href="#quick-lc136">LC136 异或</a>、<a href="#quick-lc287">LC287 重复数</a></td><td>成对抵消依赖次数保证；数值范围把数组转成含环的函数图</td></tr></tbody></table></div>
 <p><a id="quick-io"></a></p>
-<h3 id="hot100-0012-分钟按题目格式读入求解与输出">00–12 分钟｜按题目格式读入、求解与输出</h3>
+<h3 id="hot100-输入输出补充无解结果两行一组与-eof">输入输出补充：无解结果、两行一组与 EOF</h3>
 <p><strong>本课推荐：导入 <code>sys</code>，用 <code>sys.stdin.readline()</code> 读一行，立即转成算法需要的数据，再用 <code>print()</code> 输出。</strong> 全书题目程序采用完整、合法的输入：字段类型、数量、行数及取值范围符合各题约定。单组输入依次读取规定的几行；多组输入按 T、EOF 或题面指定标记结束。算法继续处理题目允许的空数组、空树、无解和越界访问前的边界。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 · 00–12 分钟｜按题目格式读入、求解与输出"><table><caption>表 4 · 00–12 分钟｜按题目格式读入、求解与输出</caption><thead><tr><th scope="col">要做的事</th><th scope="col">推荐语法</th><th scope="col">得到什么／为什么这样写</th></tr></thead><tbody><tr><td>接入标准输入</td><td><code>import sys</code></td><td>导入 Python 标准库模块，后续通过 <code>sys.stdin</code> 读取输入</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 4 · 输入输出补充：无解结果、两行一组与 EOF"><table><caption>表 4 · 输入输出补充：无解结果、两行一组与 EOF</caption><thead><tr><th scope="col">要做的事</th><th scope="col">推荐语法</th><th scope="col">得到什么／为什么这样写</th></tr></thead><tbody><tr><td>接入标准输入</td><td><code>import sys</code></td><td>导入 Python 标准库模块，后续通过 <code>sys.stdin</code> 读取输入</td></tr>
 <tr><td>读取一个整数</td><td><code>n = int(sys.stdin.readline())</code></td><td>把本行文本转成整数，例如 <code>&quot;3\n&quot;</code> 得到 <code>3</code></td></tr>
 <tr><td>读取同一行的两个整数</td><td><code>n, target = map(int, sys.stdin.readline().split())</code></td><td>按空白分割、逐项转整数，再依次赋给两个变量；本行约定恰好两个字段</td></tr>
 <tr><td>读取一行整数数组</td><td><code>nums = list(map(int, sys.stdin.readline().split()))</code></td><td>例如 <code>&quot;2 7 11\n&quot;</code> 得到 <code>[2, 7, 11]</code>；一行完成读取与转换</td></tr>
@@ -109,7 +293,7 @@
 <pre><code class="language-text">0 1</code></pre>
 <p><strong>记忆顺序是“读参数 → 读数组 → 调算法 → 输出”。</strong> n 来自题目的长度字段，用来描述第二行有多少个数；输入保证数量正确，读入器直接得到 <code>nums</code>，算法通过 <code>len(nums)</code> 访问实际数组长度。<code>result is None</code> 判断的是算法有没有找到解，属于本题输出逻辑。</p>
 <p><strong>本题推荐哈希表。</strong> <code>seen[value]</code> 保存已经扫描过的值及其下标，查到 <code>target-value</code> 就形成答案；先查再记录保证两个下标不同。n 为数组长度，期望时间 O(n)、辅助空间 O(n)。备选是枚举两层下标 <code>i &lt; j</code>：时间 O(n²)、辅助空间 O(1)，适合小数组手工推演或校验结果。排序双指针需要随值保留原下标，整体时间 O(n log n)、辅助空间 O(n)，适合顺带学习有序数组的夹逼思路。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 · 00–12 分钟｜按题目格式读入、求解与输出"><table><caption>表 5 · 00–12 分钟｜按题目格式读入、求解与输出</caption><thead><tr><th scope="col">题面规定</th><th scope="col">推荐组织方式</th><th scope="col">何时结束</th></tr></thead><tbody><tr><td>单组、每行字段位置确定</td><td>像上面一样依次调用 <code>readline()</code></td><td>处理完本组即结束</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="表 5 · 输入输出补充：无解结果、两行一组与 EOF"><table><caption>表 5 · 输入输出补充：无解结果、两行一组与 EOF</caption><thead><tr><th scope="col">题面规定</th><th scope="col">推荐组织方式</th><th scope="col">何时结束</th></tr></thead><tbody><tr><td>单组、每行字段位置确定</td><td>像上面一样依次调用 <code>readline()</code></td><td>处理完本组即结束</td></tr>
 <tr><td>首行是 T，后面固定 T 组</td><td><code>test_count = int(sys.stdin.readline())</code>，再用 <code>for _ in range(test_count)</code> 读取每组</td><td>完成规定次数；T=0 时循环执行零次</td></tr>
 <tr><td>固定两行一组，处理到 EOF</td><td><code>for line in sys.stdin:</code> 取得第一行，再用 <code>readline()</code> 取得第二行</td><td>组与组之间遇到 EOF 自动结束；每组约定完整，组间直接衔接</td></tr>
 <tr><td>每行是一个独立整数序列</td><td><code>for line in sys.stdin:</code>，每行直接转换并求解</td><td>EOF 自动结束；空行若代表空数组，按空数组求解</td></tr>
@@ -1928,189 +2112,7 @@
 <tr><td>周三 · 2026-09-16</td><td><a href="hot100-day-2.html">第 2 天 · 20 道核心</a></td><td>比较约束，迁移方法</td></tr>
 <tr><td>周四 · 2026-09-17</td><td><a href="hot100-day-3.html">第 3 天 · 21 道核心</a></td><td>识别模型，稳定边界</td></tr></tbody></table></div>
 <p>按每天约 3 小时安排阅读、输入构造、编码和运行。先完成当天核心，剩余时间从对应类别中加练；用前几题的实际耗时校准进度。每道核心都以完整实现、运行样例与边界、解释状态和复杂度作为练习目标，实际完成量以自己的记录为准。</p>
-<p><a id="program-template"></a></p>
-<h3 id="hot100-每次动手前先写统一的程序框架">每次动手前：先写统一的程序框架</h3>
-<p>本课本地练习统一按 <strong>导入模块 → 定义解题函数 → 定义 main → 调用 main</strong> 四段组织。Python 定义函数的关键字是 <code>def</code>；<code>main</code> 是我们约定的入口函数名。每次换题，主要替换三处：<strong>怎样读入参数、解题函数怎样计算、结果怎样输出</strong>。</p>
-<h4 id="hot100-拿到一道题先确定这三件事">拿到一道题，先确定这三件事</h4>
-<ol>
-<li><strong>输入是什么？</strong> 确定一组数据占几行，每行是整数、数组还是字符串；链表和树还要把输入构造成节点。</li>
-<li><strong>函数接收什么、返回什么？</strong> 例如 <code>two_sum(nums, target)</code> 接收数组和目标值，返回两个下标。算法写在解题函数中，用 <code>return</code> 把结果交回调用处。</li>
-<li><strong>输出长什么样？</strong> 确定是一个数、空格分隔的序列、逐行矩阵还是 JSON。<code>main()</code> 负责读入、调用解题函数，再按题目约定 <code>print</code>。</li>
-</ol>
-<h4 id="hot100-先选一个-main按输入格式直接套用">先选一个 main：按输入格式直接套用</h4>
-<p>文件顶部统一写 <code>import sys</code>，解题函数定义在 <code>main()</code> 前，文件末尾用 <code>if __name__ == &quot;__main__&quot;:</code> 判断，并在其中调用 <code>main()</code>（完整写法见后面的示例）。<strong>下面每个代码块都是一种可替换的 <code>main()</code>：每题选适合的一块。</strong> <code>solve</code> 代表你为这道题写好的解题函数，使用时把名字与参数一起换成实际接口；每块注释也注明了预期的返回值。</p>
-<p>这些模板按题面约定读取完整、合法的数据。先确认输入是否给出长度、每组占几行、总共有几组，再选择对应代码块。单组模板输出后结束；多组模板由组数或 EOF 决定结束。</p>
-<p><strong>① 一行一个整数 → 输出一个数</strong></p>
-<!-- code:program-template:one-int -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：5</span>
-    n = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
-
-    result = <span class="syntax-function">solve</span>(n)  <span class="syntax-comment"># 解题函数接收整数，返回一个数。</span>
-    <span class="syntax-function">print</span>(result)</code></pre>
-<p><strong>② 一行两个整数 → 输出一个数</strong></p>
-<!-- code:program-template:two-ints -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：3 7（例如网格的行数、列数）</span>
-    rows, cols = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())
-
-    result = <span class="syntax-function">solve</span>(rows, cols)
-    <span class="syntax-function">print</span>(result)</code></pre>
-<p><strong>③ 一行整数数组 → 输出一行序列</strong></p>
-<!-- code:program-template:array -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：0 1 0 3 12（本格式直接给数组）</span>
-    nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
-
-    result = <span class="syntax-function">solve</span>(nums)  <span class="syntax-comment"># 本模板约定返回一个列表。</span>
-    <span class="syntax-function">print</span>(*result)  <span class="syntax-comment"># 如 [1, 3, 12, 0, 0] 输出为 1 3 12 0 0。</span>
-
-    <span class="syntax-comment"># 若解题函数原地修改 nums 并返回 None，把上面两行改为：</span>
-    <span class="syntax-comment"># solve(nums)</span>
-    <span class="syntax-comment"># print(*nums)</span></code></pre>
-<p><strong>④ 第一行是长度，第二行是数组 → 输出一个数</strong></p>
-<!-- code:program-template:sized-array -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：</span>
-    <span class="syntax-comment"># 5</span>
-    <span class="syntax-comment"># -2 1 -3 4 -1</span>
-    n = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())  <span class="syntax-comment"># 题面约定下一行有 n 个整数。</span>
-    nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
-
-    result = <span class="syntax-function">solve</span>(nums)  <span class="syntax-comment"># 本模板约定返回一个数，如最大子数组和。</span>
-    <span class="syntax-function">print</span>(result)</code></pre>
-<p><strong>⑤ 第一行是长度和目标值，第二行是数组 → 输出两个下标</strong></p>
-<!-- code:program-template:target-array -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：</span>
-    <span class="syntax-comment"># 4 9</span>
-    <span class="syntax-comment"># 2 7 11 15</span>
-    n, target = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())
-    nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
-
-    result = <span class="syntax-function">solve</span>(nums, target)  <span class="syntax-comment"># 例如两数之和，返回 [0, 1]。</span>
-    <span class="syntax-function">print</span>(*result)  <span class="syntax-comment"># 输出 0 1。</span></code></pre>
-<p><strong>⑥ 一行完整字符串 → 输出一个数或字符串</strong></p>
-<!-- code:program-template:string -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：hello world</span>
-    s = sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">rstrip</span>(<span class="syntax-string">&quot;\r\n&quot;</span>)  <span class="syntax-comment"># 去掉行末换行，保留空格。</span>
-
-    result = <span class="syntax-function">solve</span>(s)  <span class="syntax-comment"># 如子串长度，或处理后的字符串。</span>
-    <span class="syntax-function">print</span>(result)
-
-    <span class="syntax-comment"># 若题面有第二行字符串，调用前再读：</span>
-    <span class="syntax-comment"># t = sys.stdin.readline().rstrip(&quot;\r\n&quot;)</span>
-    <span class="syntax-comment"># 然后把调用改为 result = solve(s, t)。</span></code></pre>
-<p><strong>⑦ 判断题：读取字符串 → 输出小写 true / false</strong></p>
-<!-- code:program-template:boolean -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：()[]{}</span>
-    s = sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">rstrip</span>(<span class="syntax-string">&quot;\r\n&quot;</span>)
-
-    result = <span class="syntax-function">solve</span>(s)  <span class="syntax-comment"># 约定返回 Python 布尔值 True 或 False。</span>
-    <span class="syntax-function">print</span>(<span class="syntax-string">&quot;true&quot;</span> <span class="syntax-keyword">if</span> result <span class="syntax-keyword">else</span> <span class="syntax-string">&quot;false&quot;</span>)  <span class="syntax-comment"># 本题输出协议要求小写。</span>
-    <span class="syntax-comment"># 若题面要求 True / False，用 print(result)；要求 1 / 0，用 print(int(result))。</span></code></pre>
-<p><strong>⑧ 一行多个单词 → 用 JSON 输出嵌套结果</strong></p>
-<!-- code:program-template:words-json -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> json  <span class="syntax-comment"># 这类输出在文件顶部额外导入 json；同时保留 import sys。</span>
-
-
-<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：eat tea tan ate</span>
-    words = sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()  <span class="syntax-comment"># 本格式的单词非空，且内部没有空白。</span>
-    <span class="syntax-comment"># 若题面用 JSON 数组输入（可含空字符串，如 [&quot;&quot;, &quot;eat&quot;]），改为：</span>
-    <span class="syntax-comment"># words = json.loads(sys.stdin.readline())</span>
-
-    result = <span class="syntax-function">solve</span>(words)  <span class="syntax-comment"># 如字母异位词分组，返回嵌套列表。</span>
-    <span class="syntax-function">print</span>(json.<span class="syntax-function">dumps</span>(result, ensure_ascii=<span class="syntax-literal">False</span>, separators=(<span class="syntax-string">&quot;,&quot;</span>, <span class="syntax-string">&quot;:&quot;</span>)))
-    <span class="syntax-comment"># JSON 保留嵌套结构与字符串引号，也会将布尔值写成小写。</span></code></pre>
-<p><strong>⑨ 第一行是行列数，随后是矩阵 → 逐行输出矩阵</strong></p>
-<!-- code:program-template:matrix -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：</span>
-    <span class="syntax-comment"># 2 3</span>
-    <span class="syntax-comment"># 1 2 3</span>
-    <span class="syntax-comment"># 4 5 6</span>
-    rows, cols = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())
-    matrix = [<span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())) <span class="syntax-keyword">for</span> _ <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(rows)]
-    <span class="syntax-comment"># 读取 rows 行；题面约定每行恰有 cols 个整数。</span>
-
-    result = <span class="syntax-function">solve</span>(matrix)  <span class="syntax-comment"># 本模板约定返回二维列表。</span>
-    <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> result:
-        <span class="syntax-function">print</span>(*row)  <span class="syntax-comment"># 每个内层列表输出一行。</span>
-
-    <span class="syntax-comment"># 若输入每行是连续字符，例如 101，把读矩阵那一行改为：</span>
-    <span class="syntax-comment"># matrix = [list(sys.stdin.readline().rstrip(&quot;\r\n&quot;)) for _ in range(rows)]</span>
-    <span class="syntax-comment"># 若算法返回的是岛屿数量等单值，把输出循环改为 print(result)。</span></code></pre>
-<p><strong>⑩ 第一行给出组数 → 每组读取长度和数组，输出一个结果</strong></p>
-<!-- code:program-template:counted-groups -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 输入示例：</span>
-    <span class="syntax-comment"># 2          ← 共 2 组；这些说明文字不属于实际输入</span>
-    <span class="syntax-comment"># 3          ← 第 1 组长度</span>
-    <span class="syntax-comment"># 1 2 3</span>
-    <span class="syntax-comment"># 2          ← 第 2 组长度</span>
-    <span class="syntax-comment"># 4 5</span>
-    test_cases = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
-    <span class="syntax-keyword">for</span> _ <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(test_cases):
-        n = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
-        nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
-
-        result = <span class="syntax-function">solve</span>(nums)  <span class="syntax-comment"># 每组独立计算，返回一个数。</span>
-        <span class="syntax-function">print</span>(result)  <span class="syntax-comment"># 有几组，就输出几行。</span></code></pre>
-<p><strong>⑪ 题面规定读到 EOF：每行一个数组 → 每行输出一个结果</strong></p>
-<!-- code:program-template:eof-groups -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    <span class="syntax-comment"># 本协议每组恰占一行，例如连续输入两行：</span>
-    <span class="syntax-comment"># 1 2 3</span>
-    <span class="syntax-comment"># 4 5</span>
-    <span class="syntax-keyword">for</span> line <span class="syntax-keyword">in</span> sys.stdin:  <span class="syntax-comment"># 到文件末尾 EOF 自动结束；文件为空时执行零次。</span>
-        nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, line.<span class="syntax-function">split</span>()))
-        result = <span class="syntax-function">solve</span>(nums)
-        <span class="syntax-function">print</span>(result)</code></pre>
-<p>这里每行就是一组；空白行会读成空数组，是否允许由题面决定。若一组占两行，应按该协议读取组头和下一行。在 macOS / Linux 终端手动输入时，可以在空行处按 Ctrl+D 表示 EOF；回车表示结束当前行。</p>
-<p>链表与树在“读入”和“调用”之间还有一步构造：整数列表要建成链表节点，层序字段要建成树节点。可直接参照<a href="hot100-python39.html#acm-lc206">链表完整程序</a>与<a href="hot100-python39.html#acm-lc102">树完整程序</a>中的构造和输出；上面的 <code>split()</code> 得到的是字符串字段。</p>
-<p><strong>记忆顺序：先读入并转换类型，再构造题目所需的结构，接着调用解题函数，最后按返回值和题面格式输出。</strong> 同一种输入可以配不同输出：选择模板时同时核对这两部分。</p>
-<h4 id="hot100-完整示例把选好的-main-放回四段框架">完整示例：把选好的 main 放回四段框架</h4>
-<p>下面用 <strong>LC1 两数之和</strong> 贯穿四段。输入第一行为 <code>n target</code>，第二行为 n 个整数；原题保证恰有一组解。输出两个原下标，以空格分隔。程序按题面约定接收一组完整、合法的输入，输出后结束。</p>
-<!-- code:program-template:two-sum -->
-<pre><code class="language-python"><span class="syntax-comment"># 1. 导入模块：sys 提供标准输入 sys.stdin。</span>
-<span class="syntax-keyword">import</span> sys
-
-
-<span class="syntax-comment"># 2. 定义解题函数：接收已经读好的参数，计算后返回结果。</span>
-<span class="syntax-keyword">def</span> <span class="syntax-function">two_sum</span>(nums, target):
-    <span class="syntax-comment"># seen 保存此前数值的下标；先查补数，再记录当前数。</span>
-    seen = {}
-    <span class="syntax-keyword">for</span> index, value <span class="syntax-keyword">in</span> <span class="syntax-function">enumerate</span>(nums):
-        complement = target - value
-        <span class="syntax-keyword">if</span> complement <span class="syntax-keyword">in</span> seen:
-            <span class="syntax-keyword">return</span> [seen[complement], index]
-        seen[value] = index
-    <span class="syntax-keyword">return</span> []  <span class="syntax-comment"># 若扩展到无解输入，用空列表表示；本题保证有解。</span>
-
-
-<span class="syntax-comment"># 3. 定义主函数：读入 → 调用算法 → 输出。</span>
-<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
-    n, target = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())  <span class="syntax-comment"># 第一行：数组长度和目标值。</span>
-    nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))  <span class="syntax-comment"># 第二行：整数数组。</span>
-
-    result = <span class="syntax-function">two_sum</span>(nums, target)  <span class="syntax-comment"># 把参数传给解题函数，接住 return 的结果。</span>
-    <span class="syntax-function">print</span>(*result)  <span class="syntax-comment"># 将列表展开为多个参数，输出如 0 1，而不是 [0, 1]。</span>
-
-
-<span class="syntax-comment"># 4. 直接运行这个文件时，从 main() 开始处理输入。</span>
-<span class="syntax-keyword">if</span> __name__ == <span class="syntax-string">&quot;__main__&quot;</span>:
-    <span class="syntax-function">main</span>()</code></pre>
-<p><strong>保存为 <code>answer.py</code>，执行 <code>python3 answer.py</code>，输入：</strong></p>
-<pre><code class="language-text">4 9
-2 7 11 15</code></pre>
-<p><strong>输出：</strong></p>
-<pre><code class="language-text">0 1</code></pre>
-<p><strong>真正的执行顺序：</strong> Python 从上往下执行 <code>import sys</code>，遇到两个 <code>def</code> 时建立函数；到文件末尾，<code>__name__ == &quot;__main__&quot;</code> 成立，于是调用 <code>main()</code>。<code>main()</code> 读入两行后调用 <code>two_sum()</code>；解题函数的 <code>return</code> 结果成为 <code>result</code>，随后 <code>print(*result)</code> 输出。函数定义与函数调用是两步，<code>def main():</code> 负责定义，末尾的 <code>main()</code> 才负责启动。文件被 <code>import</code> 导入时，<code>__name__</code> 取模块名，因此末尾不会自动调用 <code>main()</code>；其他程序仍可调用这些函数。</p>
-<p><strong>读入语句怎样拆解：</strong> <code>readline()</code> 每次取得一行字符串；<code>split()</code> 按连续空白分隔字段；<code>map(int, ...)</code> 逐项转成整数；<code>list(...)</code> 收集为算法可访问的整数列表。第一行有两个字段，直接解包给 <code>n, target</code>；第二行有多个字段，所以收集为 <code>nums</code>。这里 n 说明输入约定中的数组长度。</p>
-<p>普通、格式固定的输入也可以使用 <code>input()</code>；例如 <code>nums = list(map(int, input().split()))</code>。本课统一使用 <code>sys.stdin.readline()</code>，方便保持各题风格一致。<strong>力扣网页判题时，使用题目给定的类、方法名和参数接口；这里的完整框架用于本地标准输入输出练习。</strong></p>
+<p><strong>练习前回查：<a href="#program-template">三小时开头的程序框架与输入输出模板</a>。三个每日练习页也保留相同模板，方便边写边查。</strong></p>
 <p><a id="interview-part-01"></a></p>
 <p><a id="interview-part-02"></a></p>
 <p><a id="interview-part-03"></a></p>
@@ -19630,4 +19632,4 @@ rng = random.<span class="syntax-function">Random</span>(<span class="syntax-num
 </ul>
 <pre><code class="language-bash">python3.9 tools/check_python39.py --require-runtime39</code></pre>
 <p>有限测试不能证明绝对不存在隐藏错误；正式笔试仍应以题面给定的输入、输出和复杂度约束为准。</p>
-</article><nav class="chapter-pagination" aria-label="返回课程"><a href="../index.html"><span>返回首页</span><strong>查看课程与额外章节</strong></a><a href="#hot100-leetcode-hot100--python-39%E7%90%86%E8%AE%BA%E9%80%9F%E8%A7%88%E4%B8%8E%E4%B8%89%E5%A4%A9%E7%BC%96%E7%A0%81%E7%BB%83%E4%B9%A0"><span>回到顶部 ↑</span><strong>Hot100 完整指南</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页大纲 <span aria-hidden="true">⌄</span></summary><nav class="guide-outline-nav" aria-label="本页小节"><p class="guide-outline-hint">先选阅读路线，再展开算法类型。</p><details class="guide-outline-group" open><summary>三小时速览</summary><ol><li><a href="#quick-review">速览说明</a></li><li><a href="#hot100-180-%E5%88%86%E9%92%9F%E9%98%85%E8%AF%BB%E5%AE%89%E6%8E%92">180 分钟安排</a></li><li><a href="#quick-model-map">算法模型总览</a></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-io" title="01 输入输出 · 12 分钟">01 输入输出</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-io" aria-expanded="true" aria-label="收起01 输入输出 · 12 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-io" data-guide-children><li><a href="#quick-lc1">完整输入输出模板</a></li><li><a href="#quick-io-performance">大输入与输出的处理</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-sequences" title="02 数组、哈希与窗口 · 32 分钟">02 数组、哈希与窗口</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-sequences" aria-expanded="true" aria-label="收起02 数组、哈希与窗口 · 32 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-sequences" data-guide-children><li><a href="#quick-lc283">原地扫描</a></li><li><a href="#quick-two-pointers">双指针</a></li><li><a href="#quick-lc5">中心扩展</a></li><li><a href="#quick-lc54">矩阵边界</a></li><li><a href="#quick-lc560">前缀和与计数</a></li><li><a href="#quick-lc3">最长滑动窗口</a></li><li><a href="#quick-lc76">最短覆盖窗口</a></li><li><a href="#quick-sequences-bridge">哈希、分区与数组变式</a></li><li><a href="#quick-lc41">原地哈希</a></li><li><a href="#quick-matrix-window-bridge">矩阵与定长窗口变式</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-stacks" title="03 栈、队列与二分 · 22 分钟">03 栈、队列与二分</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-stacks" aria-expanded="true" aria-label="收起03 栈、队列与二分 · 22 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-stacks" data-guide-children><li><a href="#quick-lc20">括号栈</a></li><li><a href="#quick-lc739">单调栈</a></li><li><a href="#quick-lc84">单调栈的矩形范围</a></li><li><a href="#quick-lc239">单调队列</a></li><li><a href="#quick-binary">二分查找与边界</a></li><li><a href="#quick-lc33">旋转数组二分</a></li><li><a href="#quick-lc155">最小栈</a></li><li><a href="#quick-lc394">嵌套解码</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-linked" title="04 链表与 LRU · 18 分钟">04 链表与 LRU</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-linked" aria-expanded="true" aria-label="收起04 链表与 LRU · 18 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-linked" data-guide-children><li><a href="#quick-lc206">反转链表</a></li><li><a href="#quick-lc142">快慢指针与环入口</a></li><li><a href="#quick-lc148">归并排序</a></li><li><a href="#quick-lc2">链表加法与进位</a></li><li><a href="#quick-lc138">随机指针与深拷贝</a></li><li><a href="#quick-lc146">LRU 缓存</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-trees" title="05 树、堆与字典树 · 28 分钟">05 树、堆与字典树</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-trees" aria-expanded="true" aria-label="收起05 树、堆与字典树 · 28 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-trees" data-guide-children><li><a href="#quick-lc102">层序遍历</a></li><li><a href="#quick-lc215">堆与 Top-K</a></li><li><a href="#quick-lc295">双堆与中位数</a></li><li><a href="#quick-lc208">字典树 Trie</a></li><li><a href="#quick-lc98">二叉搜索树</a></li><li><a href="#quick-lc437">树上的前缀和</a></li><li><a href="#quick-lc124">树形动态规划</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-graphs" title="06 图搜索与贪心 · 14 分钟">06 图搜索与贪心</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-graphs" aria-expanded="true" aria-label="收起06 图搜索与贪心 · 14 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-graphs" data-guide-children><li><a href="#quick-lc200">网格搜索与连通块</a></li><li><a href="#quick-lc994">多源广度优先搜索</a></li><li><a href="#quick-lc207">拓扑排序</a></li><li><a href="#quick-lc55">跳跃问题与贪心</a></li><li><a href="#quick-lc56">区间合并</a></li><li><a href="#quick-lc121">股票与最优前缀</a></li><li><a href="#quick-union-find">并查集</a></li><li><a href="#quick-greedy-bridge">区间切分与多数投票</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-dp" title="07 动态规划 · 24 分钟">07 动态规划</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-dp" aria-expanded="true" aria-label="收起07 动态规划 · 24 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-dp" data-guide-children><li><a href="#quick-lc198">一维状态</a></li><li><a href="#quick-lc62">网格动态规划</a></li><li><a href="#quick-lc1143">双序列动态规划</a></li><li><a href="#quick-lc72">编辑距离</a></li><li><a href="#quick-lc416">0/1 背包</a></li><li><a href="#quick-lc322">完全背包</a></li><li><a href="#quick-lc139">单词拆分</a></li><li><a href="#quick-lc152">最大乘积与双状态</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-backtracking" title="08 回溯 · 22 分钟">08 回溯</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-backtracking" aria-expanded="true" aria-label="收起08 回溯 · 22 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-backtracking" data-guide-children><li><a href="#quick-lc17">多层选择</a></li><li><a href="#quick-lc46">排列</a></li><li><a href="#quick-lc78">子集</a></li><li><a href="#quick-lc39">组合与重复选择</a></li><li><a href="#quick-lc79">网格回溯</a></li><li><a href="#quick-lc22">括号约束</a></li><li><a href="#quick-lc131">回文分割</a></li><li><a href="#quick-lc51">N 皇后与约束剪枝</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-bits" title="09 位运算与函数图 · 4 分钟">09 位运算与函数图</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-bits" aria-expanded="true" aria-label="收起09 位运算与函数图 · 4 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-bits" data-guide-children><li><a href="#quick-lc136">异或抵消</a></li><li><a href="#quick-lc287">函数图与判环</a></li></ol></li><li><a href="#quick-coverage">Hot100 逐题覆盖索引 · 4 分钟</a></li><li><a href="#quick-hard">复杂同类题的迁移思路</a></li></ol></details><details class="guide-outline-group"><summary>三天编码练习</summary><ol><li><a href="#interview-rounds">使用方式与三轮目标</a></li><li><a href="#program-template">先写程序框架与输入输出</a></li><li><a href="#interview-parts">三天核心题总表</a></li><li><a href="#interview-structures">每天两道专项核心</a></li><li><a href="#interview-io">输入输出与构造加练</a></li><li><a href="#interview-scope">覆盖范围与选择方式</a></li></ol></details><details class="guide-outline-group"><summary>分轮题单</summary><ol><li><a href="#hot100-index">分轮阅读说明</a></li><li><a href="#round-1">第一轮 · Hot100 38 题</a></li><li><a href="#round-2">第二轮 · Hot100 62 题</a></li><li><a href="#round-3">第三轮 · 面试经典 150 补缺</a></li></ol></details><details class="guide-outline-group"><summary>完整教材</summary><ol><li><a href="#learning-panorama">学习全景</a></li><li><a href="#acm-intro">Python 与 ACM 前置</a></li><li><a href="#thinking">选型、状态与排错</a></li><li><a href="#templates">模板复用与契约</a></li><li><a href="#stage-01">01 数组与原地扫描</a></li><li><a href="#stage-02">02 哈希表与集合</a></li><li><a href="#stage-03">03 双指针与中心扩展</a></li><li><a href="#stage-04">04 矩阵与二维下标</a></li><li><a href="#stage-05">05 前缀统计</a></li><li><a href="#stage-06">06 滑动窗口</a></li><li><a href="#stage-07">07 栈与队列</a></li><li><a href="#stage-08">08 单调栈与单调队列</a></li><li><a href="#stage-09">09 二分查找</a></li><li><a href="#stage-10">10 链表与 LRU</a></li><li><a href="#stage-11">11 递归与归并分治</a></li><li><a href="#stage-12">12 二叉树与 BST</a></li><li><a href="#stage-13">13 堆与 Top-K</a></li><li><a href="#stage-14">14 字典树</a></li><li><a href="#stage-15">15 图搜索与拓扑排序</a></li><li><a href="#stage-16">16 贪心</a></li><li><a href="#stage-17">17 一维动态规划</a></li><li><a href="#stage-18">18 二维动态规划</a></li><li><a href="#stage-19">19 背包与前缀可达性</a></li><li><a href="#stage-20">20 回溯</a></li><li><a href="#stage-21">21 位运算与函数图</a></li></ol></details><details class="guide-outline-group"><summary>附录查阅</summary><ol><li><a href="#alternatives">A 备选实现</a></li><li><a href="#acm-appendix">B 公共结构与 ACM 程序</a></li><li><a href="#extensions">C 扩展模块</a></li><li><a href="#specials">D 选读专项</a></li><li><a href="#syntax-reference">E Python 语义卡</a></li><li><a href="#new-gap-examples">F 第三轮补缺范例</a></li><li><a href="#validation">使用与验证说明</a></li></ol></details></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../index.html">返回课程目录</a><a href="../extended-reading.html">扩展资料说明</a></footer></body></html>
+</article><nav class="chapter-pagination" aria-label="返回课程"><a href="../index.html"><span>返回首页</span><strong>查看课程与额外章节</strong></a><a href="#hot100-leetcode-hot100--python-39%E7%90%86%E8%AE%BA%E9%80%9F%E8%A7%88%E4%B8%8E%E4%B8%89%E5%A4%A9%E7%BC%96%E7%A0%81%E7%BB%83%E4%B9%A0"><span>回到顶部 ↑</span><strong>Hot100 完整指南</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页大纲 <span aria-hidden="true">⌄</span></summary><nav class="guide-outline-nav" aria-label="本页小节"><p class="guide-outline-hint">先选阅读路线，再展开算法类型。</p><details class="guide-outline-group" open><summary>三小时速览</summary><ol><li><a href="#quick-review">速览说明</a></li><li><a href="#program-template">01 程序框架与输入输出 · 12 分钟</a></li><li><a href="#hot100-180-%E5%88%86%E9%92%9F%E9%98%85%E8%AF%BB%E5%AE%89%E6%8E%92">180 分钟安排</a></li><li><a href="#quick-model-map">算法模型总览</a></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-io" title="输入输出补充">输入输出补充</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-io" aria-expanded="true" aria-label="收起输入输出补充子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-io" data-guide-children><li><a href="#quick-lc1">两数之和与无解输出</a></li><li><a href="#quick-io-performance">大输入与输出的处理</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-sequences" title="02 数组、哈希与窗口 · 32 分钟">02 数组、哈希与窗口</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-sequences" aria-expanded="true" aria-label="收起02 数组、哈希与窗口 · 32 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-sequences" data-guide-children><li><a href="#quick-lc283">原地扫描</a></li><li><a href="#quick-two-pointers">双指针</a></li><li><a href="#quick-lc5">中心扩展</a></li><li><a href="#quick-lc54">矩阵边界</a></li><li><a href="#quick-lc560">前缀和与计数</a></li><li><a href="#quick-lc3">最长滑动窗口</a></li><li><a href="#quick-lc76">最短覆盖窗口</a></li><li><a href="#quick-sequences-bridge">哈希、分区与数组变式</a></li><li><a href="#quick-lc41">原地哈希</a></li><li><a href="#quick-matrix-window-bridge">矩阵与定长窗口变式</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-stacks" title="03 栈、队列与二分 · 22 分钟">03 栈、队列与二分</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-stacks" aria-expanded="true" aria-label="收起03 栈、队列与二分 · 22 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-stacks" data-guide-children><li><a href="#quick-lc20">括号栈</a></li><li><a href="#quick-lc739">单调栈</a></li><li><a href="#quick-lc84">单调栈的矩形范围</a></li><li><a href="#quick-lc239">单调队列</a></li><li><a href="#quick-binary">二分查找与边界</a></li><li><a href="#quick-lc33">旋转数组二分</a></li><li><a href="#quick-lc155">最小栈</a></li><li><a href="#quick-lc394">嵌套解码</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-linked" title="04 链表与 LRU · 18 分钟">04 链表与 LRU</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-linked" aria-expanded="true" aria-label="收起04 链表与 LRU · 18 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-linked" data-guide-children><li><a href="#quick-lc206">反转链表</a></li><li><a href="#quick-lc142">快慢指针与环入口</a></li><li><a href="#quick-lc148">归并排序</a></li><li><a href="#quick-lc2">链表加法与进位</a></li><li><a href="#quick-lc138">随机指针与深拷贝</a></li><li><a href="#quick-lc146">LRU 缓存</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-trees" title="05 树、堆与字典树 · 28 分钟">05 树、堆与字典树</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-trees" aria-expanded="true" aria-label="收起05 树、堆与字典树 · 28 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-trees" data-guide-children><li><a href="#quick-lc102">层序遍历</a></li><li><a href="#quick-lc215">堆与 Top-K</a></li><li><a href="#quick-lc295">双堆与中位数</a></li><li><a href="#quick-lc208">字典树 Trie</a></li><li><a href="#quick-lc98">二叉搜索树</a></li><li><a href="#quick-lc437">树上的前缀和</a></li><li><a href="#quick-lc124">树形动态规划</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-graphs" title="06 图搜索与贪心 · 14 分钟">06 图搜索与贪心</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-graphs" aria-expanded="true" aria-label="收起06 图搜索与贪心 · 14 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-graphs" data-guide-children><li><a href="#quick-lc200">网格搜索与连通块</a></li><li><a href="#quick-lc994">多源广度优先搜索</a></li><li><a href="#quick-lc207">拓扑排序</a></li><li><a href="#quick-lc55">跳跃问题与贪心</a></li><li><a href="#quick-lc56">区间合并</a></li><li><a href="#quick-lc121">股票与最优前缀</a></li><li><a href="#quick-union-find">并查集</a></li><li><a href="#quick-greedy-bridge">区间切分与多数投票</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-dp" title="07 动态规划 · 24 分钟">07 动态规划</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-dp" aria-expanded="true" aria-label="收起07 动态规划 · 24 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-dp" data-guide-children><li><a href="#quick-lc198">一维状态</a></li><li><a href="#quick-lc62">网格动态规划</a></li><li><a href="#quick-lc1143">双序列动态规划</a></li><li><a href="#quick-lc72">编辑距离</a></li><li><a href="#quick-lc416">0/1 背包</a></li><li><a href="#quick-lc322">完全背包</a></li><li><a href="#quick-lc139">单词拆分</a></li><li><a href="#quick-lc152">最大乘积与双状态</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-backtracking" title="08 回溯 · 22 分钟">08 回溯</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-backtracking" aria-expanded="true" aria-label="收起08 回溯 · 22 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-backtracking" data-guide-children><li><a href="#quick-lc17">多层选择</a></li><li><a href="#quick-lc46">排列</a></li><li><a href="#quick-lc78">子集</a></li><li><a href="#quick-lc39">组合与重复选择</a></li><li><a href="#quick-lc79">网格回溯</a></li><li><a href="#quick-lc22">括号约束</a></li><li><a href="#quick-lc131">回文分割</a></li><li><a href="#quick-lc51">N 皇后与约束剪枝</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-bits" title="09 位运算与函数图 · 4 分钟">09 位运算与函数图</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-bits" aria-expanded="true" aria-label="收起09 位运算与函数图 · 4 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-bits" data-guide-children><li><a href="#quick-lc136">异或抵消</a></li><li><a href="#quick-lc287">函数图与判环</a></li></ol></li><li><a href="#quick-coverage">Hot100 逐题覆盖索引 · 4 分钟</a></li><li><a href="#quick-hard">复杂同类题的迁移思路</a></li></ol></details><details class="guide-outline-group"><summary>三天编码练习</summary><ol><li><a href="#interview-rounds">使用方式与三轮目标</a></li><li><a href="#interview-parts">三天核心题总表</a></li><li><a href="#interview-structures">每天两道专项核心</a></li><li><a href="#interview-io">输入输出与构造加练</a></li><li><a href="#interview-scope">覆盖范围与选择方式</a></li></ol></details><details class="guide-outline-group"><summary>分轮题单</summary><ol><li><a href="#hot100-index">分轮阅读说明</a></li><li><a href="#round-1">第一轮 · Hot100 38 题</a></li><li><a href="#round-2">第二轮 · Hot100 62 题</a></li><li><a href="#round-3">第三轮 · 面试经典 150 补缺</a></li></ol></details><details class="guide-outline-group"><summary>完整教材</summary><ol><li><a href="#learning-panorama">学习全景</a></li><li><a href="#acm-intro">Python 与 ACM 前置</a></li><li><a href="#thinking">选型、状态与排错</a></li><li><a href="#templates">模板复用与契约</a></li><li><a href="#stage-01">01 数组与原地扫描</a></li><li><a href="#stage-02">02 哈希表与集合</a></li><li><a href="#stage-03">03 双指针与中心扩展</a></li><li><a href="#stage-04">04 矩阵与二维下标</a></li><li><a href="#stage-05">05 前缀统计</a></li><li><a href="#stage-06">06 滑动窗口</a></li><li><a href="#stage-07">07 栈与队列</a></li><li><a href="#stage-08">08 单调栈与单调队列</a></li><li><a href="#stage-09">09 二分查找</a></li><li><a href="#stage-10">10 链表与 LRU</a></li><li><a href="#stage-11">11 递归与归并分治</a></li><li><a href="#stage-12">12 二叉树与 BST</a></li><li><a href="#stage-13">13 堆与 Top-K</a></li><li><a href="#stage-14">14 字典树</a></li><li><a href="#stage-15">15 图搜索与拓扑排序</a></li><li><a href="#stage-16">16 贪心</a></li><li><a href="#stage-17">17 一维动态规划</a></li><li><a href="#stage-18">18 二维动态规划</a></li><li><a href="#stage-19">19 背包与前缀可达性</a></li><li><a href="#stage-20">20 回溯</a></li><li><a href="#stage-21">21 位运算与函数图</a></li></ol></details><details class="guide-outline-group"><summary>附录查阅</summary><ol><li><a href="#alternatives">A 备选实现</a></li><li><a href="#acm-appendix">B 公共结构与 ACM 程序</a></li><li><a href="#extensions">C 扩展模块</a></li><li><a href="#specials">D 选读专项</a></li><li><a href="#syntax-reference">E Python 语义卡</a></li><li><a href="#new-gap-examples">F 第三轮补缺范例</a></li><li><a href="#validation">使用与验证说明</a></li></ol></details></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../index.html">返回课程目录</a><a href="../extended-reading.html">扩展资料说明</a></footer></body></html>
