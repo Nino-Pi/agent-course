@@ -25,13 +25,16 @@
 
   function setExpanded(module, expanded) {
     const button = module.querySelector('[data-guide-expand]');
+    if (!button) return;
     const children = document.getElementById(button.getAttribute('aria-controls'));
+    if (!children) return;
     children.hidden = !expanded;
     button.setAttribute('aria-expanded', String(expanded));
     button.setAttribute('aria-label', `${expanded ? '收起' : '展开'}${module.querySelector('a').textContent}子目录`);
   }
   outlineNav?.querySelectorAll('.guide-outline-module').forEach(module => {
     const button = module.querySelector('[data-guide-expand]');
+    if (!button) return;
     button.hidden = false;
     setExpanded(module, false);
     button.addEventListener('click', () => setExpanded(module, button.getAttribute('aria-expanded') !== 'true'));
@@ -64,7 +67,8 @@
   function revealOutlineLocation() {
     const active = outlineNav?.querySelector('a[aria-current="location"]');
     if (!active) return;
-    active.closest('.guide-outline-group').open = true;
+    const group = active.closest('.guide-outline-group');
+    if (group) group.open = true;
     const module = active.closest('.guide-outline-module');
     if (module) setExpanded(module, true);
     if (outline.hidden) return;

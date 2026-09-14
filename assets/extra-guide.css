@@ -74,3 +74,27 @@
 .guide-interview-rounds>:is(p,ul,ol){max-width:52rem;margin-left:auto;margin-right:auto}
 @media(max-width:600px){.guide-route-nav>a:last-child:nth-child(odd){grid-column:1/-1}.guide-interview-rounds>h3{font-size:18px;padding:11px 13px}}
 @media print{.guide-interview-rounds{border-top:2px solid #888}.guide-interview-rounds>:is(h3,h4){break-after:avoid}}
+
+/* Daily practice is a static reading view: navigation scrolls with the page. */
+.practice-day-nav{position:static;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:26px 0 34px}
+.practice-day-nav>a{display:flex;flex-direction:column;gap:6px;padding:15px 17px;border:1px solid #dcced3;border-radius:10px;background:#fff;color:#6f2a3d;text-decoration:none;line-height:1.55;min-width:0}
+.practice-day-nav>a:first-child{grid-column:1/-1;padding:10px 17px;background:#faf6f8;font-size:14px}
+.practice-day-nav>a:hover{border-color:#ae526c;background:#fff6f9}
+.practice-day-nav>a[aria-current=page]{border-color:#ab1034;box-shadow:inset 0 3px #ab1034;background:#fff5f8}
+.practice-day-nav span{font-size:13px;color:#755961}
+.practice-day-nav strong{font-size:17px}
+.practice-day-nav small{font-size:12px;color:#665960}
+.hot100-practice>h2{margin-top:54px;padding-top:20px;border-top:3px solid #a4405b;color:#77253b}
+.hot100-practice>h3{margin-top:36px;padding:14px 18px;background:#fff3f6;border-left:4px solid #b84464;border-radius:0 8px 8px 0;font-size:22px}
+.hot100-practice h4{font-size:18px;margin-top:29px}
+.hot100-practice :is(h5,h6){font-size:16px;line-height:1.7}
+.hot100-practice>details{margin-top:15px;background:#fcfbfc}
+.hot100-practice .table-scroll{max-width:100%}
+@media(max-width:700px){.practice-day-nav{gap:8px}.practice-day-nav>a{padding:12px}.practice-day-nav strong{font-size:15px}.practice-day-nav small{font-size:11px}.hot100-practice>h3{font-size:20px;padding:12px 14px}}
+@media(max-width:480px){.practice-day-nav{grid-template-columns:1fr}.practice-day-nav>a:first-child{grid-column:auto}.practice-day-nav small{font-size:12px}}
+@media print{.practice-day-nav{display:none}.hot100-practice>h2{border-top:2px solid #777}.hot100-practice>h3{break-after:avoid;background:transparent}}
+.hot100-practice>:is(p,h1,h2,h3,h4,ul,ol,blockquote){max-width:52rem;margin-left:auto;margin-right:auto}
+.practice-outline>ol{margin:8px 0}
+.practice-outline .guide-outline-module{margin:5px 0 10px}
+.practice-outline .guide-outline-module>ol{margin:1px 0 4px;padding-left:12px}
+.practice-outline .guide-outline-module>ol a{font-size:12px;padding:4px 8px}

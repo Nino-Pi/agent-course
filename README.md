@@ -41,7 +41,7 @@
 
 [进阶目录](https://nino-pi.github.io/agent-course/frontier/index.html)按七编组织：从执行走向改进、固定模型时的能力提升、环境与经验生产、模型训练、系统自动演化、评价与监督深化、自主研究与递归自我改进（Recursive Self-Improvement，RSI）。**目前已发布的是上述 8 章，其余主题在目录中标为后续计划。** 各章给出实际前置关系，读者可按兴趣选择固定模型路线或数学与训练路线。
 
-## Hot100：快速回顾与完整学习
+## Hot100：理论速览与三天编码练习
 
 这一部分以 **Python 3.9 与标准库**为基础，同时说明力扣的函数参数形式和 ACM 的标准输入输出形式。覆盖数组、哈希、双指针、矩阵、前缀统计、滑动窗口、栈与单调结构、二分、链表、分治、树、堆、字典树、图、贪心、动态规划、背包、回溯和位运算等内容。
 
@@ -53,6 +53,10 @@
 | **第三轮：18 题** | 从面试经典 150 中补充重要模型，独立计数 | [第三轮拓展](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#round-3) |
 
 三小时主线按“问题与输入输出 → 状态过程 → 为什么成立 → 核心代码与边界 → 同类迁移”阅读，提供[模型与详细例题导航](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-model-map)和[95 题定位表](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-coverage)。难度标签不决定是否跳过：LC41、76、84、124、239、295、51 分别补上原地哈希、最短覆盖窗、单调栈范围、树形 DP、单调队列、双堆与多约束回溯。LRU 展开哈希表和双向链表的摘接过程，并查集用岛屿网格跟踪合并；同类题交代迁移理由。**回溯（Backtracking）22 分钟、动态规划（Dynamic Programming，DP）24 分钟**；180 分钟是已有 Python 基础读者的一轮阅读预算，不等同于独立熟练实现全部题目。其余 5 道 Hard 在[同型进阶区](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-hard)说明组合方法与边界，完整教材与分轮题单继续保留。
+
+三天编码练习面向已经刷过 Hot100、需要恢复实现的读者：每天 18 个轮换类别，加 2 道专项核心，周二／周三／周四分别为 21／20／21 题，共 62 道不同核心与 38 道按需加练。每个日期页都有全部 100 题的完整主解材料，包含状态与依据、具体例子、必要构造、输入输出、样例与边界；当天核心展开，同类其他题折叠附后。全部 12 道 Hard 保留，LIS、环入口、函数图与回文分割有专项核心。
+
+**[三天核心总表](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#interview-rounds)** · **[周二 · 21 题](https://nino-pi.github.io/agent-course/extras/hot100-day-1.html)** · **[周三 · 20 题](https://nino-pi.github.io/agent-course/extras/hot100-day-2.html)** · **[周四 · 21 题](https://nino-pi.github.io/agent-course/extras/hot100-day-3.html)**
 
 ## 怎样阅读
 
@@ -79,7 +83,7 @@ agent-course/
 ├── index.html                # 在线课程首页
 ├── notes/maka/learning/      # 基础课程 01–66 章、路线、术语与图解索引
 ├── frontier/                 # 前沿进阶正文、目录与页面资源
-├── extras/                   # Hot100 完整指南
+├── extras/                   # Hot100 完整指南与三个独立编码练习页
 ├── attachments/              # 课程引用的教学附件与示例
 ├── assets/                   # 公共样式、阅读脚本、图解与字体等资源
 ├── reviews/                  # 审核范围与课程重构说明
