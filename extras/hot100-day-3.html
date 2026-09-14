@@ -13,9 +13,12 @@
 <li><strong>输出长什么样？</strong> 确定是一个数、空格分隔的序列、逐行矩阵还是 JSON。<code>main()</code> 负责读入、调用解题函数，再按题目约定 <code>print</code>。</li>
 </ol>
 <h3 id="hot100-先选一个-main按输入格式直接套用">先选一个 main：按输入格式直接套用</h3>
+<p><strong>按输入格式跳转：</strong> <a href="#io-one-int">① 单整数</a> · <a href="#io-two-ints">② 两整数</a> · <a href="#io-array">③ 一行数组</a> · <a href="#io-sized-array">④ 长度加数组</a> · <a href="#io-target-array">⑤ 目标值加数组</a></p>
+<p><a href="#io-string">⑥ 字符串</a> · <a href="#io-boolean">⑦ 布尔结果</a> · <a href="#io-words-json">⑧ 单词与 JSON</a> · <a href="#io-matrix">⑨ 矩阵</a> · <a href="#io-counted-groups">⑩ 给定组数</a> · <a href="#io-eof-groups">⑪ 读到 EOF</a> · <a href="#program-example">完整四段示例</a></p>
 <p>文件顶部统一写 <code>import sys</code>，解题函数定义在 <code>main()</code> 前，文件末尾用 <code>if __name__ == &quot;__main__&quot;:</code> 判断，并在其中调用 <code>main()</code>（完整写法见后面的示例）。<strong>下面每个代码块都是一种可替换的 <code>main()</code>：每题选适合的一块。</strong> <code>solve</code> 代表你为这道题写好的解题函数，使用时把名字与参数一起换成实际接口；每块注释也注明了预期的返回值。</p>
 <p>这些模板按题面约定读取完整、合法的数据。先确认输入是否给出长度、每组占几行、总共有几组，再选择对应代码块。单组模板输出后结束；多组模板由组数或 EOF 决定结束。</p>
-<p><strong>① 一行一个整数 → 输出一个数</strong></p>
+<p><a id="io-one-int"></a>
+<strong>① 一行一个整数 → 输出一个数</strong></p>
 <!-- code:program-template:one-int -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：5</span>
@@ -23,7 +26,8 @@
 
     result = <span class="syntax-function">solve</span>(n)  <span class="syntax-comment"># 解题函数接收整数，返回一个数。</span>
     <span class="syntax-function">print</span>(result)</code></pre>
-<p><strong>② 一行两个整数 → 输出一个数</strong></p>
+<p><a id="io-two-ints"></a>
+<strong>② 一行两个整数 → 输出一个数</strong></p>
 <!-- code:program-template:two-ints -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：3 7（例如网格的行数、列数）</span>
@@ -31,7 +35,8 @@
 
     result = <span class="syntax-function">solve</span>(rows, cols)
     <span class="syntax-function">print</span>(result)</code></pre>
-<p><strong>③ 一行整数数组 → 输出一行序列</strong></p>
+<p><a id="io-array"></a>
+<strong>③ 一行整数数组 → 输出一行序列</strong></p>
 <!-- code:program-template:array -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：0 1 0 3 12（本格式直接给数组）</span>
@@ -43,7 +48,8 @@
     <span class="syntax-comment"># 若解题函数原地修改 nums 并返回 None，把上面两行改为：</span>
     <span class="syntax-comment"># solve(nums)</span>
     <span class="syntax-comment"># print(*nums)</span></code></pre>
-<p><strong>④ 第一行是长度，第二行是数组 → 输出一个数</strong></p>
+<p><a id="io-sized-array"></a>
+<strong>④ 第一行是长度，第二行是数组 → 输出一个数</strong></p>
 <!-- code:program-template:sized-array -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
@@ -54,7 +60,8 @@
 
     result = <span class="syntax-function">solve</span>(nums)  <span class="syntax-comment"># 本模板约定返回一个数，如最大子数组和。</span>
     <span class="syntax-function">print</span>(result)</code></pre>
-<p><strong>⑤ 第一行是长度和目标值，第二行是数组 → 输出两个下标</strong></p>
+<p><a id="io-target-array"></a>
+<strong>⑤ 第一行是长度和目标值，第二行是数组 → 输出两个下标</strong></p>
 <!-- code:program-template:target-array -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
@@ -65,7 +72,8 @@
 
     result = <span class="syntax-function">solve</span>(nums, target)  <span class="syntax-comment"># 例如两数之和，返回 [0, 1]。</span>
     <span class="syntax-function">print</span>(*result)  <span class="syntax-comment"># 输出 0 1。</span></code></pre>
-<p><strong>⑥ 一行完整字符串 → 输出一个数或字符串</strong></p>
+<p><a id="io-string"></a>
+<strong>⑥ 一行完整字符串 → 输出一个数或字符串</strong></p>
 <!-- code:program-template:string -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：hello world</span>
@@ -77,7 +85,8 @@
     <span class="syntax-comment"># 若题面有第二行字符串，调用前再读：</span>
     <span class="syntax-comment"># t = sys.stdin.readline().rstrip(&quot;\r\n&quot;)</span>
     <span class="syntax-comment"># 然后把调用改为 result = solve(s, t)。</span></code></pre>
-<p><strong>⑦ 判断题：读取字符串 → 输出小写 true / false</strong></p>
+<p><a id="io-boolean"></a>
+<strong>⑦ 判断题：读取字符串 → 输出小写 true / false</strong></p>
 <!-- code:program-template:boolean -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：()[]{}</span>
@@ -86,7 +95,8 @@
     result = <span class="syntax-function">solve</span>(s)  <span class="syntax-comment"># 约定返回 Python 布尔值 True 或 False。</span>
     <span class="syntax-function">print</span>(<span class="syntax-string">&quot;true&quot;</span> <span class="syntax-keyword">if</span> result <span class="syntax-keyword">else</span> <span class="syntax-string">&quot;false&quot;</span>)  <span class="syntax-comment"># 本题输出协议要求小写。</span>
     <span class="syntax-comment"># 若题面要求 True / False，用 print(result)；要求 1 / 0，用 print(int(result))。</span></code></pre>
-<p><strong>⑧ 一行多个单词 → 用 JSON 输出嵌套结果</strong></p>
+<p><a id="io-words-json"></a>
+<strong>⑧ 一行多个单词 → 用 JSON 输出嵌套结果</strong></p>
 <!-- code:program-template:words-json -->
 <pre><code class="language-python"><span class="syntax-keyword">import</span> json  <span class="syntax-comment"># 这类输出在文件顶部额外导入 json；同时保留 import sys。</span>
 
@@ -100,7 +110,8 @@
     result = <span class="syntax-function">solve</span>(words)  <span class="syntax-comment"># 如字母异位词分组，返回嵌套列表。</span>
     <span class="syntax-function">print</span>(json.<span class="syntax-function">dumps</span>(result, ensure_ascii=<span class="syntax-literal">False</span>, separators=(<span class="syntax-string">&quot;,&quot;</span>, <span class="syntax-string">&quot;:&quot;</span>)))
     <span class="syntax-comment"># JSON 保留嵌套结构与字符串引号，也会将布尔值写成小写。</span></code></pre>
-<p><strong>⑨ 第一行是行列数，随后是矩阵 → 逐行输出矩阵</strong></p>
+<p><a id="io-matrix"></a>
+<strong>⑨ 第一行是行列数，随后是矩阵 → 逐行输出矩阵</strong></p>
 <!-- code:program-template:matrix -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
@@ -118,7 +129,8 @@
     <span class="syntax-comment"># 若输入每行是连续字符，例如 101，把读矩阵那一行改为：</span>
     <span class="syntax-comment"># matrix = [list(sys.stdin.readline().rstrip(&quot;\r\n&quot;)) for _ in range(rows)]</span>
     <span class="syntax-comment"># 若算法返回的是岛屿数量等单值，把输出循环改为 print(result)。</span></code></pre>
-<p><strong>⑩ 第一行给出组数 → 每组读取长度和数组，输出一个结果</strong></p>
+<p><a id="io-counted-groups"></a>
+<strong>⑩ 第一行给出组数 → 每组读取长度和数组，输出一个结果</strong></p>
 <!-- code:program-template:counted-groups -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
@@ -127,14 +139,15 @@
     <span class="syntax-comment"># 1 2 3</span>
     <span class="syntax-comment"># 2          ← 第 2 组长度</span>
     <span class="syntax-comment"># 4 5</span>
-    test_cases = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
-    <span class="syntax-keyword">for</span> _ <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(test_cases):
+    test_count = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
+    <span class="syntax-keyword">for</span> _ <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(test_count):
         n = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
         nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
 
         result = <span class="syntax-function">solve</span>(nums)  <span class="syntax-comment"># 每组独立计算，返回一个数。</span>
         <span class="syntax-function">print</span>(result)  <span class="syntax-comment"># 有几组，就输出几行。</span></code></pre>
-<p><strong>⑪ 题面规定读到 EOF：每行一个数组 → 每行输出一个结果</strong></p>
+<p><a id="io-eof-groups"></a>
+<strong>⑪ 题面规定读到 EOF：每行一个数组 → 每行输出一个结果</strong></p>
 <!-- code:program-template:eof-groups -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 本协议每组恰占一行，例如连续输入两行：</span>
@@ -147,6 +160,7 @@
 <p>这里每行就是一组；空白行会读成空数组，是否允许由题面决定。若一组占两行，应按该协议读取组头和下一行。在 macOS / Linux 终端手动输入时，可以在空行处按 Ctrl+D 表示 EOF；回车表示结束当前行。</p>
 <p>链表与树在“读入”和“调用”之间还有一步构造：整数列表要建成链表节点，层序字段要建成树节点。可直接参照<a href="hot100-python39.html#acm-lc206">链表完整程序</a>与<a href="hot100-python39.html#acm-lc102">树完整程序</a>中的构造和输出；上面的 <code>split()</code> 得到的是字符串字段。</p>
 <p><strong>记忆顺序：先读入并转换类型，再构造题目所需的结构，接着调用解题函数，最后按返回值和题面格式输出。</strong> 同一种输入可以配不同输出：选择模板时同时核对这两部分。</p>
+<p><a id="program-example"></a></p>
 <h3 id="hot100-完整示例把选好的-main-放回四段框架">完整示例：把选好的 main 放回四段框架</h3>
 <p>下面用 <strong>LC1 两数之和</strong> 贯穿四段。输入第一行为 <code>n target</code>，第二行为 n 个整数；原题保证恰有一组解。输出两个原下标，以空格分隔。程序按题面约定接收一组完整、合法的输入，输出后结束。</p>
 <!-- code:program-template:two-sum -->
@@ -183,6 +197,7 @@
 2 7 11 15</code></pre>
 <p><strong>输出：</strong></p>
 <pre><code class="language-text">0 1</code></pre>
+<p><strong>本题推荐哈希表。</strong> <code>seen</code> 保存已经读到的值及其下标；先查询补数，再记录当前值，保证两个下标不同。例如 <code>[3,3]</code>、target=6：第一个 3 先存入，第二个 3 查到补数，返回 <code>[0,1]</code>。n 为数组长度，期望时间 O(n)、辅助空间 O(n)。备选双层枚举 <code>i &lt; j</code> 为 O(n²) 时间、O(1) 空间，适合小数组推演或校验；排序双指针需同时保存原下标，整体 O(n log n) 时间、O(n) 辅助空间，适合练习有序数组的夹逼。</p>
 <p><strong>真正的执行顺序：</strong> Python 从上往下执行 <code>import sys</code>，遇到两个 <code>def</code> 时建立函数；到文件末尾，<code>__name__ == &quot;__main__&quot;</code> 成立，于是调用 <code>main()</code>。<code>main()</code> 读入两行后调用 <code>two_sum()</code>；解题函数的 <code>return</code> 结果成为 <code>result</code>，随后 <code>print(*result)</code> 输出。函数定义与函数调用是两步，<code>def main():</code> 负责定义，末尾的 <code>main()</code> 才负责启动。文件被 <code>import</code> 导入时，<code>__name__</code> 取模块名，因此末尾不会自动调用 <code>main()</code>；其他程序仍可调用这些函数。</p>
 <p><strong>读入语句怎样拆解：</strong> <code>readline()</code> 每次取得一行字符串；<code>split()</code> 按连续空白分隔字段；<code>map(int, ...)</code> 逐项转成整数；<code>list(...)</code> 收集为算法可访问的整数列表。第一行有两个字段，直接解包给 <code>n, target</code>；第二行有多个字段，所以收集为 <code>nums</code>。这里 n 说明输入约定中的数组长度。</p>
 <p>普通、格式固定的输入也可以使用 <code>input()</code>；例如 <code>nums = list(map(int, input().split()))</code>。本课统一使用 <code>sys.stdin.readline()</code>，方便保持各题风格一致。<strong>力扣网页判题时，使用题目给定的类、方法名和参数接口；这里的完整框架用于本地标准输入输出练习。</strong></p>
