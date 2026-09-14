@@ -28,7 +28,7 @@
 @media print{.extra-card{break-inside:avoid}.extra-guide-article details{border:0;background:transparent;padding:0}}
 
 /* Reading routes belong to the introduction and scroll away with the article. */
-.guide-route-nav{position:static;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 28px;padding:7px;background:#fff;border:1px solid #e7cbd3;border-radius:12px}
+.guide-route-nav{position:static;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 28px;padding:7px;background:#fff;border:1px solid #e7cbd3;border-radius:12px}
 .guide-route-nav a{display:flex;align-items:center;justify-content:center;min-height:44px;padding:8px 6px;border-radius:7px;color:#783549;background:#fff7f9;font-size:13px;font-weight:650;line-height:1.5;text-align:center;text-decoration:none}
 .guide-route-nav a[aria-current="location"]{background:#ab1034;color:#fff}
 .guide-route-nav a:hover{background:#f8dde5;color:#80223e}
@@ -44,7 +44,7 @@
 @media(max-width:600px){.guide-route-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:6px}.guide-route-nav a{min-height:40px;font-size:12px}.guide-quick-review>h3{font-size:18px;padding:11px 13px}}
 @media print{.guide-quick-review{border-top:2px solid #888}.guide-quick-review>h3{break-after:avoid}}
 
-/* One scroll box and four reading routes; algorithm children open on demand. */
+/* One scroll box; reading routes and algorithm children open on demand. */
 .contents:has(.guide-outline-nav){overflow:hidden}
 .reader-enhanced .contents .guide-outline-nav,.contents .guide-outline-nav{max-height:calc(100dvh - var(--reader-header-height,72px) - 116px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:3px}
 .guide-outline-hint{margin:12px 4px;color:var(--muted);font-size:12px;line-height:1.6}
@@ -64,3 +64,13 @@
 .contents .guide-current-parent>summary,.guide-current-parent>.guide-outline-row{background:#fff3f7;border-radius:6px;color:#981637}
 .guide-outline-group.guide-current-parent>summary::after{content:'当前';float:right;font-size:10px;line-height:21px;color:#aa4561}
 .guide-outline-nav :is(a,button,summary):focus-visible{outline:2px solid #ab1034;outline-offset:-2px}
+
+/* Optional practice stays beside its category and scrolls with the article. */
+.guide-interview-rounds{min-width:0;margin:36px 0 54px;padding-top:4px;border-top:3px solid #ab1034}
+.guide-interview-rounds>h3{margin-top:40px;padding:12px 15px;border-left:4px solid #bd4c69;background:#fff6f8;border-radius:0 7px 7px 0;font-size:20px}
+.guide-interview-rounds>h4{margin-top:24px;color:#723849;font-size:17px}
+.guide-interview-rounds>.table-scroll{margin:20px 0}
+.guide-interview-rounds th{background:#f7edf0;color:#51333d}
+.guide-interview-rounds>:is(p,ul,ol){max-width:52rem;margin-left:auto;margin-right:auto}
+@media(max-width:600px){.guide-route-nav>a:last-child:nth-child(odd){grid-column:1/-1}.guide-interview-rounds>h3{font-size:18px;padding:11px 13px}}
+@media print{.guide-interview-rounds{border-top:2px solid #888}.guide-interview-rounds>:is(h3,h4){break-after:avoid}}
