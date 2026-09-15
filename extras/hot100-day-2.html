@@ -16,22 +16,33 @@
 </ol>
 <p><a id="program-libraries"></a></p>
 <h3 id="hot100-常用标准库先选工具再写-import">常用标准库：先选工具，再写 import</h3>
-<p><strong>本课推荐按任务选库：动态计数用 <code>defaultdict(int)</code>，分组用 <code>defaultdict(list)</code>，现成序列的频次用 <code>Counter</code>，队列用 <code>deque</code>，堆用 <code>heapq</code>，有序数组的二分位置用 <code>bisect</code>。</strong> 它们都随 Python 3.9 提供。每道题把实际用到的导入放在代码顶部；下面是一份可按题选择的速查，核心题解和完整程序也各自写出所需导入。</p>
+<p><strong>本课推荐按任务选库：动态计数用 <code>defaultdict(int)</code>，分组用 <code>defaultdict(list)</code>，现成序列的频次用 <code>Counter</code>，队列用 <code>deque</code>，堆用 <code>heapq</code>。</strong> 它们都随 Python 3.9 提供。二分题在三小时与前两轮统一手写区间、比较和边界更新，第三轮再对照标准库。每道题把实际用到的导入放在代码顶部；下面是一份可按题选择的速查，核心题解和完整程序也各自写出所需导入。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="常用标准库：先选工具，再写 import"><table><thead><tr><th scope="col">要处理的事情</th><th scope="col">导入语句</th><th scope="col">关键写法与适用题型</th></tr></thead><tbody><tr><td>标准输入</td><td><code>import sys</code></td><td><code>sys.stdin.readline()</code> 读一行；ACM 的 main 使用它</td></tr>
 <tr><td>扫描时累加次数</td><td><code>from collections import defaultdict</code></td><td><code>counts = defaultdict(int)</code>，<code>counts[key] += 1</code>；<a href="hot100-python39.html#quick-lc560">LC560 前缀和计数</a></td></tr>
 <tr><td>按键收集一组元素</td><td><code>from collections import defaultdict</code></td><td><code>groups = defaultdict(list)</code>，<code>groups[key].append(value)</code>；<a href="hot100-python39.html#lc49">LC49 异位词分组</a></td></tr>
 <tr><td>一次建立频次表</td><td><code>from collections import Counter</code></td><td><code>counts = Counter(nums)</code> 或 <code>Counter(s)</code>；<a href="hot100-python39.html#lc347">LC347 高频元素</a>、<a href="hot100-python39.html#quick-lc76">LC76 覆盖窗口</a></td></tr>
 <tr><td>FIFO 队列、两端删除</td><td><code>from collections import deque</code></td><td><code>append()</code> 入队、<code>popleft()</code> 出队；<a href="hot100-python39.html#quick-lc102">LC102 层序遍历</a>、<a href="hot100-python39.html#quick-lc239">LC239 单调队列</a></td></tr>
 <tr><td>最小堆、Top-K、双堆</td><td><code>import heapq</code></td><td><code>heappush(heap, x)</code>、<code>heappop(heap)</code> 都加 <code>heapq.</code> 前缀，<code>heap[0]</code> 是最小值；<a href="hot100-python39.html#quick-lc215">LC215</a>、<a href="hot100-python39.html#quick-lc295">LC295</a></td></tr>
-<tr><td>有序数组的插入位置</td><td><code>from bisect import bisect_left, bisect_right</code></td><td>分别找首个 <code>&gt;= x</code>、首个 <code>&gt; x</code> 的位置；<a href="hot100-python39.html#lc300">LC300 的 tails 写法</a></td></tr>
 <tr><td>维护键的访问顺序</td><td><code>from collections import OrderedDict</code></td><td><code>move_to_end(key)</code> 移到末尾，<code>popitem(last=False)</code> 淘汰最前项；<a href="hot100-python39.html#quick-lc146">LC146 LRU</a></td></tr>
 <tr><td>嵌套结果与 JSON 输入</td><td><code>import json</code></td><td><code>json.loads(line)</code> 解析，<code>json.dumps(result)</code> 序列化；数组、矩阵、分组结果按协议使用</td></tr></tbody></table></div>
+<p><strong>先理解容器保存了什么，再记操作。</strong> <code>collections</code> 是模块，<code>defaultdict</code>、<code>Counter</code>、<code>deque</code> 是从模块中导入的容器类型；<code>heapq</code> 是操作列表的堆算法模块。下面四种工具分别解决默认值、计数、出入顺序和优先级问题。</p>
+<p><a id="library-defaultdict"></a>
+<strong>① defaultdict：普通字典的键值映射，加上“缺键时创建默认值”。</strong> 它沿用字典的哈希查找：用键的哈希值帮助定位，再核对键是否相等；键须可哈希，例如整数、字符串或只含可哈希元素的元组。在通常的哈希条件下，单次查找、写入按期望 O(1) 分析，长键的哈希成本另计。<code>defaultdict(int)</code> 保存工厂函数 <code>int</code>；执行 <code>counts[key]</code> 时，如果键已存在，就返回原值；如果缺键，就调用 <code>int()</code> 得到 0，把 <code>key: 0</code> 写入字典，再返回 0。因此 <code>counts[3] += 1</code> 的过程是“取原值（首次为 0）→ 加 1 → 写回”，第二次执行就从 1 加到 2。</p>
+<p><code>defaultdict(list)</code> 同理，每个新键调用一次 <code>list()</code>，得到各自独立的空列表，再由 <code>groups[key].append(value)</code> 收集元素。传入 <code>int</code>、<code>list</code> 是让容器在需要时调用工厂。默认工厂由缺键的下标读取触发；<code>key in counts</code> 只判断键是否存在，<code>counts.get(key, 0)</code> 只查询并返回备用值，这两种操作都保持原有键集合。LC560 适合前一种直接计数；LC437 查询祖先前缀时用后一种方式，便于让字典只记录当前路径。</p>
+<p><a id="library-counter"></a>
+<strong>② Counter：把每个元素作为键，把出现次数作为值。</strong> 它也是字典的子类。<code>Counter(&quot;aba&quot;)</code> 遍历字符串，依次把 a、b、a 的次数加一，得到 <code>a: 2, b: 1</code>；<code>Counter(nums)</code> 则遍历数组。长度为 n、不同元素数为 u 时，按通常哈希条件，建表时间 O(n)、空间 O(u)。<code>counts[key] += 1</code> 和 <code>counts[key] -= 1</code> 可以继续更新状态，适合频次统计与窗口内的加入、移出。</p>
+<p><code>Counter</code> 对缺键的下标读取返回 0，并保持原有键集合；<code>defaultdict(int)</code> 的同一次读取会创建该键。计数减到 0 时，键仍保留，负数也可以保存；需要移除键时显式 <code>del counts[key]</code>。因此判断某元素还有没有剩余次数应看 <code>counts[key] &gt; 0</code>，<code>key in counts</code> 只说明这个键存在。已有序列要直接统计时选 <code>Counter</code>；扫描过程中按状态累计次数时，本课选 <code>defaultdict(int)</code>。两者都能做动态计数，这个约定是为了读码统一。</p>
+<p><a id="library-deque"></a>
+<strong>③ deque：在左右两端都能高效增删的双端队列。</strong> 把它想成左右都有入口的队列：<code>append(x)</code> 从右端加入，<code>popleft()</code> 从左端取出，组合起来就是先进先出；<code>appendleft(x)</code> 从左端加入，<code>pop()</code> 从右端取出。它支持直接更新两端，无需像列表删除首项那样把后续元素整体前移，因此四种两端操作都是 O(1)；中间下标访问则可能需要 O(n)。</p>
+<p>例如队列 <code>[10, 20]</code> 先 <code>append(30)</code> 变成 <code>[10, 20, 30]</code>，再 <code>popleft()</code> 返回 10，剩下 <code>[20, 30]</code>。BFS 用这个顺序逐层处理节点；单调队列还会在右端反复 <code>pop()</code> 淘汰较差候选，并在左端移出过期下标。单调性由解题代码里的比较和循环维护。弹出前用 <code>if queue</code> 或 <code>while queue</code> 确认有元素，空队列弹出会触发 <code>IndexError</code>。</p>
+<p><a id="library-heapq"></a>
+<strong>④ heapq：用列表表示完全二叉树，维护“父节点不大于孩子”的最小堆。</strong> 列表下标 i 的孩子位于 <code>2*i+1</code>、<code>2*i+2</code>，父节点位于 <code>(i-1)//2</code>（根节点除外）。从根到任意孩子，父值都更小或相等，所以最小值一定在 <code>heap[0]</code>，读取它是 O(1)；其他位置只满足父子约束，整个列表并非排序结果。</p>
+<p><code>heappush</code> 把新元素放到末尾，再沿父节点方向调整；<code>heappop</code> 取出根，用末尾元素补根，再向下调整。完全二叉树的高度是 O(log n)，所以两种操作都是 O(log n)。<code>heapify</code> 从底部已有子树开始建堆，大多数节点靠近叶子、调整距离短，总成本为 O(n)。例如 <code>[3,1,4]</code> 建堆得到 <code>[1,3,4]</code>，加入 2 后可得到 <code>[1,2,4,3]</code>，弹出得到 1，剩余元素继续保持堆性质。Top-K 用堆顶追踪当前候选中最小的一个；Python 3.9 的数值最大堆用负值存储，弹出时再取负还原。空堆读取 <code>heap[0]</code> 或弹出会报错，使用前核对非空条件。</p>
 <p><strong>直接看最小用法。</strong> 下面的数值都是语法演示；解题时用题目的输入替换。<code>import heapq</code> 后写 <code>heapq.heappush(...)</code>；<code>from collections import deque</code> 后直接写 <code>deque(...)</code>。</p>
 <!-- code:program-template:libraries -->
 <pre><code class="language-python"><span class="syntax-keyword">import</span> heapq
 <span class="syntax-keyword">import</span> json
 <span class="syntax-keyword">import</span> sys  <span class="syntax-comment"># ACM 的 main 使用 sys.stdin.readline()；读写模板紧接在后面。</span>
-<span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
 <span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter, defaultdict, deque, OrderedDict
 
 <span class="syntax-comment"># 动态计数：int 是默认工厂，调用 int() 得到初值 0。</span>
@@ -59,11 +70,6 @@ heapq.<span class="syntax-function">heapify</span>(heap)          <span class="s
 heapq.<span class="syntax-function">heappush</span>(heap, <span class="syntax-number">2</span>)      <span class="syntax-comment"># O(log n) 插入。</span>
 smallest = heapq.<span class="syntax-function">heappop</span>(heap)  <span class="syntax-comment"># 得到 1；O(log n) 弹出最小值。</span>
 
-<span class="syntax-comment"># 二分：nums 已经有序；查找返回下标，原数组保持原样。</span>
-nums = [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">4</span>]
-left = <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">2</span>)  <span class="syntax-comment"># 1：第一个 &gt;= 2 的位置。</span>
-right = <span class="syntax-function">bisect_right</span>(nums, <span class="syntax-number">2</span>)  <span class="syntax-comment"># 3：第一个 &gt; 2 的位置。</span>
-
 <span class="syntax-comment"># LRU 的标准库路线：约定左端最久未用，右端最近使用。</span>
 order = <span class="syntax-function">OrderedDict</span>([(<span class="syntax-number">1</span>, <span class="syntax-string">&quot;a&quot;</span>), (<span class="syntax-number">2</span>, <span class="syntax-string">&quot;b&quot;</span>)])
 order.<span class="syntax-function">move_to_end</span>(<span class="syntax-number">1</span>)
@@ -72,10 +78,9 @@ oldest = order.<span class="syntax-function">popitem</span>(last=<span class="sy
 <span class="syntax-comment"># JSON 保留列表嵌套；输出时使用 print(text)。</span>
 text = json.<span class="syntax-function">dumps</span>([[<span class="syntax-number">1</span>, <span class="syntax-number">2</span>], [<span class="syntax-number">3</span>]])
 result = json.<span class="syntax-function">loads</span>(text)    <span class="syntax-comment"># 重新得到 [[1, 2], [3]]。</span></code></pre>
-<p><strong>记住三处边界。</strong> <code>defaultdict(int)</code> 的下标查询会把缺键写为 0；用 <code>.get(key, 0)</code> 可以只查询已有计数，例如树上前缀和需要保持当前路径的状态。<code>defaultdict(list)</code> 传入工厂 <code>list</code>，每个缺键分别创建列表。<code>bisect</code> 的位置查找是 O(log n)，随后若用列表 <code>insert()</code>，搬移元素仍是 O(n)；Python 3.9 的 <code>heapq</code> 用最小堆，数值最大堆可存负数。</p>
 <p><strong>另外两种按题使用的工具：</strong> 记忆化递归可导入 <code>from functools import lru_cache</code>，在递归函数上写 <code>@lru_cache(maxsize=None)</code>；参数须可哈希，缓存占用状态数对应的空间，递归深度仍受调用栈限制。整数平方根可导入 <code>from math import isqrt</code>，<code>isqrt(10)</code> 得到 3，用于<a href="hot100-python39.html#lc279">LC279 完全平方数</a>的候选边界。</p>
 <p>内置的 <code>list</code>、<code>dict</code>、<code>set</code>、<code>sorted</code>、<code>enumerate</code> 可以直接调用。两数之和保存“值→下标”时用普通字典；栈在列表尾部 <code>append/pop</code>；小写字母恰有 26 种时，固定频次数组便于逐项比较。选择工具时让它对应数据的含义，手写单调性、回溯状态和 DP 转移仍是本题的核心。</p>
-<p>语法依据：<a href="https://docs.python.org/3.9/library/collections.html">collections 容器</a> · <a href="https://docs.python.org/3.9/library/heapq.html">heapq 最小堆</a> · <a href="https://docs.python.org/3.9/library/bisect.html">bisect 二分</a> · <a href="https://docs.python.org/3.9/library/functools.html#functools.lru_cache">lru_cache 缓存</a>。</p>
+<p>语法依据：<a href="https://docs.python.org/3.9/library/collections.html">collections 容器</a> · <a href="https://docs.python.org/3.9/library/heapq.html">heapq 最小堆</a> · <a href="https://docs.python.org/3.9/library/functools.html#functools.lru_cache">lru_cache 缓存</a>。</p>
 <p><a id="io-format-index"></a></p>
 <h3 id="hot100-先选一个-main按输入格式直接套用">先选一个 main：按输入格式直接套用</h3>
 <p><strong>按输入格式跳转：</strong> <a href="#io-one-int">① 单整数</a> · <a href="#io-two-ints">② 两整数</a> · <a href="#io-array">③ 一行数组</a> · <a href="#io-sized-array">④ 长度加数组</a> · <a href="#io-target-array">⑤ 目标值加数组</a></p>
@@ -2770,7 +2775,7 @@ getMin</code></pre>
 <h5 id="hot100-题意状态与解题依据-31">题意、状态与解题依据</h5>
 <p><strong>接口：</strong> <code>search_insert(nums, target)</code>。递增列表 nums、target → 第一个不小于 target 的位置，可等于 len(nums)。</p>
 <p><strong>题意与前提：</strong> 在有序数组中返回 target 的位置或保持有序的插入位置；原题元素互异，返回值可以等于 n。</p>
-<p><strong>推荐思路：</strong> 手写左闭右开区间 <code>[left,right)</code> 的下界查找，返回首个 <code>&gt;= target</code> 的位置；每轮利用有序性排除一半候选，时间 O(log(n+1))、辅助空间 O(1)。这一步掌握边界含义后，可写 <code>from bisect import bisect_left</code> 并调用 <code>bisect_left(nums, target)</code>，同样的复杂度适合直接复用标准库。这里计算的是插入位置；若随后调用列表 <code>insert</code>，移动元素另需 O(n) 时间。</p>
+<p><strong>推荐思路：</strong> 手写左闭右开区间 <code>[left,right)</code> 的下界查找，返回首个 <code>&gt;= target</code> 的位置；每轮利用有序性排除一半候选，时间 O(log(n+1))、辅助空间 O(1)。循环结束时 left 与 right 相遇，正好位于小于目标和不小于目标的分界。这里计算的是插入位置；若随后调用列表 <code>insert</code>，移动元素另需 O(n) 时间。</p>
 <p><strong>状态：</strong> 使用 [left,right)：left 左侧都 &lt;target，right 及其右侧都 &gt;=target。</p>
 <p><strong>主解：</strong> 手写左闭右开。时间 O(log(n+1))；空间 O(1)。</p>
 <p><strong>读码：</strong> 这里逐句展开 <a href="hot100-python39.html#tpl-lower_bound">T01</a> 的区间更新。<code>right=n</code> 表示数组末尾之后的分界，mid 始终落在可读元素范围；取得返回位置后，若要判断目标存在，再检查位置 &lt; n 且对应元素等于 target。</p>
@@ -2819,7 +2824,7 @@ getMin</code></pre>
 <tr><td><code>nums=[1]</code>；<code>target=2</code></td><td><code>1</code></td><td>答案是数组外的插入点 n，不能再读 nums[n]。</td></tr></tbody></table></div>
 <p><strong>先查：</strong> right 初值 len(nums)，而不是最后下标；循环结束 left==right。此模板适用于允许重复的扩展。</p>
 <h5 id="hot100-备选与适用条件-29">备选与适用条件</h5>
-<div class="table-scroll" tabindex="0" role="region" aria-label="备选与适用条件"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="hot100-python39.html#alt-35-search_insert_bisect">标准库 bisect_left</a></td><td>O(log(n+1))</td><td>O(1) 辅助</td><td>已掌握下界语义时，导入 bisect_left 直接复用；返回首个 &gt;= target 的位置。后续实际插入列表另需 O(n) 时间。</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="备选与适用条件"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="hot100-python39.html#alt-35-search_insert_bisect">标准库 bisect_left</a></td><td>O(log(n+1))</td><td>O(1) 辅助</td><td>第三轮选读：用标准库复用下界；返回首个 &gt;= target 的位置。后续实际插入列表另需 O(n) 时间。</td></tr></tbody></table></div>
 </details>
 
 <details>
@@ -2841,7 +2846,7 @@ getMin</code></pre>
 <h5 id="hot100-题意状态与解题依据-32">题意、状态与解题依据</h5>
 <p><strong>接口：</strong><code>search_range(nums, target)</code>。非递减列表 nums、target → [最左下标,最右下标]；无解为 [-1,-1]。</p>
 <p><strong>题意与前提：</strong> 非递减数组中返回 target 的首末下标，无解返回 [-1,-1]；允许空数组与重复值。</p>
-<p><strong>推荐思路：</strong> 分别二分得到首个 <code>&gt;= target</code> 与首个 <code>&gt; target</code> 的位置，确认左边界确实命中，再把右侧开边界减一作为末尾下标。重复元素无论有多少，两次查找总时间仍是 O(log(n+1))、辅助空间 O(1)。备选写 <code>from bisect import bisect_left, bisect_right</code> 调用同样两个边界，复杂度相同，适合复用库函数；找到一个元素再向两侧扫描会在大量重复值时花 O(n) 时间。</p>
+<p><strong>推荐思路：</strong> 分别二分得到首个 <code>&gt;= target</code> 与首个 <code>&gt; target</code> 的位置，确认左边界确实命中，再把右侧开边界减一作为末尾下标。重复元素无论有多少，两次查找总时间仍是 O(log(n+1))、辅助空间 O(1)。两次循环分别处理“相等时保留左侧”与“相等时继续向右”；找到一个元素再向两侧扫描会在大量重复值时花 O(n) 时间。</p>
 <p><strong>状态：</strong> 两轮的未判定元素都在 [left,right)，最终分界位置允许等于 right。第一轮得到首个 &gt;=target 的位置；第二轮得到首个 &gt;target 的位置。</p>
 <p><strong>主解：</strong> 两次边界二分。时间 O(log(n+1))；空间 O(1)。</p>
 <p><strong>读码：</strong> 第一轮比较 <code>&lt; target</code> 得到 start；第二轮比较 <code>&lt;= target</code> 得到右侧开边界。两个循环都保持 <code>[left, right)</code>；仅修改比较符，不混用闭区间。</p>
@@ -2898,7 +2903,7 @@ getMin</code></pre>
 <tr><td><code>nums=[1, 3]</code>；<code>target=2</code></td><td><code>[-1, -1]</code></td><td>插入点存在并不代表元素存在。</td></tr></tbody></table></div>
 <p><strong>先查：</strong> 先检查 start==len(nums) 或 nums[start]!=target，再返回区间；首个 &gt;target 的位置减一才是末尾下标。</p>
 <h5 id="hot100-备选与适用条件-30">备选与适用条件</h5>
-<div class="table-scroll" tabindex="0" role="region" aria-label="备选与适用条件"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="hot100-python39.html#alt-34-search_range_bisect">bisect 双边界</a></td><td>O(log(n+1))</td><td>O(1) 辅助</td><td>已掌握两个边界后导入 bisect_left 与 bisect_right；先确认左界命中，再将首个 &gt; target 的位置减一。</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="备选与适用条件"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="hot100-python39.html#alt-34-search_range_bisect">bisect 双边界</a></td><td>O(log(n+1))</td><td>O(1) 辅助</td><td>第三轮选读：对照标准库与两个手写边界；先确认左界命中，再将首个 &gt; target 的位置减一。</td></tr></tbody></table></div>
 </details>
 
 <details>
@@ -6591,7 +6596,7 @@ findMedian</code></pre>
 <tr><td><code>operations=[[&#39;addNum&#39;, 2], [&#39;addNum&#39;, 2], [&#39;addNum&#39;, 2], [&#39;findMedian&#39;]]</code></td><td><code>[2]</code></td><td>大量重复值仍需维持大小平衡。</td></tr></tbody></table></div>
 <p><strong>先查：</strong> 至少加入一个数后再查询中位数。每次插入先保持两堆有序，再调整大小；插入后同时维持顺序与大小两条不变量，查询才能直接读取堆顶。</p>
 <h5 id="hot100-备选与适用条件-60">备选与适用条件</h5>
-<div class="table-scroll" tabindex="0" role="region" aria-label="备选与适用条件"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="hot100-python39.html#alt-295-MedianFinderSorted">基线：有序数组</a></td><td>add O(n)，find O(1)</td><td>O(n)</td><td>bisect 只负责 O(log n) 定位，列表搬移仍 O(n)。</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="备选与适用条件"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="hot100-python39.html#alt-295-MedianFinderSorted">基线：有序数组</a></td><td>add O(n)，find O(1)</td><td>O(n)</td><td>手写二分负责 O(log n) 定位，列表搬移仍 O(n)。</td></tr></tbody></table></div>
 </details>
 
 
@@ -8551,7 +8556,7 @@ ABCCED</code></pre>
 <h4 id="hot100-复杂度与重要备选-4">复杂度与重要备选</h4>
 <p>令 <code>n</code> 为数组长度。推荐程序最多检查 <code>n(n-1)/2</code> 对前后位置，时间 <code>O(n²)</code>；<code>dp</code> 占 <code>O(n)</code> 算法额外空间，输出一个长度为 <code>O(1)</code>。空数组扩展只做常数工作。完整程序读入数组另占 <code>O(n)</code>。</p>
 <p>需要更快时，使用<strong>最小结尾数组加二分</strong>。<code>tails[length-1]</code> 保存已扫描元素中，长度为 <code>length</code> 的递增子序列能达到的最小末尾值。相同长度下，末尾越小，后续越容易接上更大的数。</p>
-<p>读取 <code>value</code> 后，用 <code>from bisect import bisect_left</code> 找到第一个 <code>tails[index] &gt;= value</code> 的位置：若位置在末尾，就追加并使最大长度增加 1；否则用更小或相等的末尾替换该位置。<code>bisect_left</code> 把相等值放在同一位置，保持严格递增的要求。</p>
+<p>读取 <code>value</code> 后，手写 <code>[left, right)</code> 下界循环：初始 <code>left = 0, right = len(tails)</code>；若 <code>tails[mid] &lt; value</code>，令 <code>left = mid + 1</code>，否则令 <code>right = mid</code>。终止时 <code>left</code> 就是第一个 <code>tails[index] &gt;= value</code> 的位置：若位置在末尾，就追加并使最大长度增加 1；否则用更小或相等的末尾替换该位置。下界循环把相等值放在同一位置，保持严格递增的要求。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="复杂度与重要备选"><table><thead><tr><th scope="col">方法</th><th scope="col">时间</th><th scope="col">算法额外空间</th><th scope="col">推荐场景</th></tr></thead><tbody><tr><td>枚举前驱 DP</td><td><code>O(n²)</code></td><td><code>O(n)</code></td><td>先恢复“结尾状态、合法前驱、取最大值”的推导</td></tr>
 <tr><td><code>tails</code> 加二分</td><td><code>O(n log(n+1))</code></td><td><code>O(n)</code></td><td>题目要求更快算法或输入更大时；需掌握最小末尾不变量</td></tr></tbody></table></div>
 <p><code>tails</code> 的长度是答案，它的内容未必是一条真实子序列。例如 <code>[3,5,6,2,4]</code> 最后得到 <code>tails=[2,4,6]</code>，但输入中的 6 出现在 2、4 前面。若要输出一条实际 LIS，应另外记录前驱和对应下标；本题只要求长度。</p>

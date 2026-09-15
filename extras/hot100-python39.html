@@ -22,22 +22,33 @@
 </ol>
 <p><a id="program-libraries"></a></p>
 <h4 id="hot100-常用标准库先选工具再写-import">常用标准库：先选工具，再写 import</h4>
-<p><strong>本课推荐按任务选库：动态计数用 <code>defaultdict(int)</code>，分组用 <code>defaultdict(list)</code>，现成序列的频次用 <code>Counter</code>，队列用 <code>deque</code>，堆用 <code>heapq</code>，有序数组的二分位置用 <code>bisect</code>。</strong> 它们都随 Python 3.9 提供。每道题把实际用到的导入放在代码顶部；下面是一份可按题选择的速查，核心题解和完整程序也各自写出所需导入。</p>
+<p><strong>本课推荐按任务选库：动态计数用 <code>defaultdict(int)</code>，分组用 <code>defaultdict(list)</code>，现成序列的频次用 <code>Counter</code>，队列用 <code>deque</code>，堆用 <code>heapq</code>。</strong> 它们都随 Python 3.9 提供。二分题在三小时与前两轮统一手写区间、比较和边界更新，第三轮再对照标准库。每道题把实际用到的导入放在代码顶部；下面是一份可按题选择的速查，核心题解和完整程序也各自写出所需导入。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="常用标准库：先选工具，再写 import"><table><thead><tr><th scope="col">要处理的事情</th><th scope="col">导入语句</th><th scope="col">关键写法与适用题型</th></tr></thead><tbody><tr><td>标准输入</td><td><code>import sys</code></td><td><code>sys.stdin.readline()</code> 读一行；ACM 的 main 使用它</td></tr>
 <tr><td>扫描时累加次数</td><td><code>from collections import defaultdict</code></td><td><code>counts = defaultdict(int)</code>，<code>counts[key] += 1</code>；<a href="hot100-python39.html#quick-lc560">LC560 前缀和计数</a></td></tr>
 <tr><td>按键收集一组元素</td><td><code>from collections import defaultdict</code></td><td><code>groups = defaultdict(list)</code>，<code>groups[key].append(value)</code>；<a href="hot100-python39.html#lc49">LC49 异位词分组</a></td></tr>
 <tr><td>一次建立频次表</td><td><code>from collections import Counter</code></td><td><code>counts = Counter(nums)</code> 或 <code>Counter(s)</code>；<a href="hot100-python39.html#lc347">LC347 高频元素</a>、<a href="hot100-python39.html#quick-lc76">LC76 覆盖窗口</a></td></tr>
 <tr><td>FIFO 队列、两端删除</td><td><code>from collections import deque</code></td><td><code>append()</code> 入队、<code>popleft()</code> 出队；<a href="hot100-python39.html#quick-lc102">LC102 层序遍历</a>、<a href="hot100-python39.html#quick-lc239">LC239 单调队列</a></td></tr>
 <tr><td>最小堆、Top-K、双堆</td><td><code>import heapq</code></td><td><code>heappush(heap, x)</code>、<code>heappop(heap)</code> 都加 <code>heapq.</code> 前缀，<code>heap[0]</code> 是最小值；<a href="hot100-python39.html#quick-lc215">LC215</a>、<a href="hot100-python39.html#quick-lc295">LC295</a></td></tr>
-<tr><td>有序数组的插入位置</td><td><code>from bisect import bisect_left, bisect_right</code></td><td>分别找首个 <code>&gt;= x</code>、首个 <code>&gt; x</code> 的位置；<a href="hot100-python39.html#lc300">LC300 的 tails 写法</a></td></tr>
 <tr><td>维护键的访问顺序</td><td><code>from collections import OrderedDict</code></td><td><code>move_to_end(key)</code> 移到末尾，<code>popitem(last=False)</code> 淘汰最前项；<a href="hot100-python39.html#quick-lc146">LC146 LRU</a></td></tr>
 <tr><td>嵌套结果与 JSON 输入</td><td><code>import json</code></td><td><code>json.loads(line)</code> 解析，<code>json.dumps(result)</code> 序列化；数组、矩阵、分组结果按协议使用</td></tr></tbody></table></div>
+<p><strong>先理解容器保存了什么，再记操作。</strong> <code>collections</code> 是模块，<code>defaultdict</code>、<code>Counter</code>、<code>deque</code> 是从模块中导入的容器类型；<code>heapq</code> 是操作列表的堆算法模块。下面四种工具分别解决默认值、计数、出入顺序和优先级问题。</p>
+<p><a id="library-defaultdict"></a>
+<strong>① defaultdict：普通字典的键值映射，加上“缺键时创建默认值”。</strong> 它沿用字典的哈希查找：用键的哈希值帮助定位，再核对键是否相等；键须可哈希，例如整数、字符串或只含可哈希元素的元组。在通常的哈希条件下，单次查找、写入按期望 O(1) 分析，长键的哈希成本另计。<code>defaultdict(int)</code> 保存工厂函数 <code>int</code>；执行 <code>counts[key]</code> 时，如果键已存在，就返回原值；如果缺键，就调用 <code>int()</code> 得到 0，把 <code>key: 0</code> 写入字典，再返回 0。因此 <code>counts[3] += 1</code> 的过程是“取原值（首次为 0）→ 加 1 → 写回”，第二次执行就从 1 加到 2。</p>
+<p><code>defaultdict(list)</code> 同理，每个新键调用一次 <code>list()</code>，得到各自独立的空列表，再由 <code>groups[key].append(value)</code> 收集元素。传入 <code>int</code>、<code>list</code> 是让容器在需要时调用工厂。默认工厂由缺键的下标读取触发；<code>key in counts</code> 只判断键是否存在，<code>counts.get(key, 0)</code> 只查询并返回备用值，这两种操作都保持原有键集合。LC560 适合前一种直接计数；LC437 查询祖先前缀时用后一种方式，便于让字典只记录当前路径。</p>
+<p><a id="library-counter"></a>
+<strong>② Counter：把每个元素作为键，把出现次数作为值。</strong> 它也是字典的子类。<code>Counter(&quot;aba&quot;)</code> 遍历字符串，依次把 a、b、a 的次数加一，得到 <code>a: 2, b: 1</code>；<code>Counter(nums)</code> 则遍历数组。长度为 n、不同元素数为 u 时，按通常哈希条件，建表时间 O(n)、空间 O(u)。<code>counts[key] += 1</code> 和 <code>counts[key] -= 1</code> 可以继续更新状态，适合频次统计与窗口内的加入、移出。</p>
+<p><code>Counter</code> 对缺键的下标读取返回 0，并保持原有键集合；<code>defaultdict(int)</code> 的同一次读取会创建该键。计数减到 0 时，键仍保留，负数也可以保存；需要移除键时显式 <code>del counts[key]</code>。因此判断某元素还有没有剩余次数应看 <code>counts[key] &gt; 0</code>，<code>key in counts</code> 只说明这个键存在。已有序列要直接统计时选 <code>Counter</code>；扫描过程中按状态累计次数时，本课选 <code>defaultdict(int)</code>。两者都能做动态计数，这个约定是为了读码统一。</p>
+<p><a id="library-deque"></a>
+<strong>③ deque：在左右两端都能高效增删的双端队列。</strong> 把它想成左右都有入口的队列：<code>append(x)</code> 从右端加入，<code>popleft()</code> 从左端取出，组合起来就是先进先出；<code>appendleft(x)</code> 从左端加入，<code>pop()</code> 从右端取出。它支持直接更新两端，无需像列表删除首项那样把后续元素整体前移，因此四种两端操作都是 O(1)；中间下标访问则可能需要 O(n)。</p>
+<p>例如队列 <code>[10, 20]</code> 先 <code>append(30)</code> 变成 <code>[10, 20, 30]</code>，再 <code>popleft()</code> 返回 10，剩下 <code>[20, 30]</code>。BFS 用这个顺序逐层处理节点；单调队列还会在右端反复 <code>pop()</code> 淘汰较差候选，并在左端移出过期下标。单调性由解题代码里的比较和循环维护。弹出前用 <code>if queue</code> 或 <code>while queue</code> 确认有元素，空队列弹出会触发 <code>IndexError</code>。</p>
+<p><a id="library-heapq"></a>
+<strong>④ heapq：用列表表示完全二叉树，维护“父节点不大于孩子”的最小堆。</strong> 列表下标 i 的孩子位于 <code>2*i+1</code>、<code>2*i+2</code>，父节点位于 <code>(i-1)//2</code>（根节点除外）。从根到任意孩子，父值都更小或相等，所以最小值一定在 <code>heap[0]</code>，读取它是 O(1)；其他位置只满足父子约束，整个列表并非排序结果。</p>
+<p><code>heappush</code> 把新元素放到末尾，再沿父节点方向调整；<code>heappop</code> 取出根，用末尾元素补根，再向下调整。完全二叉树的高度是 O(log n)，所以两种操作都是 O(log n)。<code>heapify</code> 从底部已有子树开始建堆，大多数节点靠近叶子、调整距离短，总成本为 O(n)。例如 <code>[3,1,4]</code> 建堆得到 <code>[1,3,4]</code>，加入 2 后可得到 <code>[1,2,4,3]</code>，弹出得到 1，剩余元素继续保持堆性质。Top-K 用堆顶追踪当前候选中最小的一个；Python 3.9 的数值最大堆用负值存储，弹出时再取负还原。空堆读取 <code>heap[0]</code> 或弹出会报错，使用前核对非空条件。</p>
 <p><strong>直接看最小用法。</strong> 下面的数值都是语法演示；解题时用题目的输入替换。<code>import heapq</code> 后写 <code>heapq.heappush(...)</code>；<code>from collections import deque</code> 后直接写 <code>deque(...)</code>。</p>
 <!-- code:program-template:libraries -->
 <pre><code class="language-python"><span class="syntax-keyword">import</span> heapq
 <span class="syntax-keyword">import</span> json
 <span class="syntax-keyword">import</span> sys  <span class="syntax-comment"># ACM 的 main 使用 sys.stdin.readline()；读写模板紧接在后面。</span>
-<span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
 <span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter, defaultdict, deque, OrderedDict
 
 <span class="syntax-comment"># 动态计数：int 是默认工厂，调用 int() 得到初值 0。</span>
@@ -65,11 +76,6 @@ heapq.<span class="syntax-function">heapify</span>(heap)          <span class="s
 heapq.<span class="syntax-function">heappush</span>(heap, <span class="syntax-number">2</span>)      <span class="syntax-comment"># O(log n) 插入。</span>
 smallest = heapq.<span class="syntax-function">heappop</span>(heap)  <span class="syntax-comment"># 得到 1；O(log n) 弹出最小值。</span>
 
-<span class="syntax-comment"># 二分：nums 已经有序；查找返回下标，原数组保持原样。</span>
-nums = [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">4</span>]
-left = <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">2</span>)  <span class="syntax-comment"># 1：第一个 &gt;= 2 的位置。</span>
-right = <span class="syntax-function">bisect_right</span>(nums, <span class="syntax-number">2</span>)  <span class="syntax-comment"># 3：第一个 &gt; 2 的位置。</span>
-
 <span class="syntax-comment"># LRU 的标准库路线：约定左端最久未用，右端最近使用。</span>
 order = <span class="syntax-function">OrderedDict</span>([(<span class="syntax-number">1</span>, <span class="syntax-string">&quot;a&quot;</span>), (<span class="syntax-number">2</span>, <span class="syntax-string">&quot;b&quot;</span>)])
 order.<span class="syntax-function">move_to_end</span>(<span class="syntax-number">1</span>)
@@ -78,10 +84,9 @@ oldest = order.<span class="syntax-function">popitem</span>(last=<span class="sy
 <span class="syntax-comment"># JSON 保留列表嵌套；输出时使用 print(text)。</span>
 text = json.<span class="syntax-function">dumps</span>([[<span class="syntax-number">1</span>, <span class="syntax-number">2</span>], [<span class="syntax-number">3</span>]])
 result = json.<span class="syntax-function">loads</span>(text)    <span class="syntax-comment"># 重新得到 [[1, 2], [3]]。</span></code></pre>
-<p><strong>记住三处边界。</strong> <code>defaultdict(int)</code> 的下标查询会把缺键写为 0；用 <code>.get(key, 0)</code> 可以只查询已有计数，例如树上前缀和需要保持当前路径的状态。<code>defaultdict(list)</code> 传入工厂 <code>list</code>，每个缺键分别创建列表。<code>bisect</code> 的位置查找是 O(log n)，随后若用列表 <code>insert()</code>，搬移元素仍是 O(n)；Python 3.9 的 <code>heapq</code> 用最小堆，数值最大堆可存负数。</p>
 <p><strong>另外两种按题使用的工具：</strong> 记忆化递归可导入 <code>from functools import lru_cache</code>，在递归函数上写 <code>@lru_cache(maxsize=None)</code>；参数须可哈希，缓存占用状态数对应的空间，递归深度仍受调用栈限制。整数平方根可导入 <code>from math import isqrt</code>，<code>isqrt(10)</code> 得到 3，用于<a href="hot100-python39.html#lc279">LC279 完全平方数</a>的候选边界。</p>
 <p>内置的 <code>list</code>、<code>dict</code>、<code>set</code>、<code>sorted</code>、<code>enumerate</code> 可以直接调用。两数之和保存“值→下标”时用普通字典；栈在列表尾部 <code>append/pop</code>；小写字母恰有 26 种时，固定频次数组便于逐项比较。选择工具时让它对应数据的含义，手写单调性、回溯状态和 DP 转移仍是本题的核心。</p>
-<p>语法依据：<a href="https://docs.python.org/3.9/library/collections.html">collections 容器</a> · <a href="https://docs.python.org/3.9/library/heapq.html">heapq 最小堆</a> · <a href="https://docs.python.org/3.9/library/bisect.html">bisect 二分</a> · <a href="https://docs.python.org/3.9/library/functools.html#functools.lru_cache">lru_cache 缓存</a>。</p>
+<p>语法依据：<a href="https://docs.python.org/3.9/library/collections.html">collections 容器</a> · <a href="https://docs.python.org/3.9/library/heapq.html">heapq 最小堆</a> · <a href="https://docs.python.org/3.9/library/functools.html#functools.lru_cache">lru_cache 缓存</a>。</p>
 <p><a id="io-format-index"></a></p>
 <h4 id="hot100-先选一个-main按输入格式直接套用">先选一个 main：按输入格式直接套用</h4>
 <p><strong>按输入格式跳转：</strong> <a href="#io-one-int">① 单整数</a> · <a href="#io-two-ints">② 两整数</a> · <a href="#io-array">③ 一行数组</a> · <a href="#io-sized-array">④ 长度加数组</a> · <a href="#io-target-array">⑤ 目标值加数组</a></p>
@@ -747,7 +752,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-stacks"></a></p>
 <h3 id="hot100-4466-分钟栈单调结构与二分查找">44–66 分钟｜栈、单调结构与二分查找</h3>
 <p><strong>视频入口｜本组题型：</strong> <a href="https://www.bilibili.com/video/BV1VN411J7S7/">第 26 集：单调栈（12:28）</a> · <a href="https://www.bilibili.com/video/BV1bM411X72E/">第 27 集：单调队列（7:11）</a> · <a href="https://www.bilibili.com/video/BV1AP41137w7/">第 04 集：二分边界（12:36）</a> · <a href="#third-video-05">第 05 集：旋转数组二分（6:17，第三轮视频入口，含拓展例题）</a>。普通括号栈、MinStack 和字符串解码在原合集中没有专讲，可用对应题解补充；单调栈视频侧重候选的大小顺序。</p>
-<p>本段推荐先区分状态：普通栈记录待匹配对象，最小栈记录每一层的最小值，嵌套解码记录外层环境，单调栈记录仍在等待答案的下标。它们都用 Python 内置列表的 <code>append()</code> 入栈、<code>pop()</code> 弹出末项、<code>stack[-1]</code> 读栈顶。双端队列另写 <code>from collections import deque</code>，用 <code>popleft()</code> 从左端删除；二分查找先理解手写区间，再按场景选 <code>bisect</code> 标准库。</p>
+<p>本段推荐先区分状态：普通栈记录待匹配对象，最小栈记录每一层的最小值，嵌套解码记录外层环境，单调栈记录仍在等待答案的下标。它们都用 Python 内置列表的 <code>append()</code> 入栈、<code>pop()</code> 弹出末项、<code>stack[-1]</code> 读栈顶。双端队列另写 <code>from collections import deque</code>，用 <code>popleft()</code> 从左端删除；二分查找统一手写区间、比较条件与边界更新。</p>
 <p><a id="quick-lc20"></a></p>
 <p><strong>普通栈（Stack）· <a href="#lc20">LC20 有效括号</a>：</strong> 推荐用列表保存尚未匹配的左括号；新右括号负责关闭最近打开的一层，所以先检查栈是否为空，再弹出栈顶并比较对应类型。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/valid-parentheses/">LC20 有效的括号 · 题目</a> · <a href="https://leetcode.cn/problems/valid-parentheses/solutions/">题解</a></p>
@@ -877,7 +882,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
     end = <span class="syntax-function">lower_bound</span>(nums, target + <span class="syntax-number">1</span>) - <span class="syntax-number">1</span>
     <span class="syntax-keyword">return</span> [start, end]</code></pre>
 <p><code>lower_bound([1,2,2,4], 5) → 4</code>，这是插入位置，不能再访问 <code>nums[4]</code>；<code>search_range([1,2,2,4], 2) → [1,2]</code>。这里用 <code>target + 1</code> 查上界依赖<strong>整数</strong>前提，浮点数或字符串不能照搬。时间 O(log(n+1))、辅助空间 O(1)。</p>
-<p><strong>标准库备选：</strong> 写 <code>from bisect import bisect_left, bisect_right</code>，<code>bisect_left(nums, target)</code> 得到首个 <code>&gt;= target</code> 的位置，<code>bisect_right(nums, target)</code> 得到首个 <code>&gt; target</code> 的位置；确认左边界确实命中后，用右边界减一得到末尾下标。每次查找 O(log(n+1)) 时间、O(1) 辅助空间，适合已理解边界、只需调用现成功能的程序，也适合浮点数或字符串这类可排序对象。手写版本适合解释区间更新及迁移判定条件；真正执行 <code>list.insert</code> 仍需 O(n) 移动成本。</p>
+<p><strong>练习顺序：</strong> 先手写上下界，逐轮说明被排除的区间；标准库对照放在<a href="#third-bisect">第三轮</a>。</p>
 <p><strong>跟踪查找 2 的下界：</strong> <code>[1,2,2,4]</code> 初始范围 <code>[0,4)</code>，mid=2 的值为 2，令 right=2；mid=1 的值仍为 2，令 right=1；mid=0 的值为 1，令 left=1，返回 1。始终保持 left 左侧都小于目标、right 及其右侧都不小于目标；区间缩为空时这个分界就是最早合法位置。查找范围的右端则把目标换为 3，得到下界 3，再减一得到最后一个 2 的下标 2。</p>
 <p><a id="quick-lc33"></a></p>
 <p><strong>旋转数组 · <a href="#lc33">LC33</a>：</strong> 原数组严格递增且没有重复，旋转后每次至少有一半仍然有序。</p>
@@ -1713,7 +1718,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h3 id="hot100-126150-分钟动态规划背包与状态变式">126–150 分钟｜动态规划、背包与状态变式</h3>
 <p><strong>视频入口｜本组题型：</strong> <a href="https://www.bilibili.com/video/BV1Xj411K7oF/">第 17 集：打家劫舍与 DP 入门（8:09）</a> · <a href="https://www.bilibili.com/video/BV1ub411Q7sB/">第 20 集：最长递增子序列（12:09）</a> · <a href="https://www.bilibili.com/video/BV1TM4y1o7ug/">第 19 集：最长公共子序列与编辑距离（10:50）</a> · <a href="#third-video-18">第 18 集：0-1 背包与完全背包（15:57，第三轮视频入口，含拓展例题）</a>。第 18 集直接讲零钱兑换，其 0-1 背包方法可迁移到分割等和子集。网格 DP、单词拆分、子数组状态在原合集中没有专讲，先借第 17 集复习状态与转移，再看各题题解。</p>
 <p>分配：<strong>5 分钟一维，7 分钟二维，9 分钟背包与变式，3 分钟边界对照。</strong> 推荐按“状态含义 → 初值 → 转移 → 遍历方向 → 返回值”学习动态规划（Dynamic Programming，DP）。一维问题先明确当前变量对应哪个前缀；二维问题先用二维表，让每个状态直接对应一对下标。使用滚动变量时，当前状态写成 <code>current</code>，上一轮状态写成 <code>previous</code> 或带含义的 <code>previous_*</code>；使用状态表时，用 <code>dp[...]</code> 表示对应子问题。最终结果写成 <code>result</code>；有多种滚动状态时，用 <code>current_max</code> / <code>current_min</code> 等后缀区分。理解依赖关系后，再按是否需要保留中间结果、内存是否充足选择滚动状态。</p>
-<p><strong>本段使用的 Python 工具：</strong> 状态表用内置 <code>list</code>，最优值用 <code>min()</code> / <code>max()</code>，可达性用布尔值和 <code>or</code>，单词字典用内置 <code>set</code>。下面的核心函数可直接定义和调用；单独提交时，把上一节的读入结果传给函数，再按协议用 <code>print()</code> 输出。二分版 LIS 若采用标准库，导入 <code>from bisect import bisect_left</code>；它的用途在下方对照中说明。</p>
+<p><strong>本段使用的 Python 工具：</strong> 状态表用内置 <code>list</code>，最优值用 <code>min()</code> / <code>max()</code>，可达性用布尔值和 <code>or</code>，单词字典用内置 <code>set</code>。下面的核心函数可直接定义和调用；单独提交时，把上一节的读入结果传给函数，再按协议用 <code>print()</code> 输出。二分版 LIS 同样手写下界循环，依据严格递增要求决定相等时的更新方向。</p>
 <p><a id="quick-lc198"></a></p>
 <p><a id="quick-lc53"></a></p>
 <p><a id="quick-lc300"></a></p>
@@ -1730,7 +1735,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>推荐与备选怎么选：</strong> 下表的空间指辅助空间；三题均只返回一个数。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="126–150 分钟｜动态规划、背包与状态变式"><table><thead><tr><th scope="col">题目</th><th scope="col">当前推荐及理由</th><th scope="col">备选、复杂度与适用情况</th></tr></thead><tbody><tr><td>LC198</td><td>完整前缀表，O(n) 时间、O(n) 空间；便于观察每间房的“选／跳过”。</td><td>只求总金额时，用前两项滚动状态，O(n) 时间、O(1) 空间；要追溯实际选了哪些房屋时，保留表并从末尾比较转移来源。</td></tr>
 <tr><td>LC53</td><td><code>current</code> 与 <code>result</code> 两状态，O(n) 时间、O(1) 空间；一次扫描直接得到最大和。</td><td>前缀和减去此前最小前缀同为 O(n) 时间、O(1) 空间，适合联系区间和模型；先计算当前答案，再登记当前前缀，保证区间非空。</td></tr>
-<tr><td>LC300</td><td>逐位置 DP，O(n²) 时间、O(n) 空间；状态能直接连到某个更早、更小的元素。</td><td><a href="#alts-lc300">二分版</a>维护“每种长度的最小末尾值” <code>tails</code>，导入 <code>from bisect import bisect_left</code>，找第一个 ≥ 当前值的位置并替换，O(n log n) 时间、O(n) 空间。它适合大 n 且只求长度；<code>tails</code> 本身未必是一条真实子序列，若要还原方案，应额外记录前驱。</td></tr></tbody></table></div>
+<tr><td>LC300</td><td>逐位置 DP，O(n²) 时间、O(n) 空间；状态能直接连到某个更早、更小的元素。</td><td><a href="#alts-lc300">二分版</a>维护“每种长度的最小末尾值” <code>tails</code>，手写下界循环，找第一个 ≥ 当前值的位置并替换，O(n log n) 时间、O(n) 空间。它适合大 n 且只求长度；<code>tails</code> 本身未必是一条真实子序列，若要还原方案，应额外记录前驱。</td></tr></tbody></table></div>
 <p>LIS 的逐位置版本会比较 n(n−1)/2 对位置；n=100,000 时接近 50 亿次。这个规模应优先降低算法的比较次数，使用二分版本；输入输出方案再按数据格式与读取量选择。</p>
 <p><strong>三题各自怎样确定转移：</strong></p>
 <ul>
@@ -2566,7 +2571,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="manual-first"></a></p>
 <h3 id="hot100-主解与标准库怎样配合">主解与标准库怎样配合</h3>
 <p><strong>代表题先展开核心算法，再比较适用的库函数写法。</strong> 正文先解释“状态是什么、为何这样更新、何时结束、返回什么”，再给完整代码与推演；库函数版本用来减少后续重复实现。阅读时对照这两层，既理解原理，也掌握实际程序里的简洁写法。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="主解与标准库怎样配合"><table><thead><tr><th scope="col">正在学什么</th><th scope="col">模板必须展开什么</th><th scope="col">学会后可以怎样省事</th></tr></thead><tbody><tr><td>二分边界</td><td>左右端含义、比较条件、收缩规则、终止与返回位置</td><td>用 <code>bisect_left/right</code> 替换已经理解的边界函数</td></tr>
+<div class="table-scroll" tabindex="0" role="region" aria-label="主解与标准库怎样配合"><table><thead><tr><th scope="col">正在学什么</th><th scope="col">模板必须展开什么</th><th scope="col">学会后可以怎样省事</th></tr></thead><tbody><tr><td>二分边界</td><td>左右端含义、比较条件、收缩规则、终止与返回位置</td><td>第三轮对照标准库；前两轮手写边界函数</td></tr>
 <tr><td>堆与 Top-K</td><td>数组与树的对应、上浮、下沉、建堆、保留候选规则</td><td>用 <code>heapq</code> 替换堆操作，仍自己决定何时加入／淘汰</td></tr>
 <tr><td>排序／归并分治</td><td>分割区间、递归终点、比较合并与剩余段</td><td>在排序只是准备步骤的题里用 <code>sort/sorted</code></td></tr>
 <tr><td>频次统计与滑窗</td><td>普通字典如何更新计数，窗口何时合法</td><td>明白缺键与零计数后用 <code>Counter/defaultdict</code></td></tr>
@@ -2627,7 +2632,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>本文的“兼容 3.9”不是只把代码交给旧语法解析器检查。</strong> 库函数是否存在、参数是否受支持也必须核对。下面是照着其他资料改题时容易带进来的版本差异；中间一栏是本文采用的写法，最右栏列出不可直接照搬的新版接口。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Python 3.9 使用规则"><table><thead><tr><th scope="col">需求</th><th scope="col">本文采用的 Python 3.9 写法</th><th scope="col">不要从新版示例直接照搬</th></tr></thead><tbody><tr><td>多分支判断</td><td>普通 <code>if / elif / else</code></td><td>结构化模式匹配 <code>match / case</code></td></tr>
 <tr><td>可空类型标注</td><td><code>Optional[T]</code>；不需要标注时直接省略</td><td>用竖线连接类型的并集简写；<code>typing.Self</code> 等后续新增类型</td></tr>
-<tr><td>二分时比较对象的一项</td><td>先提取比较键，或手写二分；<code>bisect_left(nums, target)</code></td><td><code>bisect</code> 函数的 <code>key=</code> 参数</td></tr>
+<tr><td>二分时比较对象的一项</td><td>先提取比较键，再手写二分</td><td><code>bisect</code> 函数的 <code>key=</code> 参数</td></tr>
 <tr><td>统计二进制中的 1</td><td>明确非负输入后用位移循环；只需结果也可用 <code>bin(value).count(&#39;1&#39;)</code></td><td><code>int.bit_count()</code></td></tr>
 <tr><td>同步遍历两个序列</td><td>题面保证等长时用普通 <code>zip(a, b)</code>；长度不同时会在较短序列结束</td><td><code>zip(..., strict=True)</code></td></tr>
 <tr><td>扫描相邻项／分组</td><td>下标循环；分组时先定义是否允许末组不足</td><td><code>itertools.pairwise</code>、<code>itertools.batched</code></td></tr>
@@ -2645,7 +2650,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <tr><td>队列</td><td><code>from collections import deque</code></td><td>直接写 <code>deque()</code>；栈与队列章再讲操作</td></tr>
 <tr><td>频次／默认值</td><td><code>from collections import Counter, defaultdict</code></td><td><code>Counter(nums)</code>、<code>defaultdict(list)</code>；先会普通 dict</td></tr>
 <tr><td>堆</td><td><code>import heapq</code></td><td><code>heapq.heappush(heap, x)</code>；堆章之前不必使用</td></tr>
-<tr><td>有序边界</td><td><code>from bisect import bisect_left, bisect_right</code></td><td><code>bisect_left(nums, target)</code>；先读展开的二分循环，再对照库函数</td></tr>
+<tr><td>有序边界</td><td>内置列表与手写循环</td><td>先定义 <code>[left, right)</code>，再写比较与更新；<a href="#third-bisect">第三轮对照库函数</a></td></tr>
 <tr><td>精确整数平方根</td><td><code>from math import isqrt</code></td><td><code>isqrt(n)</code>；完全平方数题，避免浮点误差</td></tr>
 <tr><td>结构化输出</td><td><code>import json</code></td><td><code>json.dumps(result)</code>；嵌套列表、设计题协议</td></tr>
 <tr><td>类型提示，非必需</td><td><code>from typing import Optional</code></td><td><code>Optional[T]</code> 表示 T 或 None；不负责运行时转换</td></tr></tbody></table></div>
@@ -2882,15 +2887,14 @@ matrix = []
 <h3 id="hot100-15-常用库与真实成本">1.5 常用库与真实成本</h3>
 <pre><code class="language-python"><span class="syntax-comment"># deque 提供队首弹出，Counter 计频次，defaultdict 为新键创建默认值。</span>
 <span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque, Counter, defaultdict
-<span class="syntax-comment"># bisect 查有序列表边界；heapq 管理最小堆，math 提供数学函数，sys 处理标准输入输出。</span>
-<span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
+<span class="syntax-comment"># heapq 管理最小堆，math 提供数学函数，sys 处理标准输入输出。</span>
 <span class="syntax-keyword">import</span> heapq
 <span class="syntax-keyword">import</span> math
 <span class="syntax-keyword">import</span> sys</code></pre>
 <div class="table-scroll" tabindex="0" role="region" aria-label="1.5 常用库与真实成本"><table><thead><tr><th scope="col">需求</th><th scope="col">常用操作</th><th scope="col">必须记住的限制</th></tr></thead><tbody><tr><td>栈</td><td><code>list.append / pop</code></td><td>列表尾操作摊还 O(1)；<code>pop(0)</code> 是 O(n)</td></tr>
 <tr><td>队列</td><td><code>deque.append / popleft</code></td><td>两端 O(1)，中部随机访问不是数组级别</td></tr>
 <tr><td>频次、去重</td><td><code>dict / set / Counter</code></td><td>通常按期望 O(1)；长字符串的计算哈希成本另计</td></tr>
-<tr><td>下界／上界</td><td><code>bisect_left / bisect_right</code></td><td>二分定位 O(log n)，插入列表的移动仍 O(n)</td></tr>
+<tr><td>下界／上界</td><td>手写 <code>lower_bound / upper_bound</code></td><td>二分定位 O(log n)，插入列表的移动仍 O(n)</td></tr>
 <tr><td>堆</td><td><code>heappush / heappop / heapify</code></td><td>前两者 O(log n)，建堆 O(n)；最大堆统一存负值</td></tr>
 <tr><td>排序</td><td><code>sorted(nums) / nums.sort()</code></td><td>前者返回新列表；后者原地排序、返回 <code>None</code>；排序工作空间不能算成 O(1)</td></tr>
 <tr><td>复制</td><td><code>nums[:] / path.copy()</code></td><td>与复制长度有关；二维结构只复制外层不能隔离内层修改</td></tr></tbody></table></div>
@@ -4846,7 +4850,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>分段：</strong> 拆成下界、上界、目标区间三步；先看手写循环和推演。普通边界熟练后，再读旋转数组与双数组分割；值域计数的二分在 LC287 备选中展开。</p>
 <p><strong>阅读要点：</strong> <code>[1,2,2,2,4]</code> 查 2：下界为 1、上界为 4，等值区间是 <code>[1,3]</code>；<code>[2]</code> 查 3 返回插入位置 1，该位置等于数组长度，后续按下标访问时须先检查范围。</p>
 <p><strong>阅读衔接：</strong> 读完上下界循环与 LC34 的区间组合后进入链表；双数组中位数 LC4 在第二轮后段展开。</p>
-<p> <strong>完整教学程序：</strong> <a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> <a href="#starter-binary">读入—算法—输出</a>。本章先手写两个边界，再看 <code>bisect</code>；不靠库名记算法。</p>
+<p> <strong>完整教学程序：</strong> <a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> <a href="#starter-binary">读入—算法—输出</a>。本章手写两个边界，说明区间不变量；第三轮再对照标准库。</p>
 <p><strong>输入输出。</strong> 输入为非递减数组 <code>nums</code> 和目标 <code>target</code>；函数不改数组。返回的是一个<strong>位置</strong>，不是元素值，也不一定表示找到了相等元素。长度为 n 的数组有 n 个元素下标 <code>0..n-1</code>，但有 n+1 个插入位置 <code>0..n</code>。</p>
 <h4 id="hot100-先把下界上界说准确">先把“下界、上界”说准确</h4>
 <p>这里的下界、上界是相对 <code>target</code> 的搜索结果，不是变量 <code>left/right</code> 的别名。</p>
@@ -4934,31 +4938,13 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <tr><td><code>[2,2,2], 2</code></td><td>0</td><td>3</td><td>相等不能提前返回中间位置</td></tr>
 <tr><td><code>[1,3], 2</code></td><td>1</td><td>1</td><td>插入位置不等于匹配成功</td></tr></tbody></table></div>
 <p>闭区间“找任意匹配”的写法会使用 <code>right=n-1</code>、<code>while left&lt;=right</code>、相等时返回、失败分支排除 mid。那是另一份契约，不能把其中的 mid-1 混进这里。<strong>区间开闭本身不能单独决定循环条件</strong>；还要看维护的是元素还是答案候选。</p>
-<p><a id="binary-library-bridge"></a></p>
-<h4 id="hot100-学会手写后再用-python-39-的-bisect">学会手写后，再用 Python 3.9 的 bisect</h4>
-<p><code>bisect_left</code> 对应上面的下界，<code>bisect_right</code> 对应上界；都返回插入位置，不修改数组。这里才把已解释的循环换成库函数。<a href="https://docs.python.org/3.9/library/bisect.html" title="插入位置与有序查找">Python 3.9 接口</a></p>
-<p><strong>练习对应：</strong> <a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> 搜索插入位置；<a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> 在排序数组中查找元素的第一个和最后一个位置。 库函数与手写边界的对照示例，不是两题的完整提交代码。</p>
-<!-- code:semantic:bisect_bridge -->
-<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
-
-nums = [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">4</span>]
-target = <span class="syntax-number">2</span>
-start = <span class="syntax-function">bisect_left</span>(nums, target)  <span class="syntax-comment"># 等价于手写 lower_bound。</span>
-end = <span class="syntax-function">bisect_right</span>(nums, target)  <span class="syntax-comment"># 等价于手写 upper_bound。</span>
-
-exists = start &lt; <span class="syntax-function">len</span>(nums) <span class="syntax-keyword">and</span> nums[start] == target
-<span class="syntax-keyword">assert</span> exists
-<span class="syntax-keyword">assert</span> [start, end - <span class="syntax-number">1</span>] == [<span class="syntax-number">1</span>, <span class="syntax-number">3</span>]
-<span class="syntax-keyword">assert</span> end - start == <span class="syntax-number">3</span>
-<span class="syntax-keyword">assert</span> <span class="syntax-function">bisect_left</span>([], target) == <span class="syntax-number">0</span></code></pre>
-<p>若限制搜索范围，3.9 支持 <code>lo/hi</code>，搜索元素区间仍为 <code>[lo,hi)</code>，返回原数组中的位置，不是相对 lo 的偏移；没有 <code>key=</code> 参数。定位 O(log n) 不等于插入 O(log n)：<code>list.insert</code> 仍可能移动 O(n) 个元素。<a href="https://docs.python.org/3.9/library/bisect.html" title="插入位置与有序查找">接口与插入成本</a></p>
-<p><a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> <a href="#alt-35-search_insert_bisect">库版本</a>、<a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> <a href="#alt-34-search_range_bisect">库版本</a> 作为后续对照。不要通过反复插入维护有序表，却把整体成本误写成 O(n log n)。</p>
+<p>标准库对照安排在<a href="#third-bisect">第三轮：手写二分与库函数</a>。</p>
 <p><a id="lc35"></a></p>
 <h3 id="hot100-lc35-搜索插入位置"><a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> 搜索插入位置</h3>
 <p><strong>学习定位：第一轮必刷 · R1-13 / 38。</strong> 按<a href="#plan-09">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>search_insert(nums, target)</code>。递增列表 nums、target → 第一个不小于 target 的位置，可等于 len(nums)。</p>
 <p><strong>题意与前提：</strong> 在有序数组中返回 target 的位置或保持有序的插入位置；原题元素互异，返回值可以等于 n。</p>
-<p><strong>第一轮推荐：</strong> 手写左闭右开区间 <code>[left,right)</code> 的下界查找，返回首个 <code>&gt;= target</code> 的位置；每轮利用有序性排除一半候选，时间 O(log(n+1))、辅助空间 O(1)。这一步掌握边界含义后，可写 <code>from bisect import bisect_left</code> 并调用 <code>bisect_left(nums, target)</code>，同样的复杂度适合直接复用标准库。这里计算的是插入位置；若随后调用列表 <code>insert</code>，移动元素另需 O(n) 时间。</p>
+<p><strong>第一轮推荐：</strong> 手写左闭右开区间 <code>[left,right)</code> 的下界查找，返回首个 <code>&gt;= target</code> 的位置；每轮利用有序性排除一半候选，时间 O(log(n+1))、辅助空间 O(1)。循环结束时 left 与 right 相遇，正好位于小于目标和不小于目标的分界。这里计算的是插入位置；若随后调用列表 <code>insert</code>，移动元素另需 O(n) 时间。</p>
 <p><strong>状态：</strong> 使用 [left,right)：left 左侧都 &lt;target，right 及其右侧都 &gt;=target。</p>
 <p><strong>主解：</strong> 手写左闭右开。时间 O(log(n+1))；空间 O(1)。</p>
 <p><strong>读码：</strong> 这里逐句展开 <a href="#tpl-lower_bound">T01</a> 的区间更新。<code>right=n</code> 表示数组末尾之后的分界，mid 始终落在可读元素范围；取得返回位置后，若要判断目标存在，再检查位置 &lt; n 且对应元素等于 target。</p>
@@ -4996,7 +4982,7 @@ exists = start &lt; <span class="syntax-function">len</span>(nums) <span class="
 <details>
 <summary>备选对照：主解理解后再比较；性能或深度限制按本题说明处理</summary>
 
-<div class="table-scroll" tabindex="0" role="region" aria-label="具体推演：插入点可以落在数组中间，也可以等于 n"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="#alt-35-search_insert_bisect">标准库 bisect_left</a></td><td>O(log(n+1))</td><td>O(1) 辅助</td><td>已掌握下界语义时，导入 bisect_left 直接复用；返回首个 &gt;= target 的位置。后续实际插入列表另需 O(n) 时间。</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="具体推演：插入点可以落在数组中间，也可以等于 n"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="#alt-35-search_insert_bisect">标准库 bisect_left</a></td><td>O(log(n+1))</td><td>O(1) 辅助</td><td>第三轮选读：用标准库复用下界；返回首个 &gt;= target 的位置。后续实际插入列表另需 O(n) 时间。</td></tr></tbody></table></div>
 </details>
 
 <p><a href="#acm-lc35">本题 ACM 协议、入口与样例</a> · <a href="#stage-09">09 本章模板</a> · <a href="#hot100-index">全题导航</a></p>
@@ -5053,7 +5039,7 @@ exists = start &lt; <span class="syntax-function">len</span>(nums) <span class="
 <p><strong>学习定位：第一轮必刷 · R1-14 / 38。</strong> 按<a href="#plan-09">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>search_range(nums, target)</code>。非递减列表 nums、target → [最左下标,最右下标]；无解为 [-1,-1]。</p>
 <p><strong>题意与前提：</strong> 非递减数组中返回 target 的首末下标，无解返回 [-1,-1]；允许空数组与重复值。</p>
-<p><strong>第一轮推荐：</strong> 分别二分得到首个 <code>&gt;= target</code> 与首个 <code>&gt; target</code> 的位置，确认左边界确实命中，再把右侧开边界减一作为末尾下标。重复元素无论有多少，两次查找总时间仍是 O(log(n+1))、辅助空间 O(1)。备选写 <code>from bisect import bisect_left, bisect_right</code> 调用同样两个边界，复杂度相同，适合复用库函数；找到一个元素再向两侧扫描会在大量重复值时花 O(n) 时间。</p>
+<p><strong>第一轮推荐：</strong> 分别二分得到首个 <code>&gt;= target</code> 与首个 <code>&gt; target</code> 的位置，确认左边界确实命中，再把右侧开边界减一作为末尾下标。重复元素无论有多少，两次查找总时间仍是 O(log(n+1))、辅助空间 O(1)。两次循环分别处理“相等时保留左侧”与“相等时继续向右”；找到一个元素再向两侧扫描会在大量重复值时花 O(n) 时间。</p>
 <p><strong>状态：</strong> 两轮的未判定元素都在 [left,right)，最终分界位置允许等于 right。第一轮得到首个 &gt;=target 的位置；第二轮得到首个 &gt;target 的位置。</p>
 <p><strong>主解：</strong> 两次边界二分。时间 O(log(n+1))；空间 O(1)。</p>
 <p><strong>读码：</strong> 第一轮比较 <code>&lt; target</code> 得到 start；第二轮比较 <code>&lt;= target</code> 得到右侧开边界。两个循环都保持 <code>[left, right)</code>；仅修改比较符，不混用闭区间。</p>
@@ -5090,7 +5076,7 @@ exists = start &lt; <span class="syntax-function">len</span>(nums) <span class="
 <details>
 <summary>备选对照：主解理解后再比较；性能或深度限制按本题说明处理</summary>
 
-<div class="table-scroll" tabindex="0" role="region" aria-label="LC34 在排序数组中查找元素的第一个和最后一个位置"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="#alt-34-search_range_bisect">bisect 双边界</a></td><td>O(log(n+1))</td><td>O(1) 辅助</td><td>已掌握两个边界后导入 bisect_left 与 bisect_right；先确认左界命中，再将首个 &gt; target 的位置减一。</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="LC34 在排序数组中查找元素的第一个和最后一个位置"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="#alt-34-search_range_bisect">bisect 双边界</a></td><td>O(log(n+1))</td><td>O(1) 辅助</td><td>第三轮选读：对照标准库与两个手写边界；先确认左界命中，再将首个 &gt; target 的位置减一。</td></tr></tbody></table></div>
 </details>
 
 <p><a href="#acm-lc34">本题 ACM 协议、入口与样例</a> · <a href="#stage-09">09 本章模板</a> · <a href="#hot100-index">全题导航</a></p>
@@ -7371,7 +7357,7 @@ heap = [<span class="syntax-number">4</span>, <span class="syntax-number">1</spa
 <details>
 <summary>备选对照：主解理解后再比较；性能或深度限制按本题说明处理</summary>
 
-<div class="table-scroll" tabindex="0" role="region" aria-label="LC295 数据流的中位数"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="#alt-295-MedianFinderSorted">基线：有序数组</a></td><td>add O(n)，find O(1)</td><td>O(n)</td><td>bisect 只负责 O(log n) 定位，列表搬移仍 O(n)。</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="LC295 数据流的中位数"><table><thead><tr><th scope="col">备选实现</th><th scope="col">时间</th><th scope="col">空间</th><th scope="col">何时切换／代价</th></tr></thead><tbody><tr><td><a href="#alt-295-MedianFinderSorted">基线：有序数组</a></td><td>add O(n)，find O(1)</td><td>O(n)</td><td>手写二分负责 O(log n) 定位，列表搬移仍 O(n)。</td></tr></tbody></table></div>
 </details>
 
 <p><a href="#acm-lc295">本题 ACM 协议、入口与样例</a> · <a href="#stage-13">13 本章模板</a> · <a href="#hot100-index">全题导航</a></p>
@@ -8382,7 +8368,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <div class="table-scroll" tabindex="0" role="region" aria-label="LC300 最长递增子序列"><table><thead><tr><th scope="col">输入</th><th scope="col">预期</th><th scope="col">暴露的错误</th></tr></thead><tbody><tr><td><code>nums=[1]</code></td><td><code>1</code></td><td>长度下界为 1。</td></tr>
 <tr><td><code>nums=[2, 2, 2]</code></td><td><code>1</code></td><td>前驱比较必须是严格小于；相等不能延长。</td></tr>
 <tr><td><code>nums=[3, 1, 2]</code></td><td><code>2</code></td><td>允许跳过元素，不能只求连续递增长度。</td></tr></tbody></table></div>
-<p><strong>先查：</strong> 前驱必须严格更小，答案取 max(dp) 而不是 dp[-1]。二分备选才需要区分 bisect_left 与 bisect_right。</p>
+<p><strong>先查：</strong> 前驱必须严格更小，答案取 max(dp) 而不是 dp[-1]。二分备选找首个 &gt;= 当前值的位置；相等时替换，保持严格递增。</p>
 <details>
 <summary>备选对照：主解理解后再比较；性能或深度限制按本题说明处理</summary>
 
@@ -10329,63 +10315,11 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><a id="alts-lc35"></a></p>
 <h3 id="hot100-lc35-搜索插入位置备选"><a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> 搜索插入位置：备选</h3>
 <p><a href="#lc35">返回主解与边界</a>。</p>
-<p><a id="alt-35-search_insert_bisect"></a></p>
-<h4 id="hot100-标准库-bisect_left">标准库 bisect_left</h4>
-<p><strong>使用条件：</strong> 需要了解库语义；实际插入列表仍为 O(n)。</p>
-<p><strong>复杂度：</strong> 时间 O(log(n+1))；空间 O(1)。</p>
-<p><strong>读码：</strong><code>bisect_left</code> 不修改数组，只返回位置；目标大于所有值时返回 len(nums)，不是 -1。</p>
-<p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> 搜索插入位置。 <strong>所属题轮次：第一轮必刷 · R1-13；此处比较同题实现的复杂度与使用条件，题号沿用主线。</strong></p>
-<!-- code:alt:35:search_insert_bisect -->
-<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left
-
-
-<span class="syntax-keyword">def</span> <span class="syntax-function">search_insert_bisect</span>(nums, target):
-    <span class="syntax-comment"># 有序数组中第一个 &gt;= target 的位置；找到则是其最左下标，否则就是插入下标。</span>
-    <span class="syntax-keyword">return</span> <span class="syntax-function">bisect_left</span>(nums, target)</code></pre>
+<p>标准库对照安排在<a href="#third-bisect">第三轮：手写二分与库函数</a>。</p>
 <p><a id="alts-lc34"></a></p>
 <h3 id="hot100-lc34-在排序数组中查找元素的第一个和最后一个位置备选"><a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> 在排序数组中查找元素的第一个和最后一个位置：备选</h3>
 <p><a href="#lc34">返回主解与边界</a>。</p>
-<p><a id="alt-34-search_range_bisect"></a></p>
-<h4 id="hot100-bisect-双边界">bisect 双边界</h4>
-<p><strong>使用条件：</strong> bisect_right 返回严格大于目标的位置。</p>
-<p><strong>复杂度：</strong> 时间 O(log(n+1))；空间 O(1)。</p>
-<p><strong>读码：</strong> 左边界与右边界围成 <code>[left,right)</code>；若两者相同就不存在目标，否则闭区间答案为 <code>[left,right-1]</code>。</p>
-<p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> 在排序数组中查找元素的第一个和最后一个位置。 <strong>所属题轮次：第一轮必刷 · R1-14；此处比较同题实现的复杂度与使用条件，题号沿用主线。</strong></p>
-<!-- code:alt:34:search_range_bisect -->
-<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
-
-
-<span class="syntax-keyword">def</span> <span class="syntax-function">search_range_bisect</span>(nums, target):
-    <span class="syntax-comment"># start 是第一个 &gt;= target 的位置；end 是第一个 &gt; target 的位置。</span>
-    start = <span class="syntax-function">bisect_left</span>(nums, target)
-    end = <span class="syntax-function">bisect_right</span>(nums, target)
-    <span class="syntax-comment"># 相等元素构成半开区间 [start, end)；转成题目要求的闭区间终点 end - 1。</span>
-    <span class="syntax-keyword">return</span> [start, end - <span class="syntax-number">1</span>] <span class="syntax-keyword">if</span> start &lt; end <span class="syntax-keyword">else</span> [-<span class="syntax-number">1</span>, -<span class="syntax-number">1</span>]</code></pre>
-<p><a id="alts-lc74"></a></p>
-<h3 id="hot100-lc74-搜索二维矩阵备选"><a href="https://leetcode.cn/problems/search-a-2d-matrix/">LC74</a> 搜索二维矩阵：备选</h3>
-<p><a href="#lc74">返回主解与边界</a>。</p>
-<p><a id="alt-74-search_matrix_stair"></a></p>
-<h4 id="hot100-阶梯搜索">阶梯搜索</h4>
-<p><strong>使用条件：</strong> 利用行列有序也正确，但一般不是最优对数时间。</p>
-<p><strong>复杂度：</strong> 时间 O(rows+cols)；空间 O(1)。</p>
-<p><strong>读码：</strong> 整体有序也蕴含行列有序，所以可以从右上角消行／列。它的复杂度按行数加列数，而不是整体二分的对数。</p>
-<p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/search-a-2d-matrix/">LC74</a> 搜索二维矩阵。 <strong>所属题轮次：第二轮必刷 · R2-11；此处比较同题实现的复杂度与使用条件，题号沿用主线。</strong></p>
-<!-- code:alt:74:search_matrix_stair -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">search_matrix_stair</span>(matrix, target):
-    <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> matrix <span class="syntax-keyword">or</span> <span class="syntax-keyword">not</span> matrix[<span class="syntax-number">0</span>]:
-        <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
-    <span class="syntax-comment"># 从右上角开始：向左值更小，向下值更大，每次能排除一整行或一整列。</span>
-    row, col = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(matrix[<span class="syntax-number">0</span>]) - <span class="syntax-number">1</span>
-    <span class="syntax-keyword">while</span> row &lt; <span class="syntax-function">len</span>(matrix) <span class="syntax-keyword">and</span> col &gt;= <span class="syntax-number">0</span>:
-        <span class="syntax-keyword">if</span> matrix[row][col] == target:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">True</span>
-        <span class="syntax-keyword">if</span> matrix[row][col] &gt; target:
-            <span class="syntax-comment"># 当前值偏大，它下方同列只会更大，因此删掉当前列。</span>
-            col -= <span class="syntax-number">1</span>
-        <span class="syntax-keyword">else</span>:
-            <span class="syntax-comment"># 当前值偏小，它左侧同行只会更小，因此删掉当前行。</span>
-            row += <span class="syntax-number">1</span>
-    <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span></code></pre>
+<p>标准库对照安排在<a href="#third-bisect">第三轮：手写二分与库函数</a>。</p>
 <p><a id="alts-lc33"></a></p>
 <h3 id="hot100-lc33-搜索旋转排序数组备选"><a href="https://leetcode.cn/problems/search-in-rotated-sorted-array/">LC33</a> 搜索旋转排序数组：备选</h3>
 <p><a href="#lc33">返回主解与边界</a>。</p>
@@ -11456,22 +11390,26 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><a href="#lc295">返回主解与边界</a>。</p>
 <p><a id="alt-295-MedianFinderSorted"></a></p>
 <h4 id="hot100-基线有序数组">基线：有序数组</h4>
-<p><strong>使用条件：</strong> bisect 只负责 O(log n) 定位，列表搬移仍 O(n)。</p>
+<p><strong>使用条件：</strong> 手写二分负责 O(log n) 定位，列表搬移仍 O(n)。</p>
 <p><strong>复杂度：</strong> 时间 add O(n)，find O(1)；空间 O(n)。</p>
-<p><strong>读码：</strong> insort 先定位再插入，插入仍需移动后面的列表元素；查询中间下标快，不意味着 addNum 也是对数复杂度。</p>
+<p><strong>读码：</strong> 手写上界循环先定位，再用 insert 插入，后面的列表元素仍需移动；查询中间下标快，不意味着 addNum 也是对数复杂度。</p>
 <p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/find-median-from-data-stream/">LC295</a> 数据流的中位数。 <strong>所属题轮次：第二轮必刷 · R2-61；此处比较同题实现的复杂度与使用条件，题号沿用主线。</strong></p>
 <!-- code:alt:295:MedianFinderSorted -->
-<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> insort
-
-
-<span class="syntax-keyword">class</span> <span class="syntax-class">MedianFinderSorted</span>:
+<pre><code class="language-python"><span class="syntax-keyword">class</span> <span class="syntax-class">MedianFinderSorted</span>:
     <span class="syntax-keyword">def</span> <span class="syntax-function">__init__</span>(self):
         <span class="syntax-comment"># values 始终保持有序，中位数可以直接读取中间下标。</span>
         self.values = []
 
     <span class="syntax-keyword">def</span> <span class="syntax-function">addNum</span>(self, value):
         <span class="syntax-comment"># 先二分找到插入位置，再插入列表；定位快，但后面的元素仍需移动。</span>
-        <span class="syntax-function">insort</span>(self.values, value)
+        left, right = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(self.values)
+        <span class="syntax-keyword">while</span> left &lt; right:
+            mid = (left + right) // <span class="syntax-number">2</span>
+            <span class="syntax-keyword">if</span> self.values[mid] &lt;= value:
+                left = mid + <span class="syntax-number">1</span>  <span class="syntax-comment"># 相等时向右，找首个严格更大的值。</span>
+            <span class="syntax-keyword">else</span>:
+                right = mid
+        self.values.<span class="syntax-function">insert</span>(left, value)
 
     <span class="syntax-keyword">def</span> <span class="syntax-function">findMedian</span>(self):
         n = <span class="syntax-function">len</span>(self.values)
@@ -11951,15 +11889,20 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>读码：</strong> tails[i] 是长度 i+1 的最小可能结尾，不是最终子序列本身。相等值替换而不延长。</p>
 <p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/longest-increasing-subsequence/">LC300</a> 最长递增子序列。 <strong>所属题轮次：第二轮必刷 · R2-36；此处比较同题实现的复杂度与使用条件，题号沿用主线。</strong></p>
 <!-- code:alt:300:length_of_lis -->
-<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left
-
-
-<span class="syntax-keyword">def</span> <span class="syntax-function">length_of_lis</span>(nums):
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">length_of_lis</span>(nums):
     <span class="syntax-comment"># tails[i] 是已扫描元素中，长度为 i + 1 的递增子序列能取得的最小末尾值。</span>
     tails = []
     <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums:
         <span class="syntax-comment"># 相等时替换，不能延长严格递增子序列。</span>
-        index = <span class="syntax-function">bisect_left</span>(tails, value)
+        left, right = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(tails)
+        <span class="syntax-comment"># [left, right) 是待查区间：找首个 &gt;= value 的末尾值。</span>
+        <span class="syntax-keyword">while</span> left &lt; right:
+            mid = (left + right) // <span class="syntax-number">2</span>
+            <span class="syntax-keyword">if</span> tails[mid] &lt; value:
+                left = mid + <span class="syntax-number">1</span>  <span class="syntax-comment"># mid 及左侧都太小，排除。</span>
+            <span class="syntax-keyword">else</span>:
+                right = mid    <span class="syntax-comment"># mid 仍可能是第一个合适位置。</span>
+        index = left
         <span class="syntax-keyword">if</span> index == <span class="syntax-function">len</span>(tails):
             <span class="syntax-comment"># 大于所有现有末尾时，最长递增子序列长度可以增加 1。</span>
             tails.<span class="syntax-function">append</span>(value)
@@ -15102,7 +15045,7 @@ ros</code></pre>
 <tr><td><code>key=lambda ... / (a,b)</code></td><td><a href="#python-sort">排序键与元组比较</a></td><td>区间、优先队列</td></tr>
 <tr><td><code>append / pop / deque / popleft</code></td><td><a href="#python-queue">栈与队列</a></td><td>DFS、BFS、单调结构</td></tr>
 <tr><td><code>heapify / heappush / -value</code></td><td><a href="#python-heap">堆的实际行为</a></td><td>Top-K、合并链表、中位数</td></tr>
-<tr><td><code>bisect_left / bisect_right</code></td><td><a href="#python-bisect">二分库的返回值</a></td><td>有序边界、LIS</td></tr>
+<tr><td><code>bisect_left / bisect_right</code></td><td><a href="#python-bisect">第三轮：二分库的返回值</a></td><td>有序边界、LIS</td></tr>
 <tr><td><code>return / nonlocal / check</code></td><td><a href="#python-functions">函数、作用域与递归</a></td><td>树、回溯、答案二分</td></tr>
 <tr><td><code>class / self / node.next / is</code></td><td><a href="#python-objects">对象与节点</a></td><td>链表、树、LRU、Trie</td></tr>
 <tr><td><code>// / % / += / 1 &lt;&lt; k</code></td><td><a href="#python-arithmetic">整数运算</a>、<a href="#python-bits">位运算</a></td><td>进位、循环下标、位掩码</td></tr>
@@ -15317,24 +15260,7 @@ heapq.<span class="syntax-function">heapify</span>(max_heap)
 <span class="syntax-keyword">assert</span> -max_heap[<span class="syntax-number">0</span>] == <span class="syntax-number">7</span>
 <span class="syntax-keyword">assert</span> -heapq.<span class="syntax-function">heappop</span>(max_heap) == <span class="syntax-number">7</span>   <span class="syntax-comment"># 入堆取负，出堆再还原。</span></code></pre>
 <p>空堆调用 <code>heappop</code> 或 <code>heapreplace</code> 会报 <code>IndexError</code>。<code>heapreplace</code> 与 <code>heappushpop</code> 不是同一操作；保留最大的 <code>k</code> 个时，通常只在新值大于堆顶后才 <code>heapreplace</code>。元组堆按前项优先比较：<code>(frequency, value)</code> 按频次选；<code>(value, unique_id, node)</code> 用不同编号打破数值平局，避免比较节点。LC23 的链表编号之所以足够，是因为<strong>每条链同时在堆里至多一个候选</strong>，不是编号天然永远唯一。</p>
-<p><a id="python-bisect"></a></p>
-<h3 id="hot100-s10-bisect返回插入位置不返回找到与否">S10 <code>bisect</code>：返回插入位置，不返回找到与否</h3>
-<p>本卡用于查接口；第一次学习二分先看<a href="#tpl-lower_bound">T01 下界</a>、<a href="#tpl-upper_bound">T01b 上界</a>及逐轮手算，之后再用本卡缩写。</p>
-<p>前提是查找区间已经非递减。<code>bisect_left(nums, x)</code> 返回第一个 <code>&gt;= x</code> 的位置，<code>bisect_right</code> 返回第一个 <code>&gt; x</code> 的位置；二者都可能等于 <code>len(nums)</code>。它们不修改列表。<code>insort</code> 则还执行插入，移动元素的成本仍为 O(n)。<a href="https://docs.python.org/3.9/library/bisect.html" title="插入位置与有序查找">二分库</a></p>
-<!-- code:semantic:bisect -->
-<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
-
-nums = [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">4</span>]
-left = <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">2</span>)
-right = <span class="syntax-function">bisect_right</span>(nums, <span class="syntax-number">2</span>)
-<span class="syntax-keyword">assert</span> (left, right) == (<span class="syntax-number">1</span>, <span class="syntax-number">3</span>)
-<span class="syntax-keyword">assert</span> right - left == <span class="syntax-number">2</span>                    <span class="syntax-comment"># 相同值出现次数。</span>
-<span class="syntax-keyword">assert</span> <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">5</span>) == <span class="syntax-function">len</span>(nums)     <span class="syntax-comment"># 合法插入位置，但不是合法元素下标。</span>
-
-position = <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">3</span>)
-found = position &lt; <span class="syntax-function">len</span>(nums) <span class="syntax-keyword">and</span> nums[position] == <span class="syntax-number">3</span>
-<span class="syntax-keyword">assert</span> found <span class="syntax-keyword">is</span> <span class="syntax-literal">False</span></code></pre>
-<p>严格 LIS 使用左边界：相等元素替换同一长度的末尾，不延长；非递减子序列才对应右边界。不要只记函数名，先说出“允许相等延长吗”。</p>
+<p>标准库对照安排在<a href="#third-bisect">第三轮：手写二分与库函数</a>。</p>
 <p><a id="python-functions"></a></p>
 <h3 id="hot100-s11-函数与递归调用返回共享状态分开看">S11 函数与递归：调用、返回、共享状态分开看</h3>
 <p><code>def</code> 定义函数，执行到调用才运行函数体；<code>return value</code> 结束当前这一次调用并把值交给调用者。没有 <code>return</code> 或只有 <code>return</code> 时返回 <code>None</code>。函数名可作为值传递：模板的 <code>check</code> 是一个函数，<code>check(mid)</code> 才是执行判断。<a href="https://docs.python.org/3.9/tutorial/controlflow.html#unpacking-argument-lists" title="函数实参展开">函数</a> · <a href="https://docs.python.org/3.9/reference/simple_stmts.html" title="赋值、return、nonlocal">作用域</a></p>
@@ -15574,6 +15500,101 @@ python3.9 answer.py &lt; input.txt</code></pre>
 <tr><td>□</td><td><strong>R3-18</strong></td><td><a href="https://leetcode.cn/problems/best-time-to-buy-and-sell-stock-iv/">LC188</a> 买卖股票的最佳时机 IV：状态机 DP</td><td>有限交易次数 DP；状态定义与更新顺序</td><td><a href="#extra-lc0188">讲解</a></td></tr></tbody></table></div>
 <p>第三轮结束时：Hot100 已完成 100 / 100，补充已完成 18 / 18，合计 118 道不同题。这个数只表示本计划的范围，不等于所有考点已覆盖。</p>
 <p><strong>第三轮按需强化：</strong> 更深入的结构和组合题在<a href="#gap-general">附加参考</a>及<a href="#gap-optional">进阶选读</a>中查阅，按实际薄弱点选择；这些内容单独记录，不并入上面的 18 题。</p>
+<p><a id="third-bisect"></a></p>
+<h2 id="hot100-第三轮工具对照把手写二分映射到-bisect">第三轮工具对照：把手写二分映射到 bisect</h2>
+<p>三小时与前两轮使用手写二分：先定义区间，再根据比较排除候选，最后解释返回位置。在这里把已掌握的下界、上界对应到 Python 3.9 的标准库；算法复杂度和适用前提保持一致。下方题目都是 Hot100 原题的接口对照，沿用原题编号，属于第三轮选读。</p>
+<p><a id="binary-library-bridge"></a>
+<a id="hot100-学会手写后再用-python-39-的-bisect"></a></p>
+<h3 id="hot100-从手写边界到-python-39-的-bisect">从手写边界到 Python 3.9 的 bisect</h3>
+<p><code>bisect_left</code> 对应上面的下界，<code>bisect_right</code> 对应上界；都返回插入位置，不修改数组。这里才把已解释的循环换成库函数。<a href="https://docs.python.org/3.9/library/bisect.html" title="插入位置与有序查找">Python 3.9 接口</a></p>
+<p><strong>练习对应：</strong> <a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> 搜索插入位置；<a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> 在排序数组中查找元素的第一个和最后一个位置。 库函数与手写边界的对照示例，不是两题的完整提交代码。</p>
+<!-- code:semantic:bisect_bridge -->
+<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
+
+nums = [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">4</span>]
+target = <span class="syntax-number">2</span>
+start = <span class="syntax-function">bisect_left</span>(nums, target)  <span class="syntax-comment"># 等价于手写 lower_bound。</span>
+end = <span class="syntax-function">bisect_right</span>(nums, target)  <span class="syntax-comment"># 等价于手写 upper_bound。</span>
+
+exists = start &lt; <span class="syntax-function">len</span>(nums) <span class="syntax-keyword">and</span> nums[start] == target
+<span class="syntax-keyword">assert</span> exists
+<span class="syntax-keyword">assert</span> [start, end - <span class="syntax-number">1</span>] == [<span class="syntax-number">1</span>, <span class="syntax-number">3</span>]
+<span class="syntax-keyword">assert</span> end - start == <span class="syntax-number">3</span>
+<span class="syntax-keyword">assert</span> <span class="syntax-function">bisect_left</span>([], target) == <span class="syntax-number">0</span></code></pre>
+<p>若限制搜索范围，3.9 支持 <code>lo/hi</code>，搜索元素区间仍为 <code>[lo,hi)</code>，返回原数组中的位置，不是相对 lo 的偏移；没有 <code>key=</code> 参数。定位 O(log n) 不等于插入 O(log n)：<code>list.insert</code> 仍可能移动 O(n) 个元素。<a href="https://docs.python.org/3.9/library/bisect.html" title="插入位置与有序查找">接口与插入成本</a></p>
+<p><a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> <a href="#alt-35-search_insert_bisect">库版本</a>、<a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> <a href="#alt-34-search_range_bisect">库版本</a> 作为后续对照。不要通过反复插入维护有序表，却把整体成本误写成 O(n log n)。</p>
+<p><a id="alt-35-search_insert_bisect"></a></p>
+<h4 id="hot100-标准库-bisect_left">标准库 bisect_left</h4>
+<p><strong>使用条件：</strong> 需要了解库语义；实际插入列表仍为 O(n)。</p>
+<p><strong>复杂度：</strong> 时间 O(log(n+1))；空间 O(1)。</p>
+<p><strong>读码：</strong><code>bisect_left</code> 不修改数组，只返回位置；目标大于所有值时返回 len(nums)，不是 -1。</p>
+<p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> 搜索插入位置。 <strong>学习位置：第三轮标准库对照；原题仍按前两轮的手写解法练习。</strong></p>
+<!-- code:alt:35:search_insert_bisect -->
+<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left
+
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">search_insert_bisect</span>(nums, target):
+    <span class="syntax-comment"># 有序数组中第一个 &gt;= target 的位置；找到则是其最左下标，否则就是插入下标。</span>
+    <span class="syntax-keyword">return</span> <span class="syntax-function">bisect_left</span>(nums, target)</code></pre>
+<p><a id="alt-34-search_range_bisect"></a></p>
+<h4 id="hot100-bisect-双边界">bisect 双边界</h4>
+<p><strong>使用条件：</strong> bisect_right 返回严格大于目标的位置。</p>
+<p><strong>复杂度：</strong> 时间 O(log(n+1))；空间 O(1)。</p>
+<p><strong>读码：</strong> 左边界与右边界围成 <code>[left,right)</code>；若两者相同就不存在目标，否则闭区间答案为 <code>[left,right-1]</code>。</p>
+<p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> 在排序数组中查找元素的第一个和最后一个位置。 <strong>学习位置：第三轮标准库对照；原题仍按前两轮的手写解法练习。</strong></p>
+<!-- code:alt:34:search_range_bisect -->
+<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
+
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">search_range_bisect</span>(nums, target):
+    <span class="syntax-comment"># start 是第一个 &gt;= target 的位置；end 是第一个 &gt; target 的位置。</span>
+    start = <span class="syntax-function">bisect_left</span>(nums, target)
+    end = <span class="syntax-function">bisect_right</span>(nums, target)
+    <span class="syntax-comment"># 相等元素构成半开区间 [start, end)；转成题目要求的闭区间终点 end - 1。</span>
+    <span class="syntax-keyword">return</span> [start, end - <span class="syntax-number">1</span>] <span class="syntax-keyword">if</span> start &lt; end <span class="syntax-keyword">else</span> [-<span class="syntax-number">1</span>, -<span class="syntax-number">1</span>]</code></pre>
+<p><a id="alts-lc74"></a></p>
+<h3 id="hot100-lc74-搜索二维矩阵备选"><a href="https://leetcode.cn/problems/search-a-2d-matrix/">LC74</a> 搜索二维矩阵：备选</h3>
+<p><a href="#lc74">返回主解与边界</a>。</p>
+<p><a id="alt-74-search_matrix_stair"></a></p>
+<h4 id="hot100-阶梯搜索">阶梯搜索</h4>
+<p><strong>使用条件：</strong> 利用行列有序也正确，但一般不是最优对数时间。</p>
+<p><strong>复杂度：</strong> 时间 O(rows+cols)；空间 O(1)。</p>
+<p><strong>读码：</strong> 整体有序也蕴含行列有序，所以可以从右上角消行／列。它的复杂度按行数加列数，而不是整体二分的对数。</p>
+<p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/search-a-2d-matrix/">LC74</a> 搜索二维矩阵。 <strong>学习位置：第三轮标准库对照；原题仍按前两轮的手写解法练习。</strong></p>
+<!-- code:alt:74:search_matrix_stair -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">search_matrix_stair</span>(matrix, target):
+    <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> matrix <span class="syntax-keyword">or</span> <span class="syntax-keyword">not</span> matrix[<span class="syntax-number">0</span>]:
+        <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
+    <span class="syntax-comment"># 从右上角开始：向左值更小，向下值更大，每次能排除一整行或一整列。</span>
+    row, col = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(matrix[<span class="syntax-number">0</span>]) - <span class="syntax-number">1</span>
+    <span class="syntax-keyword">while</span> row &lt; <span class="syntax-function">len</span>(matrix) <span class="syntax-keyword">and</span> col &gt;= <span class="syntax-number">0</span>:
+        <span class="syntax-keyword">if</span> matrix[row][col] == target:
+            <span class="syntax-keyword">return</span> <span class="syntax-literal">True</span>
+        <span class="syntax-keyword">if</span> matrix[row][col] &gt; target:
+            <span class="syntax-comment"># 当前值偏大，它下方同列只会更大，因此删掉当前列。</span>
+            col -= <span class="syntax-number">1</span>
+        <span class="syntax-keyword">else</span>:
+            <span class="syntax-comment"># 当前值偏小，它左侧同行只会更小，因此删掉当前行。</span>
+            row += <span class="syntax-number">1</span>
+    <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span></code></pre>
+<p><a id="python-bisect"></a></p>
+<h3 id="hot100-s10-bisect返回插入位置不返回找到与否">S10 <code>bisect</code>：返回插入位置，不返回找到与否</h3>
+<p>本卡用于查接口；第一次学习二分先看<a href="#tpl-lower_bound">T01 下界</a>、<a href="#tpl-upper_bound">T01b 上界</a>及逐轮手算，之后再用本卡缩写。</p>
+<p>前提是查找区间已经非递减。<code>bisect_left(nums, x)</code> 返回第一个 <code>&gt;= x</code> 的位置，<code>bisect_right</code> 返回第一个 <code>&gt; x</code> 的位置；二者都可能等于 <code>len(nums)</code>。它们不修改列表。<code>insort</code> 则还执行插入，移动元素的成本仍为 O(n)。<a href="https://docs.python.org/3.9/library/bisect.html" title="插入位置与有序查找">二分库</a></p>
+<!-- code:semantic:bisect -->
+<pre><code class="language-python"><span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
+
+nums = [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">4</span>]
+left = <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">2</span>)
+right = <span class="syntax-function">bisect_right</span>(nums, <span class="syntax-number">2</span>)
+<span class="syntax-keyword">assert</span> (left, right) == (<span class="syntax-number">1</span>, <span class="syntax-number">3</span>)
+<span class="syntax-keyword">assert</span> right - left == <span class="syntax-number">2</span>                    <span class="syntax-comment"># 相同值出现次数。</span>
+<span class="syntax-keyword">assert</span> <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">5</span>) == <span class="syntax-function">len</span>(nums)     <span class="syntax-comment"># 合法插入位置，但不是合法元素下标。</span>
+
+position = <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">3</span>)
+found = position &lt; <span class="syntax-function">len</span>(nums) <span class="syntax-keyword">and</span> nums[position] == <span class="syntax-number">3</span>
+<span class="syntax-keyword">assert</span> found <span class="syntax-keyword">is</span> <span class="syntax-literal">False</span></code></pre>
+<p>严格 LIS 使用左边界：相等元素替换同一长度的末尾，不延长；非递减子序列才对应右边界。不要只记函数名，先说出“允许相等延长吗”。</p>
 <p><a id="third-round-templates"></a></p>
 <h2 id="hot100-第三轮强化模板在已有基础上更换问题约束">第三轮强化模板：在已有基础上更换问题约束</h2>
 <p>这 4 个模板分别训练可行性判断、显式图最短路、最大价值背包和组合计数。先比较输入与目标，再对照 Hot100 中已经学过的状态和转移。</p>
@@ -19743,4 +19764,4 @@ true</code></pre>
 <p><a href="https://www.bilibili.com/video/BV17o4y187h1/">观看视频（10:18）</a></p>
 <p><strong>主讲题目：</strong> LC124、LC543、LC2246。<strong>其中 Hot100 外的题目：</strong> LC2246。</p>
 <p><strong>学习重点：</strong> 比较二叉树路径与额外字符约束下的树路径，区分单边返回和全局结果。</p>
-</article><nav class="chapter-pagination" aria-label="返回课程"><a href="../index.html"><span>返回首页</span><strong>查看课程与额外章节</strong></a><a href="#hot100-leetcode-hot100--python-39%E7%90%86%E8%AE%BA%E9%80%9F%E8%A7%88%E4%B8%8E%E4%B8%89%E5%A4%A9%E7%BC%96%E7%A0%81%E7%BB%83%E4%B9%A0"><span>回到顶部 ↑</span><strong>Hot100 完整指南</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页大纲 <span aria-hidden="true">⌄</span></summary><nav class="guide-outline-nav" aria-label="本页小节"><p class="guide-outline-hint">三小时回顾 → 三天练习；教材随题查阅，第三轮按需补充。</p><details class="guide-outline-group" data-guide-route="quick-review" open><summary>三小时速览</summary><ol><li><a href="#quick-review">阅读说明</a></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#program-template" title="01 程序框架与输入输出 · 12 分钟">01 程序框架与输入输出</a><button hidden type="button" data-guide-expand aria-controls="outline-program-template" aria-expanded="true" aria-label="收起01 程序框架与输入输出 · 12 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-program-template" data-guide-children><li><a href="#program-libraries">常用标准库与 import 速查</a></li><li><a href="#io-format-index">怎样选择 main 模板</a></li><li><a href="#io-one-int">单整数输入</a></li><li><a href="#io-two-ints">两个整数输入</a></li><li><a href="#io-array">一行数组与原地输出</a></li><li><a href="#io-sized-array">长度＋数组</a></li><li><a href="#io-target-array">目标值＋数组</a></li><li><a href="#io-string">字符串输入</a></li><li><a href="#io-boolean">布尔结果输出</a></li><li><a href="#io-words-json">单词与 JSON 输出</a></li><li><a href="#io-matrix">矩阵输入输出</a></li><li><a href="#io-counted-groups">给定组数的多组输入</a></li><li><a href="#io-eof-groups">读到 EOF 的多组输入</a></li><li><a href="#program-example">四段完整框架 · LC1</a></li></ol></li><li><a href="#quick-schedule">180 分钟安排</a></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-io" title="输入输出补充">输入输出补充</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-io" aria-expanded="true" aria-label="收起输入输出补充子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-io" data-guide-children><li><a href="#quick-io-performance">大数据读写与性能</a></li><li><a href="#quick-code-style">变量命名与代码约定</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-sequences" title="02 数组、哈希与窗口 · 32 分钟">02 数组、哈希与窗口</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-sequences" aria-expanded="true" aria-label="收起02 数组、哈希与窗口 · 32 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-sequences" data-guide-children><li><a href="#quick-lc283">读写双指针：移动零 · LC283</a></li><li><a href="#quick-lc11">相向双指针：盛水 · LC11</a></li><li><a href="#quick-lc15">排序、夹逼与去重 · LC15</a></li><li><a href="#quick-lc5">中心扩展：回文子串 · LC5</a></li><li><a href="#quick-lc54">矩阵边界：螺旋遍历 · LC54</a></li><li><a href="#quick-lc560">前缀和＋频次哈希 · LC560</a></li><li><a href="#quick-lc3">最长无重复窗口 · LC3</a></li><li><a href="#quick-lc76">最短覆盖窗口 · LC76</a></li><li><a href="#quick-lc49">哈希分组：异位词 · LC49</a></li><li><a href="#quick-lc128">集合起点：最长连续序列 · LC128</a></li><li><a href="#quick-lc238">前后缀乘积 · LC238</a></li><li><a href="#quick-lc75">三路划分：颜色分类 · LC75</a></li><li><a href="#quick-lc31">字典序：下一个排列 · LC31</a></li><li><a href="#quick-lc41">原地哈希：最小缺失正数 · LC41</a></li><li><a href="#quick-matrix-window-bridge">矩阵旋转、置零与二维搜索</a></li><li><a href="#quick-lc438">定长窗口：字母异位词 · LC438</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-stacks" title="03 栈、单调结构与二分 · 22 分钟">03 栈、单调结构与二分</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-stacks" aria-expanded="true" aria-label="收起03 栈、单调结构与二分 · 22 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-stacks" data-guide-children><li><a href="#quick-lc20">普通栈：括号匹配 · LC20</a></li><li><a href="#quick-lc739">单调栈：下一个更大值 · LC739</a></li><li><a href="#quick-lc84">单调栈：矩形边界 · LC84</a></li><li><a href="#quick-lc239">单调队列：窗口最大值 · LC239</a></li><li><a href="#quick-lc35">二分下界与左右边界 · LC35/34</a></li><li><a href="#quick-lc33">旋转数组查找 · LC33</a></li><li><a href="#quick-lc155">辅助状态：最小栈 · LC155</a></li><li><a href="#quick-lc394">嵌套状态：字符串解码 · LC394</a></li><li><a href="#quick-lc74">矩阵展平后二分 · LC74</a></li><li><a href="#quick-lc153">旋转数组最小值 · LC153</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-linked" title="04 链表、归并与 LRU · 18 分钟">04 链表、归并与 LRU</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-linked" aria-expanded="true" aria-label="收起04 链表、归并与 LRU · 18 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-linked" data-guide-children><li><a href="#quick-lc206">三指针反转链表 · LC206</a></li><li><a href="#quick-lc142">快慢指针：环入口 · LC142</a></li><li><a href="#quick-lc148">分治与两路归并 · LC148/21</a></li><li><a href="#quick-lc2">进位与新链构造 · LC2</a></li><li><a href="#quick-lc19">间距双指针与删除 · LC19</a></li><li><a href="#quick-lc24">成对改边与哑节点 · LC24</a></li><li><a href="#quick-lc160">节点身份：相交链表 · LC160</a></li><li><a href="#quick-lc234">回文链表的两种路线 · LC234</a></li><li><a href="#quick-lc138">节点映射：随机链表复制 · LC138</a></li><li><a href="#quick-lc146">访问顺序：LRU 缓存 · LC146</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-trees" title="05 树、堆与字典树 · 28 分钟">05 树、堆与字典树</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-trees" aria-expanded="true" aria-label="收起05 树、堆与字典树 · 28 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-trees" data-guide-children><li><a href="#quick-lc102">队列与层序遍历 · LC102</a></li><li><a href="#quick-lc215">固定容量堆：第 K 大 · LC215</a></li><li><a href="#quick-lc295">双堆：数据流中位数 · LC295</a></li><li><a href="#quick-lc208">字典树：前缀查询 · LC208</a></li><li><a href="#hot100-%E7%AC%AC-k-%E5%A4%A7%E7%9A%84%E5%8F%A6%E4%B8%80%E6%9D%A1%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF%E5%BF%AB%E9%80%9F%E9%80%89%E6%8B%A9quickselect">快速选择：第 K 大 · LC215</a></li><li><a href="#quick-lc104">递归返回值：树高 · LC104</a></li><li><a href="#quick-lc94">显式栈与中序遍历 · LC94</a></li><li><a href="#quick-lc98">BST 约束与有序性 · LC98/230</a></li><li><a href="#quick-lc236">左右子树汇总：公共祖先 · LC236</a></li><li><a href="#quick-lc105">前序＋中序构树 · LC105</a></li><li><a href="#quick-lc437">路径状态与前缀和 · LC437</a></li><li><a href="#quick-lc347">频次分桶：前 K 个高频 · LC347</a></li><li><a href="#quick-lc124">树形 DP：单边返回与全局最优</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-graphs" title="06 图搜索与贪心 · 14 分钟">06 图搜索与贪心</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-graphs" aria-expanded="true" aria-label="收起06 图搜索与贪心 · 14 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-graphs" data-guide-children><li><a href="#quick-lc200">网格 DFS：岛屿数量 · LC200</a></li><li><a href="#quick-lc994">多源 BFS：腐烂橘子 · LC994</a></li><li><a href="#quick-lc207">邻接表、入度与拓扑排序 · LC207</a></li><li><a href="#quick-lc55">贪心覆盖边界：跳跃游戏 · LC55/45</a></li><li><a href="#quick-lc56">排序与区间合并 · LC56</a></li><li><a href="#quick-lc121">历史最小值与一次交易 · LC121</a></li><li><a href="#quick-union-find">并查集：连通块合并 · LC200</a></li><li><a href="#quick-lc763">贪心切段：划分字母区间 · LC763</a></li><li><a href="#quick-lc169">抵消与多数投票 · LC169</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-dp" title="07 动态规划与背包 · 24 分钟">07 动态规划与背包</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-dp" aria-expanded="true" aria-label="收起07 动态规划与背包 · 24 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-dp" data-guide-children><li><a href="#quick-lc198">一维 DP：打家劫舍、最大子数组与 LIS</a></li><li><a href="#quick-lc62">网格 DP：不同路径 · LC62</a></li><li><a href="#quick-lc1143">双序列 DP：LCS 与编辑距离</a></li><li><a href="#quick-lc416">0-1 背包：分割等和子集 · LC416</a></li><li><a href="#quick-lc322">完全背包：零钱兑换 · LC322</a></li><li><a href="#quick-lc139">前缀可达性：单词拆分 · LC139</a></li><li><a href="#quick-dp-bridge">状态迁移：计数、极值与网格</a></li><li><a href="#quick-lc152">双极值状态：最大乘积 · LC152</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-backtracking" title="08 回溯与剪枝 · 22 分钟">08 回溯与剪枝</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-backtracking" aria-expanded="true" aria-label="收起08 回溯与剪枝 · 22 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-backtracking" data-guide-children><li><a href="#quick-lc17">逐位选择：电话字母组合 · LC17</a></li><li><a href="#quick-lc46">排列型：used 与全排列 · LC46</a></li><li><a href="#quick-lc78">子集型：start 与子集 · LC78</a></li><li><a href="#quick-lc39">组合型：复用候选与剪枝 · LC39</a></li><li><a href="#quick-lc79">网格路径：标记与恢复 · LC79</a></li><li><a href="#quick-lc22">合法前缀：括号生成 · LC22</a></li><li><a href="#quick-lc131">分段回溯：分割回文串 · LC131</a></li><li><a href="#quick-lc51">多重约束：N 皇后 · LC51</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-bits" title="09 位运算与函数图 · 4 分钟">09 位运算与函数图</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-bits" aria-expanded="true" aria-label="收起09 位运算与函数图 · 4 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-bits" data-guide-children><li><a href="#quick-lc136">异或抵消：只出现一次 · LC136</a></li><li><a href="#quick-lc287">函数图与环入口：重复数 · LC287</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-coverage" title="10 查缺补漏 · 4 分钟">10 查缺补漏</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-coverage" aria-expanded="true" aria-label="收起10 查缺补漏 · 4 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-coverage" data-guide-children><li><a href="#quick-model-map">按算法模型查找详细例题</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-hard" title="5 道综合 Hard 的迁移思路">5 道综合 Hard 的迁移思路</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-hard" aria-expanded="true" aria-label="收起5 道综合 Hard 的迁移思路子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-hard" data-guide-children><li><a href="#quick-lc4">二分分割线：两数组中位数 · LC4</a></li><li><a href="#quick-lc23">堆与多路归并 · LC23</a></li><li><a href="#quick-lc25">分组反转链表 · LC25</a></li><li><a href="#quick-lc32">下标栈：最长有效括号 · LC32</a></li><li><a href="#quick-lc42">前后缀与双指针：接雨水 · LC42</a></li></ol></li></ol></details><details class="guide-outline-group" data-guide-route="interview-rounds"><summary>三天编码练习</summary><ol><li><a href="#interview-rounds">第 1–3 天的练习入口</a></li><li><a href="#interview-parts">每天轮换的 18 类核心题</a></li><li><a href="#interview-structures">每天两道专项核心</a></li><li><a href="#interview-io">怎样练习与选择加练</a></li></ol></details><details class="guide-outline-group" data-guide-route="hot100-index"><summary>Hot100 完整教材</summary><ol><li><a href="#hot100-index">教材与三天练习的关系</a></li><li><a href="#round-1">第一轮 · 38 道代表题</a></li><li><a href="#round-2">第二轮 · 62 道迁移与综合题</a></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#learning-panorama" title="读法、语法与解题方法">读法、语法与解题方法</a><button hidden type="button" data-guide-expand aria-controls="outline-learning-panorama" aria-expanded="true" aria-label="收起读法、语法与解题方法子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-learning-panorama" data-guide-children><li><a href="#acm-intro">Python 与输入输出详解</a></li><li><a href="#thinking">方法选择与排错</a></li><li><a href="#templates">算法模板的复用</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#textbook-categories" title="21 类算法与题目讲解">21 类算法与题目讲解</a><button hidden type="button" data-guide-expand aria-controls="outline-textbook-categories" aria-expanded="true" aria-label="收起21 类算法与题目讲解子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-textbook-categories" data-guide-children><li><a href="#stage-01">01 数组与原地扫描</a></li><li><a href="#stage-02">02 哈希表与集合</a></li><li><a href="#stage-03">03 双指针与中心扩展</a></li><li><a href="#stage-04">04 矩阵与二维下标</a></li><li><a href="#stage-05">05 前缀统计</a></li><li><a href="#stage-06">06 滑动窗口</a></li><li><a href="#stage-07">07 栈与队列</a></li><li><a href="#stage-08">08 单调栈与单调队列</a></li><li><a href="#stage-09">09 二分查找</a></li><li><a href="#stage-10">10 链表与 LRU</a></li><li><a href="#stage-11">11 递归与归并分治</a></li><li><a href="#stage-12">12 二叉树与 BST</a></li><li><a href="#stage-13">13 堆与 Top-K</a></li><li><a href="#stage-14">14 字典树</a></li><li><a href="#stage-15">15 图搜索与拓扑排序</a></li><li><a href="#stage-16">16 贪心</a></li><li><a href="#stage-17">17 一维动态规划</a></li><li><a href="#stage-18">18 二维动态规划</a></li><li><a href="#stage-19">19 背包与前缀可达性</a></li><li><a href="#stage-20">20 回溯</a></li><li><a href="#stage-21">21 位运算与函数图</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#textbook-reference" title="代码与语法查阅">代码与语法查阅</a><button hidden type="button" data-guide-expand aria-controls="outline-textbook-reference" aria-expanded="true" aria-label="收起代码与语法查阅子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-textbook-reference" data-guide-children><li><a href="#alternatives">备选算法与复杂度</a></li><li><a href="#acm-appendix">公共结构与 100 题完整程序</a></li><li><a href="#syntax-reference">Python 语法卡</a></li><li><a href="#validation">保存程序与运行样例</a></li></ol></li></ol></details><details class="guide-outline-group" data-guide-route="third-round-study"><summary>第三轮按需强化</summary><ol><li><a href="#third-round-study">选读说明</a></li><li><a href="#round-3">面试经典 150 · 精选 18 题</a></li><li><a href="#third-round-templates">4 个强化模板</a></li><li><a href="#extensions">扩展模型与例题</a></li><li><a href="#specials">进阶例题：折半搜索</a></li><li><a href="#new-gap-examples">补充题完整讲解与程序</a></li><li><a href="#third-round-videos">14 集强化视频</a></li></ol></details></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../index.html">返回课程目录</a><a href="../extended-reading.html">扩展资料说明</a></footer></body></html>
+</article><nav class="chapter-pagination" aria-label="返回课程"><a href="../index.html"><span>返回首页</span><strong>查看课程与额外章节</strong></a><a href="#hot100-leetcode-hot100--python-39%E7%90%86%E8%AE%BA%E9%80%9F%E8%A7%88%E4%B8%8E%E4%B8%89%E5%A4%A9%E7%BC%96%E7%A0%81%E7%BB%83%E4%B9%A0"><span>回到顶部 ↑</span><strong>Hot100 完整指南</strong></a></nav></div><aside class="contents"><details data-course-contents open><summary>本页大纲 <span aria-hidden="true">⌄</span></summary><nav class="guide-outline-nav" aria-label="本页小节"><p class="guide-outline-hint">三小时回顾 → 三天练习；教材随题查阅，第三轮按需补充。</p><details class="guide-outline-group" data-guide-route="quick-review" open><summary>三小时速览</summary><ol><li><a href="#quick-review">阅读说明</a></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#program-template" title="01 程序框架与输入输出 · 12 分钟">01 程序框架与输入输出</a><button hidden type="button" data-guide-expand aria-controls="outline-program-template" aria-expanded="true" aria-label="收起01 程序框架与输入输出 · 12 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-program-template" data-guide-children><li><a href="#program-libraries">常用标准库与 import 速查</a></li><li><a href="#library-defaultdict">defaultdict：缺键与默认工厂</a></li><li><a href="#library-counter">Counter：元素与次数</a></li><li><a href="#library-deque">deque：两端增删与队列顺序</a></li><li><a href="#library-heapq">heapq：最小堆与父子约束</a></li><li><a href="#io-format-index">怎样选择 main 模板</a></li><li><a href="#io-one-int">单整数输入</a></li><li><a href="#io-two-ints">两个整数输入</a></li><li><a href="#io-array">一行数组与原地输出</a></li><li><a href="#io-sized-array">长度＋数组</a></li><li><a href="#io-target-array">目标值＋数组</a></li><li><a href="#io-string">字符串输入</a></li><li><a href="#io-boolean">布尔结果输出</a></li><li><a href="#io-words-json">单词与 JSON 输出</a></li><li><a href="#io-matrix">矩阵输入输出</a></li><li><a href="#io-counted-groups">给定组数的多组输入</a></li><li><a href="#io-eof-groups">读到 EOF 的多组输入</a></li><li><a href="#program-example">四段完整框架 · LC1</a></li></ol></li><li><a href="#quick-schedule">180 分钟安排</a></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-io" title="输入输出补充">输入输出补充</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-io" aria-expanded="true" aria-label="收起输入输出补充子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-io" data-guide-children><li><a href="#quick-io-performance">大数据读写与性能</a></li><li><a href="#quick-code-style">变量命名与代码约定</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-sequences" title="02 数组、哈希与窗口 · 32 分钟">02 数组、哈希与窗口</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-sequences" aria-expanded="true" aria-label="收起02 数组、哈希与窗口 · 32 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-sequences" data-guide-children><li><a href="#quick-lc283">读写双指针：移动零 · LC283</a></li><li><a href="#quick-lc11">相向双指针：盛水 · LC11</a></li><li><a href="#quick-lc15">排序、夹逼与去重 · LC15</a></li><li><a href="#quick-lc5">中心扩展：回文子串 · LC5</a></li><li><a href="#quick-lc54">矩阵边界：螺旋遍历 · LC54</a></li><li><a href="#quick-lc560">前缀和＋频次哈希 · LC560</a></li><li><a href="#quick-lc3">最长无重复窗口 · LC3</a></li><li><a href="#quick-lc76">最短覆盖窗口 · LC76</a></li><li><a href="#quick-lc49">哈希分组：异位词 · LC49</a></li><li><a href="#quick-lc128">集合起点：最长连续序列 · LC128</a></li><li><a href="#quick-lc238">前后缀乘积 · LC238</a></li><li><a href="#quick-lc75">三路划分：颜色分类 · LC75</a></li><li><a href="#quick-lc31">字典序：下一个排列 · LC31</a></li><li><a href="#quick-lc41">原地哈希：最小缺失正数 · LC41</a></li><li><a href="#quick-matrix-window-bridge">矩阵旋转、置零与二维搜索</a></li><li><a href="#quick-lc438">定长窗口：字母异位词 · LC438</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-stacks" title="03 栈、单调结构与二分 · 22 分钟">03 栈、单调结构与二分</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-stacks" aria-expanded="true" aria-label="收起03 栈、单调结构与二分 · 22 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-stacks" data-guide-children><li><a href="#quick-lc20">普通栈：括号匹配 · LC20</a></li><li><a href="#quick-lc739">单调栈：下一个更大值 · LC739</a></li><li><a href="#quick-lc84">单调栈：矩形边界 · LC84</a></li><li><a href="#quick-lc239">单调队列：窗口最大值 · LC239</a></li><li><a href="#quick-lc35">二分下界与左右边界 · LC35/34</a></li><li><a href="#quick-lc33">旋转数组查找 · LC33</a></li><li><a href="#quick-lc155">辅助状态：最小栈 · LC155</a></li><li><a href="#quick-lc394">嵌套状态：字符串解码 · LC394</a></li><li><a href="#quick-lc74">矩阵展平后二分 · LC74</a></li><li><a href="#quick-lc153">旋转数组最小值 · LC153</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-linked" title="04 链表、归并与 LRU · 18 分钟">04 链表、归并与 LRU</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-linked" aria-expanded="true" aria-label="收起04 链表、归并与 LRU · 18 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-linked" data-guide-children><li><a href="#quick-lc206">三指针反转链表 · LC206</a></li><li><a href="#quick-lc142">快慢指针：环入口 · LC142</a></li><li><a href="#quick-lc148">分治与两路归并 · LC148/21</a></li><li><a href="#quick-lc2">进位与新链构造 · LC2</a></li><li><a href="#quick-lc19">间距双指针与删除 · LC19</a></li><li><a href="#quick-lc24">成对改边与哑节点 · LC24</a></li><li><a href="#quick-lc160">节点身份：相交链表 · LC160</a></li><li><a href="#quick-lc234">回文链表的两种路线 · LC234</a></li><li><a href="#quick-lc138">节点映射：随机链表复制 · LC138</a></li><li><a href="#quick-lc146">访问顺序：LRU 缓存 · LC146</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-trees" title="05 树、堆与字典树 · 28 分钟">05 树、堆与字典树</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-trees" aria-expanded="true" aria-label="收起05 树、堆与字典树 · 28 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-trees" data-guide-children><li><a href="#quick-lc102">队列与层序遍历 · LC102</a></li><li><a href="#quick-lc215">固定容量堆：第 K 大 · LC215</a></li><li><a href="#quick-lc295">双堆：数据流中位数 · LC295</a></li><li><a href="#quick-lc208">字典树：前缀查询 · LC208</a></li><li><a href="#hot100-%E7%AC%AC-k-%E5%A4%A7%E7%9A%84%E5%8F%A6%E4%B8%80%E6%9D%A1%E6%A0%B8%E5%BF%83%E8%B7%AF%E7%BA%BF%E5%BF%AB%E9%80%9F%E9%80%89%E6%8B%A9quickselect">快速选择：第 K 大 · LC215</a></li><li><a href="#quick-lc104">递归返回值：树高 · LC104</a></li><li><a href="#quick-lc94">显式栈与中序遍历 · LC94</a></li><li><a href="#quick-lc98">BST 约束与有序性 · LC98/230</a></li><li><a href="#quick-lc236">左右子树汇总：公共祖先 · LC236</a></li><li><a href="#quick-lc105">前序＋中序构树 · LC105</a></li><li><a href="#quick-lc437">路径状态与前缀和 · LC437</a></li><li><a href="#quick-lc347">频次分桶：前 K 个高频 · LC347</a></li><li><a href="#quick-lc124">树形 DP：单边返回与全局最优</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-graphs" title="06 图搜索与贪心 · 14 分钟">06 图搜索与贪心</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-graphs" aria-expanded="true" aria-label="收起06 图搜索与贪心 · 14 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-graphs" data-guide-children><li><a href="#quick-lc200">网格 DFS：岛屿数量 · LC200</a></li><li><a href="#quick-lc994">多源 BFS：腐烂橘子 · LC994</a></li><li><a href="#quick-lc207">邻接表、入度与拓扑排序 · LC207</a></li><li><a href="#quick-lc55">贪心覆盖边界：跳跃游戏 · LC55/45</a></li><li><a href="#quick-lc56">排序与区间合并 · LC56</a></li><li><a href="#quick-lc121">历史最小值与一次交易 · LC121</a></li><li><a href="#quick-union-find">并查集：连通块合并 · LC200</a></li><li><a href="#quick-lc763">贪心切段：划分字母区间 · LC763</a></li><li><a href="#quick-lc169">抵消与多数投票 · LC169</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-dp" title="07 动态规划与背包 · 24 分钟">07 动态规划与背包</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-dp" aria-expanded="true" aria-label="收起07 动态规划与背包 · 24 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-dp" data-guide-children><li><a href="#quick-lc198">一维 DP：打家劫舍、最大子数组与 LIS</a></li><li><a href="#quick-lc62">网格 DP：不同路径 · LC62</a></li><li><a href="#quick-lc1143">双序列 DP：LCS 与编辑距离</a></li><li><a href="#quick-lc416">0-1 背包：分割等和子集 · LC416</a></li><li><a href="#quick-lc322">完全背包：零钱兑换 · LC322</a></li><li><a href="#quick-lc139">前缀可达性：单词拆分 · LC139</a></li><li><a href="#quick-dp-bridge">状态迁移：计数、极值与网格</a></li><li><a href="#quick-lc152">双极值状态：最大乘积 · LC152</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-backtracking" title="08 回溯与剪枝 · 22 分钟">08 回溯与剪枝</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-backtracking" aria-expanded="true" aria-label="收起08 回溯与剪枝 · 22 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-backtracking" data-guide-children><li><a href="#quick-lc17">逐位选择：电话字母组合 · LC17</a></li><li><a href="#quick-lc46">排列型：used 与全排列 · LC46</a></li><li><a href="#quick-lc78">子集型：start 与子集 · LC78</a></li><li><a href="#quick-lc39">组合型：复用候选与剪枝 · LC39</a></li><li><a href="#quick-lc79">网格路径：标记与恢复 · LC79</a></li><li><a href="#quick-lc22">合法前缀：括号生成 · LC22</a></li><li><a href="#quick-lc131">分段回溯：分割回文串 · LC131</a></li><li><a href="#quick-lc51">多重约束：N 皇后 · LC51</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-bits" title="09 位运算与函数图 · 4 分钟">09 位运算与函数图</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-bits" aria-expanded="true" aria-label="收起09 位运算与函数图 · 4 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-bits" data-guide-children><li><a href="#quick-lc136">异或抵消：只出现一次 · LC136</a></li><li><a href="#quick-lc287">函数图与环入口：重复数 · LC287</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-coverage" title="10 查缺补漏 · 4 分钟">10 查缺补漏</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-coverage" aria-expanded="true" aria-label="收起10 查缺补漏 · 4 分钟子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-coverage" data-guide-children><li><a href="#quick-model-map">按算法模型查找详细例题</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#quick-hard" title="5 道综合 Hard 的迁移思路">5 道综合 Hard 的迁移思路</a><button hidden type="button" data-guide-expand aria-controls="outline-quick-hard" aria-expanded="true" aria-label="收起5 道综合 Hard 的迁移思路子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-quick-hard" data-guide-children><li><a href="#quick-lc4">二分分割线：两数组中位数 · LC4</a></li><li><a href="#quick-lc23">堆与多路归并 · LC23</a></li><li><a href="#quick-lc25">分组反转链表 · LC25</a></li><li><a href="#quick-lc32">下标栈：最长有效括号 · LC32</a></li><li><a href="#quick-lc42">前后缀与双指针：接雨水 · LC42</a></li></ol></li></ol></details><details class="guide-outline-group" data-guide-route="interview-rounds"><summary>三天编码练习</summary><ol><li><a href="#interview-rounds">第 1–3 天的练习入口</a></li><li><a href="#interview-parts">每天轮换的 18 类核心题</a></li><li><a href="#interview-structures">每天两道专项核心</a></li><li><a href="#interview-io">怎样练习与选择加练</a></li></ol></details><details class="guide-outline-group" data-guide-route="hot100-index"><summary>Hot100 完整教材</summary><ol><li><a href="#hot100-index">教材与三天练习的关系</a></li><li><a href="#round-1">第一轮 · 38 道代表题</a></li><li><a href="#round-2">第二轮 · 62 道迁移与综合题</a></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#learning-panorama" title="读法、语法与解题方法">读法、语法与解题方法</a><button hidden type="button" data-guide-expand aria-controls="outline-learning-panorama" aria-expanded="true" aria-label="收起读法、语法与解题方法子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-learning-panorama" data-guide-children><li><a href="#acm-intro">Python 与输入输出详解</a></li><li><a href="#thinking">方法选择与排错</a></li><li><a href="#templates">算法模板的复用</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#textbook-categories" title="21 类算法与题目讲解">21 类算法与题目讲解</a><button hidden type="button" data-guide-expand aria-controls="outline-textbook-categories" aria-expanded="true" aria-label="收起21 类算法与题目讲解子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-textbook-categories" data-guide-children><li><a href="#stage-01">01 数组与原地扫描</a></li><li><a href="#stage-02">02 哈希表与集合</a></li><li><a href="#stage-03">03 双指针与中心扩展</a></li><li><a href="#stage-04">04 矩阵与二维下标</a></li><li><a href="#stage-05">05 前缀统计</a></li><li><a href="#stage-06">06 滑动窗口</a></li><li><a href="#stage-07">07 栈与队列</a></li><li><a href="#stage-08">08 单调栈与单调队列</a></li><li><a href="#stage-09">09 二分查找</a></li><li><a href="#stage-10">10 链表与 LRU</a></li><li><a href="#stage-11">11 递归与归并分治</a></li><li><a href="#stage-12">12 二叉树与 BST</a></li><li><a href="#stage-13">13 堆与 Top-K</a></li><li><a href="#stage-14">14 字典树</a></li><li><a href="#stage-15">15 图搜索与拓扑排序</a></li><li><a href="#stage-16">16 贪心</a></li><li><a href="#stage-17">17 一维动态规划</a></li><li><a href="#stage-18">18 二维动态规划</a></li><li><a href="#stage-19">19 背包与前缀可达性</a></li><li><a href="#stage-20">20 回溯</a></li><li><a href="#stage-21">21 位运算与函数图</a></li></ol></li><li class="guide-outline-module"><div class="guide-outline-row"><a href="#textbook-reference" title="代码与语法查阅">代码与语法查阅</a><button hidden type="button" data-guide-expand aria-controls="outline-textbook-reference" aria-expanded="true" aria-label="收起代码与语法查阅子目录"><span aria-hidden="true">⌄</span></button></div><ol id="outline-textbook-reference" data-guide-children><li><a href="#alternatives">备选算法与复杂度</a></li><li><a href="#acm-appendix">公共结构与 100 题完整程序</a></li><li><a href="#syntax-reference">Python 语法卡</a></li><li><a href="#validation">保存程序与运行样例</a></li></ol></li></ol></details><details class="guide-outline-group" data-guide-route="third-round-study"><summary>第三轮按需强化</summary><ol><li><a href="#third-round-study">选读说明</a></li><li><a href="#round-3">面试经典 150 · 精选 18 题</a></li><li><a href="#third-bisect">手写二分与 bisect 对照</a></li><li><a href="#third-round-templates">4 个强化模板</a></li><li><a href="#extensions">扩展模型与例题</a></li><li><a href="#specials">进阶例题：折半搜索</a></li><li><a href="#new-gap-examples">补充题完整讲解与程序</a></li><li><a href="#third-round-videos">14 集强化视频</a></li></ol></details></nav></details></aside></main><footer class="site-footer"><span>Agent 工程课程 · 01–62 章</span><a href="../index.html">返回课程目录</a><a href="../extended-reading.html">扩展资料说明</a></footer></body></html>
