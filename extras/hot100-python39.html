@@ -18,6 +18,7 @@
 <h2 id="hot100-三小时系统速览每类方法都有详细例题">三小时系统速览：每类方法都有详细例题</h2>
 <p>本课面向已有 Python 基础、需要系统回顾数据结构与算法的读者。按 <strong>问题与输入输出 → 状态如何变化 → 为什么成立 → 核心代码与边界 → 同类迁移</strong> 顺序直接阅读。代表题详细展开，同类题压缩重复部分，但仍交代变化的条件、解题步骤与正确性理由。先读本节推荐实现及其状态变化，再比较能改变时间、空间或输入适用范围的备选。每段讲解给出参考代码和结果，适合顺序阅读。</p>
 <p><strong>学习顺序：今天先在这里熟悉程序框架与输入输出，再回顾各类算法；周二、周三、周四进入三天编码练习。</strong> 开头先选读常用的 <code>main()</code> 写法，其余输入格式随题查阅。看完框架后进入<a href="#quick-sequences">数组、哈希与窗口</a>，再按大纲推进其他类别；整体节奏可查<a href="#quick-schedule">180 分钟安排</a>。</p>
+<p><strong>视频怎么用：</strong> 各类例题附近的“视频补充”链接来自灵茶山艾府的<a href="https://space.bilibili.com/206214/lists/842776?type=season">《基础算法精讲》27 集合集</a>。按当前疑问选一集，重点看状态怎样变化、为什么能这样做，再回到本课代码对照。链接标注单集总时长（分钟:秒），观看时间另计；180 分钟安排仍按文字速览计算。“迁移”会注明视频例题与本课题目的条件差异，“扩展”供有余力时选看。</p>
 <p><a id="program-template"></a></p>
 <h3 id="hot100-每次动手前先写统一的程序框架">每次动手前：先写统一的程序框架</h3>
 <p>本课本地练习统一按 <strong>导入模块 → 定义解题函数 → 定义 main → 调用 main</strong> 四段组织。Python 定义函数的关键字是 <code>def</code>；<code>main</code> 是我们约定的入口函数名。每次换题，主要替换三处：<strong>怎样读入参数、解题函数怎样计算、结果怎样输出</strong>。</p>
@@ -362,6 +363,13 @@
 <h4 id="hot100-03左右夹逼盛水与三数之和">03｜左右夹逼：盛水与三数之和</h4>
 <p><a id="quick-lc11"></a></p>
 <p><a href="#lc11">LC11 盛最多水的容器</a>：非负高度 <code>[1,8,6,2,5,4,8,3,7] → 49</code>。<strong>推荐相向双指针：先算当前面积，再移动较短的一端。</strong> 面积由短边决定；固定短边而把另一端移近，宽度变小、高度上限保持不变，因此该短边参与的剩余配对可以整体排除。</p>
+<blockquote>
+<p><strong>视频补充｜相向双指针</strong></p>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1Qg411q7ia/">02｜盛最多水的容器 接雨水（12:35）</a>：对应 LC11，也讲 LC42 接雨水。适合梳理短边限制，以及怎样根据左右边界确定当前能得到的答案。</li>
+<li><a href="https://www.bilibili.com/video/BV1bP411c7oJ/">01｜两数之和 三数之和（13:19）</a>：对应后面的 LC15 三数之和。适合理解排序后为何能按和的大小移动指针，以及固定一项后怎样去重。本集“两数之和”使用有序数组（LC167）；本课 LC1 的无序数组推荐哈希表。</li>
+</ul>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">max_area</span>(heights):
     <span class="syntax-comment"># left/right 是当前两条挡板的下标，从最宽的两端开始。</span>
     left, right = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(heights) - <span class="syntax-number">1</span>
@@ -483,6 +491,10 @@
 <h4 id="hot100-06滑动窗口最长无重复子串">06｜滑动窗口：最长无重复子串</h4>
 <p><a id="quick-lc3"></a></p>
 <p><a href="#lc3">LC3 最长无重复子串</a>：<code>abba → 2</code>。<strong>推荐集合加滑动窗口</strong>：集合保存当前窗口的字符；遇到重复时，逐个移除左端字符，直到当前字符可以加入。集合与窗口同步变化，能直接看见“恢复无重复”这一步。</p>
+<blockquote>
+<p><strong>视频补充｜滑动窗口</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1hd4y1r7Gq/">03｜滑动窗口（14:57）</a>。适合分清何时扩窗、何时缩窗、何时更新答案。课上用 LC3、LC209、LC713 对照最长、最短与计数窗口；后面的 LC76 再沿这个框架维护字符需求与达标状态。</p>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">length_of_longest_substring</span>(s):
     <span class="syntax-comment"># seen 保存当前无重复窗口的字符；left 指向窗口左端。</span>
     seen = <span class="syntax-function">set</span>()
@@ -675,6 +687,10 @@
 <p><strong>跟踪 <code>([])</code>：</strong> 读 <code>(</code> 后栈为 <code>[&quot;(&quot;]</code>，读 <code>[</code> 后为 <code>[&quot;(&quot;, &quot;[&quot;]</code>；遇 <code>]</code> 弹出并匹配 <code>[</code>，再遇 <code>)</code> 弹出并匹配 <code>(</code>，最后栈为空，返回 True。栈始终只保存“已出现但未匹配的左括号”，而新右括号只能关闭最近的一层；失配当场返回 False，读完后仍有剩余左括号也返回 False。</p>
 <p><a id="quick-lc739"></a></p>
 <p><strong>单调栈（Monotonic Stack）· <a href="#lc739">LC739 每日温度</a>：</strong> 推荐从左到右扫描，栈里存尚未找到更高温度的<strong>下标</strong>；当前温度比栈顶对应温度更高时，立即用下标差结算等待天数。</p>
+<blockquote>
+<p><strong>视频补充｜单调栈</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1VN411J7S7/">26｜单调栈（12:28）</a>。对应 LC739 每日温度，也讲 LC42 接雨水。适合思考栈里等待的是什么、当前元素为什么能让旧下标出栈；后面的 LC84 在此基础上改为寻找更矮的边界。</p>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">daily_temperatures</span>(temperatures):
     result = [<span class="syntax-number">0</span>] * <span class="syntax-function">len</span>(temperatures)
     <span class="syntax-comment"># 栈存尚未等到更高温度的下标，对应温度从栈底到栈顶非递增。</span>
@@ -714,6 +730,10 @@
 <p><a id="quick-lc239"></a></p>
 <h4 id="hot100-单调队列窗口中的候选与过期">单调队列：窗口中的候选与过期</h4>
 <p><strong>单调队列（Monotonic Queue）· <a href="#lc239">LC239 滑动窗口最大值</a>：</strong> 推荐先导入 <code>from collections import deque</code>，用双端队列保存候选下标。队首用 <code>popleft()</code> 删除过期项，队尾用 <code>pop()</code> 删除已被新项压过的候选；处理完后，队首对应当前窗口最大值。</p>
+<blockquote>
+<p><strong>视频补充｜单调队列</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1bM411X72E/">27｜单调队列 滑动窗口最大值（7:11）</a>。直接对应 LC239。适合分清队首删除“已离开窗口的下标”，与队尾删除“被新元素淘汰的候选”这两种操作。</p>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">window_maximum</span>(nums, k):
@@ -740,6 +760,10 @@
 <p><a id="quick-binary"></a></p>
 <h4 id="hot100-二分边界下界旋转数组与二维搜索">二分边界：下界、旋转数组与二维搜索</h4>
 <p>二分查找（Binary Search）推荐先确定有序条件与返回含义，再选择区间模板。下界模板维护左闭右开区间 <code>[left,right)</code>，每次借助大小关系排除一半候选；这个模板可直接用于插入位置与重复值范围。旋转数组则先判明哪半有序，再决定保留哪半。</p>
+<blockquote>
+<p><strong>视频补充｜二分边界</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1AP41137w7/">04｜二分查找 红蓝染色法（12:36）</a>。对应 LC34，可迁移到 LC35。适合用红蓝区域理解哪些位置已确定、哪些仍待搜索，再核对当前区间写法的循环条件与边界更新。</p>
+</blockquote>
 <p><a id="quick-lc35"></a></p>
 <p><a id="quick-lc34"></a></p>
 <p><strong>普通下界 · <a href="#stage-09">LC35 / LC34</a>：</strong> 输入为非递减整数数组，返回第一个 <code>&gt;= target</code> 的位置；找不到时返回数组长度。</p>
@@ -767,6 +791,10 @@
 <p><strong>跟踪查找 2 的下界：</strong> <code>[1,2,2,4]</code> 初始范围 <code>[0,4)</code>，mid=2 的值为 2，令 right=2；mid=1 的值仍为 2，令 right=1；mid=0 的值为 1，令 left=1，返回 1。始终保持 left 左侧都小于目标、right 及其右侧都不小于目标；区间缩为空时这个分界就是最早合法位置。查找范围的右端则把目标换为 3，得到下界 3，再减一得到最后一个 2 的下标 2。</p>
 <p><a id="quick-lc33"></a></p>
 <p><strong>旋转数组 · <a href="#lc33">LC33</a>：</strong> 原数组严格递增且没有重复，旋转后每次至少有一半仍然有序。</p>
+<blockquote>
+<p><strong>视频补充｜旋转数组二分</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1QK411d76w/">05｜数组峰值 搜索旋转排序数组（6:17）</a>。直接包含 LC33 和 LC153，另用 LC162 讲峰值。适合在理解普通二分后，继续判断旋转数组中哪一半有序、目标所在区间怎样保留。</p>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">search_rotated</span>(nums, target):
     <span class="syntax-comment"># 搜索闭区间 [left,right]；每轮至少有一半保持升序。</span>
     left, right = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(nums) - <span class="syntax-number">1</span>
@@ -871,6 +899,10 @@
 <p><code>list_values</code> 用于<strong>无环链表</strong>的输出，时间 O(n)，收集结果占 O(n) 空间。环检测题先用快慢指针返回布尔值或入口节点，再输出题目要求的结果；这样输出过程也能结束。</p>
 <p><a id="quick-lc206"></a></p>
 <p><strong>反转 · <a href="#lc206">LC206</a>：</strong> 推荐三指针迭代：<code>previous</code> 保存已反转前缀的头，<code>current</code> 指向待处理节点；先用 <code>next_node</code> 保留原后继，再改变当前节点的连接。保存后继让下一轮仍能找到剩余链，迭代则把运行中的辅助状态固定为几个引用。</p>
+<blockquote>
+<p><strong>视频补充｜链表反转</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1sd4y1x7KN/">06｜反转链表（7:13）</a>。直接包含 LC206，并延伸到局部反转与 LC25。适合按节点连接的变化理解“保存后继 → 改边 → 推进指针”，再比较整条反转与分组反转的接回位置。</p>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">reverse_list</span>(head):
     <span class="syntax-comment"># previous 是已反转部分的头；一开始该部分为空。</span>
     previous = <span class="syntax-literal">None</span>
@@ -889,6 +921,10 @@
 <p><strong>跟踪 <code>1→2→3</code>：</strong> 开始时 previous 为空、current 为 1；处理 1 后得到 <code>1→None</code>，current 仍通过预先保存的 next_node 找到 2；接着得到 <code>2→1→None</code>，最后得到 <code>3→2→1→None</code>。循环始终把节点分成“previous 开头的已反转前缀”和“current 开头的未处理后缀”，每轮只把一个节点移到前者，所以结束时全部节点恰好反转一次。</p>
 <p><a id="quick-lc142"></a></p>
 <p><strong>快慢指针（Fast and Slow Pointers）· <a href="#lc142">LC142 环入口</a>：</strong> 推荐先让 slow 每轮走一步、fast 走两步，在环里相遇后，再让一个指针回到头部，两者每次各走一步。第一阶段识别重复走过的环，第二阶段用路程关系定位入口；下方推演说明这个关系。</p>
+<blockquote>
+<p><strong>视频补充｜快慢指针与环入口</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1KG4y1G7cu/">07｜环形链表II（7:35）</a>。直接包含 LC141、LC142。适合梳理相遇只说明有环、相遇点怎样帮助找到入口，以及为什么第二阶段两个指针都走一步。</p>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">cycle_entry</span>(head):
     <span class="syntax-comment"># slow 每次走一步，fast 每次走两步；有环时会在环内相遇。</span>
     slow = fast = head
@@ -944,6 +980,10 @@
 <p><strong>跟踪 <code>[4,2,1,3]</code>：</strong> 先断成 <code>[4,2]</code> 和 <code>[1,3]</code>，各自再断成单节点；单节点天然有序，逐层合并为 <code>[2,4]</code>、<code>[1,3]</code>，最后依次取 1、2、3、4。每次合并都从两个有序剩余链的头部选最小值，故输出也有序；递归一直缩到单节点提供了这个保证的起点。</p>
 <h4 id="hot100-同型迁移链表与缓存先分清值节点和访问顺序">同型迁移｜链表与缓存：先分清值、节点和访问顺序</h4>
 <p>普通链表继续共用前面定义的 <code>ListNode</code>、<code>build_plain_list</code>、<code>list_values</code>。箭头表示真实的 <code>next</code> 连接；按值比较大小，按节点身份判断相交或相遇。普通链表题在未说明有环时均假定无环。<a href="#shared-nodes">附录公共节点</a>另用 <code>build_list(values)</code> 返回 <code>(head, nodes)</code>，其中节点列表用于按下标建立环、共享尾部或随机指针。</p>
+<blockquote>
+<p><strong>视频补充｜链表删除与前驱</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1VP4y1Q71e/">08｜删除链表重复节点（6:48）</a>。本集标题是“删除链表重复节点”，课上也直接讲 LC19 删除倒数第 N 个节点。适合对照删除头节点、定位前驱和修改 next；重复节点题则是另一组删除条件。</p>
+</blockquote>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 9 · 同型迁移｜链表与缓存：先分清值、节点和访问顺序"><table><caption>表 9 · 同型迁移｜链表与缓存：先分清值、节点和访问顺序</caption><thead><tr><th scope="col">题目</th><th scope="col">状态与关键步骤</th><th scope="col">小输入 → 结果</th><th scope="col">关键边界</th></tr></thead><tbody><tr><td><a id="quick-lc21"></a><a href="#lc21">LC21 合并有序链表</a></td><td>直接复用<a href="#quick-linked">归并段</a>的 <code>merge_lists(a,b)</code>：哑节点保存结果入口，tail 连接两表较小的当前节点，被选中的链前进；一表耗尽后接上另一表剩余部分。 每条剩余链的头都是该链最小值，因此两头中较小者也是全体剩余节点的最小值；逐次接上它，结果前缀始终有序。</td><td><code>[1,3]</code> 与 <code>[1,2] → [1,1,2,3]</code>。</td><td>输入已排序且没有共享节点；允许空表、重复值，原地重连，O(m+n) 时间、O(1) 额外空间。</td></tr>
 <tr><td><a id="quick-lc141"></a><a href="#lc141">LC141 环形链表</a></td><td>复用<a href="#quick-linked">快慢指针段</a>的 <code>cycle_entry(head)</code>，返回值不为 <code>None</code> 就有环；只求布尔值时，两指针在环内相遇便可返回 <code>True</code>，fast 或 fast.next 为空则返回 <code>False</code>，省去找入口阶段。 无环时 fast 必到链尾；有环时两者进入环后，fast 每轮相对 slow 多走一步，最多再走一圈便会同位置，因而两种结果都能被识别。</td><td><code>a → b → a</code> → <code>True</code>；两个值都为 1、但末尾为空的节点 → <code>False</code>。</td><td>相遇按 <code>is</code> 判断节点身份；自环、空表也覆盖。O(n) 时间、O(1) 空间。</td></tr>
 <tr><td><a id="quick-lc2"></a><a href="#lc2">LC2 两数相加</a></td><td>链表逆序存十进制位；同时扫描两表，用 carry 保存进位，缺失的一位当 0。每轮输出 <code>total % 10</code>，更新 <code>carry = total // 10</code>，两表耗尽且 carry 为 0 才结束。</td><td><code>[2,4,3] + [5,6,4] → [7,0,8]</code>，即 342+465=807。</td><td>两表长度可以不同；<code>[9]+[1] → [0,1]</code>，末尾进位不能丢。O(m+n) 时间，结果以外 O(1) 空间。</td></tr>
@@ -1048,8 +1088,16 @@
 <h3 id="hot100-84112-分钟二叉树bst堆与字典树">84–112 分钟｜二叉树、BST、堆与字典树</h3>
 <p>本节推荐以题目要求的访问顺序选择结构：按层输出用队列，子树返回高度或贡献用深度优先遍历，持续维护排名边界用堆，重复查前缀用字典树。队列导入 <code>from collections import deque</code>，堆导入 <code>import heapq</code>；树节点和字典树使用下方定义的普通类，孩子映射直接用内置 <code>dict</code>。</p>
 <p>二叉树（Binary Tree）的每个节点至多有两个孩子；二叉搜索树（Binary Search Tree，BST）还要求每个节点的整个左子树值更小、整个右子树值更大。前序是“根→左→右”，中序是“左→根→右”，后序是“左→右→根”；层序按深度逐层访问。写递归前先明确返回值的意义，例如高度、单边贡献、真假或节点；父节点据此组合子树结果，空节点的返回值也随这个意义确定。</p>
+<blockquote>
+<p><strong>视频补充｜先理解递归返回值</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1UD4y1Y769/">09｜看到递归就晕？带你理解递归的本质！（7:43）</a>。用 LC104 最大深度解释递归怎样拆成子问题、子调用返回什么、父节点怎样使用结果。若读树题时难以跟上返回过程，先看这一集。</p>
+</blockquote>
 <p><a id="quick-lc102"></a></p>
 <p><strong>树的层序遍历（Breadth-first Search，BFS）· <a href="#lc102">LC102</a>：</strong> 推荐 <code>deque</code> 队列：用 <code>append()</code> 从尾部加入孩子，用 <code>popleft()</code> 从头部取最早发现的节点。每轮先固定当前层节点数，新加入的孩子留给下一轮，队列顺序就对应层序。</p>
+<blockquote>
+<p><strong>视频补充｜二叉树层序遍历</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1hG4y1277i/">13｜二叉树的层序遍历（9:14）</a>。直接对应 LC102。适合对照队列的变化，理解为什么先固定这一层的节点数，以及为什么新加入的孩子属于下一层。</p>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -1210,6 +1258,13 @@
 <strong>跟踪一次可能的划分：</strong> 目标升序下标为 4。假设先选基准 3，划分后小于段为 <code>[2,1]</code>、等于段为 <code>[3]</code>、大于段为 <code>[6,4,5]</code>；目标只可能在右段。该段若再选 5，就分成 <code>[4]</code>、<code>[5]</code>、<code>[6]</code>，等于段落在下标 4，返回 5。划分保证左段每个值都更小、右段每个值都更大，因此等于段占据的排名已经确定；目标所在段包含全部可能答案，继续对这段划分就能逐步确定目标排名。这里是为说明状态而选定的基准，实际随机过程可不同。</p>
 <h4 id="hot100-同型迁移树与堆遍历顺序返回值和路径状态">同型迁移｜树与堆：遍历顺序、返回值和路径状态</h4>
 <p>树共用前面定义的 <code>TreeNode</code>。表中的 <code>[1,2,3,null,4]</code> 按层序表示树，<code>null</code> 表示缺失的孩子。递归版本先用空子树返回值和父节点组合规则解释状态；<strong>树深接近 Python 的递归限制时，改用显式栈保存节点、处理阶段及局部结果</strong>。这种调整改变调用状态的存储位置，仍沿用同一遍历顺序与组合规则。</p>
+<blockquote>
+<p><strong>视频补充｜递归在不同树题中的用法</strong></p>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV18M411z7bb/">10｜如何灵活运用递归？（7:16）</a>：直接包含 LC101 对称二叉树、LC199 右视图。适合比较“同时递归两个位置”与“按访问顺序记录结果”；本课右视图使用层序遍历，可对照视频的递归思路。</li>
+<li><a href="https://www.bilibili.com/video/BV1W44y1Z7AR/">12｜二叉树的最近公共祖先（6:19）</a>：直接对应表中的 LC236 最近公共祖先。适合分清左右子树返回空、返回一个目标、返回已确定祖先时的含义；视频另讲的 LC235 可以利用 BST 大小关系。</li>
+</ul>
+</blockquote>
 <div class="table-scroll" tabindex="0" role="region" aria-label="表 13 · 同型迁移｜树与堆：遍历顺序、返回值和路径状态"><table><caption>表 13 · 同型迁移｜树与堆：遍历顺序、返回值和路径状态</caption><thead><tr><th scope="col">题目</th><th scope="col">状态与关键步骤</th><th scope="col">小输入 → 结果</th><th scope="col">关键边界</th></tr></thead><tbody><tr><td><a id="quick-lc104"></a><a href="#lc104">LC104 最大深度</a></td><td>子树函数返回高度：空节点返回 0，否则返回 <code>1 + max(左高, 右高)</code>。也可复用层序遍历，每完成一层深度加 1。 从当前节点向下的最长路径只能选左、右子树中的一条，再加当前这一层；对子树递归应用同一关系便得到整树高度。</td><td><code>[1,2,3,null,4] → 3</code>。</td><td>空树为 0，单节点为 1；这里数节点层数。O(n) 时间，递归栈 O(h)，h 为树高。</td></tr>
 <tr><td><a id="quick-lc94"></a><a href="#lc94">LC94 中序遍历</a></td><td>用 stack 与 current：沿左孩子入栈直到为空，弹出节点输出其值，再令 current 指向其右孩子；当 current 为空且栈为空才结束。访问顺序为左→根→右。 栈保存左子树尚待处理完的祖先；只有左侧全部完成才弹出根，随后处理右侧，因此每个节点恰按左→根→右访问一次。</td><td><code>[2,1,3] → [1,2,3]</code>。</td><td>普通树也能中序遍历，只有二叉搜索树的结果才有序；空树返回空数组。O(n) 时间，栈 O(h)。</td></tr>
 <tr><td><a id="quick-lc226"></a><a href="#lc226">LC226 翻转二叉树</a></td><td>空节点直接返回；分别保存递归翻转左右子树的结果，再把翻转后的右子树接到 left、左子树接到 right，返回当前节点。 一棵树的镜像就是“右子树的镜像在左、左子树的镜像在右”；子树已分别翻转，再交换两侧，就满足整棵树的镜像定义。</td><td><code>[2,1,3] → [2,3,1]</code>。</td><td>每个节点都要交换，不仅根节点；改变原树连接，空树仍为空。O(n) 时间，递归栈 O(h)。</td></tr>
@@ -1226,6 +1281,10 @@
 <tr><td><a id="quick-lc347"></a><a href="#lc347">LC347 前 K 个高频元素</a></td><td>哈希表统计频次，按频次放入桶：bucket[f] 保存出现 f 次的值。从最高频桶向下取，累计 k 个返回。</td><td><code>[1,1,1,2,2,3]</code>、k=2 → <code>[1,2]</code>。</td><td>取的是频次高的不同值，不是数值最大的元素；并列频次的输出顺序可不同。k 合法，期望 O(n) 时间、O(n) 额外空间。</td></tr></tbody></table></div>
 <h4 id="hot100-bst-例题把祖先约束一起传下去">BST 例题：把祖先约束一起传下去</h4>
 <p>以 <a href="#quick-lc98">LC98 验证 BST</a> 为例，输入 <code>[5,1,4,null,null,3,6]</code>，输出 False。根 5 的初始范围为 <code>(−∞,+∞)</code>；进入左孩子 1 时范围改为 <code>(−∞,5)</code>，它合法；进入右孩子 4 时范围改为 <code>(5,+∞)</code>，4 没有大于 5，立即判定失败。范围约束的是整个子树：即使把右孩子改成 7，它下面的左孩子 4 仍须满足 <code>(5,7)</code>，不能仅因 4 小于直接父节点 7 就放行。</p>
+<blockquote>
+<p><strong>视频补充｜验证二叉搜索树</strong></p>
+<p><a href="https://www.bilibili.com/video/BV14G411P7C1/">11｜验证二叉搜索树（8:34）</a>。直接对应 LC98，比较前序、中序、后序三种写法。适合先弄清祖先约束为何要向下传，再对照中序递增这一验证角度。</p>
+</blockquote>
 <p>合法正例 <code>[5,3,7,2,4,6,8]</code> 返回 True：3 在 <code>(−∞,5)</code> 内，其左孩子 2 在 <code>(−∞,3)</code>、右孩子 4 在 <code>(3,5)</code>；7 在 <code>(5,+∞)</code> 内，其左孩子 6 在 <code>(5,7)</code>、右孩子 8 在 <code>(7,+∞)</code>。所有节点都通过继承下来的开区间，说明任一祖先左侧的全部后代更小、右侧的全部后代更大，正好满足 BST 的定义。</p>
 <h4 id="hot100-两种遍历给出同一棵树前序与中序构树">两种遍历给出同一棵树：前序与中序构树</h4>
 <p>推荐使用 <code>build_tree_pre_in(preorder, inorder)</code>，输入前序与中序列表，返回根节点。名称中的 <code>pre_in</code> 对应这两种遍历；<a href="#shared-nodes">附录公共节点</a>的 <code>build_tree(tokens)</code> 则用于解析层序输入，返回 <code>(root, nodes)</code>。</p>
@@ -1295,6 +1354,10 @@
 <p><a id="quick-lc124"></a></p>
 <h4 id="hot100-树形动态规划返回给父节点的量与完整答案">树形动态规划：返回给父节点的量与完整答案</h4>
 <p><strong>树形动态规划（Tree DP）· <a href="#lc124">LC124 最大路径和</a>：</strong> 推荐后序 DFS：先取得左右孩子的单边贡献，在当前节点把两边与节点值相加更新全局答案，再返回“当前节点值＋较大的单边贡献”给父节点。前者表示在本节点完成的路径，后者表示还能向上延伸的路径，两种状态分别服务这两个用途。</p>
+<blockquote>
+<p><strong>视频补充｜树形 DP 的两种结果</strong></p>
+<p><a href="https://www.bilibili.com/video/BV17o4y187h1/">23｜树形 DP：树的直径（10:18）</a>。直接包含 LC543 二叉树直径和 LC124 最大路径和。适合弄清“返回父节点的单边长度或贡献”与“在当前节点结算的完整路径”为何分别计算。</p>
+</blockquote>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">max_path_sum</span>(root):
     <span class="syntax-comment"># 很深的树可能超过 Python 递归深度限制；这时需要改写为显式栈</span>
     <span class="syntax-keyword">if</span> root <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
@@ -1479,6 +1542,15 @@
         <span class="syntax-comment"># 把当前价格当卖出价，配上此前及当日最低价；当日买卖贡献为 0。</span>
         result = <span class="syntax-function">max</span>(result, price - min_price)
     <span class="syntax-keyword">return</span> result</code></pre>
+<details>
+<summary>按需扩展：从一次股票交易到状态机 DP</summary>
+
+<blockquote>
+<p><strong>视频补充｜股票系列扩展</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1ho4y1W7QK/">21｜买卖股票的最佳时机（14:48）</a>。适合已理解 LC121、想继续比较持有与空仓状态时观看。课上主要讲 LC122 多次交易、LC309 冷冻期和 LC188 交易次数限制；本课 LC121 最多交易一次，更新持有状态仍从首次买入的 −price 出发。约束变化时，再增加相应状态。</p>
+</blockquote>
+</details>
+
 <p><a id="quick-union-find"></a></p>
 <h4 id="hot100-连通性还有并查集union-find这一种结构">连通性还有并查集（Union Find）这一种结构</h4>
 <p>岛屿数量已经用深度优先搜索（Depth-First Search，DFS）的显式栈解决；若问题持续合并两组元素，并反复问“是否在同一组”，可以用并查集。<code>parent[x]</code> 指向父节点，代表元素是根；<code>find(x)</code> 找根，<code>union(a,b)</code> 合并两棵树。n 个元素编号为 <code>0..n-1</code>，查询与合并使用合法编号。本轮先用按大小合并：每次把小树接到大树下面，一个节点的深度每增加一层，它所属集合大小至少翻倍，因此树高有 O(log n) 保证。</p>
@@ -1557,6 +1629,13 @@
 <p><a id="quick-lc53"></a></p>
 <p><a id="quick-lc300"></a></p>
 <p><strong>单元 17，一维 DP。</strong> <a href="#lc198">LC198 打家劫舍</a>的状态是前缀最优，可以不选；<a href="#lc53">LC53 最大子数组和</a>的状态是<strong>必须以当前位置结尾的非空连续段</strong>；<a href="#lc300">LC300 最长递增子序列</a>的状态是以位置 index 结尾的最长严格递增子序列，允许不连续。</p>
+<blockquote>
+<p><strong>视频补充｜一维 DP 与最长递增子序列</strong></p>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1Xj411K7oF/">17｜动态规划入门：从记忆化搜索到递推（8:09）</a>：用 LC198 打家劫舍串起递归、记忆化搜索和递推。适合重新推导“选或不选”的状态，再理解状态表与滚动变量之间的关系。</li>
+<li><a href="https://www.bilibili.com/video/BV1ub411Q7sB/">20｜最长递增子序列（12:09）</a>：直接对应 LC300，比较 O(n²) DP 与 O(n log n) 方法。适合区分“以某个位置结尾的最优长度”与“同长度递增子序列的最小末尾”两种状态。</li>
+</ul>
+</blockquote>
 <p><code>rob([2,7,9,3,1]) → 12</code>，房屋金额非负，空数组返回 0。速览推荐用 <code>dp[index]</code> 表示前 index 间房的最优金额：比较跳过第 index 间，以及选它并接上前 index−2 间的答案。整张表便于核对每一步；第一轮在相同转移上进一步使用前两项滚动变量。</p>
 <p><code>max_sub_array([-2,-1]) → -1</code>，输入非空，推荐把 <code>current</code> 和 <code>result</code> 都初始化为首项：前者是以当前位置结尾的最优和，后者是全局答案，因此全负数组也能得到最大的那个负数。<code>length_of_lis([10,9,2,5,3,7,101,18]) → 4</code>；<code>[2,2] → 1</code>，严格递增用 <code>&lt;</code>；空数组返回 0。推荐先用 O(n²) 的逐位置 DP，看清每个 index 可以接在哪个 previous_index 后面，再根据规模选择二分版本。</p>
 <p><strong>推荐与备选怎么选：</strong> 下表的空间指辅助空间；三题均只返回一个数。</p>
@@ -1619,6 +1698,10 @@
     <span class="syntax-keyword">return</span> dp[-<span class="syntax-number">1</span>][-<span class="syntax-number">1</span>]</code></pre>
 <p><a id="quick-lc1143"></a></p>
 <p><strong><a href="#lc1143">LC1143 最长公共子序列</a></strong>：<code>longest_common_subsequence(&quot;abcde&quot;,&quot;ace&quot;) → 3</code>，子序列不要求连续。<code>rows</code>、<code>cols</code> 分别是两个字符串的长度，<code>dp[row][col]</code> 表示两个前缀 <code>a[:row]</code>、<code>b[:col]</code> 的答案；末字符相等取左上加 1，否则跳过一边，取上方和左方最大值。</p>
+<blockquote>
+<p><strong>视频补充｜双字符串 DP</strong></p>
+<p><a href="https://www.bilibili.com/video/BV1TM4y1o7ug/">19｜最长公共子序列 编辑距离（10:50）</a>。直接包含 LC1143 和后面的 LC72 编辑距离。适合看清二维表每一格对应哪两个前缀，以及末字符相等、不等时分别从哪些状态转移。</p>
+</blockquote>
 <p><strong>过程与理由：</strong> 对 a=<code>&quot;ab&quot;</code>、b=<code>&quot;ac&quot;</code>，匹配两个首字符 a 得 <code>dp[1][1]=1</code>；比较 b 与 a，继承已有的 1；比较 b 与 c，取两边前缀答案的最大值，仍为 1。末字符不相等时，公共子序列不可能同时使用这两个末尾位置，至少要跳过一边，所以取两种前缀答案的最大值；末字符相等时，可在两个更短前缀的最优公共子序列后接上这一字符，最优长度正好增加 1。</p>
 <p><a id="quick-lc72"></a></p>
 <p><strong><a href="#lc72">LC72 编辑距离</a></strong>：<code>edit_distance(&quot;horse&quot;,&quot;ros&quot;) → 3</code>，<code>edit_distance(&quot;&quot;,&quot;ab&quot;) → 2</code>。状态改为两个前缀间的最少插入、删除、替换次数；空前缀边界不再全为 0，而是另一边的长度。两题均支持空字符串；设长度为 m、n，以下版本时间、辅助空间均 O((m+1)(n+1))。推荐用列表推导逐行独立创建状态表，这样更新某一行时其他行的历史状态仍然保留。</p>
@@ -1664,6 +1747,10 @@
     <span class="syntax-keyword">return</span> dp[rows][cols]</code></pre>
 <p><a id="quick-lc416"></a></p>
 <p><strong>单元 19，背包与前缀可达性。</strong> <a href="#lc416">LC416 分割等和子集</a>中，每个正整数只用一次。推荐一维布尔表表示可达金额，并以<strong>容量逆序</strong>实现 0/1 背包（0/1 Knapsack）：较小容量保留上一轮状态，因此当前元素最多进入方案一次。<code>can_partition([1,5,11,5]) → True</code>；<code>[1,2,5] → False</code>，错误的正序会把一个 2 用两遍。</p>
+<blockquote>
+<p><strong>视频补充｜0/1 背包与完全背包</strong></p>
+<p><a href="https://www.bilibili.com/video/BV16Y411v7Y6/">18｜0-1背包 完全背包（15:57）</a>。课上用 LC494、LC322 对照两类背包，可将“每个元素只用一次”的状态依赖迁移到本节 LC416。适合重点理解容量逆序与正序为何影响复用，并区分可达性、方案数与最少数量三种答案含义。</p>
+</blockquote>
 <p><strong>为何转成背包：</strong> 若总和为偶数，只要找到一组和为总和一半的元素，剩余元素的和也必相同；每个元素对某个容量只有“不用它”与“用它一次”两种选择。逆序保证读取的 <code>dp[capacity-value]</code> 仍是加入当前元素之前的状态。</p>
 <p><strong>过程：</strong> <code>[1,5,11,5]</code> 的目标是 11；读 1 后可达 <code>{0,1}</code>，读第一个 5 后可达 <code>{0,1,5,6}</code>，读 11 时从旧的 <code>dp[0]</code> 得到 <code>dp[11]=True</code>。反例 <code>[1,2,5]</code> 的目标为 4：逆序读 2 时，<code>dp[4]</code> 读取旧的 <code>dp[2]=False</code>，不会把同一个 2 用两次。</p>
 <p><a id="quick-lc322"></a></p>
@@ -1742,6 +1829,14 @@
 <h3 id="hot100-150172-分钟八组回溯候选约束与撤销">150–172 分钟｜八组回溯：候选、约束与撤销</h3>
 <p>分配：<strong>2 分钟电话组合、5 分钟排列/子集/组合、5 分钟括号与回文、5 分钟网格路径、5 分钟 N 皇后。</strong> 推荐每题先写清“这一层选什么、怎样算合法、何时收集答案”，再套入选择—递归—撤销的回溯（Backtracking）过程。下面使用内置列表、集合和递归函数；<code>append()</code> 记录选择，<code>pop()</code> 撤销选择，<code>copy()</code> 保存独立答案。</p>
 <p>下面各题的内部递归函数统一叫 <code>backtrack</code>，并按这个顺序读：<strong>先判断是否收集答案，再枚举合法选择，记录选择，递归，撤销选择。</strong> <code>start</code> 限定候选范围，<code>index</code> 表示本层正在处理的下标。 <code>path.copy()</code> 把当前答案固定下来，<code>path.pop()</code> 让下一分支从相同父路径出发。涉及 <code>used</code>、网格占位或对角线集合时，同时恢复这些状态。N 皇后用列与两条对角线共同剪枝，是本节的多约束详细例题。</p>
+<blockquote>
+<p><strong>视频补充｜回溯的三种基本类型</strong></p>
+<ul>
+<li><a href="https://www.bilibili.com/video/BV1mG4y1A7Gu/">14｜回溯算法套路①子集型回溯（12:22）</a>：子集型：直接包含下面的 LC17、LC78、LC131。适合把候选画成递归树，比较何时记录答案，以及一个分支结束后怎样恢复路径。</li>
+<li><a href="https://www.bilibili.com/video/BV1xG4y1F7nC/">15｜回溯算法套路②组合型回溯+剪枝（14:37）</a>：组合型与剪枝：课上用 LC77、LC216、LC22。适合理解剩余候选、数量或合法前缀怎样限制搜索。迁移到本课 LC39 时，候选可重复使用，下一层仍从当前 index 开始；LC216 每个数限用一次。</li>
+<li><a href="https://www.bilibili.com/video/BV1mY411D7f6/">16｜回溯算法套路③排列型回溯+N皇后（18:16）</a>：排列型与 N 皇后：直接对应下面的 LC46、LC51。适合对照 used 标记与列、对角线约束，理解选择之后哪些状态必须一起撤销。</li>
+</ul>
+</blockquote>
 <p><a id="quick-phone-combinations"></a>
 <a id="quick-lc17"></a></p>
 <h4 id="hot100-lc17-电话号码的字母组合每个输入位置选一个字母">LC17 电话号码的字母组合：每个输入位置选一个字母</h4>
