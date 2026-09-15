@@ -14,6 +14,179 @@
 <li><strong>函数接收什么、返回什么？</strong> 例如 <code>two_sum(nums, target)</code> 接收数组和目标值，返回两个下标。算法写在解题函数中，用 <code>return</code> 把结果交回调用处。</li>
 <li><strong>输出长什么样？</strong> 确定是一个数、空格分隔的序列、逐行矩阵还是 JSON。<code>main()</code> 负责读入、调用解题函数，再按题目约定 <code>print</code>。</li>
 </ol>
+<p><a id="program-containers"></a></p>
+<h3 id="hot100-常见容器listdictset-的增删查改">常见容器：list、dict、set 的增删查改</h3>
+<p><strong>直接使用：</strong> <code>list</code>、<code>dict</code>、<code>set</code> 是 Python 内置类型，创建它们可以直接写下面的代码。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="常见容器：list、dict、set 的增删查改"><table><thead><tr><th scope="col">你要保存什么</th><th scope="col">选择</th><th scope="col">创建示例</th></tr></thead><tbody><tr><td>按顺序排列的元素，允许重复</td><td>列表 <code>list</code></td><td><code>nums = [10, 20, 30]</code></td></tr>
+<tr><td>每个键对应一个值</td><td>字典 <code>dict</code></td><td><code>scores = {&quot;Alice&quot;: 90}</code></td></tr>
+<tr><td>只关心有哪些不同元素</td><td>集合 <code>set</code></td><td><code>seen = {10, 20}</code></td></tr></tbody></table></div>
+<p><a id="container-list"></a></p>
+<h3 id="hot100-①-list按顺序保存用下标访问">① list：按顺序保存，用下标访问</h3>
+<p><strong>用途：</strong> 数组、栈、回溯路径。下标从 <strong>0</strong> 开始，<code>nums[-1]</code> 表示最后一个元素。</p>
+<p><strong>增加和修改</strong></p>
+<!-- code:program-template:container-list-add -->
+<pre><code class="language-python">nums = [<span class="syntax-number">10</span>, <span class="syntax-number">20</span>]
+nums.<span class="syntax-function">append</span>(<span class="syntax-number">30</span>)        <span class="syntax-comment"># 末尾增加一个元素。</span>
+nums.<span class="syntax-function">extend</span>([<span class="syntax-number">40</span>, <span class="syntax-number">50</span>])  <span class="syntax-comment"># 把另一段序列的元素逐个加到末尾。</span>
+nums.<span class="syntax-function">insert</span>(<span class="syntax-number">1</span>, <span class="syntax-number">15</span>)     <span class="syntax-comment"># 在下标 1 处插入，后面的元素向右移动。</span>
+nums[<span class="syntax-number">0</span>] = <span class="syntax-number">5</span>           <span class="syntax-comment"># 修改下标 0 处的值。</span>
+
+<span class="syntax-function">print</span>(nums)</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">[5, 15, 20, 30, 40, 50]</code></pre>
+<p><strong>删除：先想清楚“按下标”还是“按值”</strong></p>
+<!-- code:program-template:container-list-delete -->
+<pre><code class="language-python">nums = [<span class="syntax-number">10</span>, <span class="syntax-number">20</span>, <span class="syntax-number">20</span>, <span class="syntax-number">30</span>]
+last = nums.<span class="syntax-function">pop</span>()      <span class="syntax-comment"># 删除并返回最后一个元素 30。</span>
+first = nums.<span class="syntax-function">pop</span>(<span class="syntax-number">0</span>)   <span class="syntax-comment"># 删除并返回下标 0 处的元素 10。</span>
+nums.<span class="syntax-function">remove</span>(<span class="syntax-number">20</span>)       <span class="syntax-comment"># 按值删除：只删除第一个 20。</span>
+
+<span class="syntax-function">print</span>(last, first)
+<span class="syntax-function">print</span>(nums)
+
+<span class="syntax-keyword">del</span> nums[<span class="syntax-number">0</span>]           <span class="syntax-comment"># 按下标删除剩下的元素。</span>
+<span class="syntax-function">print</span>(nums)</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">30 10
+[20]
+[]</code></pre>
+<p><strong>查询、遍历和常用写法</strong></p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="① list：按顺序保存，用下标访问"><table><thead><tr><th scope="col">目的</th><th scope="col">写法</th><th scope="col">记忆点</th></tr></thead><tbody><tr><td>长度 / 是否非空</td><td><code>len(nums)</code> / <code>if nums:</code></td><td>空列表为假</td></tr>
+<tr><td>查询下标 0 的元素</td><td><code>nums[0]</code></td><td>先确保有这个位置</td></tr>
+<tr><td>是否包含某个值</td><td><code>20 in nums</code></td><td>按值查找，O(n)</td></tr>
+<tr><td>遍历值</td><td><code>for value in nums:</code></td><td>直接得到每个值</td></tr>
+<tr><td>遍历下标和值</td><td><code>for index, value in enumerate(nums):</code></td><td>同时得到位置和值</td></tr>
+<tr><td>切片</td><td><code>nums[1:3]</code></td><td>取下标 1、2，左闭右开，得到新列表</td></tr>
+<tr><td>复制</td><td><code>copy = nums.copy()</code></td><td>创建一份浅拷贝</td></tr>
+<tr><td>原地排序</td><td><code>nums.sort()</code></td><td>修改原列表</td></tr>
+<tr><td>新建排序结果</td><td><code>ordered = sorted(nums)</code></td><td>原列表保持原顺序</td></tr>
+<tr><td>清空</td><td><code>nums.clear()</code></td><td>删除所有元素</td></tr></tbody></table></div>
+<details>
+<summary>展开：append / extend、删除边界与复杂度</summary>
+
+<ul>
+<li><code>append([2, 3])</code>：把整个列表作为一个元素加入。</li>
+<li><code>extend([2, 3])</code>：分别加入 2、3 两个元素。</li>
+<li><code>pop()</code> 要求列表非空；指定下标时，下标必须有效。</li>
+<li><code>remove(value)</code> 要求值存在；不确定时先判断 <code>value in nums</code>。</li>
+<li>栈用 <code>append()</code> 入栈、<code>pop()</code> 出栈，遵循后进先出。</li>
+<li>下标读写 O(1)；末尾追加摊还 O(1)，末尾弹出 O(1)。</li>
+<li>中间插入、删除需要移动元素，通常 O(n)。</li>
+<li>删除首项 <code>pop(0)</code> 为 O(n)；先进先出队列选下一节的 <code>deque</code>。</li>
+<li><code>nums.sort()</code> 返回 <code>None</code>；直接调用，排序结果保存在 nums 中。</li>
+<li>浅拷贝只复制外层列表；嵌套列表的内层对象仍共享。</li>
+</ul>
+</details>
+
+<p><a id="container-dict"></a></p>
+<h3 id="hot100-②-dict用键找到对应的值">② dict：用键找到对应的值</h3>
+<p><strong>用途：</strong> 保存“值 → 下标”“前缀和 → 次数”等对应关系。</p>
+<p><strong>增加和修改：都用 <code>字典[键] = 值</code></strong></p>
+<!-- code:program-template:container-dict-add -->
+<pre><code class="language-python">scores = {<span class="syntax-string">&quot;Alice&quot;</span>: <span class="syntax-number">90</span>}
+scores[<span class="syntax-string">&quot;Bob&quot;</span>] = <span class="syntax-number">80</span>      <span class="syntax-comment"># 新键：增加一项。</span>
+scores[<span class="syntax-string">&quot;Alice&quot;</span>] = <span class="syntax-number">95</span>    <span class="syntax-comment"># 已有键：更新它的值。</span>
+
+<span class="syntax-function">print</span>(scores[<span class="syntax-string">&quot;Alice&quot;</span>])          <span class="syntax-comment"># 读取已知存在的键。</span>
+<span class="syntax-function">print</span>(scores.<span class="syntax-function">get</span>(<span class="syntax-string">&quot;Cindy&quot;</span>, <span class="syntax-number">0</span>))   <span class="syntax-comment"># 缺键时返回备用值 0。</span>
+<span class="syntax-function">print</span>(<span class="syntax-string">&quot;Bob&quot;</span> <span class="syntax-keyword">in</span> scores)          <span class="syntax-comment"># in 判断的是键。</span></code></pre>
+<p>输出：</p>
+<pre><code class="language-text">95
+0
+True</code></pre>
+<p><strong>删除和遍历</strong></p>
+<!-- code:program-template:container-dict-delete -->
+<pre><code class="language-python">scores = {<span class="syntax-string">&quot;Alice&quot;</span>: <span class="syntax-number">95</span>, <span class="syntax-string">&quot;Bob&quot;</span>: <span class="syntax-number">80</span>, <span class="syntax-string">&quot;Cindy&quot;</span>: <span class="syntax-number">85</span>}
+removed = scores.<span class="syntax-function">pop</span>(<span class="syntax-string">&quot;Bob&quot;</span>)    <span class="syntax-comment"># 删除这个键，并返回它的值。</span>
+<span class="syntax-keyword">del</span> scores[<span class="syntax-string">&quot;Cindy&quot;</span>]            <span class="syntax-comment"># 删除已知存在的键。</span>
+
+<span class="syntax-function">print</span>(removed)
+<span class="syntax-keyword">for</span> name, score <span class="syntax-keyword">in</span> scores.<span class="syntax-function">items</span>():  <span class="syntax-comment"># 同时取得键和值。</span>
+    <span class="syntax-function">print</span>(name, score)</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">80
+Alice 95</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="② dict：用键找到对应的值"><table><thead><tr><th scope="col">目的</th><th scope="col">写法</th><th scope="col">记忆点</th></tr></thead><tbody><tr><td>创建空字典</td><td><code>positions = {}</code></td><td>也可写 <code>dict()</code></td></tr>
+<tr><td>长度 / 是否非空</td><td><code>len(scores)</code> / <code>if scores:</code></td><td>长度是键的数量</td></tr>
+<tr><td>获取值，兼容缺键</td><td><code>scores.get(name, 0)</code></td><td>缺键返回 0，保持字典原样</td></tr>
+<tr><td>删除，兼容缺键</td><td><code>scores.pop(name, None)</code></td><td>缺键返回 None</td></tr>
+<tr><td>遍历键</td><td><code>for name in scores:</code></td><td>默认遍历键</td></tr>
+<tr><td>遍历值</td><td><code>for score in scores.values():</code></td><td>只取值</td></tr>
+<tr><td>遍历键和值</td><td><code>for name, score in scores.items():</code></td><td>两个变量依次接收</td></tr>
+<tr><td>批量增加或更新</td><td><code>scores.update({&quot;Bob&quot;: 88, &quot;Cindy&quot;: 92})</code></td><td>同名键被新值覆盖</td></tr>
+<tr><td>清空</td><td><code>scores.clear()</code></td><td>删除所有键值对</td></tr></tbody></table></div>
+<details>
+<summary>展开：键的要求、缺键与遍历边界</summary>
+
+<ul>
+<li>一个键对应一个值；再次给同一个键赋值，就是覆盖旧值。</li>
+<li>键须可哈希：整数、字符串、只含可哈希元素的元组都常用。</li>
+<li>列表、普通字典、集合不能直接作为键。</li>
+<li><code>scores[name]</code>、<code>del scores[name]</code>、<code>scores.pop(name)</code> 要求键存在。</li>
+<li>缺键时读值，推荐 <code>get</code>；缺键时删除，给 <code>pop</code> 传备用值。</li>
+<li>按通常哈希条件，查找、增加、删除期望 O(1)。</li>
+<li>Python 3.9 字典按插入顺序遍历。</li>
+<li>遍历时修改键的数量，先遍历快照，例如 <code>for name in list(scores):</code>。</li>
+</ul>
+</details>
+
+<p><a id="container-set"></a></p>
+<h3 id="hot100-③-set去重和判断是否见过">③ set：去重和判断“是否见过”</h3>
+<p><strong>用途：</strong> 去重、访问标记、快速查重。集合中的元素各不相同。</p>
+<p><strong>创建和增加</strong></p>
+<!-- code:program-template:container-set-add -->
+<pre><code class="language-python">seen = <span class="syntax-function">set</span>()          <span class="syntax-comment"># 空集合用 set()；{} 创建的是空字典。</span>
+seen.<span class="syntax-function">add</span>(<span class="syntax-number">10</span>)          <span class="syntax-comment"># 加入一个元素。</span>
+seen.<span class="syntax-function">add</span>(<span class="syntax-number">10</span>)          <span class="syntax-comment"># 重复加入，仍然只有一个 10。</span>
+seen.<span class="syntax-function">update</span>([<span class="syntax-number">20</span>, <span class="syntax-number">30</span>]) <span class="syntax-comment"># 从一段数据中加入多个元素。</span>
+
+<span class="syntax-function">print</span>(<span class="syntax-function">len</span>(seen))
+<span class="syntax-function">print</span>(<span class="syntax-number">20</span> <span class="syntax-keyword">in</span> seen)
+<span class="syntax-function">print</span>(<span class="syntax-function">sorted</span>(seen))  <span class="syntax-comment"># 排序后展示，让输出顺序固定。</span></code></pre>
+<p>输出：</p>
+<pre><code class="language-text">3
+True
+[10, 20, 30]</code></pre>
+<p><strong>删除：优先记住 <code>discard</code></strong></p>
+<!-- code:program-template:container-set-delete -->
+<pre><code class="language-python">seen = {<span class="syntax-number">10</span>, <span class="syntax-number">20</span>, <span class="syntax-number">30</span>}
+seen.<span class="syntax-function">discard</span>(<span class="syntax-number">20</span>)      <span class="syntax-comment"># 删除 20；元素不存在时也可安全调用。</span>
+seen.<span class="syntax-function">discard</span>(<span class="syntax-number">99</span>)      <span class="syntax-comment"># 99 不存在，集合保持原样。</span>
+seen.<span class="syntax-function">remove</span>(<span class="syntax-number">10</span>)       <span class="syntax-comment"># 删除确定存在的 10。</span>
+
+<span class="syntax-function">print</span>(<span class="syntax-function">sorted</span>(seen))</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">[30]</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="③ set：去重和判断“是否见过”"><table><thead><tr><th scope="col">目的</th><th scope="col">写法</th><th scope="col">记忆点</th></tr></thead><tbody><tr><td>从数组去重</td><td><code>seen = set(nums)</code></td><td>得到不同元素的集合</td></tr>
+<tr><td>是否见过</td><td><code>value in seen</code></td><td>按通常哈希条件，期望 O(1)</td></tr>
+<tr><td>长度 / 是否非空</td><td><code>len(seen)</code> / <code>if seen:</code></td><td>长度是不同元素的数量</td></tr>
+<tr><td>遍历</td><td><code>for value in seen:</code></td><td>遍历顺序无保证</td></tr>
+<tr><td>交集</td><td><code>a &amp; b</code></td><td>两边都有的元素</td></tr>
+<tr><td>并集</td><td><code>a | b</code></td><td>至少在一边的元素</td></tr>
+<tr><td>差集</td><td><code>a - b</code></td><td>在 a 中、但不在 b 中的元素</td></tr>
+<tr><td>清空</td><td><code>seen.clear()</code></td><td>删除所有元素</td></tr></tbody></table></div>
+<details>
+<summary>展开：remove / discard / pop 与集合边界</summary>
+
+<ul>
+<li><code>discard(value)</code>：删除指定值；缺少这个值也能正常执行。</li>
+<li><code>remove(value)</code>：删除指定值；缺少这个值会触发 <code>KeyError</code>。</li>
+<li><code>pop()</code>：取出并删除任意一个元素；要求集合非空。</li>
+<li>集合按元素查询，访问方式是 <code>value in seen</code>。</li>
+<li>集合没有位置下标；要按顺序输出，先 <code>sorted(seen)</code>。</li>
+<li>元素须可哈希，和字典的键遵循相同要求。</li>
+<li>按通常哈希条件，单个元素的增加、删除、查询期望 O(1)。</li>
+<li>遍历过程中增删元素，先遍历快照，例如 <code>for value in list(seen):</code>。</li>
+</ul>
+</details>
+
+<p><strong>统一记忆：</strong></p>
+<ul>
+<li><code>list</code>：<code>append</code> 增加，<code>pop</code> 按下标删除，<code>remove</code> 按值删除。</li>
+<li><code>dict</code>：<code>data[key] = value</code> 增改，<code>get</code> 查询，<code>pop(key, default)</code> 删除。</li>
+<li><code>set</code>：<code>add</code> 增加，<code>discard</code> 删除，<code>in</code> 判断是否存在。</li>
+</ul>
+<p>语法依据：<a href="https://docs.python.org/3.9/tutorial/datastructures.html">Python 3.9 数据结构教程</a>。</p>
 <p><a id="program-libraries"></a></p>
 <h3 id="hot100-常用标准库先选工具再写-import">常用标准库：先选工具，再写 import</h3>
 <p>先看自己要维护什么，再选下面的工具。每段示例都可以单独运行，代码顶部就是这段代码需要的导入。</p>
