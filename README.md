@@ -43,6 +43,8 @@
 
 ## Hot100：理论速览与三天编码练习
 
+**题目范围：三小时速览、第一轮、第二轮及三天编码练习只使用 Hot100。额外例题、通用强化模板和包含其他例题的视频统一放在[第三轮补充与强化](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#third-round-study)，面试经典 150 精选题单与按需强化分别记录。**
+
 这一部分以 **Python 3.9 与标准库**为基础，同时说明力扣的函数参数形式和 ACM 的标准输入输出形式。覆盖数组、哈希、双指针、矩阵、前缀统计、滑动窗口、栈与单调结构、二分、链表、分治、树、堆、字典树、图、贪心、动态规划、背包、回溯和位运算等内容。
 
 | 阅读方式 | 适合的场景 | 直接入口 |
@@ -50,7 +52,7 @@
 | **三小时系统速览** | 已有 Python 基础，按数据结构与算法阅读详细例题；88 道 Easy/Medium 与 7 道必要 Hard 在主线，5 道同型进阶 | [三小时速览](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-review) |
 | **第一轮：38 题** | 按知识单元建立解题骨架 | [第一轮题单](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#round-1) |
 | **第二轮：62 题** | 同型迁移与综合提升，与第一轮合计覆盖 Hot100 | [第二轮题单](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#round-2) |
-| **第三轮：18 题** | 从面试经典 150 中补充重要模型，独立计数 | [第三轮拓展](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#round-3) |
+| **第三轮：补充与强化** | 面试经典 150 精选 18 题；另附强化模板、扩展题和视频，按需选择 | [第三轮拓展](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#round-3) |
 
 三小时主线按“问题与输入输出 → 状态过程 → 为什么成立 → 核心代码与边界 → 同类迁移”阅读，提供[模型与详细例题导航](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-model-map)和[95 题定位表](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-coverage)。难度标签不决定是否跳过：LC41、76、84、124、239、295、51 分别补上原地哈希、最短覆盖窗、单调栈范围、树形 DP、单调队列、双堆与多约束回溯。LRU 展开哈希表和双向链表的摘接过程，并查集用岛屿网格跟踪合并；同类题交代迁移理由。**回溯（Backtracking）22 分钟、动态规划（Dynamic Programming，DP）24 分钟**；180 分钟是已有 Python 基础读者的一轮阅读预算，不等同于独立熟练实现全部题目。其余 5 道 Hard 在[同型进阶区](https://nino-pi.github.io/agent-course/extras/hot100-python39.html#quick-hard)说明组合方法与边界，完整教材与分轮题单继续保留。
 
