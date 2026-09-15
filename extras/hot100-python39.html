@@ -22,70 +22,121 @@
 </ol>
 <p><a id="program-libraries"></a></p>
 <h4 id="hot100-常用标准库先选工具再写-import">常用标准库：先选工具，再写 import</h4>
-<p><strong>本课推荐按任务选库：动态计数用 <code>defaultdict(int)</code>，分组用 <code>defaultdict(list)</code>，现成序列的频次用 <code>Counter</code>，队列用 <code>deque</code>，堆用 <code>heapq</code>。</strong> 它们都随 Python 3.9 提供。二分题在三小时与前两轮统一手写区间、比较和边界更新，第三轮再对照标准库。每道题把实际用到的导入放在代码顶部；下面是一份可按题选择的速查，核心题解和完整程序也各自写出所需导入。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="常用标准库：先选工具，再写 import"><table><thead><tr><th scope="col">要处理的事情</th><th scope="col">导入语句</th><th scope="col">关键写法与适用题型</th></tr></thead><tbody><tr><td>标准输入</td><td><code>import sys</code></td><td><code>sys.stdin.readline()</code> 读一行；ACM 的 main 使用它</td></tr>
-<tr><td>扫描时累加次数</td><td><code>from collections import defaultdict</code></td><td><code>counts = defaultdict(int)</code>，<code>counts[key] += 1</code>；<a href="hot100-python39.html#quick-lc560">LC560 前缀和计数</a></td></tr>
-<tr><td>按键收集一组元素</td><td><code>from collections import defaultdict</code></td><td><code>groups = defaultdict(list)</code>，<code>groups[key].append(value)</code>；<a href="hot100-python39.html#lc49">LC49 异位词分组</a></td></tr>
-<tr><td>一次建立频次表</td><td><code>from collections import Counter</code></td><td><code>counts = Counter(nums)</code> 或 <code>Counter(s)</code>；<a href="hot100-python39.html#lc347">LC347 高频元素</a>、<a href="hot100-python39.html#quick-lc76">LC76 覆盖窗口</a></td></tr>
-<tr><td>FIFO 队列、两端删除</td><td><code>from collections import deque</code></td><td><code>append()</code> 入队、<code>popleft()</code> 出队；<a href="hot100-python39.html#quick-lc102">LC102 层序遍历</a>、<a href="hot100-python39.html#quick-lc239">LC239 单调队列</a></td></tr>
-<tr><td>最小堆、Top-K、双堆</td><td><code>import heapq</code></td><td><code>heappush(heap, x)</code>、<code>heappop(heap)</code> 都加 <code>heapq.</code> 前缀，<code>heap[0]</code> 是最小值；<a href="hot100-python39.html#quick-lc215">LC215</a>、<a href="hot100-python39.html#quick-lc295">LC295</a></td></tr>
-<tr><td>维护键的访问顺序</td><td><code>from collections import OrderedDict</code></td><td><code>move_to_end(key)</code> 移到末尾，<code>popitem(last=False)</code> 淘汰最前项；<a href="hot100-python39.html#quick-lc146">LC146 LRU</a></td></tr>
-<tr><td>嵌套结果与 JSON 输入</td><td><code>import json</code></td><td><code>json.loads(line)</code> 解析，<code>json.dumps(result)</code> 序列化；数组、矩阵、分组结果按协议使用</td></tr></tbody></table></div>
-<p><strong>先理解容器保存了什么，再记操作。</strong> <code>collections</code> 是模块，<code>defaultdict</code>、<code>Counter</code>、<code>deque</code> 是从模块中导入的容器类型；<code>heapq</code> 是操作列表的堆算法模块。下面四种工具分别解决默认值、计数、出入顺序和优先级问题。</p>
-<p><a id="library-defaultdict"></a>
-<strong>① defaultdict：普通字典的键值映射，加上“缺键时创建默认值”。</strong> 它沿用字典的哈希查找：用键的哈希值帮助定位，再核对键是否相等；键须可哈希，例如整数、字符串或只含可哈希元素的元组。在通常的哈希条件下，单次查找、写入按期望 O(1) 分析，长键的哈希成本另计。<code>defaultdict(int)</code> 保存工厂函数 <code>int</code>；执行 <code>counts[key]</code> 时，如果键已存在，就返回原值；如果缺键，就调用 <code>int()</code> 得到 0，把 <code>key: 0</code> 写入字典，再返回 0。因此 <code>counts[3] += 1</code> 的过程是“取原值（首次为 0）→ 加 1 → 写回”，第二次执行就从 1 加到 2。</p>
-<p><code>defaultdict(list)</code> 同理，每个新键调用一次 <code>list()</code>，得到各自独立的空列表，再由 <code>groups[key].append(value)</code> 收集元素。传入 <code>int</code>、<code>list</code> 是让容器在需要时调用工厂。默认工厂由缺键的下标读取触发；<code>key in counts</code> 只判断键是否存在，<code>counts.get(key, 0)</code> 只查询并返回备用值，这两种操作都保持原有键集合。LC560 适合前一种直接计数；LC437 查询祖先前缀时用后一种方式，便于让字典只记录当前路径。</p>
-<p><a id="library-counter"></a>
-<strong>② Counter：把每个元素作为键，把出现次数作为值。</strong> 它也是字典的子类。<code>Counter(&quot;aba&quot;)</code> 遍历字符串，依次把 a、b、a 的次数加一，得到 <code>a: 2, b: 1</code>；<code>Counter(nums)</code> 则遍历数组。长度为 n、不同元素数为 u 时，按通常哈希条件，建表时间 O(n)、空间 O(u)。<code>counts[key] += 1</code> 和 <code>counts[key] -= 1</code> 可以继续更新状态，适合频次统计与窗口内的加入、移出。</p>
-<p><code>Counter</code> 对缺键的下标读取返回 0，并保持原有键集合；<code>defaultdict(int)</code> 的同一次读取会创建该键。计数减到 0 时，键仍保留，负数也可以保存；需要移除键时显式 <code>del counts[key]</code>。因此判断某元素还有没有剩余次数应看 <code>counts[key] &gt; 0</code>，<code>key in counts</code> 只说明这个键存在。已有序列要直接统计时选 <code>Counter</code>；扫描过程中按状态累计次数时，本课选 <code>defaultdict(int)</code>。两者都能做动态计数，这个约定是为了读码统一。</p>
-<p><a id="library-deque"></a>
-<strong>③ deque：在左右两端都能高效增删的双端队列。</strong> 把它想成左右都有入口的队列：<code>append(x)</code> 从右端加入，<code>popleft()</code> 从左端取出，组合起来就是先进先出；<code>appendleft(x)</code> 从左端加入，<code>pop()</code> 从右端取出。它支持直接更新两端，无需像列表删除首项那样把后续元素整体前移，因此四种两端操作都是 O(1)；中间下标访问则可能需要 O(n)。</p>
-<p>例如队列 <code>[10, 20]</code> 先 <code>append(30)</code> 变成 <code>[10, 20, 30]</code>，再 <code>popleft()</code> 返回 10，剩下 <code>[20, 30]</code>。BFS 用这个顺序逐层处理节点；单调队列还会在右端反复 <code>pop()</code> 淘汰较差候选，并在左端移出过期下标。单调性由解题代码里的比较和循环维护。弹出前用 <code>if queue</code> 或 <code>while queue</code> 确认有元素，空队列弹出会触发 <code>IndexError</code>。</p>
-<p><a id="library-heapq"></a>
-<strong>④ heapq：用列表表示完全二叉树，维护“父节点不大于孩子”的最小堆。</strong> 列表下标 i 的孩子位于 <code>2*i+1</code>、<code>2*i+2</code>，父节点位于 <code>(i-1)//2</code>（根节点除外）。从根到任意孩子，父值都更小或相等，所以最小值一定在 <code>heap[0]</code>，读取它是 O(1)；其他位置只满足父子约束，整个列表并非排序结果。</p>
-<p><code>heappush</code> 把新元素放到末尾，再沿父节点方向调整；<code>heappop</code> 取出根，用末尾元素补根，再向下调整。完全二叉树的高度是 O(log n)，所以两种操作都是 O(log n)。<code>heapify</code> 从底部已有子树开始建堆，大多数节点靠近叶子、调整距离短，总成本为 O(n)。例如 <code>[3,1,4]</code> 建堆得到 <code>[1,3,4]</code>，加入 2 后可得到 <code>[1,2,4,3]</code>，弹出得到 1，剩余元素继续保持堆性质。Top-K 用堆顶追踪当前候选中最小的一个；Python 3.9 的数值最大堆用负值存储，弹出时再取负还原。空堆读取 <code>heap[0]</code> 或弹出会报错，使用前核对非空条件。</p>
-<p><strong>直接看最小用法。</strong> 下面的数值都是语法演示；解题时用题目的输入替换。<code>import heapq</code> 后写 <code>heapq.heappush(...)</code>；<code>from collections import deque</code> 后直接写 <code>deque(...)</code>。</p>
-<!-- code:program-template:libraries -->
+<p>先看自己要维护什么，再选下面的工具。每段示例都可以单独运行，代码顶部就是这段代码需要的导入。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="常用标准库：先选工具，再写 import"><table><thead><tr><th scope="col">你现在要做什么</th><th scope="col">选哪个工具</th><th scope="col">记住这一句</th></tr></thead><tbody><tr><td>边扫描边累计，或把同类元素收到一起</td><td><code>defaultdict</code></td><td>新键自动得到初值：计数从 0 开始，分组从空列表开始</td></tr>
+<tr><td>已经有数组或字符串，想统计每种元素出现几次</td><td><code>Counter</code></td><td>把一段数据直接变成“元素 → 次数”</td></tr>
+<tr><td>按到达顺序处理，先来的先处理</td><td><code>deque</code></td><td>右边加入，左边取出</td></tr>
+<tr><td>数据不断加入，每次取当前最小的值</td><td><code>heapq</code></td><td>堆顶始终是当前最小值</td></tr></tbody></table></div>
+<p><a id="library-defaultdict"></a></p>
+<h4 id="hot100-①-defaultdict给新键准备好初值">① defaultdict：给新键准备好初值</h4>
+<p><strong>什么时候用？</strong> 扫描时才知道会遇到哪些键，希望遇到新键就直接累加或追加。本课最常用的是 <strong><code>defaultdict(int)</code> 计数、<code>defaultdict(list)</code> 分组</strong>。</p>
+<p><strong>例子 A：记录已经遇到的前缀和各有几次。</strong> 这是 <a href="hot100-python39.html#quick-lc560">LC560 和为 K 的子数组</a>使用的计数工具；下面只演示计数，不展开完整解题过程。</p>
+<!-- code:program-template:library-defaultdict-int -->
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> defaultdict
+
+counts = <span class="syntax-function">defaultdict</span>(int)  <span class="syntax-comment"># 新键的初值由 int() 生成，结果是 0。</span>
+counts[<span class="syntax-number">0</span>] = <span class="syntax-number">1</span>             <span class="syntax-comment"># 空前缀的和为 0，预先记录一次。</span>
+counts[<span class="syntax-number">3</span>] += <span class="syntax-number">1</span>            <span class="syntax-comment"># 第一次遇到前缀和 3：0 + 1。</span>
+counts[<span class="syntax-number">3</span>] += <span class="syntax-number">1</span>            <span class="syntax-comment"># 再次遇到前缀和 3：1 + 1。</span>
+
+<span class="syntax-function">print</span>(counts[<span class="syntax-number">3</span>])
+<span class="syntax-function">print</span>(<span class="syntax-function">dict</span>(counts))       <span class="syntax-comment"># 转成普通字典，只为清楚展示内容。</span></code></pre>
+<p>输出：</p>
+<pre><code class="language-text">2
+{0: 1, 3: 2}</code></pre>
+<p><strong>例子 B：把字母相同的单词放在同一组。</strong> <a href="hot100-python39.html#lc49">LC49 字母异位词分组</a>可以用排序后的字符串作为分组键。</p>
+<!-- code:program-template:library-defaultdict-list -->
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> defaultdict
+
+groups = <span class="syntax-function">defaultdict</span>(list)  <span class="syntax-comment"># 每个新键得到各自独立的空列表。</span>
+<span class="syntax-keyword">for</span> word <span class="syntax-keyword">in</span> [<span class="syntax-string">&quot;eat&quot;</span>, <span class="syntax-string">&quot;tea&quot;</span>, <span class="syntax-string">&quot;tan&quot;</span>]:
+    key = <span class="syntax-string">&quot;&quot;</span>.<span class="syntax-function">join</span>(<span class="syntax-function">sorted</span>(word))  <span class="syntax-comment"># eat、tea 都得到 aet。</span>
+    groups[key].<span class="syntax-function">append</span>(word)    <span class="syntax-comment"># 同一个键对应同一个分组。</span>
+
+<span class="syntax-function">print</span>(<span class="syntax-function">dict</span>(groups))</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">{&#39;aet&#39;: [&#39;eat&#39;, &#39;tea&#39;], &#39;ant&#39;: [&#39;tan&#39;]}</code></pre>
+<p><strong>核心机制：</strong> <code>groups[key]</code> 先查键；键存在就取原值，缺键就调用 <code>list()</code> 创建并保存空列表。<code>defaultdict(int)</code> 同理，只是调用 <code>int()</code> 得到 0。因此初始化时写 <code>int</code> 或 <code>list</code>，把“怎样生成默认值”交给容器。</p>
+<p><strong>记住一个边界：</strong> 缺键时用 <code>counts[key]</code> 查询会创建这个键；只想查询时用 <code>counts.get(key, 0)</code>，缺键返回备用值 0，字典保持原样。键要可哈希，例如整数、字符串或只含可哈希元素的元组。通常哈希条件下，单次查询和更新按期望 O(1) 分析；分组例子的单词排序还需单独计算成本。</p>
+<p><a id="library-counter"></a></p>
+<h4 id="hot100-②-counter直接统计已有数据的次数">② Counter：直接统计已有数据的次数</h4>
+<p><strong>什么时候用？</strong> 手上已有数组或字符串，接下来要比较频次、找高频元素，或者根据字符数量维护窗口。例如 <a href="hot100-python39.html#lc347">LC347 前 K 个高频元素</a>、<a href="hot100-python39.html#quick-lc76">LC76 最小覆盖子串</a>。</p>
+<!-- code:program-template:library-counter -->
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter
+
+nums = [<span class="syntax-number">1</span>, <span class="syntax-number">1</span>, <span class="syntax-number">2</span>, <span class="syntax-number">3</span>, <span class="syntax-number">3</span>, <span class="syntax-number">3</span>]
+counts = <span class="syntax-function">Counter</span>(nums)  <span class="syntax-comment"># 一次扫描，建立“元素 → 出现次数”。</span>
+
+<span class="syntax-function">print</span>(<span class="syntax-function">dict</span>(counts))
+<span class="syntax-function">print</span>(counts[<span class="syntax-number">3</span>])        <span class="syntax-comment"># 3 出现了三次。</span>
+<span class="syntax-function">print</span>(counts[<span class="syntax-number">9</span>])        <span class="syntax-comment"># 9 没出现过，查询得到 0。</span>
+
+counts[<span class="syntax-number">3</span>] -= <span class="syntax-number">1</span>          <span class="syntax-comment"># 次数可以继续更新，例如窗口移出一个 3。</span>
+<span class="syntax-function">print</span>(counts[<span class="syntax-number">3</span>])</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">{1: 2, 2: 1, 3: 3}
+3
+0
+2</code></pre>
+<p><strong>核心机制：</strong> <code>Counter(nums)</code> 遍历输入，把元素作为字典的键，把出现次数作为值。<code>Counter(&quot;aba&quot;)</code> 同样会得到 <code>a: 2, b: 1</code>。n 个元素、u 种不同值，建表期望时间 O(n)，空间 O(u)。</p>
+<p><strong>和 defaultdict 怎么选？</strong> 已有数据要建立频次表，推荐 <code>Counter(data)</code>；边计算前缀和等状态边计数，推荐 <code>defaultdict(int)</code>；每个键要保存一组元素，推荐 <code>defaultdict(list)</code>。两种计数容器都支持后续加减，这里按任务统一写法。</p>
+<p><strong>记住一个边界：</strong> <code>Counter</code> 查询缺键得到 0，查询本身不会创建键。次数减到 0 或负数时，键仍可保留；判断还有没有剩余次数用 <code>counts[key] &gt; 0</code>。<code>key in counts</code> 判断的是键是否存在。</p>
+<p><a id="library-deque"></a></p>
+<h4 id="hot100-③-deque按顺序排队先来的先处理">③ deque：按顺序排队，先来的先处理</h4>
+<p><strong>什么时候用？</strong> 任务需要先进先出，例如 <a href="hot100-python39.html#quick-lc102">LC102 二叉树层序遍历</a>：先加入的节点先处理，它的孩子排到后面。</p>
+<!-- code:program-template:library-deque -->
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+
+queue = <span class="syntax-function">deque</span>([<span class="syntax-number">3</span>, <span class="syntax-number">1</span>, <span class="syntax-number">4</span>])  <span class="syntax-comment"># 3 最早进入队列。</span>
+queue.<span class="syntax-function">append</span>(<span class="syntax-number">2</span>)           <span class="syntax-comment"># 从右端加入，队列变成 3、1、4、2。</span>
+
+<span class="syntax-keyword">if</span> queue:                <span class="syntax-comment"># 有元素时再取出。</span>
+    first = queue.<span class="syntax-function">popleft</span>()  <span class="syntax-comment"># 从左端取出最早进入的 3。</span>
+    <span class="syntax-function">print</span>(first)
+
+<span class="syntax-function">print</span>(<span class="syntax-function">list</span>(queue))</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">3
+[1, 4, 2]</code></pre>
+<p><strong>核心机制：</strong> 双端队列允许在左右两端直接增删，取走首项时，其余元素保持顺序。BFS 常写 <code>while queue:</code>，每次 <code>popleft()</code> 处理一个节点，再用 <code>append()</code> 加入后续节点。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="③ deque：按顺序排队，先来的先处理"><table><thead><tr><th scope="col">操作</th><th scope="col">含义</th><th scope="col">时间</th></tr></thead><tbody><tr><td><code>queue.append(value)</code></td><td>右端加入</td><td>O(1)</td></tr>
+<tr><td><code>queue.popleft()</code></td><td>左端取出</td><td>O(1)</td></tr>
+<tr><td><code>queue.appendleft(value)</code></td><td>左端加入</td><td>O(1)</td></tr>
+<tr><td><code>queue.pop()</code></td><td>右端取出</td><td>O(1)</td></tr></tbody></table></div>
+<p><strong>记住一个边界：</strong> 弹出前通过 <code>if queue</code> 或 <code>while queue</code> 确保队列非空。中间位置的下标访问可能需要 O(n)，随机访问优先用列表。<a href="hot100-python39.html#quick-lc239">LC239 滑动窗口最大值</a>也用 deque，但还要自己写比较与循环，维护候选的单调性。</p>
+<p><a id="library-heapq"></a></p>
+<h4 id="hot100-④-heapq按大小处理每次取当前最小值">④ heapq：按大小处理，每次取当前最小值</h4>
+<p><strong>什么时候用？</strong> 元素持续加入，同时反复需要当前最小值。例如 <a href="hot100-python39.html#lc23">LC23 合并 K 个升序链表</a>从各链表候选中取最小节点；<a href="hot100-python39.html#quick-lc215">LC215 第 K 大元素</a>用容量为 k 的最小堆维护最大的 k 个候选。</p>
+<!-- code:program-template:library-heapq -->
 <pre><code class="language-python"><span class="syntax-keyword">import</span> heapq
-<span class="syntax-keyword">import</span> json
-<span class="syntax-keyword">import</span> sys  <span class="syntax-comment"># ACM 的 main 使用 sys.stdin.readline()；读写模板紧接在后面。</span>
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter, defaultdict, deque, OrderedDict
 
-<span class="syntax-comment"># 动态计数：int 是默认工厂，调用 int() 得到初值 0。</span>
-counts = <span class="syntax-function">defaultdict</span>(int)
-counts[<span class="syntax-number">0</span>] = <span class="syntax-number">1</span>                 <span class="syntax-comment"># LC560：空前缀预先出现一次。</span>
-counts[<span class="syntax-number">3</span>] += <span class="syntax-number">1</span>                <span class="syntax-comment"># 首次遇到 3：先得到 0，再加到 1。</span>
-
-<span class="syntax-comment"># 分组：每个新键各自得到一个空列表。</span>
-groups = <span class="syntax-function">defaultdict</span>(list)
-groups[<span class="syntax-string">&quot;aet&quot;</span>].<span class="syntax-function">append</span>(<span class="syntax-string">&quot;eat&quot;</span>)
-groups[<span class="syntax-string">&quot;aet&quot;</span>].<span class="syntax-function">append</span>(<span class="syntax-string">&quot;tea&quot;</span>)   <span class="syntax-comment"># 同一签名下得到 [&quot;eat&quot;, &quot;tea&quot;]。</span>
-
-<span class="syntax-comment"># 直接统计已有数据。</span>
-frequency = <span class="syntax-function">Counter</span>(<span class="syntax-string">&quot;aba&quot;</span>)  <span class="syntax-comment"># a 出现 2 次，b 出现 1 次。</span>
-missing_count = frequency[<span class="syntax-string">&quot;z&quot;</span>]  <span class="syntax-comment"># 得到 0，Counter 此次查询保持原有键集合。</span>
-
-<span class="syntax-comment"># 队列：从右端入队、左端出队；两端操作都是 O(1)。</span>
-queue = <span class="syntax-function">deque</span>([<span class="syntax-number">10</span>, <span class="syntax-number">20</span>])
-queue.<span class="syntax-function">append</span>(<span class="syntax-number">30</span>)
-first = queue.<span class="syntax-function">popleft</span>()      <span class="syntax-comment"># first 为 10，队列剩下 20、30。</span>
-
-<span class="syntax-comment"># 最小堆：列表保存堆，操作通过 heapq 调用。</span>
 heap = [<span class="syntax-number">3</span>, <span class="syntax-number">1</span>, <span class="syntax-number">4</span>]
-heapq.<span class="syntax-function">heapify</span>(heap)          <span class="syntax-comment"># O(n) 建堆；堆列表只保证父节点不大于孩子。</span>
-heapq.<span class="syntax-function">heappush</span>(heap, <span class="syntax-number">2</span>)      <span class="syntax-comment"># O(log n) 插入。</span>
-smallest = heapq.<span class="syntax-function">heappop</span>(heap)  <span class="syntax-comment"># 得到 1；O(log n) 弹出最小值。</span>
+heapq.<span class="syntax-function">heapify</span>(heap)           <span class="syntax-comment"># 原地把列表整理成最小堆。</span>
+heapq.<span class="syntax-function">heappush</span>(heap, <span class="syntax-number">2</span>)       <span class="syntax-comment"># 加入 2，同时保持最小堆性质。</span>
 
-<span class="syntax-comment"># LRU 的标准库路线：约定左端最久未用，右端最近使用。</span>
-order = <span class="syntax-function">OrderedDict</span>([(<span class="syntax-number">1</span>, <span class="syntax-string">&quot;a&quot;</span>), (<span class="syntax-number">2</span>, <span class="syntax-string">&quot;b&quot;</span>)])
-order.<span class="syntax-function">move_to_end</span>(<span class="syntax-number">1</span>)
-oldest = order.<span class="syntax-function">popitem</span>(last=<span class="syntax-literal">False</span>)  <span class="syntax-comment"># 淘汰 (2, &quot;b&quot;)。</span>
+<span class="syntax-keyword">if</span> heap:
+    smallest = heapq.<span class="syntax-function">heappop</span>(heap)  <span class="syntax-comment"># 取出当前最小值 1。</span>
+    <span class="syntax-function">print</span>(smallest)
 
-<span class="syntax-comment"># JSON 保留列表嵌套；输出时使用 print(text)。</span>
-text = json.<span class="syntax-function">dumps</span>([[<span class="syntax-number">1</span>, <span class="syntax-number">2</span>], [<span class="syntax-number">3</span>]])
-result = json.<span class="syntax-function">loads</span>(text)    <span class="syntax-comment"># 重新得到 [[1, 2], [3]]。</span></code></pre>
-<p><strong>另外两种按题使用的工具：</strong> 记忆化递归可导入 <code>from functools import lru_cache</code>，在递归函数上写 <code>@lru_cache(maxsize=None)</code>；参数须可哈希，缓存占用状态数对应的空间，递归深度仍受调用栈限制。整数平方根可导入 <code>from math import isqrt</code>，<code>isqrt(10)</code> 得到 3，用于<a href="hot100-python39.html#lc279">LC279 完全平方数</a>的候选边界。</p>
-<p>内置的 <code>list</code>、<code>dict</code>、<code>set</code>、<code>sorted</code>、<code>enumerate</code> 可以直接调用。两数之和保存“值→下标”时用普通字典；栈在列表尾部 <code>append/pop</code>；小写字母恰有 26 种时，固定频次数组便于逐项比较。选择工具时让它对应数据的含义，手写单调性、回溯状态和 DP 转移仍是本题的核心。</p>
+<span class="syntax-keyword">if</span> heap:
+    <span class="syntax-function">print</span>(heap[<span class="syntax-number">0</span>])            <span class="syntax-comment"># 查看剩余元素的最小值 2，保留它。</span></code></pre>
+<p>输出：</p>
+<pre><code class="language-text">1
+2</code></pre>
+<p><strong>核心机制：</strong> 堆用列表保存一棵完全二叉树，始终维护“父节点的值 ≤ 孩子的值”，因此根 <code>heap[0]</code> 就是最小值。插入或弹出后，库函数沿树调整位置，恢复这个关系。列表的其他位置只保证父子关系；要得到完整排序结果可以用 <code>sorted(nums)</code>。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="④ heapq：按大小处理，每次取当前最小值"><table><thead><tr><th scope="col">操作</th><th scope="col">含义</th><th scope="col">时间</th></tr></thead><tbody><tr><td><code>heapq.heapify(heap)</code></td><td>原地建堆，直接修改列表</td><td>O(n)</td></tr>
+<tr><td><code>heap[0]</code></td><td>查看最小值</td><td>O(1)</td></tr>
+<tr><td><code>heapq.heappush(heap, value)</code></td><td>加入一个值并调整堆</td><td>O(log n)</td></tr>
+<tr><td><code>heapq.heappop(heap)</code></td><td>取出最小值并调整堆</td><td>O(log n)</td></tr></tbody></table></div>
+<p><strong>和 deque 怎么选？</strong> 同样依次加入 3、1、4、2，deque 首先取出最早来的 <strong>3</strong>；最小堆首先取出当前最小的 <strong>1</strong>。按到达顺序选 deque，按大小优先级选 heapq。</p>
+<p><strong>记住两个边界：</strong> 查看堆顶或弹出前确保堆非空；<code>heapify</code> 原地修改列表，直接写 <code>heapq.heapify(heap)</code>。Python 3.9 中要优先取最大数，可以把数值取负后入堆，再把弹出的值取负还原；<a href="hot100-python39.html#quick-lc295">LC295 数据流的中位数</a>会展示这个写法。</p>
+<h4 id="hot100-其他工具遇到对应任务时再选">其他工具：遇到对应任务时再选</h4>
+<div class="table-scroll" tabindex="0" role="region" aria-label="其他工具：遇到对应任务时再选"><table><thead><tr><th scope="col">要处理的事情</th><th scope="col">导入与核心写法</th></tr></thead><tbody><tr><td>ACM 标准输入</td><td><code>import sys</code>；<code>sys.stdin.readline()</code> 读一行，下一节展开完整模板</td></tr>
+<tr><td>JSON 数组或嵌套结果</td><td><code>import json</code>；<code>json.loads(line)</code> 解析，<code>json.dumps(result)</code> 转成输出文本</td></tr>
+<tr><td>LRU 访问顺序</td><td><code>from collections import OrderedDict</code>；<code>move_to_end(key)</code> 移到末尾，<code>popitem(last=False)</code> 淘汰最前项，见 <a href="hot100-python39.html#quick-lc146">LC146</a></td></tr>
+<tr><td>记忆化递归</td><td><code>from functools import lru_cache</code>；<code>@lru_cache(maxsize=None)</code> 缓存函数结果，参数须可哈希，缓存占用状态空间，递归仍有栈深限制</td></tr>
+<tr><td>整数平方根</td><td><code>from math import isqrt</code>；<code>isqrt(10)</code> 得到 3，见 <a href="hot100-python39.html#lc279">LC279</a></td></tr></tbody></table></div>
+<p>以上工具均适用于 Python 3.9。<code>list</code>、<code>dict</code>、<code>set</code>、<code>sorted</code>、<code>enumerate</code> 是内置工具，可以直接调用。二分题在三小时与前两轮统一手写区间、比较和边界更新，第三轮再对照 <code>bisect</code>。</p>
 <p>语法依据：<a href="https://docs.python.org/3.9/library/collections.html">collections 容器</a> · <a href="https://docs.python.org/3.9/library/heapq.html">heapq 最小堆</a> · <a href="https://docs.python.org/3.9/library/functools.html#functools.lru_cache">lru_cache 缓存</a>。</p>
 <p><a id="io-format-index"></a></p>
 <h4 id="hot100-先选一个-main按输入格式直接套用">先选一个 main：按输入格式直接套用</h4>
