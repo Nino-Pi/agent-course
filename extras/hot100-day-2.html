@@ -14,6 +14,68 @@
 <li><strong>函数接收什么、返回什么？</strong> 例如 <code>two_sum(nums, target)</code> 接收数组和目标值，返回两个下标。算法写在解题函数中，用 <code>return</code> 把结果交回调用处。</li>
 <li><strong>输出长什么样？</strong> 确定是一个数、空格分隔的序列、逐行矩阵还是 JSON。<code>main()</code> 负责读入、调用解题函数，再按题目约定 <code>print</code>。</li>
 </ol>
+<p><a id="program-libraries"></a></p>
+<h3 id="hot100-常用标准库先选工具再写-import">常用标准库：先选工具，再写 import</h3>
+<p><strong>本课推荐按任务选库：动态计数用 <code>defaultdict(int)</code>，分组用 <code>defaultdict(list)</code>，现成序列的频次用 <code>Counter</code>，队列用 <code>deque</code>，堆用 <code>heapq</code>，有序数组的二分位置用 <code>bisect</code>。</strong> 它们都随 Python 3.9 提供。每道题把实际用到的导入放在代码顶部；下面是一份可按题选择的速查，核心题解和完整程序也各自写出所需导入。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="常用标准库：先选工具，再写 import"><table><thead><tr><th scope="col">要处理的事情</th><th scope="col">导入语句</th><th scope="col">关键写法与适用题型</th></tr></thead><tbody><tr><td>标准输入</td><td><code>import sys</code></td><td><code>sys.stdin.readline()</code> 读一行；ACM 的 main 使用它</td></tr>
+<tr><td>扫描时累加次数</td><td><code>from collections import defaultdict</code></td><td><code>counts = defaultdict(int)</code>，<code>counts[key] += 1</code>；<a href="hot100-python39.html#quick-lc560">LC560 前缀和计数</a></td></tr>
+<tr><td>按键收集一组元素</td><td><code>from collections import defaultdict</code></td><td><code>groups = defaultdict(list)</code>，<code>groups[key].append(value)</code>；<a href="hot100-python39.html#lc49">LC49 异位词分组</a></td></tr>
+<tr><td>一次建立频次表</td><td><code>from collections import Counter</code></td><td><code>counts = Counter(nums)</code> 或 <code>Counter(s)</code>；<a href="hot100-python39.html#lc347">LC347 高频元素</a>、<a href="hot100-python39.html#quick-lc76">LC76 覆盖窗口</a></td></tr>
+<tr><td>FIFO 队列、两端删除</td><td><code>from collections import deque</code></td><td><code>append()</code> 入队、<code>popleft()</code> 出队；<a href="hot100-python39.html#quick-lc102">LC102 层序遍历</a>、<a href="hot100-python39.html#quick-lc239">LC239 单调队列</a></td></tr>
+<tr><td>最小堆、Top-K、双堆</td><td><code>import heapq</code></td><td><code>heappush(heap, x)</code>、<code>heappop(heap)</code> 都加 <code>heapq.</code> 前缀，<code>heap[0]</code> 是最小值；<a href="hot100-python39.html#quick-lc215">LC215</a>、<a href="hot100-python39.html#quick-lc295">LC295</a></td></tr>
+<tr><td>有序数组的插入位置</td><td><code>from bisect import bisect_left, bisect_right</code></td><td>分别找首个 <code>&gt;= x</code>、首个 <code>&gt; x</code> 的位置；<a href="hot100-python39.html#lc300">LC300 的 tails 写法</a></td></tr>
+<tr><td>维护键的访问顺序</td><td><code>from collections import OrderedDict</code></td><td><code>move_to_end(key)</code> 移到末尾，<code>popitem(last=False)</code> 淘汰最前项；<a href="hot100-python39.html#quick-lc146">LC146 LRU</a></td></tr>
+<tr><td>嵌套结果与 JSON 输入</td><td><code>import json</code></td><td><code>json.loads(line)</code> 解析，<code>json.dumps(result)</code> 序列化；数组、矩阵、分组结果按协议使用</td></tr></tbody></table></div>
+<p><strong>直接看最小用法。</strong> 下面的数值都是语法演示；解题时用题目的输入替换。<code>import heapq</code> 后写 <code>heapq.heappush(...)</code>；<code>from collections import deque</code> 后直接写 <code>deque(...)</code>。</p>
+<!-- code:program-template:libraries -->
+<pre><code class="language-python"><span class="syntax-keyword">import</span> heapq
+<span class="syntax-keyword">import</span> json
+<span class="syntax-keyword">import</span> sys  <span class="syntax-comment"># ACM 的 main 使用 sys.stdin.readline()；读写模板紧接在后面。</span>
+<span class="syntax-keyword">from</span> bisect <span class="syntax-keyword">import</span> bisect_left, bisect_right
+<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter, defaultdict, deque, OrderedDict
+
+<span class="syntax-comment"># 动态计数：int 是默认工厂，调用 int() 得到初值 0。</span>
+counts = <span class="syntax-function">defaultdict</span>(int)
+counts[<span class="syntax-number">0</span>] = <span class="syntax-number">1</span>                 <span class="syntax-comment"># LC560：空前缀预先出现一次。</span>
+counts[<span class="syntax-number">3</span>] += <span class="syntax-number">1</span>                <span class="syntax-comment"># 首次遇到 3：先得到 0，再加到 1。</span>
+
+<span class="syntax-comment"># 分组：每个新键各自得到一个空列表。</span>
+groups = <span class="syntax-function">defaultdict</span>(list)
+groups[<span class="syntax-string">&quot;aet&quot;</span>].<span class="syntax-function">append</span>(<span class="syntax-string">&quot;eat&quot;</span>)
+groups[<span class="syntax-string">&quot;aet&quot;</span>].<span class="syntax-function">append</span>(<span class="syntax-string">&quot;tea&quot;</span>)   <span class="syntax-comment"># 同一签名下得到 [&quot;eat&quot;, &quot;tea&quot;]。</span>
+
+<span class="syntax-comment"># 直接统计已有数据。</span>
+frequency = <span class="syntax-function">Counter</span>(<span class="syntax-string">&quot;aba&quot;</span>)  <span class="syntax-comment"># a 出现 2 次，b 出现 1 次。</span>
+missing_count = frequency[<span class="syntax-string">&quot;z&quot;</span>]  <span class="syntax-comment"># 得到 0，Counter 此次查询保持原有键集合。</span>
+
+<span class="syntax-comment"># 队列：从右端入队、左端出队；两端操作都是 O(1)。</span>
+queue = <span class="syntax-function">deque</span>([<span class="syntax-number">10</span>, <span class="syntax-number">20</span>])
+queue.<span class="syntax-function">append</span>(<span class="syntax-number">30</span>)
+first = queue.<span class="syntax-function">popleft</span>()      <span class="syntax-comment"># first 为 10，队列剩下 20、30。</span>
+
+<span class="syntax-comment"># 最小堆：列表保存堆，操作通过 heapq 调用。</span>
+heap = [<span class="syntax-number">3</span>, <span class="syntax-number">1</span>, <span class="syntax-number">4</span>]
+heapq.<span class="syntax-function">heapify</span>(heap)          <span class="syntax-comment"># O(n) 建堆；堆列表只保证父节点不大于孩子。</span>
+heapq.<span class="syntax-function">heappush</span>(heap, <span class="syntax-number">2</span>)      <span class="syntax-comment"># O(log n) 插入。</span>
+smallest = heapq.<span class="syntax-function">heappop</span>(heap)  <span class="syntax-comment"># 得到 1；O(log n) 弹出最小值。</span>
+
+<span class="syntax-comment"># 二分：nums 已经有序；查找返回下标，原数组保持原样。</span>
+nums = [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>, <span class="syntax-number">2</span>, <span class="syntax-number">4</span>]
+left = <span class="syntax-function">bisect_left</span>(nums, <span class="syntax-number">2</span>)  <span class="syntax-comment"># 1：第一个 &gt;= 2 的位置。</span>
+right = <span class="syntax-function">bisect_right</span>(nums, <span class="syntax-number">2</span>)  <span class="syntax-comment"># 3：第一个 &gt; 2 的位置。</span>
+
+<span class="syntax-comment"># LRU 的标准库路线：约定左端最久未用，右端最近使用。</span>
+order = <span class="syntax-function">OrderedDict</span>([(<span class="syntax-number">1</span>, <span class="syntax-string">&quot;a&quot;</span>), (<span class="syntax-number">2</span>, <span class="syntax-string">&quot;b&quot;</span>)])
+order.<span class="syntax-function">move_to_end</span>(<span class="syntax-number">1</span>)
+oldest = order.<span class="syntax-function">popitem</span>(last=<span class="syntax-literal">False</span>)  <span class="syntax-comment"># 淘汰 (2, &quot;b&quot;)。</span>
+
+<span class="syntax-comment"># JSON 保留列表嵌套；输出时使用 print(text)。</span>
+text = json.<span class="syntax-function">dumps</span>([[<span class="syntax-number">1</span>, <span class="syntax-number">2</span>], [<span class="syntax-number">3</span>]])
+result = json.<span class="syntax-function">loads</span>(text)    <span class="syntax-comment"># 重新得到 [[1, 2], [3]]。</span></code></pre>
+<p><strong>记住三处边界。</strong> <code>defaultdict(int)</code> 的下标查询会把缺键写为 0；用 <code>.get(key, 0)</code> 可以只查询已有计数，例如树上前缀和需要保持当前路径的状态。<code>defaultdict(list)</code> 传入工厂 <code>list</code>，每个缺键分别创建列表。<code>bisect</code> 的位置查找是 O(log n)，随后若用列表 <code>insert()</code>，搬移元素仍是 O(n)；Python 3.9 的 <code>heapq</code> 用最小堆，数值最大堆可存负数。</p>
+<p><strong>另外两种按题使用的工具：</strong> 记忆化递归可导入 <code>from functools import lru_cache</code>，在递归函数上写 <code>@lru_cache(maxsize=None)</code>；参数须可哈希，缓存占用状态数对应的空间，递归深度仍受调用栈限制。整数平方根可导入 <code>from math import isqrt</code>，<code>isqrt(10)</code> 得到 3，用于<a href="hot100-python39.html#lc279">LC279 完全平方数</a>的候选边界。</p>
+<p>内置的 <code>list</code>、<code>dict</code>、<code>set</code>、<code>sorted</code>、<code>enumerate</code> 可以直接调用。两数之和保存“值→下标”时用普通字典；栈在列表尾部 <code>append/pop</code>；小写字母恰有 26 种时，固定频次数组便于逐项比较。选择工具时让它对应数据的含义，手写单调性、回溯状态和 DP 转移仍是本题的核心。</p>
+<p>语法依据：<a href="https://docs.python.org/3.9/library/collections.html">collections 容器</a> · <a href="https://docs.python.org/3.9/library/heapq.html">heapq 最小堆</a> · <a href="https://docs.python.org/3.9/library/bisect.html">bisect 二分</a> · <a href="https://docs.python.org/3.9/library/functools.html#functools.lru_cache">lru_cache 缓存</a>。</p>
 <p><a id="io-format-index"></a></p>
 <h3 id="hot100-先选一个-main按输入格式直接套用">先选一个 main：按输入格式直接套用</h3>
 <p><strong>按输入格式跳转：</strong> <a href="#io-one-int">① 单整数</a> · <a href="#io-two-ints">② 两整数</a> · <a href="#io-array">③ 一行数组</a> · <a href="#io-sized-array">④ 长度加数组</a> · <a href="#io-target-array">⑤ 目标值加数组</a></p>
@@ -24,7 +86,9 @@
 <strong>① 一行一个整数 → 输出一个数</strong></p>
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/climbing-stairs/">LC70 爬楼梯 · 题目</a> · <a href="https://leetcode.cn/problems/climbing-stairs/solutions/">题解</a></p>
 <!-- code:program-template:one-int -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：5</span>
     n = <span class="syntax-function">int</span>(sys.stdin.<span class="syntax-function">readline</span>())
 
@@ -34,7 +98,9 @@
 <strong>② 一行两个整数 → 输出一个数</strong></p>
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/unique-paths/">LC62 不同路径 · 题目</a> · <a href="https://leetcode.cn/problems/unique-paths/solutions/">题解</a></p>
 <!-- code:program-template:two-ints -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：3 7（例如网格的行数、列数）</span>
     rows, cols = <span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>())
 
@@ -45,7 +111,9 @@
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/move-zeroes/">LC283 移动零 · 题目</a> · <a href="https://leetcode.cn/problems/move-zeroes/solutions/">题解</a>
 套用移动零时，使用代码末尾的原地修改分支，输出 nums。</p>
 <!-- code:program-template:array -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：0 1 0 3 12（本格式直接给数组）</span>
     nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">split</span>()))
 
@@ -59,7 +127,9 @@
 <strong>④ 第一行是长度，第二行是数组 → 输出一个数</strong></p>
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/maximum-subarray/">LC53 最大子数组和 · 题目</a> · <a href="https://leetcode.cn/problems/maximum-subarray/solutions/">题解</a></p>
 <!-- code:program-template:sized-array -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
     <span class="syntax-comment"># 5</span>
     <span class="syntax-comment"># -2 1 -3 4 -1</span>
@@ -72,7 +142,9 @@
 <strong>⑤ 第一行是长度和目标值，第二行是数组 → 输出两个下标</strong></p>
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/two-sum/">LC1 两数之和 · 题目</a> · <a href="https://leetcode.cn/problems/two-sum/solutions/">题解</a></p>
 <!-- code:program-template:target-array -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
     <span class="syntax-comment"># 4 9</span>
     <span class="syntax-comment"># 2 7 11 15</span>
@@ -85,7 +157,9 @@
 <strong>⑥ 一行完整字符串 → 输出一个数或字符串</strong></p>
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/">LC3 无重复字符的最长子串 · 题目</a> · <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/solutions/">题解</a></p>
 <!-- code:program-template:string -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：hello world</span>
     s = sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">rstrip</span>(<span class="syntax-string">&quot;\r\n&quot;</span>)  <span class="syntax-comment"># 去掉行末换行，保留空格。</span>
 
@@ -99,7 +173,9 @@
 <strong>⑦ 判断题：读取字符串 → 输出小写 true / false</strong></p>
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/valid-parentheses/">LC20 有效的括号 · 题目</a> · <a href="https://leetcode.cn/problems/valid-parentheses/solutions/">题解</a></p>
 <!-- code:program-template:boolean -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：()[]{}</span>
     s = sys.stdin.<span class="syntax-function">readline</span>().<span class="syntax-function">rstrip</span>(<span class="syntax-string">&quot;\r\n&quot;</span>)
 
@@ -111,6 +187,7 @@
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/group-anagrams/">LC49 字母异位词分组 · 题目</a> · <a href="https://leetcode.cn/problems/group-anagrams/solutions/">题解</a></p>
 <!-- code:program-template:words-json -->
 <pre><code class="language-python"><span class="syntax-keyword">import</span> json  <span class="syntax-comment"># 这类输出在文件顶部额外导入 json；同时保留 import sys。</span>
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
@@ -127,7 +204,9 @@
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/set-matrix-zeroes/">LC73 矩阵置零 · 题目</a> · <a href="https://leetcode.cn/problems/set-matrix-zeroes/solutions/">题解</a>
 套用矩阵置零时，调用原地算法后逐行输出 matrix；此处的 result 分支适用于返回新矩阵的接口。</p>
 <!-- code:program-template:matrix -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
     <span class="syntax-comment"># 2 3</span>
     <span class="syntax-comment"># 1 2 3</span>
@@ -148,7 +227,9 @@
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/maximum-subarray/">LC53 最大子数组和 · 题目</a> · <a href="https://leetcode.cn/problems/maximum-subarray/solutions/">题解</a>
 组数与逐组输出是本地练习协议，每组单独调用一次本题算法。</p>
 <!-- code:program-template:counted-groups -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
     <span class="syntax-comment"># 2          ← 共 2 组；这些说明文字不属于实际输入</span>
     <span class="syntax-comment"># 3          ← 第 1 组长度</span>
@@ -167,7 +248,9 @@
 <p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/maximum-subarray/">LC53 最大子数组和 · 题目</a> · <a href="https://leetcode.cn/problems/maximum-subarray/solutions/">题解</a>
 每行一组与 EOF 结束是本地练习协议，每组单独调用一次本题算法。</p>
 <!-- code:program-template:eof-groups -->
-<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
+<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 本协议每组恰占一行，例如连续输入两行：</span>
     <span class="syntax-comment"># 1 2 3</span>
     <span class="syntax-comment"># 4 5</span>
@@ -253,7 +336,7 @@
 <h4 id="hot100-输入输出与构造">输入输出与构造</h4>
 <p>第一行 n k；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
+<p>导入 <code>from collections import defaultdict</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">3 2
 1 1 1</code></pre>
@@ -265,23 +348,25 @@
 <p><strong>推荐思路：</strong> 用前缀和加频次字典；当前前缀与某个历史前缀相差 k，就得到一段答案，所以先累计历史 <code>prefix_sum-k</code> 的次数，再记录当前前缀。它可统一处理负数、零和正数，期望时间 O(n)、辅助空间 O(n)。小输入可用“固定左端，右端逐项累加”的枚举法核对，时间 O(n²)、辅助空间 O(1)；大规模输入优先用字典复用所有历史前缀。</p>
 <p><strong>状态：</strong> counts 在查询时只记录当前位置之前的前缀；空前缀 0 预先出现一次。</p>
 <p><strong>主解：</strong> 前缀和+频次。时间 期望 O(n)；空间 O(n)。</p>
-<p><strong>读码：</strong><code>counts.get(prefix_sum-k, 0)</code> 返回满足条件的旧前缀数量，不是布尔值。<code>[0,0]</code>、<code>k=0</code> 时两轮分别增加 1 和 2；缺键默认 0 不会写入字典。见<a href="hot100-python39.html#python-hash">查询与插入</a>。</p>
+<p><strong>导入与读码：</strong> 先写 <code>from collections import defaultdict</code>，再用 <code>counts = defaultdict(int)</code> 建频次表、<code>counts[0] = 1</code> 登记空前缀。<code>counts[prefix_sum-k]</code> 给出满足条件的旧前缀数量，<code>counts[prefix_sum] += 1</code> 登记当前前缀。<code>[0,0]</code>、<code>k=0</code> 时两轮分别增加 1 和 2。缺键下标查询会创建计数 0；它贡献 0 个起点，每轮至多新增常数个键，空间仍为 O(n)。见<a href="hot100-python39.html#program-libraries">常用标准库</a>。</p>
 <h4 id="hot100-推荐完整程序">推荐完整程序</h4>
 <!-- code:practice:560 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> defaultdict
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">subarray_sum</span>(nums, k):
     <span class="syntax-comment"># counts 在查询时只记录当前位置之前的前缀；</span>
     <span class="syntax-comment"># 预存空前缀 0，统计从下标 0 开始的区间。</span>
-    counts = {<span class="syntax-number">0</span>: <span class="syntax-number">1</span>}
+    counts = <span class="syntax-function">defaultdict</span>(int)  <span class="syntax-comment"># int() 提供缺键初值 0，便于直接累加。</span>
+    counts[<span class="syntax-number">0</span>] = <span class="syntax-number">1</span>
     <span class="syntax-comment"># prefix_sum 是截至当前元素的累加和；result 是已统计出的目标和非空子数组数量。</span>
     prefix_sum = result = <span class="syntax-number">0</span>
     <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums:
         prefix_sum += value
         <span class="syntax-comment"># 先查旧前缀再登记当前前缀，不能计入空区间。</span>
-        result += counts.<span class="syntax-function">get</span>(prefix_sum - k, <span class="syntax-number">0</span>)
-        counts[prefix_sum] = counts.<span class="syntax-function">get</span>(prefix_sum, <span class="syntax-number">0</span>) + <span class="syntax-number">1</span>
+        result += counts[prefix_sum - k]
+        counts[prefix_sum] += <span class="syntax-number">1</span>
     <span class="syntax-keyword">return</span> result
 
 
@@ -391,7 +476,7 @@
 <h5 id="hot100-输入输出与构造-2">输入输出与构造</h5>
 <p>首行单词数 n，随后 n 个完整文本行，每行一个单词（空单词为空行）。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>import json</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>int(...)</code> 把对应字段转为整数。<code>rstrip(&quot;\r\n&quot;)</code> 只去掉行尾换行，保留字符串中的空格。</p>
+<p>导入 <code>import json</code>、<code>from collections import defaultdict</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>int(...)</code> 把对应字段转为整数。<code>rstrip(&quot;\r\n&quot;)</code> 只去掉行尾换行，保留字符串中的空格。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">6
 eat
@@ -410,20 +495,20 @@ bat</code></pre>
 <p><strong>记号：</strong> N 为单词数，L=max(1, 最大词长)，Σ=26；计数键版本仅用于小写英文字母。</p>
 <p><strong>主解：</strong> 通用：排序键。时间 O(N L log(L+1))；空间 O(NL)。</p>
 <p><strong>读码：</strong><code>sorted(word)</code> 分配字符列表，<code>&quot;&quot;.join(...)</code> 再拼成字符串键；每个新键保存在字典中，排序也可能使用与词长成比例的临时空间。<code>groups[key]</code> 是一组原单词，<code>list(groups.values())</code> 收集这些分组列表，组间顺序由首次遇到键的次序决定，题目接受任意合法顺序。见<a href="hot100-python39.html#python-sort">排序</a>与<a href="hot100-python39.html#python-strings">字符转换</a>。</p>
+<p><strong>标准库写法：</strong> 导入 <code>defaultdict</code>，用 <code>defaultdict(list)</code> 为每个新签名建立独立列表，然后直接追加单词。</p>
 <h5 id="hot100-推荐完整程序-2">推荐完整程序</h5>
 <!-- code:practice:49 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">import</span> json
+<pre><code class="language-python"><span class="syntax-keyword">import</span> json
+<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> defaultdict
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">group_anagrams</span>(words):
     <span class="syntax-comment"># groups 的每个键对应一组异位词；组内保存原单词，保留其实际拼写。</span>
-    groups = {}
+    groups = <span class="syntax-function">defaultdict</span>(list)  <span class="syntax-comment"># 每个新键自动获得独立的空列表。</span>
     <span class="syntax-keyword">for</span> word <span class="syntax-keyword">in</span> words:
         <span class="syntax-comment"># 把异位词转为同一个可哈希的键；空串也有合法键。</span>
         key = <span class="syntax-string">&#39;&#39;</span>.<span class="syntax-function">join</span>(<span class="syntax-function">sorted</span>(word))  <span class="syntax-comment"># sorted 返回字符列表，join 再拼回字符串。</span>
-        <span class="syntax-keyword">if</span> key <span class="syntax-keyword">not</span> <span class="syntax-keyword">in</span> groups:
-            groups[key] = []
         groups[key].<span class="syntax-function">append</span>(word)
     <span class="syntax-keyword">return</span> <span class="syntax-function">list</span>(groups.<span class="syntax-function">values</span>())
 
@@ -541,10 +626,10 @@ bat</code></pre>
 <tr><td>节点 -3 的右孩子 11</td><td>10−3+11=18</td><td>18−8=10</td><td>根 10 之后的前缀</td><td>-3→11</td></tr></tbody></table></div>
 <p>再看树 <code>[1,2,2]</code>、目标 0，正确答案为 0。进入左孩子时得到前缀 3，处理完后应将它撤销；随后进入右孩子，也得到前缀 3，查询历史前缀 3 时应得到 0。若遗留左孩子的计数，就会误算出一条“左右兄弟之间”的路径。这正是离开事件要恢复的状态。</p>
 <h5 id="hot100-完整-python-39-程序">完整 Python 3.9 程序</h5>
-<p>导入 <code>sys</code> 按行读取，导入 <code>deque</code> 构造真实节点。<code>counts.get(key, 0)</code> 表示尚未出现的历史前缀次数为 0；进入/离开事件使用普通列表栈保存。</p>
+<p>导入 <code>sys</code> 按行读取、<code>deque</code> 构造真实节点、<code>defaultdict</code> 累加前缀频次。<code>counts.get(key, 0)</code> 只查询已有祖先前缀，未命中时返回 0；退出时清理归零键，使映射只占当前路径的空间。进入/离开事件使用普通列表栈保存。</p>
 <!-- code:practice:437 -->
 <pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> defaultdict, deque
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -589,7 +674,8 @@ bat</code></pre>
     <span class="syntax-comment"># 进入事件登记前缀，退出事件撤销前缀；</span>
     <span class="syntax-comment"># 栈模拟递归回溯。</span>
     <span class="syntax-comment"># counts 保存当前祖先路径上各前缀和的次数；虚拟空前缀 0 支持从根开始的路径。</span>
-    counts = {<span class="syntax-number">0</span>: <span class="syntax-number">1</span>}
+    counts = <span class="syntax-function">defaultdict</span>(int)
+    counts[<span class="syntax-number">0</span>] = <span class="syntax-number">1</span>
     stack = [(root, <span class="syntax-number">0</span>, <span class="syntax-literal">False</span>)] <span class="syntax-keyword">if</span> root <span class="syntax-keyword">else</span> []
     result = <span class="syntax-number">0</span>
     <span class="syntax-keyword">while</span> stack:
@@ -602,8 +688,9 @@ bat</code></pre>
             <span class="syntax-keyword">continue</span>
         prefix_sum += node.val
         <span class="syntax-comment"># 当前前缀减去某个祖先前缀等于 target，就找到一条以当前节点结尾的路径。</span>
+        <span class="syntax-comment"># 只查询祖先计数；get 未命中时返回 0，保持字典只存当前路径的前缀。</span>
         result += counts.<span class="syntax-function">get</span>(prefix_sum - target, <span class="syntax-number">0</span>)
-        counts[prefix_sum] = counts.<span class="syntax-function">get</span>(prefix_sum, <span class="syntax-number">0</span>) + <span class="syntax-number">1</span>
+        counts[prefix_sum] += <span class="syntax-number">1</span>
         <span class="syntax-comment"># 退出事件先入栈、孩子后入栈，确保处理完全部后代才撤销当前前缀。</span>
         stack.<span class="syntax-function">append</span>((node, prefix_sum, <span class="syntax-literal">True</span>))
         <span class="syntax-keyword">if</span> node.right:
@@ -1848,16 +1935,16 @@ ABC</code></pre>
 <p>内层循环的顺序是“合法时先尝试更新答案，再移走一个左端字符”。因此移出必需字符导致失效之前，最后一个合法窗口已经有机会被保存。盈余字符从负数加回 0 时依然够用；只有加到正数时，才把 <code>missing</code> 加 1。</p>
 <p>若目标为 <code>&quot;AA&quot;</code>，初始化应是 <code>need[&#39;A&#39;]=2</code>、<code>missing=2</code>，每收到一个仍缺的 A 才减少一次缺额。这样同时处理了字符种类和重复次数；原串走完仍缺字符时，程序返回空字符串。</p>
 <h4 id="hot100-推荐完整程序-20">推荐完整程序</h4>
+<p>导入 <code>sys</code> 读取两行字符串，导入 <code>Counter</code> 用 <code>Counter(t)</code> 建立包含重复字符的目标频次。</p>
 <!-- code:practice:76 -->
 <pre><code class="language-python"><span class="syntax-keyword">import</span> sys
+<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">min_window</span>(s, t):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> t:
         <span class="syntax-keyword">return</span> <span class="syntax-string">&#39;&#39;</span>
-    need = {}
-    <span class="syntax-keyword">for</span> char <span class="syntax-keyword">in</span> t:
-        need[char] = need.<span class="syntax-function">get</span>(char, <span class="syntax-number">0</span>) + <span class="syntax-number">1</span>
+    need = <span class="syntax-function">Counter</span>(t)  <span class="syntax-comment"># 一次统计目标频次，重复字符也计入需求。</span>
     <span class="syntax-comment"># missing 计缺少的字符总数；need 可为负，表示有富余。</span>
     missing = <span class="syntax-function">len</span>(t)
     <span class="syntax-comment"># left 是当前窗口起点；best_left、best_length 保存最短合法窗口，初始长度比整串还长。</span>
@@ -4082,7 +4169,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-45">输入输出与构造</h5>
 <p>第一行 n；第二行 n 个节点值；第三行 random_count（等于 n）；第四行 n 个 random 目标下标，-1 表示空引用。两个数组长度相同，其空数组也各占一行。输出 [值数组, random下标数组] 的 JSON。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>import json</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
+<p>导入 <code>import json</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
 <p><code>build_random</code> 先建全部节点，再把 random_indices 转为节点引用；-1 表示空引用。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">5
@@ -4100,8 +4187,8 @@ getMin</code></pre>
 <p><strong>读码：</strong><code>copies</code> 的键是原节点对象，不是节点值；相同值的两个节点仍需两个新节点。<code>{None: None}</code> 使空 next/random 也能用同一条字典赋值逻辑处理。见<a href="hot100-python39.html#python-objects">节点键</a>。</p>
 <h5 id="hot100-推荐完整程序-45">推荐完整程序</h5>
 <!-- code:practice:138 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">import</span> json
+<pre><code class="language-python"><span class="syntax-keyword">import</span> json
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">RandomNode</span>:
@@ -4392,7 +4479,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-47">输入输出与构造</h5>
 <p>第一行 token_count；第二行是紧凑层序的 token_count 个字段，空节点写 null。空树可写 0 与下一空白行，或 1 与下一行 null。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><code>build_tree</code> 按非空父节点依次分配左右孩子，返回根和原 token 下标到节点的映射；这里不是完全二叉树下标公式。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">4
@@ -4408,8 +4495,8 @@ getMin</code></pre>
 <p><strong>读码：</strong><code>current = current.left</code> 下探，<code>stack.pop()</code> 回到尚未访问的父节点，再去右子树。<code>while current or stack</code> 是“还有当前子树或待处理祖先”，不是要求两者同时非空。</p>
 <h5 id="hot100-推荐完整程序-48">推荐完整程序</h5>
 <!-- code:practice:94 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -4500,7 +4587,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-48">输入输出与构造</h5>
 <p>第一行 token_count；第二行是紧凑层序的 token_count 个字段，空节点写 null。空树可写 0 与下一空白行，或 1 与下一行 null。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><code>build_tree</code> 按非空父节点依次分配左右孩子，返回根和原 token 下标到节点的映射；这里不是完全二叉树下标公式。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">7
@@ -4514,8 +4601,8 @@ getMin</code></pre>
 <p><strong>题意与前提：</strong> 求根到叶最长路径的节点数；空树深度为 0。</p>
 <h5 id="hot100-推荐完整程序-49">推荐完整程序</h5>
 <!-- code:practice:104 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -4606,7 +4693,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-49">输入输出与构造</h5>
 <p>第一行 token_count；第二行是紧凑层序的 token_count 个字段，空节点写 null。空树可写 0 与下一空白行，或 1 与下一行 null。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><code>build_tree</code> 按非空父节点依次分配左右孩子，返回根和原 token 下标到节点的映射；这里不是完全二叉树下标公式。</p>
 <p><code>emit_tree</code> 将结果树转回层序文本，空树输出 null。</p>
 <p><strong>样例输入</strong></p>
@@ -4623,8 +4710,8 @@ getMin</code></pre>
 <p><strong>读码：</strong> 本实现先交换当前节点的左右引用，再分别递归处理交换后的两棵子树。修改的是 root.left/right；return root 返回原根对象，不表示新建整棵树。</p>
 <h5 id="hot100-推荐完整程序-50">推荐完整程序</h5>
 <!-- code:practice:226 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">emit_tree</span>(root):
@@ -4738,7 +4825,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-50">输入输出与构造</h5>
 <p>第一行 token_count；第二行是紧凑层序的 token_count 个字段，空节点写 null。空树可写 0 与下一空白行，或 1 与下一行 null。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><code>build_tree</code> 按非空父节点依次分配左右孩子，返回根和原 token 下标到节点的映射；这里不是完全二叉树下标公式。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">7
@@ -4754,8 +4841,8 @@ getMin</code></pre>
 <p><strong>读码：</strong> 先排除结构和值不匹配，再做外侧、内侧两次镜像递归。两空为真，一空为假。</p>
 <h5 id="hot100-推荐完整程序-51">推荐完整程序</h5>
 <!-- code:practice:101 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -4847,7 +4934,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-51">输入输出与构造</h5>
 <p>第一行 token_count；第二行是紧凑层序的 token_count 个字段，空节点写 null。空树可写 0 与下一空白行，或 1 与下一行 null。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>import json</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>import json</code>、<code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><code>build_tree</code> 按非空父节点依次分配左右孩子，返回根和原 token 下标到节点的映射；这里不是完全二叉树下标公式。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">7
@@ -4863,9 +4950,9 @@ getMin</code></pre>
 <p><strong>读码：</strong> 进入本层时 <code>len(queue)</code> 固定循环次数；之后加入的孩子不在这一轮处理。<code>result.append(level)</code> 保存本轮新建的列表，不与下一层共用同一个 <code>level</code>。见<a href="hot100-python39.html#python-queue">队列</a>。</p>
 <h5 id="hot100-推荐完整程序-52">推荐完整程序</h5>
 <!-- code:practice:102 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">import</span> json
+<pre><code class="language-python"><span class="syntax-keyword">import</span> json
 <span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -4964,7 +5051,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-52">输入输出与构造</h5>
 <p>第一行 n；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
 <p><code>emit_tree</code> 将结果树转回层序文本，空树输出 null。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">5
@@ -4980,8 +5067,8 @@ getMin</code></pre>
 <p><strong>读码：</strong> 使用区间下标而非递归切片，避免不断复制子数组。中间元素建根，左右区间各自生成子树；返回的是本次区间对应的根节点，不是数组。</p>
 <h5 id="hot100-推荐完整程序-53">推荐完整程序</h5>
 <!-- code:practice:108 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">emit_tree</span>(root):
@@ -5064,7 +5151,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-53">输入输出与构造</h5>
 <p>第一行 token_count；第二行是非空二叉搜索树的紧凑层序字段，首字段是根值，空孩子写 null。第三行 k，保证 1 ≤ k ≤ 节点数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><code>build_tree</code> 按非空父节点依次分配左右孩子，返回根和原 token 下标到节点的映射；这里不是完全二叉树下标公式。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">5
@@ -5081,8 +5168,8 @@ getMin</code></pre>
 <p><strong>读码：</strong> 中序每真正取出一个节点才减少 k，不在压入左链时计数。返回第 k 个节点的值，不需要把全部中序结果都存下来。</p>
 <h5 id="hot100-推荐完整程序-54">推荐完整程序</h5>
 <!-- code:practice:230 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -5170,7 +5257,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-54">输入输出与构造</h5>
 <p>第一行 token_count；第二行是紧凑层序的 token_count 个字段，空节点写 null。空树可写 0 与下一空白行，或 1 与下一行 null。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><code>build_tree</code> 按非空父节点依次分配左右孩子，返回根和原 token 下标到节点的映射；这里不是完全二叉树下标公式。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">7
@@ -5186,8 +5273,8 @@ getMin</code></pre>
 <p><strong>读码：</strong><code>level_size</code> 在循环前固定；从左到右入队时，<code>index == level_size-1</code> 的节点就是本层最后一个。不是看到一个右孩子就直接认定它属于右视图。</p>
 <h5 id="hot100-推荐完整程序-55">推荐完整程序</h5>
 <!-- code:practice:199 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -5278,7 +5365,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-55">输入输出与构造</h5>
 <p>第一行 token_count；第二行是紧凑层序的 token_count 个字段，空节点写 null。空树可写 0 与下一空白行，或 1 与下一行 null。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><code>build_tree</code> 按非空父节点依次分配左右孩子，返回根和原 token 下标到节点的映射；这里不是完全二叉树下标公式。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">7
@@ -5294,8 +5381,8 @@ getMin</code></pre>
 <p><strong>读码：</strong> predecessor 从左子树起沿 right 找到链末端，先把原右子树挂在那里，再把左子树移到右边、清空左边。此时不要求左子树已经展开；后续沿 current.right 继续做相同重连，最终得到前序链。</p>
 <h5 id="hot100-推荐完整程序-56">推荐完整程序</h5>
 <!-- code:practice:114 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -6068,7 +6155,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-58">输入输出与构造</h5>
 <p>第一行 num_courses edge_count；随后 edge_count 行，每行 course prerequisite，表示 prerequisite → course。课程编号为 0 到 num_courses - 1。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>from collections import deque</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
+<p>导入 <code>from collections import deque</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">2 1
 1 0</code></pre>
@@ -6084,8 +6171,8 @@ getMin</code></pre>
 <p><strong>读码：</strong> 先按先修课 → 后续课建邻接表和入度；用普通循环把零入度节点放入队列；之后每轮消除一个已完成节点的影响。</p>
 <h5 id="hot100-推荐完整程序-59">推荐完整程序</h5>
 <!-- code:practice:207 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">can_finish</span>(num_courses, prerequisites):
@@ -6367,7 +6454,7 @@ getMin</code></pre>
 <h5 id="hot100-输入输出与构造-61">输入输出与构造</h5>
 <p>第一行 n k；第二行 nums 的 n 个整数，保证 1 ≤ k ≤ 不同数值的个数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>import heapq</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
+<p>导入 <code>import heapq</code>、<code>from collections import Counter</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">6 2
 1 1 1 2 2 3</code></pre>
@@ -6381,17 +6468,17 @@ getMin</code></pre>
 <p><strong>记号：</strong> U 为不同元素个数；输出顺序不作要求。</p>
 <p><strong>主解：</strong> 计数+大小 k 堆。时间 期望 O(n+U log(k+1))；空间 O(U+k)。</p>
 <p><strong>读码：</strong><code>counts.items()</code> 每轮解包得到数值与频次，入堆时反过来放 <code>(frequency,value)</code>。返回推导式只取每条目的 value；堆数组不是最终排序结果，但本题不要求顺序。</p>
+<p><strong>标准库写法：</strong> <code>Counter(nums)</code> 负责频次表，<code>heapq</code> 负责按频次保留 k 个候选；下面分别写出两项导入。</p>
 <h5 id="hot100-推荐完整程序-62">推荐完整程序</h5>
 <!-- code:practice:347 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">import</span> heapq
+<pre><code class="language-python"><span class="syntax-keyword">import</span> heapq
+<span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">top_k_frequent</span>(nums, k):
     <span class="syntax-comment"># counts 记录每个不同数值的出现次数；堆按频次挑选，数值只是同频次时的次要比较项。</span>
-    counts = {}
-    <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums:
-        counts[value] = counts.<span class="syntax-function">get</span>(value, <span class="syntax-number">0</span>) + <span class="syntax-number">1</span>
+    counts = <span class="syntax-function">Counter</span>(nums)  <span class="syntax-comment"># 直接统计每个值的出现次数。</span>
     heap = []
     <span class="syntax-keyword">for</span> value, frequency <span class="syntax-keyword">in</span> counts.<span class="syntax-function">items</span>():
         heapq.<span class="syntax-function">heappush</span>(heap, (frequency, value))  <span class="syntax-comment"># 第一关键字是频次，不是数值。</span>
@@ -6785,7 +6872,7 @@ findMedian</code></pre>
 <h5 id="hot100-输入输出与构造-67">输入输出与构造</h5>
 <p>第一行 rows cols；随后 rows 行，每行是 intervals 的 cols 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>import json</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
+<p>导入 <code>import json</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>split()</code> 按空白分隔本题的一行字段。<code>map(int, ...)</code> 把协议中需要整数的一组字段逐个转换。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">4 2
 1 3
@@ -6803,8 +6890,8 @@ findMedian</code></pre>
 <p><strong>读码：</strong><code>for left, right in sorted(intervals)</code> 按区间首项、再按次项排序后解包。<code>result[-1][1]</code> 是最后一段的右端；<code>not result or ...</code> 的短路保护避免空列表取 <code>[-1]</code>。见<a href="hot100-python39.html#python-sort">排序</a>与<a href="hot100-python39.html#python-condition">短路</a>。</p>
 <h5 id="hot100-推荐完整程序-68">推荐完整程序</h5>
 <!-- code:practice:56 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">import</span> json
+<pre><code class="language-python"><span class="syntax-keyword">import</span> json
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">merge_intervals</span>(intervals):
@@ -7255,7 +7342,7 @@ ace</code></pre>
 <h5 id="hot100-输入输出与构造-73">输入输出与构造</h5>
 <p>num_rows：一个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
-<p>导入 <code>import sys</code>、<code>import json</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>int(...)</code> 把对应字段转为整数。</p>
+<p>导入 <code>import json</code>、<code>import sys</code>。<code>sys.stdin.readline()</code> 每次读取一行。<code>int(...)</code> 把对应字段转为整数。</p>
 <p><strong>样例输入</strong></p>
 <pre><code class="language-text">5</code></pre>
 <p><strong>样例输出</strong></p>
@@ -7269,8 +7356,8 @@ ace</code></pre>
 <p><strong>读码：</strong> 每轮重新执行 <code>[1]*(row+1)</code> 得到新行，不会与上一行共享列表。内部 col 的范围不含两端，端点保持初始化的 1。</p>
 <h5 id="hot100-推荐完整程序-74">推荐完整程序</h5>
 <!-- code:practice:118 -->
-<pre><code class="language-python"><span class="syntax-keyword">import</span> sys
-<span class="syntax-keyword">import</span> json
+<pre><code class="language-python"><span class="syntax-keyword">import</span> json
+<span class="syntax-keyword">import</span> sys
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">generate_pascal</span>(num_rows):
