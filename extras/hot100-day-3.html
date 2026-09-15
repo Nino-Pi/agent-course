@@ -6,6 +6,7 @@
 <p><a href="#practice-today">直接开始当天核心题</a> · <a href="#io-format-index">按输入格式查模板</a></p>
 <p><a id="program-template"></a></p>
 <h2 id="hot100-每次动手前先写统一的程序框架">每次动手前：先写统一的程序框架</h2>
+<p><strong>视频补充｜输入输出：</strong> 原 27 集聚焦算法，没有单列 Python 输入输出课。先按下面的模板练习；模板旁的题目与题解入口用于核对算法接口。本地 main 负责读写，LeetCode 提交时按题面给定的类或函数签名填写算法。</p>
 <p>本课本地练习统一按 <strong>导入模块 → 定义解题函数 → 定义 main → 调用 main</strong> 四段组织。Python 定义函数的关键字是 <code>def</code>；<code>main</code> 是我们约定的入口函数名。每次换题，主要替换三处：<strong>怎样读入参数、解题函数怎样计算、结果怎样输出</strong>。</p>
 <h3 id="hot100-拿到一道题先确定这三件事">拿到一道题，先确定这三件事</h3>
 <ol>
@@ -21,6 +22,7 @@
 <p>这些模板按题面约定读取完整、合法的数据。先确认输入是否给出长度、每组占几行、总共有几组，再选择对应代码块。单组模板输出后结束；多组模板由组数或 EOF 决定结束。</p>
 <p><a id="io-one-int"></a>
 <strong>① 一行一个整数 → 输出一个数</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/climbing-stairs/">LC70 爬楼梯 · 题目</a> · <a href="https://leetcode.cn/problems/climbing-stairs/solutions/">题解</a></p>
 <!-- code:program-template:one-int -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：5</span>
@@ -30,6 +32,7 @@
     <span class="syntax-function">print</span>(result)</code></pre>
 <p><a id="io-two-ints"></a>
 <strong>② 一行两个整数 → 输出一个数</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/unique-paths/">LC62 不同路径 · 题目</a> · <a href="https://leetcode.cn/problems/unique-paths/solutions/">题解</a></p>
 <!-- code:program-template:two-ints -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：3 7（例如网格的行数、列数）</span>
@@ -39,6 +42,8 @@
     <span class="syntax-function">print</span>(result)</code></pre>
 <p><a id="io-array"></a>
 <strong>③ 一行整数数组 → 输出一行序列</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/move-zeroes/">LC283 移动零 · 题目</a> · <a href="https://leetcode.cn/problems/move-zeroes/solutions/">题解</a>
+套用移动零时，使用代码末尾的原地修改分支，输出 nums。</p>
 <!-- code:program-template:array -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：0 1 0 3 12（本格式直接给数组）</span>
@@ -52,6 +57,7 @@
     <span class="syntax-comment"># print(*nums)</span></code></pre>
 <p><a id="io-sized-array"></a>
 <strong>④ 第一行是长度，第二行是数组 → 输出一个数</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/maximum-subarray/">LC53 最大子数组和 · 题目</a> · <a href="https://leetcode.cn/problems/maximum-subarray/solutions/">题解</a></p>
 <!-- code:program-template:sized-array -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
@@ -64,6 +70,7 @@
     <span class="syntax-function">print</span>(result)</code></pre>
 <p><a id="io-target-array"></a>
 <strong>⑤ 第一行是长度和目标值，第二行是数组 → 输出两个下标</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/two-sum/">LC1 两数之和 · 题目</a> · <a href="https://leetcode.cn/problems/two-sum/solutions/">题解</a></p>
 <!-- code:program-template:target-array -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
@@ -76,6 +83,7 @@
     <span class="syntax-function">print</span>(*result)  <span class="syntax-comment"># 输出 0 1。</span></code></pre>
 <p><a id="io-string"></a>
 <strong>⑥ 一行完整字符串 → 输出一个数或字符串</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/">LC3 无重复字符的最长子串 · 题目</a> · <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/solutions/">题解</a></p>
 <!-- code:program-template:string -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：hello world</span>
@@ -89,6 +97,7 @@
     <span class="syntax-comment"># 然后把调用改为 result = solve(s, t)。</span></code></pre>
 <p><a id="io-boolean"></a>
 <strong>⑦ 判断题：读取字符串 → 输出小写 true / false</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/valid-parentheses/">LC20 有效的括号 · 题目</a> · <a href="https://leetcode.cn/problems/valid-parentheses/solutions/">题解</a></p>
 <!-- code:program-template:boolean -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：()[]{}</span>
@@ -99,6 +108,7 @@
     <span class="syntax-comment"># 若题面要求 True / False，用 print(result)；要求 1 / 0，用 print(int(result))。</span></code></pre>
 <p><a id="io-words-json"></a>
 <strong>⑧ 一行多个单词 → 用 JSON 输出嵌套结果</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/group-anagrams/">LC49 字母异位词分组 · 题目</a> · <a href="https://leetcode.cn/problems/group-anagrams/solutions/">题解</a></p>
 <!-- code:program-template:words-json -->
 <pre><code class="language-python"><span class="syntax-keyword">import</span> json  <span class="syntax-comment"># 这类输出在文件顶部额外导入 json；同时保留 import sys。</span>
 
@@ -114,6 +124,8 @@
     <span class="syntax-comment"># JSON 保留嵌套结构与字符串引号，也会将布尔值写成小写。</span></code></pre>
 <p><a id="io-matrix"></a>
 <strong>⑨ 第一行是行列数，随后是矩阵 → 逐行输出矩阵</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/set-matrix-zeroes/">LC73 矩阵置零 · 题目</a> · <a href="https://leetcode.cn/problems/set-matrix-zeroes/solutions/">题解</a>
+套用矩阵置零时，调用原地算法后逐行输出 matrix；此处的 result 分支适用于返回新矩阵的接口。</p>
 <!-- code:program-template:matrix -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
@@ -133,6 +145,8 @@
     <span class="syntax-comment"># 若算法返回的是岛屿数量等单值，把输出循环改为 print(result)。</span></code></pre>
 <p><a id="io-counted-groups"></a>
 <strong>⑩ 第一行给出组数 → 每组读取长度和数组，输出一个结果</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/maximum-subarray/">LC53 最大子数组和 · 题目</a> · <a href="https://leetcode.cn/problems/maximum-subarray/solutions/">题解</a>
+组数与逐组输出是本地练习协议，每组单独调用一次本题算法。</p>
 <!-- code:program-template:counted-groups -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 输入示例：</span>
@@ -150,6 +164,8 @@
         <span class="syntax-function">print</span>(result)  <span class="syntax-comment"># 有几组，就输出几行。</span></code></pre>
 <p><a id="io-eof-groups"></a>
 <strong>⑪ 题面规定读到 EOF：每行一个数组 → 每行输出一个结果</strong></p>
+<p><strong>模板可套用例题：</strong> <a href="https://leetcode.cn/problems/maximum-subarray/">LC53 最大子数组和 · 题目</a> · <a href="https://leetcode.cn/problems/maximum-subarray/solutions/">题解</a>
+每行一组与 EOF 结束是本地练习协议，每组单独调用一次本题算法。</p>
 <!-- code:program-template:eof-groups -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
     <span class="syntax-comment"># 本协议每组恰占一行，例如连续输入两行：</span>
@@ -165,6 +181,7 @@
 <p><a id="program-example"></a></p>
 <h3 id="hot100-完整示例把选好的-main-放回四段框架">完整示例：把选好的 main 放回四段框架</h3>
 <p>下面用 <strong>LC1 两数之和</strong> 贯穿四段。输入第一行为 <code>n target</code>，第二行为 n 个整数；原题保证恰有一组解。输出两个原下标，以空格分隔。程序按题面约定接收一组完整、合法的输入，输出后结束。</p>
+<p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/two-sum/">LC1 两数之和 · 题目</a> · <a href="https://leetcode.cn/problems/two-sum/solutions/">题解</a></p>
 <!-- code:program-template:two-sum -->
 <pre><code class="language-python"><span class="syntax-comment"># 1. 导入模块：sys 提供标准输入 sys.stdin。</span>
 <span class="syntax-keyword">import</span> sys
