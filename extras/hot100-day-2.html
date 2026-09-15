@@ -348,6 +348,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">2</code></pre>
 <h4 id="hot100-题意状态与解题依据">题意、状态与解题依据</h4>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/subarray-sum-equals-k/solution/qian-zhui-he-ha-xi-biao-cong-liang-ci-bi-4mwr/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>subarray_sum(nums, k)</code>。整数列表 nums、目标 k → 和为 k 的非空连续区间数量；允许负数。</p>
 <p><strong>题意与前提：</strong> 统计和恰为 k 的连续非空子数组个数；元素可以为负数、零或正数。</p>
 <p><strong>推荐思路：</strong> 用前缀和加频次字典；当前前缀与某个历史前缀相差 k，就得到一段答案，所以先累计历史 <code>prefix_sum-k</code> 的次数，再记录当前前缀。它可统一处理负数、零和正数，期望时间 O(n)、辅助空间 O(n)。小输入可用“固定左端，右端逐项累加”的枚举法核对，时间 O(n²)、辅助空间 O(1)；大规模输入优先用字典复用所有历史前缀。</p>
@@ -421,6 +422,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">0 1</code></pre>
 <h5 id="hot100-题意状态与解题依据-1">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/two-sum/solution/dong-hua-cong-liang-shu-zhi-he-zhong-wo-0yvmj/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>two_sum(nums, target)</code>。整数列表 nums＋目标 target → 两个原下标的列表；无解扩展为 []，不修改 nums。</p>
 <p><strong>题意与前提：</strong> 返回和为 target 的两个不同下标；允许重复值，原题保证恰有一组解。</p>
 <p><strong>思路：</strong> 要找一对下标；把 a+b=target 改写为“此前是否见过 target-value”。</p>
@@ -493,6 +495,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">[[&quot;eat&quot;,&quot;tea&quot;,&quot;ate&quot;],[&quot;tan&quot;,&quot;nat&quot;],[&quot;bat&quot;]]</code></pre>
 <h5 id="hot100-题意状态与解题依据-2">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/group-anagrams/solution/ha-xi-biao-fen-zu-jian-ji-xie-fa-pythonj-1ukv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>group_anagrams(words)</code>。字符串列表 words → 按异位词分组的二维列表；不修改输入，分组顺序不限。</p>
 <p><strong>题意与前提：</strong> 按字符及频次相同分组；空字符串合法，外层和组内顺序不限。</p>
 <p><strong>推荐思路：</strong> 用 <code>&quot;&quot;.join(sorted(word))</code> 构造排序键，再用字典把同键单词归到一组；排序键同时保留字符种类与次数，适用于通用字符。设 N 为词数、L=max(1, 最大词长)，时间 O(NL log(L+1))、辅助空间 O(NL)。若输入明确限制为 26 个小写字母，可改用 26 项计数元组作键，时间 O(N(L+26))、辅助空间 O(N·26)，适合较长单词的分组；两种方法的输出分组引用另占 O(N)。</p>
@@ -553,6 +556,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">4</code></pre>
 <h5 id="hot100-题意状态与解题依据-3">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-consecutive-sequence/solution/ha-xi-biao-on-zuo-fa-pythonjavacgojsrust-whop/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>longest_consecutive(nums)</code>。整数列表 nums → 最长数值连续段长度；不要求位置连续，不修改输入。</p>
 <p><strong>题意与前提：</strong> 求最长的数值连续序列长度，不要求原数组位置连续；数组可为空。</p>
 <p><strong>思路：</strong> 要求值连续，不要求原数组位置连续；先去重，再只从连续段起点出发。</p>
@@ -605,6 +609,7 @@ bat</code></pre>
 <h4 id="hot100-lc437-路径总和-iii--medium">LC437 路径总和 III · Medium</h4>
 <p><strong>周四核心 · 树路径前缀频次。</strong> 进入/离开事件维护当前路径上的前缀频次。</p>
 <p><strong>检查重点：</strong> 跨兄弟子树不能相互配对；负数、零路径和与长链。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/path-sum-iii/solution/zuo-fa-he-560-ti-shi-yi-yang-de-pythonja-fmzo/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-题意与输入输出">题意与输入输出</h5>
 <p>给定二叉树和目标和 <code>target</code>，统计节点值之和等于目标的<strong>向下连续路径数量</strong>。路径可以从任何节点开始，到任何后代结束；它至少包含一个节点，沿途只能从父节点走向孩子。节点值允许为负数和 0。</p>
 <p>本程序第一行读取 <code>token_count</code>；第二行读取紧凑层序字段，空孩子写 <code>null</code>；第三行读取 <code>target_sum</code>。构造器按队列为每个非空父节点依次分配左右孩子。例如 <code>1 null 2 3</code> 对应 1.right=2、2.left=3。输出符合条件的路径条数。</p>
@@ -738,6 +743,7 @@ bat</code></pre>
 <h3 id="hot100-lc75-颜色分类--medium">LC75 颜色分类 · Medium</h3>
 <p><strong>当天核心 · 三路原地分区。</strong> left、index、right 分别界定已归位的 0、待处理区域和已归位的 2。</p>
 <p><strong>检查重点：</strong> 交换右侧后 index 保持不动，继续检查刚换回的元素；核对三段区间。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/sort-colors/solution/on-cha-ru-pai-xu-jian-ji-xie-fa-pythonja-zk60/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-4">输入输出与构造</h4>
 <p>第一行 n；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -830,6 +836,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1 3 12 0 0</code></pre>
 <h5 id="hot100-题意状态与解题依据-5">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/move-zeroes/solution/kuai-man-zhi-zhen-wei-shi-yao-ke-yi-ba-s-1h8x/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>move_zeroes(nums)</code>。整数列表 nums → 返回 None，原地把非零项稳定前移、后缀置零；输出 nums。</p>
 <p><strong>题意与前提：</strong> 原地把零移到末尾，保持非零元素的相对顺序；返回 None。</p>
 <p><strong>推荐思路：</strong> 用同向读写指针先把非零值稳定写入前缀，再清零剩余后缀。两个阶段分别负责保留与补齐，便于检查原地修改的结果；时间 O(n)、辅助空间 O(1)。备选的快慢指针交换同为 O(n) 时间、O(1) 辅助空间，适合将“保留项搬到前面”的动作统一为交换；两者都保持非零值相对顺序。</p>
@@ -842,19 +849,16 @@ bat</code></pre>
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">move_zeroes</span>(nums):
-    <span class="syntax-comment"># write 是下一个非零值的写入下标；从 0 开始，表示第一个非零值写到数组开头。</span>
-    <span class="syntax-comment"># 处理过程中 nums[:write] 已按原顺序保存读到的全部非零值。</span>
+    <span class="syntax-comment"># write 是下一个非零值的写入下标；nums[:write] 保存已读非零值，顺序不变。</span>
     write = <span class="syntax-number">0</span>
     <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums:
         <span class="syntax-keyword">if</span> value != <span class="syntax-number">0</span>:
-            <span class="syntax-comment"># 遇到非零值才写入；写入位置始终不超过已读位置，保留后面尚未读到的元素。</span>
+            <span class="syntax-comment"># 写入位置不超过当前读取位置，因此后面尚未读取的值仍然保留。</span>
             nums[write] = value
-            <span class="syntax-comment"># 这个位置已经写好，write 前进到下一个可写位置。</span>
             write += <span class="syntax-number">1</span>
-    <span class="syntax-comment"># 第一阶段结束，write 等于非零元素个数；此后它表示下一个要补零的位置。</span>
-    <span class="syntax-keyword">while</span> write &lt; <span class="syntax-function">len</span>(nums):
-        nums[write] = <span class="syntax-number">0</span>
-        write += <span class="syntax-number">1</span>
+    <span class="syntax-comment"># write 此时等于非零值个数；从这个固定边界开始，把剩余位置补成 0。</span>
+    <span class="syntax-keyword">for</span> index <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(write, <span class="syntax-function">len</span>(nums)):
+        nums[index] = <span class="syntax-number">0</span>
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
@@ -904,6 +908,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">5 6 7 1 2 3 4</code></pre>
 <h5 id="hot100-题意状态与解题依据-6">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/rotate-array/solution/tu-jie-yuan-di-zuo-fa-yi-tu-miao-dong-py-ryfv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>rotate_array(nums, k)</code>。列表 nums、非负位移 k → 返回 None，原地右旋；输出 nums。</p>
 <p><strong>题意与前提：</strong> 把非空数组原地向右轮转 k 步，k≥0 且可超过长度；返回 None。</p>
 <p><strong>思路：</strong> 循环位移，先对长度取模；利用“整体翻转，再分段翻转”恢复相对顺序。</p>
@@ -972,6 +977,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">24 12 8 6</code></pre>
 <h5 id="hot100-题意状态与解题依据-7">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/product-of-array-except-self/solution/qian-hou-zhui-fen-jie-fu-ti-dan-pythonja-86r1/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>product_except_self(nums)</code>。整数列表 nums → 每个位置之外元素的乘积列表；不修改输入。</p>
 <p><strong>题意与前提：</strong> 不使用除法，返回每个位置以外所有元素的乘积；允许零和负数。</p>
 <p><strong>思路：</strong> 每个位置的答案=它左侧乘积×右侧乘积；不需要除法，因此能自然处理零。</p>
@@ -1022,6 +1028,7 @@ bat</code></pre>
 <h4 id="hot100-lc41-缺失的第一个正数--hard">LC41 缺失的第一个正数 · Hard</h4>
 <p><strong>周二核心 · 值域槽位归位。</strong> 把1..n的x放到x-1，重复目标值时停止交换。</p>
 <p><strong>检查重点：</strong> 检查[1,1]、[3,4,-1,1]；必须说明while与防死循环条件。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/first-missing-positive/solution/huan-zuo-wei-tong-guo-li-zi-li-jie-suan-qa94e/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-8">输入输出与构造</h5>
 <p>第一行 n；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -1092,6 +1099,7 @@ bat</code></pre>
 <h4 id="hot100-lc31-下一个排列--medium">LC31 下一个排列 · Medium</h4>
 <p><strong>周四核心 · 字典序后继。</strong> 找最右上升点、最小更大项、反转后缀。</p>
 <p><strong>检查重点：</strong> 全降序、重复值与单元素；不是枚举全排列。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/next-permutation/solution/jiao-ni-cong-ling-kai-shi-si-kao-zhe-ti-9qfrq/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-9">输入输出与构造</h5>
 <p>第一行 n；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -1176,6 +1184,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1</code></pre>
 <h5 id="hot100-题意状态与解题依据-10">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/single-number/solution/li-yong-yi-huo-de-xing-zhi-fu-ti-dan-pyt-oizc/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>single_number(nums)</code>。整数列表 nums → 唯一单独出现的值；其余值必须恰好出现两次。</p>
 <p><strong>题意与前提：</strong> 非空数组中恰有一个数出现一次，其余每个数恰好出现两次，找出单次元素。</p>
 <p><strong>思路：</strong> 除了一个数，其余都恰好两次；异或的抵消律可消掉成对元素。</p>
@@ -1240,6 +1249,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">3</code></pre>
 <h5 id="hot100-题意状态与解题依据-11">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/majority-element/solution/on-mo-er-tou-piao-fa-yan-jin-zheng-ming-ww1zv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>majority_element(nums)</code>。非空列表 nums → 出现次数超过一半的值；原题保证存在。</p>
 <p><strong>题意与前提：</strong> 非空数组保证有出现次数严格超过 n/2 的元素，返回该多数元素。</p>
 <p><strong>思路：</strong> 存在出现次数严格超过 n/2 的元素；每次删除一对不同值，不会改变多数元素最终获胜的事实。</p>
@@ -1294,6 +1304,7 @@ bat</code></pre>
 <h3 id="hot100-lc15-三数之和--medium">LC15 三数之和 · Medium</h3>
 <p><strong>当天核心 · 排序后夹逼与同层去重。</strong> 排序，固定一项，再左右夹逼。</p>
 <p><strong>检查重点：</strong> 检查[-1,0,1,2,-1,-4]无重复组合及三个0。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/3sum/solution/shuang-zhi-zhen-xiang-bu-ming-bai-yi-ge-pno55/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-12">输入输出与构造</h4>
 <p>第一行 n；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -1390,6 +1401,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">49</code></pre>
 <h5 id="hot100-题意状态与解题依据-13">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/container-with-most-water/solution/by-endlesscheng-f0xz/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>max_area(heights)</code>。非负高度列表 heights → 最大容积整数；不修改输入。</p>
 <p><strong>题意与前提：</strong> 至少两根非负高度竖线，选两根使容器面积最大；宽度是下标差。</p>
 <p><strong>推荐思路：</strong> 两端相向扫描，每轮先计算“短边高度 × 下标距离”，再移动较短的一端。固定短边时，把另一端移近只会缩短宽度，故可以排除该短边参与的剩余配对；时间 O(n)、辅助空间 O(1)。枚举全部两线组合的备选为 O(n²) 时间、O(1) 辅助空间，适合解释搜索空间和核对小数组，规模增大时采用双指针。</p>
@@ -1450,6 +1462,7 @@ bat</code></pre>
 <h4 id="hot100-lc42-接雨水--hard">LC42 接雨水 · Hard</h4>
 <p><strong>周四核心 · 双端水位。</strong> 双指针维护左右已知最大值。</p>
 <p><strong>检查重点：</strong> 检验凹槽、单调柱列；单调栈是同题另解，未默认手写。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/trapping-rain-water/solution/zuo-liao-nbian-huan-bu-hui-yi-ge-shi-pin-ukwm/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-14">输入输出与构造</h5>
 <p>第一行 n；第二行 heights 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -1535,6 +1548,8 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">bab</code></pre>
 <h5 id="hot100-题意状态与解题依据-15">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-palindromic-substring/solution/mo-ban-on-manacher-suan-fa-pythonjavacgo-t6cx/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 本课把最佳答案的比较放在每个中心扩展结束后，只比较该中心的最长回文；有效区间是 <code>[left+1, right)</code>，长度为 <code>right-left-1</code>。</p>
 <p><strong>接口：</strong><code>longest_palindrome(s)</code>。字符串 s → 一个最长连续回文子串；多解可返回任一合法最优解。</p>
 <p><strong>题意与前提：</strong> 返回非空字符串的最长连续回文子串；若有多个最长解，接受任意一个。</p>
 <p><strong>推荐思路：</strong> 枚举字符中心与字符间隙，向两侧扩展并只保存最长段的起点、长度；中心天然刻画回文的对称性，时间 O(n²)、辅助空间 O(1)。若后续还要反复判断任意区间是否回文，可用区间 DP，时间 O(n²)、辅助空间 O(n²)；若平方时间已成为瓶颈，再学习 O(n) 时间、O(n) 辅助空间的 Manacher 及其镜像半径维护。返回长度为 L 的子串还需要 O(L) 切片时间与输出空间。</p>
@@ -1547,16 +1562,17 @@ bat</code></pre>
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">longest_palindrome</span>(s):
-    <span class="syntax-comment"># start、length 记录目前最长回文的起点和长度；空串时保留 0、0。</span>
     start = length = <span class="syntax-number">0</span>
     <span class="syntax-keyword">for</span> center <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(<span class="syntax-function">len</span>(s)):
-        <span class="syntax-comment"># 分别覆盖奇数长度和偶数长度回文。</span>
+        <span class="syntax-comment"># 同一个字符作奇数中心，相邻字符之间作偶数中心。</span>
         <span class="syntax-keyword">for</span> left, right <span class="syntax-keyword">in</span> [(center, center), (center, center + <span class="syntax-number">1</span>)]:
             <span class="syntax-keyword">while</span> left &gt;= <span class="syntax-number">0</span> <span class="syntax-keyword">and</span> right &lt; <span class="syntax-function">len</span>(s) <span class="syntax-keyword">and</span> s[left] == s[right]:
-                <span class="syntax-keyword">if</span> right - left + <span class="syntax-number">1</span> &gt; length:
-                    start, length = left, right - left + <span class="syntax-number">1</span>
                 left -= <span class="syntax-number">1</span>
                 right += <span class="syntax-number">1</span>
+            <span class="syntax-comment"># 停下时两端已越过有效回文；有效区间是 [left + 1, right)。</span>
+            candidate_length = right - left - <span class="syntax-number">1</span>
+            <span class="syntax-keyword">if</span> candidate_length &gt; length:
+                start, length = left + <span class="syntax-number">1</span>, candidate_length
     <span class="syntax-keyword">return</span> s[start:start + length]
 
 
@@ -1593,6 +1609,7 @@ bat</code></pre>
 <h3 id="hot100-lc73-矩阵置零--medium">LC73 矩阵置零 · Medium</h3>
 <p><strong>当天核心 · 首行首列标记。</strong> 单独保存首行/首列是否原有0，再原地标记。</p>
 <p><strong>检查重点：</strong> 检验首行首列含0及新写0不能扩散。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/set-matrix-zeroes/solution/yi-bu-bu-you-hua-cong-omn-dao-o1-kong-ji-fdgt/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-16">输入输出与构造</h4>
 <p>第一行 rows cols；随后 rows 行，每行是 matrix 的 cols 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -1629,9 +1646,9 @@ bat</code></pre>
         <span class="syntax-keyword">return</span>
     rows, cols = <span class="syntax-function">len</span>(matrix), <span class="syntax-function">len</span>(matrix[<span class="syntax-number">0</span>])
     <span class="syntax-comment"># 首行首列要当标记区，先单独记住它们原本是否含零。</span>
-    <span class="syntax-comment"># any 在发现第一个零后即可停止；for 表达式按需产生布尔值。</span>
-    first_row_zero = <span class="syntax-function">any</span>(matrix[<span class="syntax-number">0</span>][col] == <span class="syntax-number">0</span> <span class="syntax-keyword">for</span> col <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(cols))
-    first_col_zero = <span class="syntax-function">any</span>(matrix[row][<span class="syntax-number">0</span>] == <span class="syntax-number">0</span> <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(rows))
+    <span class="syntax-comment"># 首行直接判断 0 是否存在；首列用 any 逐行检查第一个元素。</span>
+    first_row_zero = <span class="syntax-number">0</span> <span class="syntax-keyword">in</span> matrix[<span class="syntax-number">0</span>]
+    first_col_zero = <span class="syntax-function">any</span>(row[<span class="syntax-number">0</span>] == <span class="syntax-number">0</span> <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> matrix)
     <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(<span class="syntax-number">1</span>, rows):
         <span class="syntax-keyword">for</span> col <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(<span class="syntax-number">1</span>, cols):
             <span class="syntax-keyword">if</span> matrix[row][col] == <span class="syntax-number">0</span>:
@@ -1693,6 +1710,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1 2 3 6 9 8 7 4 5</code></pre>
 <h5 id="hot100-题意状态与解题依据-17">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/spiral-matrix/solution/liang-chong-fang-fa-jian-ji-gao-xiao-pyt-4wzk/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>spiral_order(matrix)</code>。矩形 matrix → 螺旋读取的一维列表；不修改输入。</p>
 <p><strong>题意与前提：</strong> 按顺时针螺旋顺序返回非空矩阵元素；单行和单列也必须只访问一次。</p>
 <p><strong>推荐思路：</strong> 用四个边界记录未读取矩形，按上、右、下、左的顺序输出，读完一边就收缩该边。规则矩形使四个整数足以表示剩余范围；时间 O(rows·cols)、辅助空间 O(1)，输出另占 O(rows·cols)。备选方向模拟用访问表标记格子，时间同为 O(rows·cols)、辅助空间 O(rows·cols)，适合理解逐格移动与转向，也为之后带障碍路线的模拟提供思路。</p>
@@ -1766,6 +1784,7 @@ bat</code></pre>
 <h4 id="hot100-lc48-旋转图像--medium">LC48 旋转图像 · Medium</h4>
 <p><strong>周四核心 · 矩阵转置反转。</strong> 只交换主对角线上方，再逐行reverse。</p>
 <p><strong>检查重点：</strong> 检验1x1与2x2；不能转置两次、不能输出新矩阵冒充原地。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/rotate-image/solution/shu-xue-ben-zhi-liang-ci-fan-zhuan-deng-aon4a/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-18">输入输出与构造</h5>
 <p>第一行 rows cols；随后 rows 行，每行是 matrix 的 cols 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -1849,6 +1868,7 @@ bat</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">true</code></pre>
 <h5 id="hot100-题意状态与解题依据-19">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/search-a-2d-matrix-ii/solution/tu-jie-pai-chu-fa-yi-tu-miao-dong-python-kytg/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>search_matrix_ii(matrix, target)</code>。行列各自递增的矩阵 matrix、target → bool；不修改输入。</p>
 <p><strong>题意与前提：</strong> 每行、每列各自有序，判断 target 是否存在；拉平后不一定有序。</p>
 <p><strong>思路：</strong> 行递增、列递增，但整体未必一维有序；从右上角出发，每步排除一行或一列。</p>
@@ -1905,6 +1925,8 @@ bat</code></pre>
 <h3 id="hot100-lc76-最小覆盖子串--hard">LC76 最小覆盖子串 · Hard</h3>
 <p><strong>当天核心 · 最短覆盖窗口。</strong> need 记录窗口仍缺的次数，missing 统计仍缺的字符总数；满足覆盖后收缩左端。</p>
 <p><strong>检查重点：</strong> 检查目标含重复字符、无解、收缩后失去覆盖；区分所缺字符总数与种类数。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/minimum-window-substring/solution/liang-chong-fang-fa-cong-o52mn-dao-omnfu-3ezz/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 本课统一使用 <code>missing</code> 表示尚缺字符总数。每个字符都更新差额，正数才代表尚缺；无关字符从 0 变负、移出后回到 0，因此窗口进出可以采用同一规则。原文还有按达标种类计数的写法，可在掌握本版后比较。</p>
 <h4 id="hot100-输入输出与构造-20">输入输出与构造</h4>
 <p>2 个完整文本行，依次作为函数参数；空字符串占一个空行，保留空格。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -1939,6 +1961,7 @@ ABC</code></pre>
 <tr><td>移出下标 9 的 B</td><td>10</td><td>0,1,0</td><td>1</td><td>覆盖失效，保留 <code>BANC</code>。</td></tr></tbody></table></div>
 <p>内层循环的顺序是“合法时先尝试更新答案，再移走一个左端字符”。因此移出必需字符导致失效之前，最后一个合法窗口已经有机会被保存。盈余字符从负数加回 0 时依然够用；只有加到正数时，才把 <code>missing</code> 加 1。</p>
 <p>若目标为 <code>&quot;AA&quot;</code>，初始化应是 <code>need[&#39;A&#39;]=2</code>、<code>missing=2</code>，每收到一个仍缺的 A 才减少一次缺额。这样同时处理了字符种类和重复次数；原串走完仍缺字符时，程序返回空字符串。</p>
+<p>无关字符的目标次数为 0：移入时 need 从 0 减到负数，移出时最多回到 0，始终不会增加 missing。因此每个字符统一登记加减，覆盖只看剩余缺额。</p>
 <h4 id="hot100-推荐完整程序-20">推荐完整程序</h4>
 <p>导入 <code>sys</code> 读取两行字符串，导入 <code>Counter</code> 用 <code>Counter(t)</code> 建立包含重复字符的目标频次。</p>
 <!-- code:practice:76 -->
@@ -1949,27 +1972,22 @@ ABC</code></pre>
 <span class="syntax-keyword">def</span> <span class="syntax-function">min_window</span>(s, t):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> t:
         <span class="syntax-keyword">return</span> <span class="syntax-string">&#39;&#39;</span>
-    need = <span class="syntax-function">Counter</span>(t)  <span class="syntax-comment"># 一次统计目标频次，重复字符也计入需求。</span>
-    <span class="syntax-comment"># missing 计缺少的字符总数；need 可为负，表示有富余。</span>
-    missing = <span class="syntax-function">len</span>(t)
-    <span class="syntax-comment"># left 是当前窗口起点；best_left、best_length 保存最短合法窗口，初始长度比整串还长。</span>
+    <span class="syntax-comment"># need[char] = 目标次数 - 当前窗口次数；正数是缺额，负数是富余。</span>
+    need = <span class="syntax-function">Counter</span>(t)
+    missing = <span class="syntax-function">len</span>(t)  <span class="syntax-comment"># 尚缺的字符总个数；目标 AA 一开始缺 2 个。</span>
     left = best_left = <span class="syntax-number">0</span>
-    best_length = <span class="syntax-function">len</span>(s) + <span class="syntax-number">1</span>
+    best_length = <span class="syntax-function">len</span>(s) + <span class="syntax-number">1</span>  <span class="syntax-comment"># 大于任何可能答案，表示尚未找到覆盖窗口。</span>
     <span class="syntax-keyword">for</span> right, char <span class="syntax-keyword">in</span> <span class="syntax-function">enumerate</span>(s):
-        <span class="syntax-keyword">if</span> char <span class="syntax-keyword">in</span> need:
-            <span class="syntax-keyword">if</span> need[char] &gt; <span class="syntax-number">0</span>:
-                missing -= <span class="syntax-number">1</span>
-            need[char] -= <span class="syntax-number">1</span>
-        <span class="syntax-comment"># 窗口合法时先记录答案，再尝试收缩。</span>
+        <span class="syntax-keyword">if</span> need[char] &gt; <span class="syntax-number">0</span>:
+            missing -= <span class="syntax-number">1</span>  <span class="syntax-comment"># 只有填补缺额，才减少尚缺个数。</span>
+        need[char] -= <span class="syntax-number">1</span>    <span class="syntax-comment"># 每个移入字符都登记；无关字符从 0 减到负数。</span>
         <span class="syntax-keyword">while</span> missing == <span class="syntax-number">0</span>:
             <span class="syntax-keyword">if</span> right - left + <span class="syntax-number">1</span> &lt; best_length:
                 best_left, best_length = left, right - left + <span class="syntax-number">1</span>
             left_char = s[left]
-            <span class="syntax-keyword">if</span> left_char <span class="syntax-keyword">in</span> need:
-                <span class="syntax-comment"># 左端字符将离开窗口：归还一个需求；归还后变为正数，说明窗口开始缺字符。</span>
-                need[left_char] += <span class="syntax-number">1</span>
-                <span class="syntax-keyword">if</span> need[left_char] &gt; <span class="syntax-number">0</span>:
-                    missing += <span class="syntax-number">1</span>
+            need[left_char] += <span class="syntax-number">1</span>  <span class="syntax-comment"># 移出左端字符，归还一个需求。</span>
+            <span class="syntax-keyword">if</span> need[left_char] &gt; <span class="syntax-number">0</span>:
+                missing += <span class="syntax-number">1</span>     <span class="syntax-comment"># 从恰好满足变为缺少，窗口失去覆盖。</span>
             left += <span class="syntax-number">1</span>
     <span class="syntax-keyword">if</span> best_length &gt; <span class="syntax-function">len</span>(s):
         <span class="syntax-keyword">return</span> <span class="syntax-string">&#39;&#39;</span>
@@ -2011,6 +2029,7 @@ ABC</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">3</code></pre>
 <h5 id="hot100-题意状态与解题依据-21">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/solution/xia-biao-zong-suan-cuo-qing-kan-zhe-by-e-iaks/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>length_of_longest_substring(s)</code>。字符串 s → 最长无重复连续子串长度。</p>
 <p><strong>题意与前提：</strong> 求不含重复字符的最长连续子串长度；空串答案为 0。</p>
 <p><strong>推荐思路：</strong> 用集合维护当前无重复窗口；遇到重复就从左端逐个移除，恢复合法后更新最长长度。集合里的字符与窗口一一对应，适合先看清状态变化；期望时间 O(n)、辅助空间 O(min(n,Σ))，Σ 为字符种类数。备选用字典记录最近位置，直接把 left 更新为旧 left 与冲突位置后一格的较大值；复杂度相同，适合已经掌握窗口边界、希望合并逐步移除操作的场景。</p>
@@ -2069,6 +2088,8 @@ ABC</code></pre>
 <h4 id="hot100-lc438-找到字符串中所有字母异位词--medium">LC438 找到字符串中所有字母异位词 · Medium</h4>
 <p><strong>周四核心 · 定长频次窗口。</strong> 两张26项频次数组。</p>
 <p><strong>检查重点：</strong> 检查p比s长、重复字符；固定长度才比较频次。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-all-anagrams-in-a-string/solution/liang-chong-fang-fa-ding-chang-hua-chuan-14pd/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 本课保留 26 项频次数组，适合题面的英文小写字母，逐项比较在 Python 3.9 下含义明确。阅读原文的 Counter 比较版时，要留意零计数键的相等语义与 Python 版本；本课代码以当前运行版本验证为准。</p>
 <h5 id="hot100-输入输出与构造-22">输入输出与构造</h5>
 <p>2 个完整文本行，依次作为函数参数；空字符串占一个空行，保留空格。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -2148,6 +2169,7 @@ abc</code></pre>
 <h3 id="hot100-lc32-最长有效括号--hard">LC32 最长有效括号 · Hard</h3>
 <p><strong>当天核心 · 括号下标哨兵。</strong> 栈初始[-1]；失配后重设长度起点。</p>
 <p><strong>检查重点：</strong> ()(()结果2，)()())结果4；答案不是两倍栈长。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-valid-parentheses/solution/on-chai-zha-dan-tong-guo-li-zi-fa-ming-s-lb5s/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-23">输入输出与构造</h4>
 <p>1 个完整文本行，依次作为函数参数；空字符串占一个空行，保留空格。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -2231,6 +2253,7 @@ abc</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">true</code></pre>
 <h5 id="hot100-题意状态与解题依据-24">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/valid-parentheses/solution/gua-hao-xiao-xiao-le-san-chong-li-yong-z-2xb3/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>is_valid_parentheses(s)</code>。括号字符串 s → 是否有效的 bool；空串实现返回 True。</p>
 <p><strong>题意与前提：</strong> 判断括号串能否同种匹配且正确嵌套；剩余未匹配左括号也应判错。</p>
 <p><strong>推荐思路：</strong> 用列表作栈保存尚未匹配的左括号，右括号出现时先判空、再弹出最近的一层并核对类型。后进先出的顺序正好对应括号嵌套；时间 O(n)、辅助空间 O(n)。若扩展题只有一种括号，可用一个余额计数器，扫描中保持非负、结束时为零，时间 O(n)、辅助空间 O(1)；本题有三种括号，仍用栈保存类型和顺序。</p>
@@ -2311,6 +2334,7 @@ getMin</code></pre>
 0
 -2</code></pre>
 <h5 id="hot100-题意状态与解题依据-25">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/min-stack/solution/ben-zhi-shi-wei-hu-qian-zhui-zui-xiao-zh-x0g8/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>MinStack()</code>。MinStack() 创建状态；push/pop 改栈，top/getMin 返回值；查询与 pop 要求非空。</p>
 <p><strong>题意与前提：</strong> 设计支持 push/pop/top/getMin 的栈；查询和弹出只在非空时发生，重复最小值要保留。</p>
 <p><strong>推荐思路：</strong> 每层保存“本层值、截至本层的最小值”二元组，push 时与上一层最小值比较，pop 后直接读取露出的历史最小值。值与最小值成对保存，便于核对恢复过程；每次操作摊还 O(1)、辅助空间 O(n)。备选用原值栈和独立最小值栈，每次新值小于或等于当前最小时都记录；复杂度相同，适合将两种状态分开维护，但需要同步处理重复最小值。</p>
@@ -2377,6 +2401,7 @@ getMin</code></pre>
 <h4 id="hot100-lc394-字符串解码--medium">LC394 字符串解码 · Medium</h4>
 <p><strong>周四核心 · 嵌套解码环境栈。</strong> 数字累加，左括号保存外层，右括号恢复并展开。</p>
 <p><strong>检查重点：</strong> 10[a]与嵌套；复杂度按实际复制/输出规模计，不能一概O(输入长)。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/decode-string/solution/di-gui-yong-zhan-mo-ni-di-gui-pythonjava-kcsv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-26">输入输出与构造</h5>
 <p>1 个完整文本行，依次作为函数参数；空字符串占一个空行，保留空格。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -2456,6 +2481,7 @@ getMin</code></pre>
 <h3 id="hot100-lc84-柱状图中最大的矩形--hard">LC84 柱状图中最大的矩形 · Hard</h3>
 <p><strong>当天核心 · 柱形边界单调栈。</strong> 保留等高柱；遇到更矮柱时弹出并以 index - stack[-1] - 1 结算宽度。</p>
 <p><strong>检查重点：</strong> 等高柱、单柱、末尾清栈；宽度不能写right-left。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/largest-rectangle-in-histogram/solution/dan-diao-zhan-fu-ti-dan-pythonjavacgojsr-89s7/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-27">输入输出与构造</h4>
 <p>第一行 n；第二行 heights 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -2542,6 +2568,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1 1 4 2 1 1 0 0</code></pre>
 <h5 id="hot100-题意状态与解题依据-28">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/daily-temperatures/solution/shi-pin-jiang-qing-chu-wei-shi-yao-yao-y-k0ks/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>daily_temperatures(temperatures)</code>。温度列表 temperatures → 每个位置等到更暖日的距离，无更暖日为 0。</p>
 <p><strong>题意与前提：</strong> 对每天返回到下一次严格更高温度的天数，无更高温度则为 0；相等不算更暖。</p>
 <p><strong>推荐思路：</strong> 从左到右扫描，栈保存仍在等待更高温度的下标；新温度到来时结算所有严格更低的栈顶，用下标差得到等待天数。每个位置至多入栈、出栈一次，时间 O(n)、辅助空间 O(n)，输出另占 O(n)。备选从右到左维护未来候选，先淘汰不高于当前温度的候选，再读取栈顶；复杂度相同，适合从“当前项向右找最近候选”的角度理解。</p>
@@ -2599,6 +2626,7 @@ getMin</code></pre>
 <h4 id="hot100-lc239-滑动窗口最大值--hard">LC239 滑动窗口最大值 · Hard</h4>
 <p><strong>周四核心 · 滑窗单调双端队列。</strong> 保存下标，先过期，再清较弱候选。</p>
 <p><strong>检查重点：</strong> 检查k=1、k=n、重复最大值；值相同也要管理过期下标。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/sliding-window-maximum/solution/shi-pin-yi-ge-shi-pin-miao-dong-dan-diao-ezj6/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-29">输入输出与构造</h5>
 <p>第一行 n k，保证 1 ≤ k ≤ n；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -2674,6 +2702,7 @@ getMin</code></pre>
 <h3 id="hot100-lc4-寻找两个正序数组的中位数--hard">LC4 寻找两个正序数组的中位数 · Hard</h3>
 <p><strong>当天核心 · 双数组分割二分。</strong> 在短数组二分分割线，以两侧最大最小校验。</p>
 <p><strong>检查重点：</strong> 一数组为空、奇偶总长、极不均衡长度；总长非0。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/median-of-two-sorted-arrays/solution/tu-jie-xun-xu-jian-jin-cong-shuang-zhi-z-p2gd/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-30">输入输出与构造</h4>
 <p>第一行 n1，第二行 nums1 的 n1 个整数；第三行 n2，第四行 nums2 的 n2 个整数。两个数组均按非递减顺序排列，至少一个非空；空数组也占一条空白数据行。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -2773,6 +2802,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">2</code></pre>
 <h5 id="hot100-题意状态与解题依据-31">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/search-insert-position/solution/er-fen-cha-zhao-zong-shi-xie-bu-dui-yi-g-nq23/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>search_insert(nums, target)</code>。递增列表 nums、target → 第一个不小于 target 的位置，可等于 len(nums)。</p>
 <p><strong>题意与前提：</strong> 在有序数组中返回 target 的位置或保持有序的插入位置；原题元素互异，返回值可以等于 n。</p>
 <p><strong>推荐思路：</strong> 手写左闭右开区间 <code>[left,right)</code> 的下界查找，返回首个 <code>&gt;= target</code> 的位置；每轮利用有序性排除一半候选，时间 O(log(n+1))、辅助空间 O(1)。循环结束时 left 与 right 相遇，正好位于小于目标和不小于目标的分界。这里计算的是插入位置；若随后调用列表 <code>insert</code>，移动元素另需 O(n) 时间。</p>
@@ -2834,6 +2864,7 @@ getMin</code></pre>
 <h4 id="hot100-lc34-在排序数组中查找元素的第一个和最后一个位置--medium">LC34 在排序数组中查找元素的第一个和最后一个位置 · Medium</h4>
 <p><strong>周二核心 · 首尾边界二分。</strong> lower_bound和upper_bound两次二分。</p>
 <p><strong>检查重点：</strong> 重复目标、无目标、空输入；左闭右开区间更新要一致。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/solution/er-fen-cha-zhao-zong-shi-xie-bu-dui-yi-g-t9l9/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-32">输入输出与构造</h5>
 <p>第一行 n target；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -2926,6 +2957,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">true</code></pre>
 <h5 id="hot100-题意状态与解题依据-33">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/search-a-2d-matrix/solution/liang-chong-fang-fa-er-fen-cha-zhao-pai-39d74/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>search_matrix(matrix, target)</code>。全局可展平成非递减序列的 matrix、target → bool；行列独立有序还不够。</p>
 <p><strong>题意与前提：</strong> 矩阵每行有序，且下一行首元素大于上一行末元素；判断 target 是否存在。</p>
 <p><strong>思路：</strong> 每行有序，且下一行首项大于上一行末项，所以整个矩阵可视为一维有序数组。</p>
@@ -2979,6 +3011,7 @@ getMin</code></pre>
 <h4 id="hot100-lc33-搜索旋转排序数组--medium">LC33 搜索旋转排序数组 · Medium</h4>
 <p><strong>周四核心 · 旋转有序段二分。</strong> 判断哪半有序，再查目标是否属于该半。</p>
 <p><strong>检查重点：</strong> 无重复是前提；已排序、单元素和目标在旋转两侧。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/search-in-rotated-sorted-array/solution/by-endlesscheng-auuh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-34">输入输出与构造</h5>
 <p>第一行 n target；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -3062,6 +3095,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1</code></pre>
 <h5 id="hot100-题意状态与解题依据-35">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-minimum-in-rotated-sorted-array/solution/by-endlesscheng-owgd/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>find_min_rotated(nums)</code>。非空、无重复的旋转递增数组 nums → 最小数值；不是下标。</p>
 <p><strong>题意与前提：</strong> 求旋转有序数组的最小值；数组非空且值互异，未旋转也合法。</p>
 <p><strong>思路：</strong> 要找下降断点之后的最小值；用 mid 与右端比较，判断最小值位于哪一半。</p>
@@ -3113,6 +3147,7 @@ getMin</code></pre>
 <h3 id="hot100-lc148-排序链表--medium">LC148 排序链表 · Medium</h3>
 <p><strong>当天核心 · 分治归并链表排序。</strong> 自顶向下归并为恢复版；O(1)空间追问用自底向上。</p>
 <p><strong>检查重点：</strong> 两节点严格缩小、断链不丢节点；递归版不算常数空间进阶通过。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/sort-list/solution/liang-chong-fang-fa-fen-zhi-die-dai-mo-k-caei/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-使用的模块与程序流程">使用的模块与程序流程</h4>
 <p>本题导入 <code>import sys</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h4 id="hot100-题意与本地输入协议">题意与本地输入协议</h4>
@@ -3247,6 +3282,8 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">2</code></pre>
 <h5 id="hot100-题意状态与解题依据-36">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/intersection-of-two-linked-lists/solution/tu-jie-yi-zhang-tu-miao-dong-xiang-jiao-m6tg1/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 条件表达式每次只更新一个指针的位置：有节点就沿 next 前进，到 None 后换到另一条链的头；两条路线的总长度相同。</p>
 <p><strong>接口：</strong><code>get_intersection_node(head_a, head_b)</code>。两个无环链表头 head_a/head_b → 共享节点对象或 None；不按数值判断相交。</p>
 <p><strong>题意与前提：</strong> 返回两条无环链表的第一个共享节点，不相交返回 None；相交按节点身份，不按值相等。</p>
 <p><strong>思路：</strong> 相交是共享同一个节点对象，不是节点值相等；无环链表的公共部分必为公共后缀。</p>
@@ -3297,20 +3334,13 @@ getMin</code></pre>
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">get_intersection_node</span>(head_a, head_b):
-    node_a = head_a
-    node_b = head_b
-    <span class="syntax-comment"># 比较同一个节点，而不是数值相等；各走完 A+B 后必对齐。</span>
+    node_a, node_b = head_a, head_b
+    <span class="syntax-comment"># 每步沿当前链前进；到达 None 后，下一步切到另一条链的头。</span>
+    <span class="syntax-comment"># 两条路线都走 A+B 的总长度，长度差被抵消；比较的是节点身份。</span>
     <span class="syntax-keyword">while</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-keyword">not</span> node_b:
-        <span class="syntax-keyword">if</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
-            node_a = head_b
-        <span class="syntax-keyword">else</span>:
-            node_a = node_a.next
-
-        <span class="syntax-keyword">if</span> node_b <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
-            node_b = head_a
-        <span class="syntax-keyword">else</span>:
-            node_b = node_b.next
-    <span class="syntax-comment"># 有交点时返回共同节点；无交点时两个指针最终同时到达 None。</span>
+        node_a = node_a.next <span class="syntax-keyword">if</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-keyword">not</span> <span class="syntax-literal">None</span> <span class="syntax-keyword">else</span> head_b
+        node_b = node_b.next <span class="syntax-keyword">if</span> node_b <span class="syntax-keyword">is</span> <span class="syntax-keyword">not</span> <span class="syntax-literal">None</span> <span class="syntax-keyword">else</span> head_a
+    <span class="syntax-comment"># 有交点时停在共同节点；无交点时两者最终都为 None。</span>
     <span class="syntax-keyword">return</span> node_a
 
 
@@ -3363,6 +3393,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">5 4 3 2 1</code></pre>
 <h5 id="hot100-题意状态与解题依据-37">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/reverse-linked-list/solution/you-xie-cuo-liao-yi-ge-shi-pin-jiang-tou-o5zy/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>reverse_list(head)</code>。无环链表头 head → 反转后的新头；复用节点并修改 next。</p>
 <p><strong>题意与前提：</strong> 反转单链表的 next 指针并返回新头；允许空链表，原头最终成为尾。</p>
 <p><strong>推荐思路：</strong> 用三指针迭代反转链表，节点沿用本单元的 <code>ListNode</code>，算法本身使用普通变量和 <code>while</code> 即可。先保存后继，再把当前节点接到已反转前缀，最后推进两个头指针；这让已处理与未处理部分始终都能找到。时间 O(n)、辅助空间 O(1)，适合长链。备选递归版先反转后缀再接回当前节点，时间 O(n)、栈 O(n)，适合短链上理解递归返回的新头；两个版本均重连原节点。</p>
@@ -3467,6 +3498,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">true</code></pre>
 <h5 id="hot100-题意状态与解题依据-38">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/palindrome-linked-list/solution/o1-kong-jian-zuo-fa-xun-zhao-zhong-jian-rv0f3/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>is_palindrome_list(head)</code>。无环链表头 head → bool；主解会临时反转后半段，返回前恢复原链。</p>
 <p><strong>题意与前提：</strong> 判断非空链表是否回文；本书原地主解在比较后恢复原链，返回布尔值。</p>
 <p><strong>思路：</strong> 比较前半段与倒序后半段；快慢指针定位分界，链表反转提供逆序访问。</p>
@@ -3570,6 +3602,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">true</code></pre>
 <h5 id="hot100-题意状态与解题依据-39">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/linked-list-cycle/solution/mei-xiang-ming-bai-yi-ge-shi-pin-jiang-t-c4sw/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>has_cycle(head)</code>。链表头 head → 是否有环的 bool；不修改节点。</p>
 <p><strong>题意与前提：</strong> 判断链表是否有环；输入用值序列与 position 构造，-1 表示无环，空链合法。</p>
 <p><strong>推荐思路：</strong> 用 Floyd 快慢指针，slow 每轮一步、fast 每轮两步，以节点身份判断相遇。无环时 fast 到达链尾；有环时快指针每轮相对多走一步，最终会在环内追上慢指针。算法使用节点引用与循环，时间 O(n)、辅助空间 O(1)。备选用内置 <code>set</code> 保存已访问节点对象，重复遇到同一个对象就发现环，期望时间 O(n)、空间 O(n)，适合优先理解重复访问或还要保留访问记录的情况。</p>
@@ -3651,6 +3684,7 @@ getMin</code></pre>
 <h4 id="hot100-lc21-合并两个有序链表--easy">LC21 合并两个有序链表 · Easy</h4>
 <p><strong>周二核心 · 有序链表归并。</strong> dummy/tail，每次接较小表头。</p>
 <p><strong>检查重点：</strong> 空表、重复值及相同值稳定性；输出要复用原节点。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/merge-two-sorted-lists/solution/liang-chong-fang-fa-die-dai-di-gui-pytho-wf75/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-40">输入输出与构造</h5>
 <p>依次读取两条链表。每条链表各占两行：第一行节点数，第二行节点值；长度为 0 时也保留空白数据行。 节点值按非递减顺序排列。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -3776,6 +3810,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">7 0 8</code></pre>
 <h5 id="hot100-题意状态与解题依据-41">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/add-two-numbers/solution/dong-hua-jian-ji-xie-fa-cong-di-gui-dao-oe0di/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>add_two_numbers(head_a, head_b)</code>。两个逆序存数字的链表头 → 新建的结果链头；不修改输入链。</p>
 <p><strong>题意与前提：</strong> 两个非负整数按十进制位逆序存于非空链表，返回表示两数之和的新链表。</p>
 <p><strong>思路：</strong> 逆序存储的十进制数字逐位相加，状态只有进位。</p>
@@ -3879,6 +3914,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1 2 3 5</code></pre>
 <h5 id="hot100-题意状态与解题依据-42">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/remove-nth-node-from-end-of-list/solution/ru-he-shan-chu-jie-dian-liu-fen-zhong-ga-xpfs/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>remove_nth_from_end(head, n)</code>。链表头 head、合法倒数位置 n → 删除后的新头；可能删除原头。</p>
 <p><strong>题意与前提：</strong> 删除倒数第 n 个节点并返回新头，1≤n≤链长；可能删除头或唯一节点。</p>
 <p><strong>思路：</strong> 倒数定位可以用固定指针间距消去链长；dummy 统一删除头节点。</p>
@@ -3973,6 +4009,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">2 1 4 3</code></pre>
 <h5 id="hot100-题意状态与解题依据-43">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/swap-nodes-in-pairs/solution/tu-jie-die-dai-di-gui-yi-zhang-tu-miao-d-51ap/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>swap_pairs(head)</code>。链表头 head → 两两交换后的新头；交换连接，不是交换数值。</p>
 <p><strong>题意与前提：</strong> 每两个节点交换位置，不交换节点值；空链或末尾单个节点保持合法。</p>
 <p><strong>思路：</strong> 交换的是节点连接，不是交换 val；每次处理前驱、第一点、第二点三者。</p>
@@ -4057,6 +4094,7 @@ getMin</code></pre>
 <h4 id="hot100-lc25-k-个一组翻转链表--hard">LC25 K 个一组翻转链表 · Hard</h4>
 <p><strong>周四核心 · K段边界与反转接回。</strong> 先找到kth，保存group_next，反转已确认完整段。</p>
 <p><strong>检查重点：</strong> 不足k段不变、k=1；不能只交换节点值。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/reverse-nodes-in-k-group/solution/you-xie-cuo-liao-yi-ge-shi-pin-jiang-tou-plfs/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-44">输入输出与构造</h5>
 <p>第一行 n k；第二行节点值的 n 个整数。 k ≥ 1，最后不足 k 个节点的部分保持原顺序。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -4184,6 +4222,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">[[7,13,11,10,1],[-1,0,4,2,0]]</code></pre>
 <h5 id="hot100-题意状态与解题依据-45">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/copy-list-with-random-pointer/solution/bu-yong-ha-xi-biao-de-zuo-fa-pythonjavac-nzdo/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>copy_random_list(head)</code>。含 random 引用的链表头 head → 深拷贝新头；新节点不能引用原节点。</p>
 <p><strong>题意与前提：</strong> 深拷贝含 next、random 指针的链表；输入是值序列与 random 目标下标，-1 表示 None。</p>
 <p><strong>思路：</strong> 需要复制节点身份关系；先建立原节点到新节点的映射，再连接 next 和 random。</p>
@@ -4274,6 +4313,7 @@ getMin</code></pre>
 <h4 id="hot100-lc287-寻找重复数--medium">LC287 寻找重复数 · Medium</h4>
 <p><strong>周四核心 · 函数图Floyd。</strong> 把nums值当下一位置，Floyd相遇后定位入口。</p>
 <p><strong>检查重点：</strong> 把 nums[index] 视为后继，比较周三 LC142 的环入口；值域 1..n-1、长度 n 保证重复数存在，读入数组保持不变。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-the-duplicate-number/solution/yong-ji-huan-shu-li-jie-zuo-fa-tong-142-tkoc2/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-题意与输入输出-1">题意与输入输出</h5>
 <p>数组中恰有一种数重复出现，它可能出现两次或更多次。推荐方法需要保持数组不变，并使用常数辅助空间。</p>
 <p>这里用 <code>n</code> 表示<strong>数组长度</strong>，因此合法值域写成 <code>1..n-1</code>，且 <code>n≥2</code>。这与通常题面“长度 n+1、值域 1..n”的条件相同，只是统一了本地数量变量。</p>
@@ -4357,6 +4397,7 @@ getMin</code></pre>
 <h3 id="hot100-lc98-验证二叉搜索树--medium">LC98 验证二叉搜索树 · Medium</h3>
 <p><strong>当天核心 · BST全局有序性。</strong> 迭代中序严格递增。</p>
 <p><strong>检查重点：</strong> 跨祖先违规与重复值；只比较父子不够。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/validate-binary-search-tree/solution/qian-xu-zhong-xu-hou-xu-san-chong-fang-f-yxvh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-46">输入输出与构造</h4>
 <p>第一行 token_count；第二行是紧凑层序的 token_count 个字段，空节点写 null。空树可写 0 与下一空白行，或 1 与下一行 null。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -4492,6 +4533,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1 3 2</code></pre>
 <h5 id="hot100-题意状态与解题依据-47">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/binary-tree-inorder-traversal/solution/tu-jie-morris-bian-li-xian-suo-er-cha-sh-cm2s/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>inorder_traversal(root)</code>。二叉树根 root → 中序值列表；不修改树。</p>
 <p><strong>题意与前提：</strong> 返回二叉树中序序列：左、根、右；空树返回空列表。</p>
 <p><strong>推荐思路：</strong> 用内置列表作显式栈，沿左孩子逐个 <code>append</code>，走到空处再 <code>pop</code> 访问根，随后转向右子树。栈保存尚待访问的祖先，直接实现左→根→右，并适合很深的树。时间 O(n)、辅助栈 O(h)，结果另占 O(n)。递归备选按同样顺序把值追加到共享结果列表，时间 O(n)、栈 O(h)，适合树深可控时按定义理解；追问常数辅助空间时可选 Morris，时间 O(n)、辅助空间 O(1)，代价是临时修改前驱指针并在遍历完成前逐一恢复。</p>
@@ -4603,6 +4645,7 @@ getMin</code></pre>
 <p><strong>推荐实现：</strong> <code>max_depth_bfs</code>。队列每轮固定本层节点数，处理完一层就把 depth 加 1；空树返回 0。</p>
 <p><strong>推荐程序的算法复杂度：</strong> 时间 O(n)；空间 O(w)。</p>
 <p><strong>状态与依据：</strong> 队列开始一轮时恰好保存一层；先固定本层大小，再把孩子追加到下一层，所以每完成一轮就增加一层。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/maximum-depth-of-binary-tree/solution/kan-wan-zhe-ge-shi-pin-rang-ni-dui-di-gu-44uz/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>题意与前提：</strong> 求根到叶最长路径的节点数；空树深度为 0。</p>
 <h5 id="hot100-推荐完整程序-49">推荐完整程序</h5>
 <!-- code:practice:104 -->
@@ -4707,6 +4750,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">4 7 2 9 6 3 1</code></pre>
 <h5 id="hot100-题意状态与解题依据-49">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/invert-binary-tree/solution/shi-pin-shen-ru-li-jie-di-gui-pythonjava-zhqh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>invert_tree(root)</code>。二叉树根 root → 翻转后的根；原地交换左右孩子，空树返回 None。</p>
 <p><strong>题意与前提：</strong> 原地交换二叉树每个节点的左右子树；空树合法，返回根节点。</p>
 <p><strong>思路：</strong> 对每个节点交换左右孩子；遍历方式不影响最终结构。</p>
@@ -4838,6 +4882,8 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">true</code></pre>
 <h5 id="hot100-题意状态与解题依据-50">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/symmetric-tree/solution/ru-he-ling-huo-yun-yong-di-gui-lai-kan-s-6dq5/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 镜像检查分为当前值、外侧子树、内侧子树三个条件；空节点统一用身份比较判断是否同时为空。</p>
 <p><strong>接口：</strong><code>is_symmetric(root)</code>。二叉树根 root → 是否镜像对称的 bool；不修改树。</p>
 <p><strong>题意与前提：</strong> 判断二叉树是否镜像对称；左右对应节点的值与结构都必须匹配。</p>
 <p><strong>思路：</strong> 比较的不是左右子树相同，而是互为镜像；状态是需要配对比较的两个节点。</p>
@@ -4890,19 +4936,14 @@ getMin</code></pre>
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">is_symmetric</span>(root):
     <span class="syntax-keyword">def</span> <span class="syntax-function">mirror</span>(node_a, node_b):
-        <span class="syntax-keyword">if</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span> <span class="syntax-keyword">and</span> node_b <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">True</span>
+        <span class="syntax-comment"># 任一侧为空时，只有两侧同时为空才对称。</span>
         <span class="syntax-keyword">if</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span> <span class="syntax-keyword">or</span> node_b <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
-        <span class="syntax-keyword">if</span> node_a.val != node_b.val:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
-
-        <span class="syntax-comment"># 镜像比较外侧与外侧、内侧与内侧，不是同侧相比较。</span>
-        outside_equal = <span class="syntax-function">mirror</span>(node_a.left, node_b.right)
-        <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> outside_equal:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
-        <span class="syntax-keyword">return</span> <span class="syntax-function">mirror</span>(node_a.right, node_b.left)
-
+            <span class="syntax-keyword">return</span> node_a <span class="syntax-keyword">is</span> node_b
+        <span class="syntax-comment"># 镜像的三个条件：当前值相等、外侧对称、内侧对称。</span>
+        <span class="syntax-comment"># and 从左往右判断；某个条件失败便停止后续递归。</span>
+        <span class="syntax-keyword">return</span> (node_a.val == node_b.val
+                <span class="syntax-keyword">and</span> <span class="syntax-function">mirror</span>(node_a.left, node_b.right)
+                <span class="syntax-keyword">and</span> <span class="syntax-function">mirror</span>(node_a.right, node_b.left))
     <span class="syntax-keyword">if</span> root <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
         <span class="syntax-keyword">return</span> <span class="syntax-literal">True</span>
     <span class="syntax-keyword">return</span> <span class="syntax-function">mirror</span>(root.left, root.right)
@@ -4947,6 +4988,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">[[3],[9,20],[15,7]]</code></pre>
 <h5 id="hot100-题意状态与解题依据-51">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/binary-tree-level-order-traversal/solution/bfs-wei-shi-yao-yao-yong-dui-lie-yi-ge-s-xlpz/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>level_order(root)</code>。二叉树根 root → 每层一个列表的二维结果；不修改树。</p>
 <p><strong>题意与前提：</strong> 按层返回二维节点值列表，每层从左到右；空树返回空列表。</p>
 <p><strong>推荐思路：</strong> 导入 <code>from collections import deque</code>，用队列做 BFS。进入一层时先记录 <code>level_size=len(queue)</code>，本轮只弹出这些节点，孩子从尾部追加到下一层；这样队列顺序与所需输出层次一致。时间 O(n)、辅助队列 O(w)，输出另占 O(n)。备选 DFS 把 <code>depth</code> 传给孩子并追加到对应结果层，先左后右也能保持每层顺序，时间 O(n)、调用栈 O(h)；它适合宽树且深度可控的情况，深链优先使用迭代。</p>
@@ -5064,6 +5106,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">0 -3 9 -10 null 5</code></pre>
 <h5 id="hot100-题意状态与解题依据-52">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/convert-sorted-array-to-binary-search-tree/solution/ru-men-di-gui-cong-er-cha-shu-kai-shi-py-inu6/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>sorted_array_to_bst(nums)</code>。严格递增数组 nums → 新建的高度平衡 BST 根；返回树不是值列表。</p>
 <p><strong>题意与前提：</strong> 将严格递增数组转成任意一棵高度平衡 BST；正确形状不唯一。</p>
 <p><strong>思路：</strong> 既要 BST 又要平衡：中点做根，左右有序区间递归构造左右子树。</p>
@@ -5165,6 +5208,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1</code></pre>
 <h5 id="hot100-题意状态与解题依据-53">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/kth-smallest-element-in-a-bst/solution/zhong-xu-bian-li-pythonjavaccgojsrust-by-wc02/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>kth_smallest(root, k)</code>。BST 根 root、合法排名 k → 第 k 小的数值；不是返回节点。</p>
 <p><strong>题意与前提：</strong> 合法 BST 中返回第 k 小的节点值，1≤k≤节点数。</p>
 <p><strong>思路：</strong> BST 的中序有序；第 k 次访问到的节点就是第 k 小。若有多次查询，可预处理子树大小。</p>
@@ -5270,6 +5314,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1 3 4</code></pre>
 <h5 id="hot100-题意状态与解题依据-54">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/binary-tree-right-side-view/solution/ru-he-ling-huo-yun-yong-di-gui-lai-kan-s-r1nc/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>right_side_view(root)</code>。二叉树根 root → 从右边看到的值列表；不修改树。</p>
 <p><strong>题意与前提：</strong> 返回二叉树每层最右侧可见节点值；空树返回空列表。</p>
 <p><strong>思路：</strong> 每一层从右看能见到最右节点；BFS 取层尾，或右优先 DFS 取该深度第一次出现。</p>
@@ -5378,6 +5423,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">1 2 3 4 5 6</code></pre>
 <h5 id="hot100-题意状态与解题依据-55">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/flatten-binary-tree-to-linked-list/solution/liang-chong-fang-fa-tou-cha-fa-fen-zhi-p-h9bg/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>flatten_tree(root)</code>。二叉树根 root → 返回 None，原地按前序串到 right，所有 left 置空。</p>
 <p><strong>题意与前提：</strong> 原地按前序展开成右链，所有 left 都必须置为 None；不创建替代节点。</p>
 <p><strong>思路：</strong> 按前序顺序把所有节点接到 right 上，并把所有 left 置空。</p>
@@ -5477,6 +5523,7 @@ getMin</code></pre>
 <h4 id="hot100-lc105-从前序与中序遍历序列构造二叉树--medium">LC105 从前序与中序遍历序列构造二叉树 · Medium</h4>
 <p><strong>周四核心 · 前中序结构重建。</strong> 显式栈模拟前序建节点与中序完成左子树的过程。</p>
 <p><strong>检查重点：</strong> 不能用切片隐藏开销；偏斜树与前/中序一致性，实际构造输出可校验。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/construct-binary-tree-from-preorder-and-inorder-traversal/solution/tu-jie-cong-on2-dao-onpythonjavacgojsrus-aob8/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-题意与输入输出-2">题意与输入输出</h5>
 <p>给出同一棵二叉树的前序遍历和中序遍历，恢复节点及左右孩子关系。前序是“根、左、右”，中序是“左、根、右”；节点值互不重复，因此两种顺序可以共同确定唯一的树。</p>
 <p>本程序读取一组合法输入：第一行 <code>preorder_count</code>，第二行前序整数序列；第三行 <code>inorder_count</code>，第四行中序整数序列。两个长度相等，数据与长度一致。程序也支持长度为 0 的空树，两条数据行仍各保留一行空行。</p>
@@ -5611,6 +5658,7 @@ getMin</code></pre>
 <h3 id="hot100-lc124-二叉树中的最大路径和--hard">LC124 二叉树中的最大路径和 · Hard</h3>
 <p><strong>当天核心 · 单臂收益与完整路径。</strong> 迭代后序；单臂max(0,gain)，双臂只更新全局。</p>
 <p><strong>检查重点：</strong> 全负树返回最大节点值；深树、路径不经根。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/binary-tree-maximum-path-sum/solution/shi-pin-che-di-zhang-wo-zhi-jing-dpcong-n9s91/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-使用的模块与程序流程-1">使用的模块与程序流程</h4>
 <p>本题导入 <code>import sys</code>、<code>import json</code>、<code>from collections import deque</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h4 id="hot100-题意与本地输入协议-1">题意与本地输入协议</h4>
@@ -5716,6 +5764,7 @@ getMin</code></pre>
 <h4 id="hot100-lc543-二叉树的直径--easy">LC543 二叉树的直径 · Easy</h4>
 <p><strong>周二核心 · 高度返回与直径更新。</strong> 显式栈后序处理，返回高度并结算两臂边数。</p>
 <p><strong>检查重点：</strong> 直径按边数；返回给父节点只能取一支，不是全局直径。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/diameter-of-binary-tree/solution/shi-pin-che-di-zhang-wo-zhi-jing-dpcong-taqma/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-题意与输入输出-3">题意与输入输出</h5>
 <p>给出一棵二叉树，求任意两个节点之间最长简单路径的<strong>边数</strong>。路径可以经过某个子树的根，未必经过整棵树的根。单节点树的直径为 0。</p>
 <p>本程序第一行读取 <code>token_count</code>，第二行读取对应数量的紧凑层序字段，空孩子写 <code>null</code>。构造器按队列依次为每个非空父节点消费左、右两个位置，末尾缺失的空孩子可以省略。例如 <code>1 null 2 3</code> 对应 1.right=2、2.left=3。程序输出一个整数。</p>
@@ -5839,6 +5888,7 @@ getMin</code></pre>
 <h4 id="hot100-lc236-二叉树的最近公共祖先--medium">LC236 二叉树的最近公共祖先 · Medium</h4>
 <p><strong>周四核心 · 父节点表与祖先链求交。</strong> 建立父节点表，比较两条祖先链。</p>
 <p><strong>检查重点：</strong> 比较对象身份；p为q祖先；迭代父映射辅助空间O(n)。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-tree/solution/fen-lei-tao-lun-luan-ru-ma-yi-ge-shi-pin-2r95/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-题意与输入输出-4">题意与输入输出</h5>
 <p>给定二叉树中的两个节点 <code>p</code>、<code>q</code>，找出同时作为它们祖先、且深度最大的节点。一个节点也视为自己的祖先，所以 <code>p</code> 本身可能就是答案。</p>
 <p>本程序读取一棵非空树和两个有效目标：第一行是 <code>token_count</code>；第二行是紧凑层序字段，缺少孩子写 <code>null</code>；第三行是 <code>p_index q_index</code>，表示两个非空节点在<strong>原输入 token 序列中的 0 基下标</strong>。这些下标包含 <code>null</code> 所占的位置。输出最近公共祖先在同一 token 序列中的下标。</p>
@@ -5975,6 +6025,7 @@ getMin</code></pre>
 <h3 id="hot100-lc994-腐烂的橘子--medium">LC994 腐烂的橘子 · Medium</h3>
 <p><strong>当天核心 · 多源最短层数。</strong> 全部初始腐烂源入队，逐层感染。</p>
 <p><strong>检查重点：</strong> 无新鲜返回0、隔离新鲜返回-1；不能从一个源逐个重跑。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/rotting-oranges/solution/duo-yuan-bfsfu-ti-dan-pythonjavacgojsrus-yfmh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-56">输入输出与构造</h4>
 <p>第一行 rows cols；随后 rows 行，每行是 grid 的 cols 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -6070,6 +6121,7 @@ getMin</code></pre>
 <h4 id="hot100-lc200-岛屿数量--medium">LC200 岛屿数量 · Medium</h4>
 <p><strong>周二核心 · 网格连通分量。</strong> 迭代DFS，入栈即标记。</p>
 <p><strong>检查重点：</strong> 多岛、全水；BFS/并查集仅备选，不默认三种都编码。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/number-of-islands/solution/ba-fang-wen-guo-de-ge-zi-cha-shang-qi-zi-9gs0/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-57">输入输出与构造</h5>
 <p>第一行 rows cols；随后 rows 行，每行是 grid 的 cols 个字符，每格以空格分隔。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -6167,6 +6219,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">true</code></pre>
 <h5 id="hot100-题意状态与解题依据-58">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/course-schedule/solution/san-se-biao-ji-fa-pythonjavacgojsrust-by-pll7/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>can_finish(num_courses, prerequisites)</code>。课程数 num_courses、[course,prerequisite] 列表 → 是否全部可完成的 bool。</p>
 <p><strong>题意与前提：</strong> 判断能否完成全部课程；编号从 0 开始，[a,b] 表示 b 必须先于 a。</p>
 <p><strong>推荐思路：</strong> 用 Kahn 入度拓扑排序，导入 <code>from collections import deque</code> 保存当前入度为 0 的课程；邻接表按先修课→后续课建边。完成一门课就减少它所有后继的入度，降到 0 表示全部前置条件已经满足，可以加入队列。处理数等于课程数时可全部完成；有环的剩余课程会互相等待。时间与包含邻接表的辅助空间均为 O(V+E)。备选迭代 DFS 三色判环也为 O(V+E) 时间与空间，以显式栈维护当前路径，遇指向灰色节点的边便发现环，适合沿依赖链解释循环来源。</p>
@@ -6255,6 +6308,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">5</code></pre>
 <h4 id="hot100-题意状态与解题依据-59">题意、状态与解题依据</h4>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/solution/on-kuai-su-xuan-ze-suan-fa-pythonjavaccg-lh7c/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>find_kth_largest(nums, k)</code>。列表 nums、合法 k → 第 k 大的数值；重复值按元素数计，不修改输入。</p>
 <p><strong>题意与前提：</strong> 返回排序意义上的第 k 大，1≤k≤n；重复值参与排名，不是第 k 个不同值。</p>
 <p><strong>推荐思路：</strong> 保留最大的 k 个元素，用最小堆的堆顶充当候选门槛；新数更大时替换堆顶并下沉，保证堆内始终是已扫描前缀中最大的 k 个。本单元先读下方手写 <code>_sift_down</code>，把父子堆序与局部修复看清楚；实际调用可导入 <code>heapq</code>，使用备选中的 <code>heapify</code> 与 <code>heapreplace</code>，候选规则相同。两者时间 O(k+(n-k)·log(k+1))、空间 O(k)，适合 k 较小或持续维护排名。只查一次且排序成本可接受时选 <code>sorted(nums)[-k]</code>，时间 O(n log n)、空间 O(n)；允许原地修改且希望期望线性时间时选随机快速选择，期望 O(n)、最坏 O(n²)，迭代原地版辅助空间 O(1)，保留输入的副本另占 O(n)。</p>
@@ -6336,6 +6390,7 @@ getMin</code></pre>
 <h4 id="hot100-lc23-合并-k-个升序链表--hard">LC23 合并 K 个升序链表 · Hard</h4>
 <p><strong>周二核心 · 多路归并堆。</strong> 堆存(val,来源编号,node)，每次接最小头并补后继。</p>
 <p><strong>检查重点：</strong> 相同val不能比较节点；k=0与空子链；分治归并只列备选。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/merge-k-sorted-lists/solution/liang-chong-fang-fa-zui-xiao-dui-fen-zhi-zbzx/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-60">输入输出与构造</h5>
 <p>第一行 list_count；随后每条有序链表各占两行：第一行长度 n，第二行 n 个节点值。空链表也保留对应的空白数据行。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -6466,6 +6521,7 @@ getMin</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">2 1</code></pre>
 <h5 id="hot100-题意状态与解题依据-61">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/top-k-frequent-elements/solution/tong-pai-xu-on-xian-xing-zuo-fa-pythonja-oqq2/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>top_k_frequent(nums, k)</code>。列表 nums、k → 最高频的 k 个数，顺序不限；不修改输入。</p>
 <p><strong>题意与前提：</strong> 返回频次最高的 k 个不同元素，顺序不限；原题保证边界处答案集合唯一。</p>
 <p><strong>思路：</strong> 先把原数组压缩为 value→frequency，再对频次求 Top K；频次范围不超过 n，也可用桶。</p>
@@ -6518,6 +6574,8 @@ getMin</code></pre>
 <h4 id="hot100-lc295-数据流的中位数--hard">LC295 数据流的中位数 · Hard</h4>
 <p><strong>周四核心 · 双堆在线中位数。</strong> 小半部负值最大堆，大半部最小堆，左多至多1。</p>
 <p><strong>检查重点：</strong> 奇偶切换、负数重复；查询前至少插入一次；两堆顺序和大小都需满足。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-median-from-data-stream/solution/ru-he-zi-ran-yin-ru-da-xiao-dui-jian-ji-4v22k/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 本课使用负数表示最大堆，并分步展示“移入、转移、平衡”。原文若使用 <code>heappush_max</code> 等最大堆接口，应先核对运行版本；本课 Python 3.9 的实现沿用 <code>heapq</code> 最小堆接口。</p>
 <h5 id="hot100-输入输出与构造-62">输入输出与构造</h5>
 <p>首行 Q；随后 addNum x / findMedian。仅 findMedian 输出；查询前至少插入一个数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -6608,6 +6666,7 @@ findMedian</code></pre>
 <h3 id="hot100-lc45-跳跃游戏-ii--medium">LC45 跳跃游戏 II · Medium</h3>
 <p><strong>当天核心 · 当前跳数层边界。</strong> 扫描一层的最远可达，到层末才加步数。</p>
 <p><strong>检查重点：</strong> 单元素为0；原题保证可达，不能每次更新最远位置就加步数。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/jump-game-ii/solution/tu-jie-yi-zhang-tu-miao-dong-tiao-yue-yo-h2d4/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-输入输出与构造-63">输入输出与构造</h4>
 <p>第一行 n；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -6690,6 +6749,7 @@ findMedian</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">5</code></pre>
 <h5 id="hot100-题意状态与解题依据-64">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/solution/mei-ju-mai-chu-jie-ge-wei-hu-mai-ru-de-z-02ud/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>max_profit(prices)</code>。价格列表 prices → 至多一次交易的最大利润；可不交易，最低为 0。</p>
 <p><strong>题意与前提：</strong> 最多买卖一次，必须先买后卖，求最大利润；无利可图时可以不交易。</p>
 <p><strong>推荐思路：</strong> 一次扫描维护历史最低价 <code>min_price</code> 与最大收益 <code>result</code>，直接使用循环和内置 <code>min</code>、<code>max</code>。固定卖出日后，较低的历史买价总会给出较高利润；逐日比较这些最佳候选，就覆盖所有合法的一次交易。时间 O(n)、辅助空间 O(1)。备选状态 DP 用 <code>hold</code> 表示买入后的最好收益、<code>cash</code> 表示卖出后的最好收益，同样 O(n) 时间、O(1) 空间，适合衔接手续费、冷冻期和交易次数变式；本题 <code>hold</code> 从 <code>-price</code> 更新以表示第一次买入。</p>
@@ -6748,6 +6808,7 @@ findMedian</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">true</code></pre>
 <h5 id="hot100-题意状态与解题依据-65">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/jump-game/solution/liang-chong-li-jie-fang-shi-wei-hu-zui-y-q67s/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>can_jump(nums)</code>。非负跳跃上限列表 nums → 能否到达末尾的 bool；不修改输入。</p>
 <p><strong>题意与前提：</strong> 原题的非空非负数组每项表示最大跳距，判断终点是否可达；单元素已到终点。本课为本题统一扩展空数组边界：空数组没有终点，返回 <code>False</code>，速览、主解、备选及完整入口采用同一约定。</p>
 <p><strong>推荐思路：</strong> 向前扫描并维护最远可达边界 <code>farthest</code>，使用普通循环和内置 <code>max</code>。每个位置可以跳 0..nums[index] 步，可达位置构成连续前缀；只有当前点在前缀内，才用它扩展右端。时间 O(n)、辅助空间 O(1)，适合同时理解 LC45 的按步数扩展边界。备选从终点向前移动目标 <code>goal</code>：当前位置能覆盖 goal 时，就让它成为新的 goal，最后检查目标是否回到起点；时间和空间相同，适合从“哪些点能够接力到终点”理解可达性。</p>
@@ -6807,6 +6868,7 @@ findMedian</code></pre>
 <h4 id="hot100-lc763-划分字母区间--medium">LC763 划分字母区间 · Medium</h4>
 <p><strong>周四核心 · 最远末次出现。</strong> 记录各字符最后位置，当前段右界取最大。</p>
 <p><strong>检查重点：</strong> 闭合整段才能切；单字符与所有字符同一段。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/partition-labels/solution/ben-zhi-shi-he-bing-qu-jian-jian-ji-xie-ygsn8/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-66">输入输出与构造</h5>
 <p>1 个完整文本行，依次作为函数参数；空字符串占一个空行，保留空格。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -6887,6 +6949,7 @@ findMedian</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">[[1,6],[8,10],[15,18]]</code></pre>
 <h5 id="hot100-题意状态与解题依据-67">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/merge-intervals/solution/jian-dan-zuo-fa-yi-ji-wei-shi-yao-yao-zh-f2b3/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>merge_intervals(intervals)</code>。闭区间列表 intervals → 合并后的新二维列表；不改原区间。</p>
 <p><strong>题意与前提：</strong> 合并所有重叠闭区间；端点相接算重叠，零长度区间合法。</p>
 <p><strong>推荐思路：</strong> 用内置 <code>sorted(intervals)</code> 按起点排序，再顺序维护结果的最后一段；当前左端落在该段右端以内时扩展右端，否则新开一段。排序保证后续起点越来越大，出现的间隙以后也无法被填回，所以已经完成的旧段可以保持不变。时间 O(n log n)、排序辅助空间 O(n)，输出另占 O(n)，并保留原输入。若输入已按起点有序，可直接扫描，时间 O(n)、输出以外 O(1) 状态；允许改动输入时也可用 <code>list.sort()</code>，但 Python 排序仍可能使用 O(n) 临时空间。</p>
@@ -6937,6 +7000,8 @@ findMedian</code></pre>
 <h3 id="hot100-lc139-单词拆分--medium">LC139 单词拆分 · Medium</h3>
 <p><strong>当天核心 · 词典前缀可达。</strong> 有界长度切片+哈希DP；Trie作为优化。</p>
 <p><strong>检查重点：</strong> aaaa可重复aa；catsandog无解；Python切片/哈希成本要计入。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/word-break/solution/jiao-ni-yi-bu-bu-si-kao-dpcong-ji-yi-hua-chrs/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> <code>max(map(len, words), default=0)</code> 把逐词取长度和求最大值放在一起；空词表得到 0。后面的 DP 状态与转移仍逐步展开。</p>
 <h4 id="hot100-使用的模块与程序流程-2">使用的模块与程序流程</h4>
 <p>本题导入 <code>import sys</code>、<code>import json</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h4 id="hot100-题意与本地输入协议-2">题意与本地输入协议</h4>
@@ -6966,9 +7031,8 @@ findMedian</code></pre>
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">word_break</span>(s, word_dict):
     words = <span class="syntax-function">set</span>(word_dict)
-    max_word_length = <span class="syntax-number">0</span>
-    <span class="syntax-keyword">for</span> word <span class="syntax-keyword">in</span> words:
-        max_word_length = <span class="syntax-function">max</span>(max_word_length, <span class="syntax-function">len</span>(word))
+    <span class="syntax-comment"># 一次取最长词长；空词表的默认长度为 0。</span>
+    max_word_length = <span class="syntax-function">max</span>(<span class="syntax-function">map</span>(len, words), default=<span class="syntax-number">0</span>)
     <span class="syntax-comment"># dp[end] 表示 s[:end] 能否完整拆成词；空前缀可以拆，因此 dp[0] 为 True。</span>
     dp = [<span class="syntax-literal">False</span>] * (<span class="syntax-function">len</span>(s) + <span class="syntax-number">1</span>)
     dp[<span class="syntax-number">0</span>] = <span class="syntax-literal">True</span>
@@ -7019,6 +7083,7 @@ findMedian</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">2</code></pre>
 <h5 id="hot100-题意状态与解题依据-68">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/climbing-stairs/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-7zm1/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>climb_stairs(n)</code>。台阶数 n → 每次一步或两步的方案数；实现以零阶一种方案初始化。</p>
 <p><strong>题意与前提：</strong> 每步走 1 或 2 阶，求到第 n 阶的方案数；原题 n≥1。</p>
 <p><strong>思路：</strong> 最后一步只有从 n-1 或 n-2 来；方案数为两种来源相加。</p>
@@ -7073,6 +7138,7 @@ findMedian</code></pre>
 <h4 id="hot100-lc198-打家劫舍--medium">LC198 打家劫舍 · Medium</h4>
 <p><strong>周二核心 · 相邻选择前缀最优。</strong> previous_two 与 previous_one 保存此前两个前缀的最优值；比较取当前房屋与跳过当前房屋。</p>
 <p><strong>检查重点：</strong> 单房、两房及不能连续取相邻房；不能拿它代表连续子数组。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/house-robber/solution/ru-he-xiang-chu-zhuang-tai-ding-yi-he-zh-1wt1/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-69">输入输出与构造</h5>
 <p>第一行 n；第二行 nums 的 n 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -7141,6 +7207,7 @@ findMedian</code></pre>
 <h4 id="hot100-lc152-乘积最大子数组--medium">LC152 乘积最大子数组 · Medium</h4>
 <p><strong>周四核心 · 结尾最大最小乘积。</strong> 同时保留旧最大/最小再更新。</p>
 <p><strong>检查重点：</strong> 两个负数翻转最值、零重启；先覆盖旧max再算min会污染来源。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/maximum-product-subarray/solution/dong-tai-gui-hua-jian-ji-gao-xiao-python-i778/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-70">输入输出与构造</h5>
 <p>第一行 n（n ≥ 1）；第二行 nums 的 n 个整数。子数组必须非空。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -7219,6 +7286,7 @@ findMedian</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">6</code></pre>
 <h5 id="hot100-题意状态与解题依据-71">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/maximum-subarray/solution/qian-zhui-he-zuo-fa-ben-zhi-shi-mai-mai-abu71/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>max_sub_array(nums)</code>。非空整数列表 nums → 非空连续子数组的最大和；不修改输入。</p>
 <p><strong>题意与前提：</strong> 求非空数组中连续非空子数组的最大和；不能用空区间得到 0。</p>
 <p><strong>思路：</strong> 定义“以 index 结尾的最优非空连续段”；它要么从当前项重新开始，要么接上上一位置的最优段，因此一次扫描就能确定每个右端点的答案。</p>
@@ -7280,6 +7348,7 @@ ace</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">3</code></pre>
 <h4 id="hot100-题意状态与解题依据-72">题意、状态与解题依据</h4>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-common-subsequence/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-lbz5/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>longest_common_subsequence_dp(s, t)</code>。字符串 s、t → 最长公共子序列长度；不要求连续。</p>
 <p><strong>题意与前提：</strong> 返回两个字符串最长公共子序列的长度；可以不连续，但必须保留相对顺序。</p>
 <p><strong>思路：</strong> 两个序列可跳过元素，定义两前缀的最优匹配长度；是否取最后字符决定转移。</p>
@@ -7353,6 +7422,7 @@ ace</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">[[1],[1,1],[1,2,1],[1,3,3,1],[1,4,6,4,1]]</code></pre>
 <h5 id="hot100-题意状态与解题依据-73">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/pascals-triangle/solution/jian-dan-ti-jian-dan-zuo-pythonjavaccgoj-z596/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>generate_pascal(num_rows)</code>。行数 num_rows → 杨辉三角二维列表。</p>
 <p><strong>题意与前提：</strong> 生成杨辉三角前 num_rows 行，num_rows≥1；各行必须是独立列表。</p>
 <p><strong>思路：</strong> 每个内部位置来自上一行相邻两数之和；行首行尾为 1。</p>
@@ -7409,6 +7479,7 @@ ace</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">28</code></pre>
 <h5 id="hot100-题意状态与解题依据-74">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/unique-paths/solution/liang-chong-fang-fa-dong-tai-gui-hua-zu-o5k32/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong> <code>unique_paths_dp(rows, cols)</code>。正整数 rows、cols → 只向右／向下的路径数；不输出路径内容。</p>
 <p><strong>题意与前提：</strong> rows×cols 网格从左上到右下，只能向右或向下，求路径数；无障碍，尺寸均≥1。</p>
 <p><strong>思路：</strong> 只能向右/下，状态依赖无环；路径数等于从上方到达的数量加从左方到达的数量。</p>
@@ -7465,6 +7536,7 @@ ace</code></pre>
 <h4 id="hot100-lc64-最小路径和--medium">LC64 最小路径和 · Medium</h4>
 <p><strong>周二核心 · 网格最小代价。</strong> 二维 dp 保存到每个格子的最小路径和；取上方与左方的较小值加当前值，滚动数组作为空间优化。</p>
 <p><strong>检查重点：</strong> 首行首列只有一个来源；修改输入与辅助空间约定要说清。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/minimum-path-sum/solution/jiao-ni-yi-bu-bu-si-kao-dpcong-ji-yi-hua-zfb2/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-75">输入输出与构造</h5>
 <p>第一行 rows cols；随后 rows 行，每行是 grid 的 cols 个整数。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -7547,6 +7619,7 @@ ace</code></pre>
 <h4 id="hot100-lc72-编辑距离--medium">LC72 编辑距离 · Medium</h4>
 <p><strong>周四核心 · 双前缀编辑距离。</strong> 二维表，空前缀成本i/j，三种操作最小值。</p>
 <p><strong>检查重点：</strong> 空串、相同串、替换；滚动优化先保存左上旧值。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/edit-distance/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-uo5q/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-输入输出与构造-76">输入输出与构造</h5>
 <p>2 个完整文本行，依次作为函数参数；空字符串占一个空行，保留空格。</p>
 <p>本程序处理一组完整、合法的输入；字段数量和类型符合上述约定。</p>
@@ -7622,6 +7695,7 @@ ros</code></pre>
 <h3 id="hot100-lc322-零钱兑换--medium">LC322 零钱兑换 · Medium</h3>
 <p><strong>当天核心 · 无限次最少硬币。</strong> 金额外层正序，枚举最后一枚。</p>
 <p><strong>检查重点：</strong> 0金额、不可达、[1,3,4]凑6；同一硬币可复用。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/coin-change/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-21m5/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-使用的模块与程序流程-3">使用的模块与程序流程</h4>
 <p>本题导入 <code>import sys</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h4 id="hot100-题意与本地输入协议-3">题意与本地输入协议</h4>
@@ -7689,6 +7763,7 @@ ros</code></pre>
 <h4 id="hot100-lc416-分割等和子集--medium">LC416 分割等和子集 · Medium</h4>
 <p><strong>周二核心 · 0/1可达背包。</strong> 布尔dp，数外层、容量倒序。</p>
 <p><strong>检查重点：</strong> [2,3,7]不能重复取2；两个相同值是不同位置不能set去重。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/partition-equal-subset-sum/solution/0-1-bei-bao-cong-ji-yi-hua-sou-suo-dao-d-ev76/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-使用的模块与程序流程-4">使用的模块与程序流程</h5>
 <p>本题导入 <code>import sys</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h5 id="hot100-题意与本地输入协议-4">题意与本地输入协议</h5>
@@ -7754,6 +7829,7 @@ ros</code></pre>
 <h4 id="hot100-lc279-完全平方数--medium">LC279 完全平方数 · Medium</h4>
 <p><strong>周四核心 · 无限次最少平方项。</strong> isqrt生成正平方数，金额正序求最少数。</p>
 <p><strong>检查重点：</strong> n=12为3、13为2；不能贪心总减最大平方数。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/perfect-squares/solution/dong-tai-gui-hua-cong-ji-yi-hua-sou-suo-3kz1g/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-使用的模块与程序流程-5">使用的模块与程序流程</h5>
 <p>本题导入 <code>import sys</code>、<code>from math import isqrt</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h5 id="hot100-题意与本地输入协议-5">题意与本地输入协议</h5>
@@ -7823,6 +7899,7 @@ ros</code></pre>
 <h3 id="hot100-lc46-全排列--medium">LC46 全排列 · Medium</h3>
 <p><strong>当天核心 · 排列路径占用。</strong> used加path；只在长度n收集副本。</p>
 <p><strong>检查重点：</strong> [1,2]需有两个顺序；撤销path与used，不能保留start递增约束。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/permutations/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-jing-que-6hrh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-使用的模块与程序流程-6">使用的模块与程序流程</h4>
 <p>本题导入 <code>import sys</code>、<code>import json</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h4 id="hot100-题意与本地输入协议-6">题意与本地输入协议</h4>
@@ -7906,6 +7983,7 @@ ros</code></pre>
 <h4 id="hot100-lc78-子集--medium">LC78 子集 · Medium</h4>
 <p><strong>周二核心 · 递增下标子集。</strong> start加path；每次入递归收集副本。</p>
 <p><strong>检查重点：</strong> 包含空集；子集不按值剪枝，答案列表互相独立。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/subsets/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-8tkl/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-使用的模块与程序流程-7">使用的模块与程序流程</h5>
 <p>本题导入 <code>import sys</code>、<code>import json</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h5 id="hot100-题意与本地输入协议-7">题意与本地输入协议</h5>
@@ -7987,6 +8065,7 @@ ros</code></pre>
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">ad ae af bd be bf cd ce cf</code></pre>
 <h5 id="hot100-题意状态与解题依据-77">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/letter-combinations-of-a-phone-number/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-3orv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>letter_combinations(digits)</code>。仅含 2..9 的数字字符串 digits → 字母组合字符串列表；空输入返回 []。</p>
 <p><strong>题意与前提：</strong> 返回电话数字对应的所有字母组合；数字限 2..9，空输入返回 [] 而不是 [&#39;&#39;]。</p>
 <p><strong>思路：</strong> 每一位数字提供一组候选，答案是这些候选集合的笛卡尔积。</p>
@@ -8056,6 +8135,7 @@ _PHONE = {
 <h4 id="hot100-lc39-组合总和--medium">LC39 组合总和 · Medium</h4>
 <p><strong>周四核心 · 可复用非降下标组合。</strong> 排序后start/remaining，下一层仍传index。</p>
 <p><strong>检查重点：</strong> [2],4可选两次；顺序不同不算新组合；正数保证终止。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/combination-sum/solution/liang-chong-fang-fa-xuan-huo-bu-xuan-mei-mhf9/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-使用的模块与程序流程-8">使用的模块与程序流程</h5>
 <p>本题导入 <code>import sys</code>、<code>import json</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h5 id="hot100-题意与本地输入协议-8">题意与本地输入协议</h5>
@@ -8140,6 +8220,7 @@ _PHONE = {
 <p><strong>样例输出</strong></p>
 <pre><code class="language-text">((())) (()()) (())() ()(()) ()()()</code></pre>
 <h5 id="hot100-题意状态与解题依据-78">题意、状态与解题依据</h5>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/generate-parentheses/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-wcdw/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>接口：</strong><code>generate_parenthesis(n)</code>。非负对数 n → 全部合法括号字符串列表。</p>
 <p><strong>题意与前提：</strong> 原题返回 n 对括号的全部合法序列，n≥1；任何前缀都不能右括号多于左括号。本模板额外支持 n=0，返回 <code>[&#39;&#39;]</code>，表示一个空括号串方案。</p>
 <p><strong>思路：</strong> 枚举所有合法括号串；合法性可以在构造前缀时提前判断，而不必生成后再验证。</p>
@@ -8198,6 +8279,7 @@ _PHONE = {
 <h4 id="hot100-lc79-单词搜索--medium">LC79 单词搜索 · Medium</h4>
 <p><strong>周二核心 · 网格路径占用恢复。</strong> 把当前格子临时置为 None 表示路径占用，四向搜索后恢复原字符。</p>
 <p><strong>检查重点：</strong> 字符匹配但需重复使用格子应失败；成功返回后棋盘不被污染。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/word-search/solution/liang-ge-you-hua-rang-dai-ma-ji-bai-jie-g3mmm/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-题意与输入输出-5">题意与输入输出</h5>
 <p>给定字符矩阵 <code>board</code> 和非空单词 <code>word</code>，判断能否沿上下左右相邻的格子依次读出单词。同一条路径中，每个格子最多使用一次；不同搜索分支可以重新使用同一个格子。</p>
 <p>本地输入第一行为 <code>rows cols</code>，随后 <code>rows</code> 行各有 <code>cols</code> 个空格分隔的单字符，最后一行为单词。输入保证矩阵规则、字符和单词合法。输出小写 <code>true</code> 或 <code>false</code>。程序返回前会恢复矩阵原来的字符。</p>
@@ -8296,6 +8378,7 @@ ABCCED</code></pre>
 <h4 id="hot100-lc131-分割回文串--medium">LC131 分割回文串 · Medium</h4>
 <p><strong>周四核心 · 回文预处理与分割。</strong> 回文表加start回溯切分。</p>
 <p><strong>检查重点：</strong> 先建立回文表，再枚举下一段结束位置；检查 aab、单字符和全相同字符，start 到末尾时收集答案。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/palindrome-partitioning/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-fues/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-题意与输入输出-6">题意与输入输出</h5>
 <p>把字符串 <code>s</code> 切成若干连续片段，要求每一段都是回文串，返回全部切分方案。所有字符按原顺序恰好覆盖一次。回文串从左到右与从右到左读取相同，例如 <code>a</code>、<code>aa</code>、<code>aba</code>。</p>
 <p>本地输入一行非空小写字符串，输出一行 JSON 二维数组。每个内层数组是一份分段方案，程序按每段结束位置从小到大的深度优先顺序生成答案。</p>
@@ -8395,6 +8478,7 @@ ABCCED</code></pre>
 <h4 id="hot100-lc51-n-皇后--hard">LC51 N 皇后 · Hard</h4>
 <p><strong>周四核心 · 列与两类对角线约束。</strong> 按行放置，列/r-c/r+c三个集合。</p>
 <p><strong>检查重点：</strong> n=1有1解，n=2/3无解；每次返回恢复全部三个集合。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/n-queens/solution/hui-su-tao-lu-miao-sha-nhuang-hou-shi-pi-mljv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-题意与输入输出-7">题意与输入输出</h5>
 <p>在 <code>n×n</code> 棋盘放置 <code>n</code> 个皇后，使任意两个皇后不在同一行、同一列或同一条对角线上。返回全部合法棋盘，每行用字符串表示，<code>Q</code> 是皇后，<code>.</code> 是空位。原题 <code>1≤n≤9</code>。</p>
 <p>本地输入一行整数 <code>n</code>，输出一行 JSON 数组：每个元素是一份由 <code>n</code> 个字符串组成的棋盘。程序按每行从左到右尝试列的顺序输出方案。</p>
@@ -8490,6 +8574,7 @@ ABCCED</code></pre>
 <h3 id="hot100-lc300-最长递增子序列--medium">LC300 最长递增子序列 · Medium</h3>
 <p><strong>当天核心 · 结尾型 LIS DP 与最小尾值优化。</strong> 先用 O(n²) DP 定义以当前项结尾的最长长度，再比较 tails 与二分的 O(n log n) 优化。</p>
 <p><strong>检查重点：</strong> 检查重复值不能延长严格递增序列、子序列可以跳过元素；说明 dp[index] 与 tails[length-1] 的含义。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-increasing-subsequence/solution/jiao-ni-yi-bu-bu-si-kao-dpfu-o1-kong-jia-4zma/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-题意与输入输出-8">题意与输入输出</h4>
 <p>给定整数数组 <code>nums</code>，求最长<strong>严格递增子序列</strong>的长度。子序列可以跳过元素，但保留原来的先后顺序；相等的值不能延长严格递增序列。本题输出长度，数组保持原样。</p>
 <p>本地第一行输入数量 <code>n</code>，第二行输入 <code>n</code> 个整数；输出一个整数。原题数组非空。程序也自然支持空数组：本地用 <code>n=0</code> 和第二行空行表示，返回 0。</p>
@@ -8565,6 +8650,7 @@ ABCCED</code></pre>
 <h3 id="hot100-lc142-环形链表-ii--medium">LC142 环形链表 II · Medium</h3>
 <p><strong>当天核心 · Floyd入口定位。</strong> 相遇后一个回头，两者等速到入口。</p>
 <p><strong>检查重点：</strong> 141仅判环不能代表入口证明；检查入口在头与带长前缀。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/linked-list-cycle-ii/solution/mei-xiang-ming-bai-yi-ge-shi-pin-jiang-t-nvsq/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h4 id="hot100-题意与真实链表输入">题意与真实链表输入</h4>
 <p>给定单链表头节点 <code>head</code>，返回环入口的<strong>节点对象</strong>；没有环则返回 <code>None</code>。节点值可以重复，判断相遇时比较是否为同一个对象。</p>
 <p>本地第一行是 <code>n position</code>，第二行是 <code>n</code> 个节点值。先按这些值建立一条普通链，再把尾节点的 <code>next</code> 指向原下标 <code>position</code> 对应的节点。<code>position=-1</code> 表示不接回去；非负值保证是合法下标。空链使用 <code>0 -1</code>，第二行为空行。</p>
@@ -8661,6 +8747,7 @@ ABCCED</code></pre>
 <h4 id="hot100-lc146-lru-缓存--medium">LC146 LRU 缓存 · Medium</h4>
 <p><strong>周二核心 · LRU映射与双向链表。</strong> 手写双哨兵；head.next为MRU，tail.prev为LRU。</p>
 <p><strong>检查重点：</strong> 更新旧键不增容、get命中刷新、淘汰同步删字典；逐步核对节点身份。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/lru-cache/solution/tu-jie-yi-zhang-tu-miao-dong-lrupythonja-czgt/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-使用的模块与程序流程-9">使用的模块与程序流程</h5>
 <p>本题导入 <code>import sys</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h5 id="hot100-题意与本地输入协议-9">题意与本地输入协议</h5>
@@ -8784,6 +8871,7 @@ get 4</code></pre>
 <h4 id="hot100-lc208-实现-trie-前缀树--medium">LC208 实现 Trie (前缀树) · Medium</h4>
 <p><strong>周二核心 · Trie终止标记。</strong> 节点children字典加end；完整insert/search/startsWith。</p>
 <p><strong>检查重点：</strong> apple插入后app前缀真但单词假；重复插入、共享前缀。</p>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/implement-trie-prefix-tree/solution/cong-er-cha-shu-dao-er-shi-liu-cha-shu-p-xsj4/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <h5 id="hot100-使用的模块与程序流程-10">使用的模块与程序流程</h5>
 <p>本题导入 <code>import sys</code>。从 <code>main()</code> 按本题协议逐行读入并构造数据，调用下面的完整算法，再用 <code>print()</code> 输出结果。</p>
 <h5 id="hot100-题意与本地输入协议-10">题意与本地输入协议</h5>

@@ -415,23 +415,21 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc283"></a></p>
 <p><a href="#lc283">LC283 移动零</a>：输入 <code>[0,1,0,3]</code>，原数组变为 <code>[1,3,0,0]</code>，保持非零元素顺序。<strong>推荐“覆盖非零项，再补零”</strong>：读指针遍历，写指针只在保留非零值后前进。两个阶段分别完成稳定保留与后缀清理，便于逐句核对原地修改的结果。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/move-zeroes/">LC283 移动零 · 题目</a> · <a href="https://leetcode.cn/problems/move-zeroes/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/move-zeroes/solution/kuai-man-zhi-zhen-wei-shi-yao-ke-yi-ba-s-1h8x/">LC283 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">move_zeroes</span>(nums):
-    <span class="syntax-comment"># write 是下一个非零值要写入的下标；从位置 0 开始填。</span>
+    <span class="syntax-comment"># write 是下一个非零值的写入下标；nums[:write] 保存已读非零值，顺序不变。</span>
     write = <span class="syntax-number">0</span>
-    <span class="syntax-comment"># index 是读指针，逐个检查原数组；每轮读取前 write 不超过 index。</span>
-    <span class="syntax-keyword">for</span> index <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(<span class="syntax-function">len</span>(nums)):
-        <span class="syntax-comment"># 遇到非零值才占用写入位置；遇到 0 时 write 保持不动。</span>
-        <span class="syntax-keyword">if</span> nums[index] != <span class="syntax-number">0</span>:
-            <span class="syntax-comment"># 把当前非零值放入已整理前缀的末尾，保持非零值原来的顺序。</span>
-            nums[write] = nums[index]
-            <span class="syntax-comment"># 当前位置已经写好，向右一格，成为下一个可写位置。</span>
+    <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums:
+        <span class="syntax-keyword">if</span> value != <span class="syntax-number">0</span>:
+            <span class="syntax-comment"># 写入位置不超过当前读取位置，因此后面尚未读取的值仍然保留。</span>
+            nums[write] = value
             write += <span class="syntax-number">1</span>
-    <span class="syntax-comment"># 扫描结束后，nums[:write] 全是非零值；剩余位置统一补 0。</span>
+    <span class="syntax-comment"># write 此时等于非零值个数；从这个固定边界开始，把剩余位置补成 0。</span>
     <span class="syntax-keyword">for</span> index <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(write, <span class="syntax-function">len</span>(nums)):
         nums[index] = <span class="syntax-number">0</span></code></pre>
 <p>时间 O(n)、辅助空间 O(1)，空数组和全零数组也成立。<strong>备选是同向双指针交换</strong>：读到非零值就与写位置交换，再推进写指针；同样是 O(n) 时间、O(1) 辅助空间。覆盖版适合先学清楚两个处理阶段，交换版适合迁移到“把保留项搬到前面”的原地分区题；两者都必须保留非零项的原有顺序。</p>
 <p>哈希（Hash Table）用<a href="#quick-lc1">输入输出段的 LC1 完整程序</a>：<strong>先查补数，再保存当前下标</strong>，<code>[3,3]</code>、target=6 得到 <code>[0,1]</code>，不能让一个位置与自身配对；期望时间 O(n)、空间 O(n)。解题函数统一返回列表，无解用 <code>[]</code>；原题保证有解时直接输出下标。若本地协议要求无解标记，在 <code>main()</code> 中按<a href="#quick-io">无解输出补充</a>处理。</p>
-<p><strong>跟着状态走：</strong> LC283 读到 1 时写入位置 0，<code>write=1</code>；读到 3 时写入位置 1，<code>write=2</code>，最后只把剩余两个位置补 0。处理任一前缀后，<code>nums[:write]</code> 恰好保存这个前缀的全部非零值，且顺序未变；执行写入时的 write 不超过当前 index，所以不会覆盖尚未读取的数据。</p>
+<p><strong>跟着状态走：</strong> LC283 读到 1 时写入位置 0，<code>write=1</code>；读到 3 时写入位置 1，<code>write=2</code>，最后只把剩余两个位置补 0。处理任一前缀后，<code>nums[:write]</code> 恰好保存这个前缀的全部非零值，且顺序未变；执行写入时的 write 不超过当前读取位置，所以不会覆盖尚未读取的数据。</p>
 <p>LC1 读第一个 3 时，历史表为空，记录 <code>{3:0}</code>；读第二个 3 时，补数 3 已在表中，返回 <code>[0,1]</code>。每次查询只面对更早的下标，既保证不用同一位置两次，也保证任意一对答案都会在读到较晚那一项时被找到。</p>
 <p><a id="quick-two-pointers"></a>
 <a id="hot100-03左右夹逼盛水与三数之和"></a></p>
@@ -445,6 +443,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 </ul>
 </blockquote>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/container-with-most-water/">LC11 盛最多水的容器 · 题目</a> · <a href="https://leetcode.cn/problems/container-with-most-water/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/container-with-most-water/solution/by-endlesscheng-f0xz/">LC11 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">max_area</span>(heights):
     <span class="syntax-comment"># left/right 是当前两条挡板的下标，从最宽的两端开始。</span>
     left, right = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(heights) - <span class="syntax-number">1</span>
@@ -464,6 +463,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc15"></a></p>
 <p><a href="#lc15">LC15 三数之和</a>：<code>[-1,0,1,2,-1,-4] → [[-1,-1,2],[-1,0,1]]</code>。<strong>推荐排序后固定一个数，再对余下区间左右夹逼</strong>：排序让“和偏小就增大左端、和偏大就减小右端”有了依据，也让相同值聚在一起。固定项和找到答案后的两端都按值跳过重复，保证每种三元组输出一次。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/3sum/">LC15 三数之和 · 题目</a> · <a href="https://leetcode.cn/problems/3sum/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/3sum/solution/shuang-zhi-zhen-xiang-bu-ming-bai-yi-ge-pno55/">LC15 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">three_sum</span>(nums):
     nums = <span class="syntax-function">sorted</span>(nums)
     result = []
@@ -501,18 +501,19 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc5"></a></p>
 <p><a href="#lc5">LC5 最长回文子串</a>：<code>aba → aba</code>，<code>abba → abba</code>。<strong>推荐中心扩展</strong>：单字符与字符间隙分别作为奇数、偶数长度回文的中心，左右字符相同时继续外扩。只记录最佳起点与长度，最后统一截取答案，状态少且便于解释每次扩展。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/longest-palindromic-substring/">LC5 最长回文子串 · 题目</a> · <a href="https://leetcode.cn/problems/longest-palindromic-substring/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/longest-palindromic-substring/solution/mo-ban-on-manacher-suan-fa-pythonjavacgo-t6cx/">LC5 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">longest_palindrome</span>(s):
-    <span class="syntax-comment"># start/length 记录当前最长回文的起点与长度；空串长度为 0。</span>
     start = length = <span class="syntax-number">0</span>
     <span class="syntax-keyword">for</span> center <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(<span class="syntax-function">len</span>(s)):
-        <span class="syntax-comment"># 两个起点分别处理奇数长度与偶数长度回文。</span>
-        <span class="syntax-keyword">for</span> left, right <span class="syntax-keyword">in</span> ((center, center), (center, center + <span class="syntax-number">1</span>)):
+        <span class="syntax-comment"># 同一个字符作奇数中心，相邻字符之间作偶数中心。</span>
+        <span class="syntax-keyword">for</span> left, right <span class="syntax-keyword">in</span> [(center, center), (center, center + <span class="syntax-number">1</span>)]:
             <span class="syntax-keyword">while</span> left &gt;= <span class="syntax-number">0</span> <span class="syntax-keyword">and</span> right &lt; <span class="syntax-function">len</span>(s) <span class="syntax-keyword">and</span> s[left] == s[right]:
-                <span class="syntax-keyword">if</span> right - left + <span class="syntax-number">1</span> &gt; length:
-                    start, length = left, right - left + <span class="syntax-number">1</span>
-                <span class="syntax-comment"># 当前两端相同才继续向外扩；下一轮重新检查边界和字符。</span>
                 left -= <span class="syntax-number">1</span>
                 right += <span class="syntax-number">1</span>
+            <span class="syntax-comment"># 停下时两端已越过有效回文；有效区间是 [left + 1, right)。</span>
+            candidate_length = right - left - <span class="syntax-number">1</span>
+            <span class="syntax-keyword">if</span> candidate_length &gt; length:
+                start, length = left + <span class="syntax-number">1</span>, candidate_length
     <span class="syntax-keyword">return</span> s[start:start + length]</code></pre>
 <p>空串返回空串。中心扫描时间 O(n²)、辅助空间 O(1)；最后返回长度为 L 的 Python 切片还要 O(L) 时间与 O(L) 输出空间。</p>
 <p><strong>怎样选择另一种方法：</strong> 区间动态规划（Interval Dynamic Programming）保存每个 <code>s[left:right+1]</code> 是否为回文，时间 O(n²)、辅助空间 O(n²)，适合后续还要反复查询任意区间是否回文，例如 LC131 的分割判断。只求一个最长答案时优先中心扩展；若字符串大到平方时间成为瓶颈，再学 Manacher，利用镜像半径把时间降到 O(n)，辅助空间 O(n)，代价是额外的半径与边界维护。</p>
@@ -522,6 +523,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc54"></a></p>
 <p><a href="#lc54">LC54 螺旋矩阵</a>：<code>[[1,2,3],[4,5,6]] → [1,2,3,6,5,4]</code>，输入为规则矩阵。<strong>推荐用上、下、左、右四个边界围住尚未读取的矩形</strong>，按顺时针读完一边就收缩一边；矩形结构使四个整数足以记录剩余范围。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/spiral-matrix/">LC54 螺旋矩阵 · 题目</a> · <a href="https://leetcode.cn/problems/spiral-matrix/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/spiral-matrix/solution/liang-chong-fang-fa-jian-ji-gao-xiao-pyt-4wzk/">LC54 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">spiral_order</span>(matrix):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> matrix <span class="syntax-keyword">or</span> <span class="syntax-keyword">not</span> matrix[<span class="syntax-number">0</span>]:
         <span class="syntax-keyword">return</span> []
@@ -555,6 +557,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc560"></a></p>
 <p><a href="#lc560">LC560 和为 K 的子数组</a>：<code>[0,0]</code>、k=0 → 3。<strong>推荐前缀和加频次字典</strong>：维护当前前缀 prefix_sum，查询历史中 <code>prefix_sum-k</code> 的次数，再把 prefix_sum 记入字典。前缀相减就是连续区间的和，因此查询到几次，就新增几段以当前位置结尾的答案。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/subarray-sum-equals-k/">LC560 和为 K 的子数组 · 题目</a> · <a href="https://leetcode.cn/problems/subarray-sum-equals-k/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/subarray-sum-equals-k/solution/qian-zhui-he-ha-xi-biao-cong-liang-ci-bi-4mwr/">LC560 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> defaultdict
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">subarray_sum</span>(nums, k):
@@ -578,6 +581,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc3"></a></p>
 <p><a href="#lc3">LC3 最长无重复子串</a>：<code>abba → 2</code>。<strong>推荐集合加滑动窗口</strong>：集合保存当前窗口的字符；遇到重复时，逐个移除左端字符，直到当前字符可以加入。集合与窗口同步变化，能直接看见“恢复无重复”这一步。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/">LC3 无重复字符的最长子串 · 题目</a> · <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/solution/xia-biao-zong-suan-cuo-qing-kan-zhe-by-e-iaks/">LC3 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">length_of_longest_substring</span>(s):
     <span class="syntax-comment"># seen 保存当前无重复窗口的字符；left 指向窗口左端。</span>
     seen = <span class="syntax-function">set</span>()
@@ -596,39 +600,35 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>过程与不变量：</strong> <code>abba</code> 先形成 <code>a → ab</code>；读到第二个 b，要先移走 a、再移走旧 b，窗口变成新 b；最后加入 a 得到 <code>ba</code>，最大长度仍为 2。每次更新时窗口恰好无重复，且左端只移动到消除冲突所必需的位置，因此得到的是以当前右端结尾的最长合法窗口；比较所有右端便得到全局最长。</p>
 <p><a id="quick-lc76"></a></p>
 <h4 id="hot100-最短覆盖窗口达标后怎样继续缩小">最短覆盖窗口：达标后怎样继续缩小</h4>
-<p><a href="#lc76">LC76 最小覆盖子串</a>：<code>ADOBECODEBANC</code> 覆盖 <code>ABC</code> → <code>BANC</code>。<strong>推荐字符计数加可变窗口</strong>，先写 <code>from collections import Counter</code>。<code>Counter(t)</code> 建立目标频次表；<code>need</code> 记录目标需要的数量，<code>window</code> 记录当前窗口内的数量；<code>formed</code> 记录数量已经达标的字符<strong>种类数</strong>。目标为 <code>AA</code> 时，窗口里要有两个 A，这一种字符才算达标。</p>
+<p><a href="#lc76">LC76 最小覆盖子串</a>：<code>ADOBECODEBANC</code> 覆盖 <code>ABC</code> → <code>BANC</code>。<strong>推荐字符计数加可变窗口</strong>，先写 <code>from collections import Counter</code>。<code>Counter(t)</code> 建立目标频次表；<code>need</code> 记录“目标次数减去窗口次数”，<code>missing</code> 记录尚缺的字符<strong>总个数</strong>。目标为 <code>AA</code> 时，missing 从 2 开始，每填补一个 A 的缺额就减 1；正的 need 表示缺少，负的 need 表示富余。三小时与完整教材使用同一份状态和代码。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/minimum-window-substring/">LC76 最小覆盖子串 · 题目</a> · <a href="https://leetcode.cn/problems/minimum-window-substring/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/minimum-window-substring/solution/liang-chong-fang-fa-cong-o52mn-dao-omnfu-3ezz/">LC76 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">min_window</span>(s, t):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> t:
-        <span class="syntax-keyword">return</span> <span class="syntax-string">&quot;&quot;</span>
-    <span class="syntax-comment"># need 是目标字符所需次数，window 是当前窗口中的实际次数。</span>
+        <span class="syntax-keyword">return</span> <span class="syntax-string">&#39;&#39;</span>
+    <span class="syntax-comment"># need[char] = 目标次数 - 当前窗口次数；正数是缺额，负数是富余。</span>
     need = <span class="syntax-function">Counter</span>(t)
-    window = <span class="syntax-function">Counter</span>()
-    <span class="syntax-comment"># formed 数已满足需求的字符种类，重复出现多次仍只算一种。</span>
-    formed = <span class="syntax-number">0</span>
-    left = <span class="syntax-number">0</span>
-    <span class="syntax-comment"># start/size 保存最短合法窗口；不可能的初始长度表示尚未找到。</span>
-    start, size = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(s) + <span class="syntax-number">1</span>
+    missing = <span class="syntax-function">len</span>(t)  <span class="syntax-comment"># 尚缺的字符总个数；目标 AA 一开始缺 2 个。</span>
+    left = best_left = <span class="syntax-number">0</span>
+    best_length = <span class="syntax-function">len</span>(s) + <span class="syntax-number">1</span>  <span class="syntax-comment"># 大于任何可能答案，表示尚未找到覆盖窗口。</span>
     <span class="syntax-keyword">for</span> right, char <span class="syntax-keyword">in</span> <span class="syntax-function">enumerate</span>(s):
-        window[char] += <span class="syntax-number">1</span>
-        <span class="syntax-keyword">if</span> char <span class="syntax-keyword">in</span> need <span class="syntax-keyword">and</span> window[char] == need[char]:
-            formed += <span class="syntax-number">1</span>
-        <span class="syntax-comment"># 所有种类达标才尝试缩短窗口；每次移走左端前先记录当前答案。</span>
-        <span class="syntax-keyword">while</span> formed == <span class="syntax-function">len</span>(need):
-            <span class="syntax-keyword">if</span> right - left + <span class="syntax-number">1</span> &lt; size:
-                start, size = left, right - left + <span class="syntax-number">1</span>
-            outgoing = s[left]
-            <span class="syntax-comment"># 移走前恰好达标，移走后才会少一种；多余字符不影响达标。</span>
-            <span class="syntax-keyword">if</span> outgoing <span class="syntax-keyword">in</span> need <span class="syntax-keyword">and</span> window[outgoing] == need[outgoing]:
-                formed -= <span class="syntax-number">1</span>
-            window[outgoing] -= <span class="syntax-number">1</span>
+        <span class="syntax-keyword">if</span> need[char] &gt; <span class="syntax-number">0</span>:
+            missing -= <span class="syntax-number">1</span>  <span class="syntax-comment"># 只有填补缺额，才减少尚缺个数。</span>
+        need[char] -= <span class="syntax-number">1</span>    <span class="syntax-comment"># 每个移入字符都登记；无关字符从 0 减到负数。</span>
+        <span class="syntax-keyword">while</span> missing == <span class="syntax-number">0</span>:
+            <span class="syntax-keyword">if</span> right - left + <span class="syntax-number">1</span> &lt; best_length:
+                best_left, best_length = left, right - left + <span class="syntax-number">1</span>
+            left_char = s[left]
+            need[left_char] += <span class="syntax-number">1</span>  <span class="syntax-comment"># 移出左端字符，归还一个需求。</span>
+            <span class="syntax-keyword">if</span> need[left_char] &gt; <span class="syntax-number">0</span>:
+                missing += <span class="syntax-number">1</span>     <span class="syntax-comment"># 从恰好满足变为缺少，窗口失去覆盖。</span>
             left += <span class="syntax-number">1</span>
-    <span class="syntax-keyword">if</span> size &gt; <span class="syntax-function">len</span>(s):
-        <span class="syntax-keyword">return</span> <span class="syntax-string">&quot;&quot;</span>
-    <span class="syntax-keyword">return</span> s[start:start + size]</code></pre>
-<p><strong>过程与依据：</strong> 在 <code>s=&quot;ABAAC&quot;、t=&quot;AAC&quot;</code> 中，需要 A 两次、C 一次。扫到最后的 C 才首次达标，此时窗口 <code>ABAAC</code>；移走多余的第一个 A 后仍覆盖，移走 B 后得到 <code>AAC</code>，再移走一个 A 就不再覆盖，所以答案是 <code>AAC</code>。<code>formed</code> 从 1 到 2 表示 A、C 这两种字符都达标，并不是有了两个字符。右端固定时，持续缩左端会枚举该右端下所有可能改善答案的合法窗口；一旦失去必需字符，再缩只会更缺，因此可以等待右端扩展。</p>
+    <span class="syntax-keyword">if</span> best_length &gt; <span class="syntax-function">len</span>(s):
+        <span class="syntax-keyword">return</span> <span class="syntax-string">&#39;&#39;</span>
+    <span class="syntax-keyword">return</span> s[best_left:best_left + best_length]</code></pre>
+<p><strong>过程与依据：</strong> 在 <code>s=&quot;ABAAC&quot;、t=&quot;AAC&quot;</code> 中，需要 A 两次、C 一次。扫到最后的 C 才首次达标，此时窗口 <code>ABAAC</code>；移走多余的第一个 A 后仍覆盖，移走 B 后得到 <code>AAC</code>，再移走一个 A 就不再覆盖，所以答案是 <code>AAC</code>。<code>missing</code> 从 3 逐步减到 0，表示两个 A 和一个 C 的缺额都已填满；移出仍然必需的 A 后又变为 1。右端固定时，持续缩左端会枚举该右端下所有可能改善答案的合法窗口；一旦失去必需字符，再缩只会更缺，因此可以等待右端扩展。</p>
 <p>按目标安排更新顺序：LC3 求最长合法窗口，先恢复合法再更新；LC76 求最短覆盖窗口，覆盖达标时先更新，再尝试缩短；LC438 则在窗口达到固定长度时比较频次。LC76 期望时间 O(|s|+|t|)，辅助空间 O(Σ)，Σ 为 s 与 t 中出现的字符种类数；返回长度为 L 的子串还需 O(L) 输出空间与复制时间。无覆盖返回空串，空目标在代码中也返回空串。</p>
 <p><a id="quick-sequences-bridge"></a></p>
 <h4 id="hot100-数组与哈希迁移不只会两数之和">数组与哈希迁移：不只会两数之和</h4>
@@ -641,6 +641,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <tr><td><a id="quick-lc31"></a><a href="#lc31">LC31 下一个排列</a></td><td>从右找首个 <code>nums[i] &lt; nums[i+1]</code> 的位置 i；从右找首个比它大的数交换，再反转 i 后面的降序后缀，使增幅最小。 **为何成立：**下降后缀已经是这些数的最大排列；只能提高它左边的某一位，选择最靠右的一位、用刚好更大的值替换，再把后缀变最小，才是紧邻的下一个排列。</td><td><code>[1,3,2] → [2,1,3]</code>；<code>[3,2,1] → [1,2,3]</code>。 <strong>过程：</strong><code>[1,3,2]</code> 的下降后缀是 <code>[3,2]</code>，提高前面的 1：与刚好更大的 2 交换得到 <code>[2,3,1]</code>，反转后缀得到 <code>[2,1,3]</code>。</td><td>没找到 i，说明已是最大排列，反转全部；重复值比较必须严格。时间 O(n)、辅助空间 O(1)，原地修改；不生成全部排列。</td></tr></tbody></table></div>
 <p><strong>LC238：前缀与后缀分别负责一侧。</strong> 函数返回新数组，不修改 <code>nums</code>。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/product-of-array-except-self/">LC238 除了自身以外数组的乘积 · 题目</a> · <a href="https://leetcode.cn/problems/product-of-array-except-self/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/product-of-array-except-self/solution/qian-hou-zhui-fen-jie-fu-ti-dan-pythonja-86r1/">LC238 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">product_except_self</span>(nums):
     result = [<span class="syntax-number">1</span>] * <span class="syntax-function">len</span>(nums)
     <span class="syntax-comment"># 写入 result[index] 时，left_product 只包含 index 左侧元素；空乘积为 1。</span>
@@ -658,6 +659,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
     <span class="syntax-keyword">return</span> result</code></pre>
 <p><strong>LC75：按值归入三个区域，再判断当前项是否已经检查。</strong> 返回值为 <code>None</code>，结果写回 <code>nums</code>。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/sort-colors/">LC75 颜色分类 · 题目</a> · <a href="https://leetcode.cn/problems/sort-colors/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/sort-colors/solution/on-cha-ru-pai-xu-jian-ji-xie-fa-pythonja-zk60/">LC75 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">sort_colors</span>(nums):
     <span class="syntax-comment"># [0,left) 已是 0，[left,current) 已是 1；current 检查下一个未知项。</span>
     left = current = <span class="syntax-number">0</span>
@@ -677,6 +679,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
             current += <span class="syntax-number">1</span></code></pre>
 <p><strong>LC31：先让高位尽可能晚地增加，再让后缀尽可能小。</strong> 返回值为 <code>None</code>，结果写回 <code>nums</code>；这里也让空数组、单元素数组保持原样。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/next-permutation/">LC31 下一个排列 · 题目</a> · <a href="https://leetcode.cn/problems/next-permutation/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/next-permutation/solution/jiao-ni-cong-ling-kai-shi-si-kao-zhe-ti-9qfrq/">LC31 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">next_permutation</span>(nums):
     <span class="syntax-comment"># i 寻找最靠右的上升起点；其右侧后缀已经非递增。</span>
     i = <span class="syntax-function">len</span>(nums) - <span class="syntax-number">2</span>
@@ -701,6 +704,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h4 id="hot100-原地哈希in-place-hashinglc41-缺失的第一个正数">原地哈希（In-place Hashing）：LC41 缺失的第一个正数</h4>
 <p><a href="#lc41">LC41</a> 给一个可含负数、0、重复值的整数数组，找没有出现的最小正整数。<code>[3,4,-1,1] → 2</code>。长度为 n 时答案只可能在 <code>1..n+1</code>：如果 <code>1..n</code> 都在，答案为 n+1；否则答案是其中的某个缺口。因此让值 x 对应槽位 x−1，用输入数组自身记录哪些正数存在。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/first-missing-positive/">LC41 缺失的第一个正数 · 题目</a> · <a href="https://leetcode.cn/problems/first-missing-positive/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/first-missing-positive/solution/huan-zuo-wei-tong-guo-li-zi-li-jie-suan-qa94e/">LC41 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">first_missing_positive</span>(nums):
     n = <span class="syntax-function">len</span>(nums)
     <span class="syntax-keyword">for</span> index <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(n):
@@ -727,6 +731,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <tr><td><a id="quick-lc438"></a><a href="#lc438">LC438 找到所有字母异位词</a></td><td>固定窗口（Fixed-size Sliding Window）的长度等于 p 的长度：进入一个字符，超过长度就移出一个字符；窗口字符频次与 p 完全相同时记录左端。 **为何成立：**每个长度为 len(p) 的窗口恰好检查一次；频次数组相等，当且仅当窗口与 p 含有相同字符和相同次数。</td><td><code>s=&quot;cbaebabacd&quot;, p=&quot;abc&quot; → [0,6]</code>。 **过程：**首窗 cba 与 abc 频次相同，记录 0；向右移动一格，移出 c、加入 e，窗口变 bae，不记录；继续移到 bac 时记录 6。</td><td>不能只比较字符集合，重复次数也要一致。原题均为小写英文字母；p 比 s 长返回空列表。两张 26 项频次数组避免零计数键的差异，时间 O(26·len(s)+len(p))，除答案外空间 O(26)。</td></tr></tbody></table></div>
 <p><strong>LC438：每加入一个新字符，就移出超出固定长度的旧字符。</strong> 推荐两张 26 项列表保存目标与窗口频次；<code>ord(char) - ord(&quot;a&quot;)</code> 把小写字母映射到下标，直接使用 Python 内置 <code>ord</code> 即可。原题 p 非空；这个函数将空 p 扩展为返回空列表。窗口达到 len(p) 后，每次左右端各前进一步，再比较两张频次表。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/find-all-anagrams-in-a-string/">LC438 找到字符串中所有字母异位词 · 题目</a> · <a href="https://leetcode.cn/problems/find-all-anagrams-in-a-string/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/find-all-anagrams-in-a-string/solution/liang-chong-fang-fa-ding-chang-hua-chuan-14pd/">LC438 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">find_anagrams</span>(s, p):
     size = <span class="syntax-function">len</span>(p)
     <span class="syntax-keyword">if</span> size == <span class="syntax-number">0</span> <span class="syntax-keyword">or</span> size &gt; <span class="syntax-function">len</span>(s):
@@ -756,6 +761,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc20"></a></p>
 <p><strong>普通栈（Stack）· <a href="#lc20">LC20 有效括号</a>：</strong> 推荐用列表保存尚未匹配的左括号；新右括号负责关闭最近打开的一层，所以先检查栈是否为空，再弹出栈顶并比较对应类型。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/valid-parentheses/">LC20 有效的括号 · 题目</a> · <a href="https://leetcode.cn/problems/valid-parentheses/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/valid-parentheses/solution/gua-hao-xiao-xiao-le-san-chong-li-yong-z-2xb3/">LC20 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">is_valid_parentheses</span>(s):
     <span class="syntax-comment"># 栈保存尚未配对的左括号，栈顶是最近打开的一层。</span>
     stack = []
@@ -783,6 +789,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a href="https://www.bilibili.com/video/BV1VN411J7S7/">视频第 26 集｜单调栈（12:28）</a>。对应 LC739 每日温度，也讲 LC42 接雨水。适合思考栈里等待的是什么、当前元素为什么能让旧下标出栈；后面的 LC84 在此基础上改为寻找更矮的边界。</p>
 </blockquote>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/daily-temperatures/">LC739 每日温度 · 题目</a> · <a href="https://leetcode.cn/problems/daily-temperatures/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/daily-temperatures/solution/shi-pin-jiang-qing-chu-wei-shi-yao-yao-y-k0ks/">LC739 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">daily_temperatures</span>(temperatures):
     result = [<span class="syntax-number">0</span>] * <span class="syntax-function">len</span>(temperatures)
     <span class="syntax-comment"># 栈存尚未等到更高温度的下标，对应温度从栈底到栈顶非递增。</span>
@@ -801,6 +808,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h4 id="hot100-单调栈结算左右边界之间的最大矩形">单调栈：结算左右边界之间的最大矩形</h4>
 <p><strong>单调栈的双侧范围 · <a href="#lc84">LC84 柱状图最大矩形</a>：</strong> 遇到更矮柱子，结算被弹出柱子能延伸的宽度。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/largest-rectangle-in-histogram/">LC84 柱状图中最大的矩形 · 题目</a> · <a href="https://leetcode.cn/problems/largest-rectangle-in-histogram/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/largest-rectangle-in-histogram/solution/dan-diao-zhan-fu-ti-dan-pythonjavacgojsr-89s7/">LC84 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">largest_rectangle</span>(heights):
     nums = heights + [<span class="syntax-number">0</span>]  <span class="syntax-comment"># 末尾补 0，结算仍在栈中的正高度</span>
     <span class="syntax-comment"># 栈存高度非递减的下标；遇到更矮柱子，弹出并结算旧柱。</span>
@@ -828,6 +836,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a href="https://www.bilibili.com/video/BV1bM411X72E/">视频第 27 集｜单调队列 滑动窗口最大值（7:11）</a>。直接对应 LC239。适合分清队首删除“已离开窗口的下标”，与队尾删除“被新元素淘汰的候选”这两种操作。</p>
 </blockquote>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/sliding-window-maximum/">LC239 滑动窗口最大值 · 题目</a> · <a href="https://leetcode.cn/problems/sliding-window-maximum/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/sliding-window-maximum/solution/shi-pin-yi-ge-shi-pin-miao-dong-dan-diao-ezj6/">LC239 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">window_maximum</span>(nums, k):
@@ -862,6 +871,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc34"></a></p>
 <p><strong>普通下界 · <a href="#stage-09">LC35 / LC34</a>：</strong> 输入为非递减整数数组，返回第一个 <code>&gt;= target</code> 的位置；找不到时返回数组长度。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/search-insert-position/">LC35 搜索插入位置 · 题目</a> · <a href="https://leetcode.cn/problems/search-insert-position/solutions/">题解</a>； <a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34 在排序数组中查找元素的第一个和最后一个位置 · 题目</a> · <a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/search-insert-position/solution/er-fen-cha-zhao-zong-shi-xie-bu-dui-yi-g-nq23/">LC35 题解</a> · <a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/solution/er-fen-cha-zhao-zong-shi-xie-bu-dui-yi-g-t9l9/">LC34 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">lower_bound</span>(nums, target):
     left, right = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(nums)  <span class="syntax-comment"># 搜索区间 [left, right)</span>
     <span class="syntax-keyword">while</span> left &lt; right:
@@ -887,6 +897,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc33"></a></p>
 <p><strong>旋转数组 · <a href="#lc33">LC33</a>：</strong> 原数组严格递增且没有重复，旋转后每次至少有一半仍然有序。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/search-in-rotated-sorted-array/">LC33 搜索旋转排序数组 · 题目</a> · <a href="https://leetcode.cn/problems/search-in-rotated-sorted-array/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/search-in-rotated-sorted-array/solution/by-endlesscheng-auuh/">LC33 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">search_rotated</span>(nums, target):
     <span class="syntax-comment"># 搜索闭区间 [left,right]；每轮至少有一半保持升序。</span>
     left, right = <span class="syntax-number">0</span>, <span class="syntax-function">len</span>(nums) - <span class="syntax-number">1</span>
@@ -916,6 +927,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <tr><td><a id="quick-lc153"></a><a href="#lc153">LC153 旋转数组最小值</a></td><td>无重复值，区间 <code>[left,right]</code> 始终包含最小值；若 <code>nums[mid] &gt; nums[right]</code>，最小值在 mid 右边，令 <code>left=mid+1</code>；否则令 <code>right=mid</code>，因为 mid 本身可能最小。重合后返回该位置的值。 mid 比右端大说明两者之间跨过旋转断点，最小值只能在右半；否则 mid 到右端已升序，最小值至多在 mid，因此保留 mid、舍弃它右侧仍不漏解。</td><td><code>[3,4,5,1,2] → 1</code>；<code>[1,2,3] → 1</code>。</td><td>输入非空；未旋转与单元素也成立。重复值需要另处理相等边界；时间 O(log n)，空间 O(1)。</td></tr></tbody></table></div>
 <h4 id="hot100-保存当前层的答案minstack">保存当前层的答案：MinStack</h4>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/min-stack/">LC155 最小栈 · 题目</a> · <a href="https://leetcode.cn/problems/min-stack/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/min-stack/solution/ben-zhi-shi-wei-hu-qian-zhui-zui-xiao-zh-x0g8/">LC155 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">class</span> <span class="syntax-class">MinStack</span>:
     <span class="syntax-keyword">def</span> <span class="syntax-function">__init__</span>(self):
         <span class="syntax-comment"># 每格存 (当前值, 到这一格为止的最小值)，弹出后旧最小值自然恢复。</span>
@@ -940,6 +952,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>备选是两个栈：</strong> 一个保存全部值，另一个只在新值小于或等于当前最小时记录新最小值；弹出值等于最小值栈顶时，两栈同步弹出。每次操作仍为摊还 O(1)、最坏空间 O(n)，适合希望把原值与最小值历史分开维护的实现；重复最小值也逐次记录，使弹出一份后仍能恢复正确结果。</p>
 <h4 id="hot100-保存外层环境字符串解码">保存外层环境：字符串解码</h4>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/decode-string/">LC394 字符串解码 · 题目</a> · <a href="https://leetcode.cn/problems/decode-string/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/decode-string/solution/di-gui-yong-zhan-mo-ni-di-gui-pythonjava-kcsv/">LC394 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">decode_string</span>(s):
     <span class="syntax-comment"># 栈保存进入每层括号之前的 (外层字符列表, 本层重复次数)。</span>
     stack = []
@@ -997,6 +1010,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc206"></a></p>
 <p><strong>反转 · <a href="#lc206">LC206</a>：</strong> 推荐三指针迭代：<code>previous</code> 保存已反转前缀的头，<code>current</code> 指向待处理节点；先用 <code>next_node</code> 保留原后继，再改变当前节点的连接。保存后继让下一轮仍能找到剩余链，迭代则把运行中的辅助状态固定为几个引用。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/reverse-linked-list/">LC206 反转链表 · 题目</a> · <a href="https://leetcode.cn/problems/reverse-linked-list/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/reverse-linked-list/solution/you-xie-cuo-liao-yi-ge-shi-pin-jiang-tou-o5zy/">LC206 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">reverse_list</span>(head):
     <span class="syntax-comment"># previous 是已反转部分的头；一开始该部分为空。</span>
     previous = <span class="syntax-literal">None</span>
@@ -1016,6 +1030,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc142"></a></p>
 <p><strong>快慢指针（Fast and Slow Pointers）· <a href="#lc142">LC142 环入口</a>：</strong> 推荐先让 slow 每轮走一步、fast 走两步，在环里相遇后，再让一个指针回到头部，两者每次各走一步。第一阶段识别重复走过的环，第二阶段用路程关系定位入口；下方推演说明这个关系。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/linked-list-cycle-ii/">LC142 环形链表 II · 题目</a> · <a href="https://leetcode.cn/problems/linked-list-cycle-ii/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/linked-list-cycle-ii/solution/mei-xiang-ming-bai-yi-ge-shi-pin-jiang-t-nvsq/">LC142 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">cycle_entry</span>(head):
     <span class="syntax-comment"># slow 每次走一步，fast 每次走两步；有环时会在环内相遇。</span>
     slow = fast = head
@@ -1036,6 +1051,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc148"></a></p>
 <p><strong>归并排序（Merge Sort）· <a href="#lc148">LC148</a>：</strong> 推荐自顶向下归并：用快慢指针找到中点，断开成两个更短的链，分别排好后合并，最后返回新的头节点。链表可以沿 <code>next</code> 顺序取数并直接重连，恰好适合把两个有序剩余链逐项合并。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/merge-two-sorted-lists/">LC21 合并两个有序链表 · 题目</a> · <a href="https://leetcode.cn/problems/merge-two-sorted-lists/solutions/">题解</a>； <a href="https://leetcode.cn/problems/sort-list/">LC148 排序链表 · 题目</a> · <a href="https://leetcode.cn/problems/sort-list/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/merge-two-sorted-lists/solution/liang-chong-fang-fa-die-dai-di-gui-pytho-wf75/">LC21 题解</a> · <a href="https://leetcode.cn/problems/sort-list/solution/liang-chong-fang-fa-fen-zhi-die-dai-mo-k-caei/">LC148 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">merge_lists</span>(a, b):
     dummy = <span class="syntax-function">ListNode</span>()
     <span class="syntax-comment"># tail 是结果链末尾；每次接入 a/b 中较小的头节点并推进对应输入。</span>
@@ -1083,6 +1099,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <tr><td><a id="quick-lc146"></a><a href="#lc146">LC146 LRU 缓存</a></td><td>有序映射按“最久未用→最近使用”排列；get 命中及 put 插入/更新都把键移到末尾，超容量时删除最左项；get 未命中返回 -1。</td><td>容量 2：put(1,1)、put(2,2)、get(1)、put(3,3) 后，get(2)=-1，get(1)=1。</td><td>更新旧键也算使用，不应增大容量；本模板允许容量 0，此时不保存数据。标准库版每次操作平均 O(1)，空间 O(capacity)。</td></tr></tbody></table></div>
 <h4 id="hot100-逐位处理输入进位与输出两数相加">逐位处理输入、进位与输出：两数相加</h4>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/add-two-numbers/">LC2 两数相加 · 题目</a> · <a href="https://leetcode.cn/problems/add-two-numbers/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/add-two-numbers/solution/dong-hua-jian-ji-xie-fa-cong-di-gui-dao-oe0di/">LC2 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">add_two_numbers</span>(a, b):
     dummy = <span class="syntax-function">ListNode</span>()
     tail = dummy
@@ -1106,6 +1123,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>跟踪 <code>[2,4,3] + [5,6,4]</code>：</strong> 第一位 <code>2+5+0=7</code>，写 7、carry=0；第二位 <code>4+6+0=10</code>，写 0、carry=1；第三位 <code>3+4+1=8</code>，写 8、carry=0，结果为 <code>[7,0,8]</code>。每轮的 total 都满足 <code>total = 10 * 新进位 + 当前输出位</code>，已经输出的低位不会再改变；因此两表与进位都耗尽时，所有数位已经完整相加。</p>
 <h4 id="hot100-复制的是节点关系随机链表">复制的是节点关系：随机链表</h4>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/copy-list-with-random-pointer/">LC138 随机链表的复制 · 题目</a> · <a href="https://leetcode.cn/problems/copy-list-with-random-pointer/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/copy-list-with-random-pointer/solution/bu-yong-ha-xi-biao-de-zuo-fa-pythonjavac-nzdo/">LC138 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">class</span> <span class="syntax-class">RandomNode</span>:
     <span class="syntax-keyword">def</span> <span class="syntax-function">__init__</span>(self, val):
         self.val = val
@@ -1135,6 +1153,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h4 id="hot100-使用标准库维护访问顺序lru">使用标准库维护访问顺序：LRU</h4>
 <p>本轮推荐先用 <code>from collections import OrderedDict</code> 导入有序字典。让左端表示最久未使用、右端表示最近使用：查询命中或写入后调用 <code>move_to_end(key)</code>，超容量时调用 <code>popitem(last=False)</code> 淘汰左端。一个对象同时保存键值与访问次序，这两个 API 直接表达 LRU 的更新规则。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/lru-cache/">LC146 LRU 缓存 · 题目</a> · <a href="https://leetcode.cn/problems/lru-cache/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/lru-cache/solution/tu-jie-yi-zhang-tu-miao-dong-lrupythonja-czgt/">LC146 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> OrderedDict
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">LRUCache</span>:
@@ -1187,6 +1206,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc102"></a></p>
 <p><strong>树的层序遍历（Breadth-first Search，BFS）· <a href="#lc102">LC102</a>：</strong> 推荐 <code>deque</code> 队列：用 <code>append()</code> 从尾部加入孩子，用 <code>popleft()</code> 从头部取最早发现的节点。每轮先固定当前层节点数，新加入的孩子留给下一轮，队列顺序就对应层序。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/binary-tree-level-order-traversal/">LC102 二叉树的层序遍历 · 题目</a> · <a href="https://leetcode.cn/problems/binary-tree-level-order-traversal/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/binary-tree-level-order-traversal/solution/bfs-wei-shi-yao-yao-yong-dui-lie-yi-ge-s-xlpz/">LC102 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">TreeNode</span>:
@@ -1220,6 +1240,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc215"></a></p>
 <p><strong>固定容量最小堆（Min-Heap）· <a href="#lc215">LC215 第 K 大</a>：</strong> 本轮推荐导入 <code>heapq</code> 后逐项 <code>heappush</code>，超过 k 个就 <code>heappop</code> 最小值；留下最大的 k 个，堆顶就是其中最小的那个。容量上限限制了候选存储，堆顶则直接提供淘汰门槛。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/">LC215 数组中的第 K 个最大元素 · 题目</a> · <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/solution/on-kuai-su-xuan-ze-suan-fa-pythonjavaccg-lh7c/">LC215 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">import</span> heapq
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">kth_largest</span>(nums, k):
@@ -1245,6 +1266,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h4 id="hot100-双堆持续到来的数据怎样维护中位数">双堆：持续到来的数据怎样维护中位数</h4>
 <p><strong>双堆（Two Heaps）· <a href="#lc295">LC295 数据流中位数</a>：</strong> 推荐用两个 <code>heapq</code> 堆分别维护较小半和较大半：左半存负数表示最大堆，右半用普通最小堆。每次插入后调整边界值与数量，让中间的一到两个数始终位于堆顶。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/find-median-from-data-stream/">LC295 数据流的中位数 · 题目</a> · <a href="https://leetcode.cn/problems/find-median-from-data-stream/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/find-median-from-data-stream/solution/ru-he-zi-ran-yin-ru-da-xiao-dui-jian-ji-4v22k/">LC295 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">import</span> heapq
 
 <span class="syntax-keyword">class</span> <span class="syntax-class">MedianFinder</span>:
@@ -1277,6 +1299,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc208"></a></p>
 <p><strong>字典树（Trie）· <a href="#lc208">LC208</a>：</strong> 推荐每个节点用内置 <code>dict</code> 保存“字符→孩子”，并用 <code>is_word</code> 记录完整单词的终点。插入和查询都逐字符前进；前缀查询检查路径，完整词查询继续检查终点标记，因此能准确区分 <code>app</code> 与 <code>apple</code>。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/implement-trie-prefix-tree/">LC208 实现 Trie（前缀树） · 题目</a> · <a href="https://leetcode.cn/problems/implement-trie-prefix-tree/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/implement-trie-prefix-tree/solution/cong-er-cha-shu-dao-er-shi-liu-cha-shu-p-xsj4/">LC208 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">class</span> <span class="syntax-class">TrieNode</span>:
     <span class="syntax-keyword">def</span> <span class="syntax-function">__init__</span>(self):
         <span class="syntax-comment"># children 按下一个字符找节点；is_word 区分完整单词结尾与普通前缀。</span>
@@ -1318,6 +1341,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h4 id="hot100-第-k-大的另一条核心路线快速选择quickselect">第 K 大的另一条核心路线：快速选择（Quickselect）</h4>
 <p>当 LC215 允许原地改动数组、目标是期望线性时间时，推荐随机快速选择。导入 <code>import random</code>，用 <code>random.randint(left, right)</code> 选当前范围内的基准；把目标换成升序下标 <code>len(nums)-k</code>，围绕基准值分成“小于、等于、大于”三段，随后只继续处理包含目标的那一段。划分已经确定了中间段的排名，缩小到目标一侧就能保留答案并减少后续工作。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/">LC215 数组中的第 K 个最大元素 · 题目</a> · <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/solution/on-kuai-su-xuan-ze-suan-fa-pythonjavaccg-lh7c/">LC215 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">import</span> random
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">kth_largest_quickselect</span>(nums, k):
@@ -1375,6 +1399,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h4 id="hot100-两种遍历给出同一棵树前序与中序构树">两种遍历给出同一棵树：前序与中序构树</h4>
 <p>推荐使用 <code>build_tree_pre_in(preorder, inorder)</code>，输入前序与中序列表，返回根节点。名称中的 <code>pre_in</code> 对应这两种遍历；<a href="#shared-nodes">附录公共节点</a>的 <code>build_tree(tokens)</code> 则用于解析层序输入，返回 <code>(root, nodes)</code>。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/construct-binary-tree-from-preorder-and-inorder-traversal/">LC105 从前序与中序遍历序列构造二叉树 · 题目</a> · <a href="https://leetcode.cn/problems/construct-binary-tree-from-preorder-and-inorder-traversal/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/construct-binary-tree-from-preorder-and-inorder-traversal/solution/tu-jie-cong-on2-dao-onpythonjavacgojsrus-aob8/">LC105 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">build_tree_pre_in</span>(preorder, inorder):
     <span class="syntax-comment"># 值不重复时，positions 直接定位根在中序中的分界位置。</span>
     positions = {value: index <span class="syntax-keyword">for</span> index, value <span class="syntax-keyword">in</span> <span class="syntax-function">enumerate</span>(inorder)}
@@ -1400,6 +1425,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>跟踪前序 <code>[2,1,3]</code>、中序 <code>[1,2,3]</code>：</strong> 初始中序范围 <code>[0,2]</code>，前序游标取出 2，位置表给出 middle=1，于是左子树只能使用范围 <code>[0,0]</code>、右子树只能使用 <code>[2,2]</code>。先构左树，游标取 1，两侧范围都空；返回后再构右树，游标取 3，两侧也空，最终返回根 2、左 1、右 3。前序规定“根先于全部子树、左子树先于右子树”，中序规定“左区间、根、右区间”；值唯一时两种顺序合在一起就唯一确定了每一步的根和范围。</p>
 <h4 id="hot100-一条路径上的前缀才能配对路径总和">一条路径上的前缀才能配对：路径总和</h4>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/path-sum-iii/">LC437 路径总和 III · 题目</a> · <a href="https://leetcode.cn/problems/path-sum-iii/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/path-sum-iii/solution/zuo-fa-he-560-ti-shi-yi-yang-de-pythonja-fmzo/">LC437 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> defaultdict
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">path_sum_count</span>(root, target):
@@ -1429,6 +1455,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>跟踪上面的全 0 树：</strong> 进入根时 prefix=0，查询旧计数得到 1，计入“根自身”这条路径，再把 <code>count[0]</code> 从 1 加到 2。进入左孩子查询得到 2，分别对应“左孩子自身”和“根到左”；左孩子离开后必须把计数恢复为 2，右孩子才会同样得到 2 条，而不是把左分支的前缀也算进来。总数为 <code>1+2+2=5</code>。任意向下路径和都等于“当前前缀−起点之前的祖先前缀”，所以查询 <code>prefix−target</code> 恰好与所有合法起点一一对应；先查后加还避免把当前节点之后的空路径计入。</p>
 <h4 id="hot100-按出现次数分桶前-k-个高频元素">按出现次数分桶：前 K 个高频元素</h4>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/top-k-frequent-elements/">LC347 前 K 个高频元素 · 题目</a> · <a href="https://leetcode.cn/problems/top-k-frequent-elements/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/top-k-frequent-elements/solution/tong-pai-xu-on-xian-xing-zuo-fa-pythonja-oqq2/">LC347 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> Counter
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">top_k_frequent</span>(nums, k):
@@ -1450,6 +1477,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h4 id="hot100-树形动态规划返回给父节点的量与完整答案">树形动态规划：返回给父节点的量与完整答案</h4>
 <p><strong>树形动态规划（Tree DP）· <a href="#lc124">LC124 最大路径和</a>：</strong> 推荐后序 DFS：先取得左右孩子的单边贡献，在当前节点把两边与节点值相加更新全局答案，再返回“当前节点值＋较大的单边贡献”给父节点。前者表示在本节点完成的路径，后者表示还能向上延伸的路径，两种状态分别服务这两个用途。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/binary-tree-maximum-path-sum/">LC124 二叉树中的最大路径和 · 题目</a> · <a href="https://leetcode.cn/problems/binary-tree-maximum-path-sum/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/binary-tree-maximum-path-sum/solution/shi-pin-che-di-zhang-wo-zhi-jing-dpcong-n9s91/">LC124 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">max_path_sum</span>(root):
     <span class="syntax-comment"># 很深的树可能超过 Python 递归深度限制；这时需要改写为显式栈</span>
     <span class="syntax-keyword">if</span> root <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
@@ -1485,6 +1513,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong><a href="#lc200">LC200 岛屿数量</a>：</strong> 推荐显式栈 DFS：扫描时遇到新陆地就加一座岛，把该陆地标记并入栈，随后沿四个方向完整访问这座岛。字符网格 <code>[[&quot;1&quot;,&quot;1&quot;],[&quot;0&quot;,&quot;1&quot;]] → 1</code>；空网格返回 0。发现陆地时就改成水，避免重复入栈。此函数会修改网格；需要保留输入时传入 <code>[row[:] for row in grid]</code>。时间、最坏辅助空间均 O(rows·cols)。</p>
 <p><strong>为何只加一次：</strong> 从一块未访问陆地出发，栈会沿四邻接访问整个连通块；不会跨水进入别的岛，也不会漏掉能沿陆地到达的格子。该块全被标记后，外层扫描不会再次把它计为新岛。上例从 <code>(0,0)</code> 开始，依次发现 <code>(0,1)</code>、<code>(1,1)</code>，计数只在起点加到 1，后两格不会另加。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/number-of-islands/">LC200 岛屿数量 · 题目</a> · <a href="https://leetcode.cn/problems/number-of-islands/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/number-of-islands/solution/ba-fang-wen-guo-de-ge-zi-cha-shang-qi-zi-9gs0/">LC200 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">num_islands</span>(grid):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> grid <span class="syntax-keyword">or</span> <span class="syntax-keyword">not</span> grid[<span class="syntax-number">0</span>]:
         <span class="syntax-keyword">return</span> <span class="syntax-number">0</span>
@@ -1517,6 +1546,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>过程：</strong> 上例第 0 分钟只有 <code>(0,0)</code> 腐烂；第 1 分钟新增 <code>(1,0)、(0,1)</code>；第 2 分钟新增 <code>(1,1)、(0,2)</code>；第 3 分钟新增 <code>(2,1)</code>；第 4 分钟新增 <code>(2,2)</code>，新鲜数归零。</p>
 <p><strong>为何时间最短：</strong> 所有初始腐烂点同时出发，队列第 t 层恰好是距最近传播源 t 步的位置；每条相邻传播都用一分钟，后续路径不可能更早到达已经发现的格子。入队时立即标记可避免同一格被两个来源重复计数；冻结层长保证不会在一分钟内传播多步。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/rotting-oranges/">LC994 腐烂的橘子 · 题目</a> · <a href="https://leetcode.cn/problems/rotting-oranges/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/rotting-oranges/solution/duo-yuan-bfsfu-ti-dan-pythonjavacgojsrus-yfmh/">LC994 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">oranges_rotting</span>(grid):
@@ -1556,6 +1586,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong><a href="#lc207">LC207 课程表</a>：</strong> 推荐 Kahn 拓扑排序，用邻接表列出后继，用入度计数未满足的前置条件，用 <code>deque</code> 保存当前可学课程；完成一门课就减少它的后继入度，降到零再入队。<code>n=2, prerequisites=[[1,0]] → True</code>，<code>[课程,前置课程]</code> 表示前置课程指向课程；再加 <code>[0,1]</code> 就有环，返回 False。课程编号为 <code>0..n-1</code>，孤立课程也要入队统计。时间与包含邻接表的辅助空间均为 O(V+E)，V 为课程数、E 为先修关系数。备选是 DFS 三色判环：白色未访问、灰色在当前路径、黑色已完成，遇到指向灰色的边就发现环；同样 O(V+E) 时间与空间，适合沿依赖路径解释环的来源。深依赖链选显式栈 DFS；Kahn 版本适合直接给出一组可行学习顺序。</p>
 <p><strong>过程与判定理由：</strong> 只有边 <code>0→1</code> 时，入度为 <code>[0,1]</code>，先学 0，再把 1 的入度减到 0、学完 1，完成数为 2。若同时有 <code>1→0</code>，两门课入度均为 1，队列起初就为空。一般地，入度为 0 的课程没有未满足依赖，可以安全移除；有向无环图一定能找到这样的起点，逐步移除可学完全部课程。若仍有课程却再无零入度点，沿它们尚存的前置边不断回溯必会重复节点，说明剩余部分有环。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/course-schedule/">LC207 课程表 · 题目</a> · <a href="https://leetcode.cn/problems/course-schedule/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/course-schedule/solution/san-se-biao-ji-fa-pythonjavacgojsrust-by-pll7/">LC207 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">from</span> collections <span class="syntax-keyword">import</span> deque
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">can_finish</span>(n, prerequisites):
@@ -1587,6 +1618,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>备选怎样选：</strong> LC55 也可以从终点向前移动目标：若当前位置能覆盖当前目标，就把目标改成当前位置，最后检查是否回到起点；时间 O(n)、辅助空间 O(1)，适合从“能接力到终点的位置”理解可达性。LC45 可用动态规划记录到达每个位置的最少步数，枚举每条可行跳跃做转移，最坏 O(n²) 时间、O(n) 空间，适合小规模输入上核对状态关系；本轮采用覆盖边界，把连续可达区间合并处理后达到 O(n) 时间。</p>
 <p><strong>分层跟读：</strong> 对 <code>[2,3,1,1,4]</code>，第 0 步边界是下标 0；扫描 0 后最远到 2，到达旧边界，步数加为 1、<code>end=2</code>。接着扫描 1、2，把下一步的最远边界扩到 4；扫完下标 2 才把步数加为 2，终点已被覆盖。每一层都枚举当前步数可到的全部位置，再合并它们的下一步覆盖范围，所以第一次覆盖终点的层数就是最少步数；LC55 只需检查扫描位置是否越过可达边界，越过就说明中间已断路。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/jump-game/">LC55 跳跃游戏 · 题目</a> · <a href="https://leetcode.cn/problems/jump-game/solutions/">题解</a>； <a href="https://leetcode.cn/problems/jump-game-ii/">LC45 跳跃游戏 II · 题目</a> · <a href="https://leetcode.cn/problems/jump-game-ii/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/jump-game/solution/liang-chong-li-jie-fang-shi-wei-hu-zui-y-q67s/">LC55 题解</a> · <a href="https://leetcode.cn/problems/jump-game-ii/solution/tu-jie-yi-zhang-tu-miao-dong-tiao-yue-yo-h2d4/">LC45 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">can_jump</span>(nums):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> nums:
         <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
@@ -1617,6 +1649,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong><a href="#lc56">LC56 合并区间</a>：</strong> 推荐用内置 <code>sorted(intervals)</code> 排序，再用一个结果列表保存已合并区间；每次新建 <code>[left, right]</code> 保存新段，重叠时扩展最后一段的右端。闭区间列表 <code>[[1,3],[2,6],[8,10]] → [[1,6],[8,10]]</code>，每项满足左端 ≤ 右端。先按左端排序，再比较最后一个合并结果；端点相等也算重叠。复制区间后再修改，避免改到原输入。时间 O(n log n)，排序辅助空间 O(n)，输出另占 O(n)。如果输入已按左端有序，可以直接扫描，时间降为 O(n)、输出以外只用 O(1) 状态；如果调用 <code>list.sort()</code> 原地排序，Python 排序仍可能使用 O(n) 临时空间，且会改变输入顺序。</p>
 <p><strong>过程与不变量：</strong> 先保存 <code>[1,3]</code>；读 <code>[2,6]</code> 时 2 不超过当前右端 3，合成 <code>[1,6]</code>；读 <code>[8,10]</code> 时 8 已超过 6，新开一段。由于后续左端只会更大，一旦出现间隙，后来的区间也无法填回这个间隙；答案中除最后一段外都已定稿，只检查最后一段就足够。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/merge-intervals/">LC56 合并区间 · 题目</a> · <a href="https://leetcode.cn/problems/merge-intervals/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/merge-intervals/solution/jian-dan-zuo-fa-yi-ji-wei-shi-yao-yao-zh-f2b3/">LC56 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">merge_intervals</span>(intervals):
     <span class="syntax-comment"># 按起点排序后，result 保存已合并的互不重叠区间；只需比较最后一段。</span>
     result = []
@@ -1631,6 +1664,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong><a href="#lc121">LC121 买卖股票</a>：</strong> 推荐一次扫描维护 <code>min_price</code> 和 <code>result</code>：先把今天纳入历史最低价，再比较今天卖出的利润。<code>[7,1,5,3,6,4] → 5</code>。题目允许最多一次买入、一次卖出，收益初值 0 表示可不交易；按时间顺序更新最低价保证候选买入日在卖出日之前或当天。时间 O(n)、辅助空间 O(1)。备选是两个状态的动态规划，<code>hold</code> 保存买入后的最好收益、<code>cash</code> 保存已卖出的最好收益，同样 O(n) 时间、O(1) 空间，适合后续学习手续费、冷冻期或交易次数等股票变式；本题更新 <code>hold</code> 时来源是 <code>-price</code>，这样状态始终表示第一次买入。</p>
 <p><strong>过程与理由：</strong> 价格 7 后历史最低为 7；读 1 后改为 1，随后在 5 卖出的候选利润为 4，在 3 卖为 2，在 6 卖为 5，最终保存 5。固定卖出日后，历史最低买价必然使利润最大；逐日比较这些最优卖出候选，便穷尽所有合法交易。当天价格同时参与最低价只会给出利润 0，不会制造逆序交易。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/">LC121 买卖股票的最佳时机 · 题目</a> · <a href="https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/solution/mei-ju-mai-chu-jie-ge-wei-hu-mai-ru-de-z-02ud/">LC121 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">max_profit</span>(prices):
     <span class="syntax-comment"># min_price 是截至当前的最低买入价；用无穷让第一个价格正常更新它。</span>
     min_price = <span class="syntax-function">float</span>(<span class="syntax-string">&quot;inf&quot;</span>)
@@ -1680,6 +1714,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p>8 没有相邻陆地，保持独立，输出 2。每次成功 union 只把两个连通块变成一个，所以计数减一；同根边只形成块内的另一条路线，不减少岛数。处理全部相邻边后，同根恰好等价于陆地连通，因此集合数就是岛屿数。</p>
 <p>下面的完整包装复用上面的 <code>UnionFind</code>，不修改输入；为便于编号给所有格子分配位置，但水格从不计数，也从不参与合并。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/number-of-islands/">LC200 岛屿数量 · 题目</a> · <a href="https://leetcode.cn/problems/number-of-islands/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/number-of-islands/solution/ba-fang-wen-guo-de-ge-zi-cha-shang-qi-zi-9gs0/">LC200 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">num_islands_union_find</span>(grid):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> grid <span class="syntax-keyword">or</span> <span class="syntax-keyword">not</span> grid[<span class="syntax-number">0</span>]:
         <span class="syntax-keyword">return</span> <span class="syntax-number">0</span>
@@ -1744,6 +1779,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <li>LC300 每条以 index 结尾、长度大于 1 的递增子序列都有某个更早且更小的倒数第二项 previous_index；枚举所有这样的 previous_index 就穷尽了连接方式。对 <code>[3,1,2,4]</code>，各位置 dp 为 <code>[1,1,2,3]</code>；处理 4 时，从 3、1、2 结尾的状态分别得到长度 2、2、3，取 3。</li>
 </ul>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/house-robber/">LC198 打家劫舍 · 题目</a> · <a href="https://leetcode.cn/problems/house-robber/solutions/">题解</a>； <a href="https://leetcode.cn/problems/maximum-subarray/">LC53 最大子数组和 · 题目</a> · <a href="https://leetcode.cn/problems/maximum-subarray/solutions/">题解</a>； <a href="https://leetcode.cn/problems/longest-increasing-subsequence/">LC300 最长递增子序列 · 题目</a> · <a href="https://leetcode.cn/problems/longest-increasing-subsequence/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/house-robber/solution/ru-he-xiang-chu-zhuang-tai-ding-yi-he-zh-1wt1/">LC198 题解</a> · <a href="https://leetcode.cn/problems/maximum-subarray/solution/qian-zhui-he-zuo-fa-ben-zhi-shi-mai-mai-abu71/">LC53 题解</a> · <a href="https://leetcode.cn/problems/longest-increasing-subsequence/solution/jiao-ni-yi-bu-bu-si-kao-dpfu-o1-kong-jia-4zma/">LC300 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">rob</span>(nums):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> nums:
         <span class="syntax-keyword">return</span> <span class="syntax-number">0</span>
@@ -1781,6 +1817,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p>只求右下角计数且需要节省内存时，改用一行 <code>dp</code>，从左到右执行 <code>dp[col] += dp[col-1]</code>：更新前的 <code>dp[col]</code> 是上方，已更新的 <code>dp[col-1]</code> 是左方。时间仍为 O(rows·cols)，辅助空间为 O(cols)。若题目始终是无障碍、只向右下的网格，可导入 <code>from math import comb</code>，调用 <code>comb(rows+cols-2, rows-1)</code>：每条路径共走 rows+cols−2 步，选择其中 rows−1 步向下即可。公式也可按 d=min(rows−1, cols−1) 逐项乘除，用 d 次算术步骤和常数个整数变量求值；Python 大整数及 <code>comb</code> 的实际成本随结果位数和内部实现变化。只求总数时组合公式直接，含障碍或需要各格状态时选择 DP。</p>
 <p><strong>过程与理由：</strong> 2×3 网格先把首行、首列设为 1，第二行依次算出 <code>1、1+1=2、1+2=3</code>。到内部格的最后一步只可能来自上方或左方，这两类路径互不重叠且包括全部走法，所以相加；首行、首列没有第二种来路，初值只能为 1。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/unique-paths/">LC62 不同路径 · 题目</a> · <a href="https://leetcode.cn/problems/unique-paths/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/unique-paths/solution/liang-chong-fang-fa-dong-tai-gui-hua-zu-o5k32/">LC62 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">unique_paths</span>(rows, cols):
     <span class="syntax-keyword">if</span> rows &lt;= <span class="syntax-number">0</span> <span class="syntax-keyword">or</span> cols &lt;= <span class="syntax-number">0</span>:
         <span class="syntax-keyword">return</span> <span class="syntax-number">0</span>
@@ -1805,6 +1842,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>逐格小例子：</strong> <code>&quot;ab&quot; → &quot;ac&quot;</code> 的表以空串、a、ac 为列，以空串、a、ab 为行：首行为 <code>[0,1,2]</code>；a 行为 <code>[1,0,1]</code>；ab 行为 <code>[2,1,1]</code>。右下角比较删除的 <code>1+1</code>、插入的 <code>1+1</code>、替换的 <code>0+1</code>，取 1，即把 b 替换为 c。</p>
 <p><strong>这两题的实现选择：</strong> 速览和第一轮推荐二维表，O((m+1)(n+1)) 时间与辅助空间，适合逐格推导和从完整表回溯具体匹配／编辑操作。只求最终长度或次数、且内存紧张时，保留“上一行 + 当前行”，把辅助空间降为 O(n+1)；让较短字符串作为列还可降到 O(min(m,n)+1)。转移次数保持 O(mn)。进一步压成一行时，要在覆盖上方值之前保存旧的左上值；优先选择自己能清楚解释新旧状态的一版。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/longest-common-subsequence/">LC1143 最长公共子序列 · 题目</a> · <a href="https://leetcode.cn/problems/longest-common-subsequence/solutions/">题解</a>； <a href="https://leetcode.cn/problems/edit-distance/">LC72 编辑距离 · 题目</a> · <a href="https://leetcode.cn/problems/edit-distance/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/longest-common-subsequence/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-lbz5/">LC1143 题解</a> · <a href="https://leetcode.cn/problems/edit-distance/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-uo5q/">LC72 题解</a></p>
 <pre><code class="language-python"><span class="syntax-comment"># LCS：dp[row][col] 表示 a 前 row 个字符与 b 前 col 个字符的最长公共子序列长度。</span>
 <span class="syntax-keyword">def</span> <span class="syntax-function">longest_common_subsequence</span>(a, b):
     rows, cols = <span class="syntax-function">len</span>(a), <span class="syntax-function">len</span>(b)
@@ -1854,6 +1892,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <tr><td>LC322</td><td>第一轮按金额从小到大，在内层枚举最后一枚硬币；也可把金额当图节点，导入 <code>from collections import deque</code>，用 BFS 每层增加一枚硬币；只把 0..C 范围内、尚未访问的金额入队，首次到达目标即是最少枚数，队列耗尽则不可达。</td><td>金额 DP 与当前硬币外层版本都为 O(kC) 时间、O(C) 空间，适合完整计算各金额；BFS 最坏同阶，适合目标能在较少层到达的情况，另需队列与已访问集合。</td></tr></tbody></table></div>
 <p>分配状态表前先估算 C 和 kC。状态范围超过内存或时间预算时，优先根据可达状态是否稀疏等题目条件选择算法；高效读取只能减少读入开销。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/partition-equal-subset-sum/">LC416 分割等和子集 · 题目</a> · <a href="https://leetcode.cn/problems/partition-equal-subset-sum/solutions/">题解</a>； <a href="https://leetcode.cn/problems/coin-change/">LC322 零钱兑换 · 题目</a> · <a href="https://leetcode.cn/problems/coin-change/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/partition-equal-subset-sum/solution/0-1-bei-bao-cong-ji-yi-hua-sou-suo-dao-d-ev76/">LC416 题解</a> · <a href="https://leetcode.cn/problems/coin-change/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-21m5/">LC322 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">can_partition</span>(nums):
     total = <span class="syntax-function">sum</span>(nums)
     <span class="syntax-keyword">if</span> total % <span class="syntax-number">2</span>:
@@ -1882,6 +1921,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong><a href="#lc139">LC139 单词拆分</a></strong>：<code>word_break(&quot;leetcode&quot;,[&quot;leet&quot;,&quot;code&quot;]) → True</code>；<code>&quot;catsandog&quot;</code> 用 <code>[&quot;cats&quot;,&quot;dog&quot;,&quot;sand&quot;,&quot;and&quot;,&quot;cat&quot;]</code> 无法拆分，返回 False。<code>dp[end]</code> 表示前缀 <code>s[:end]</code> 能否由字典单词拼成，单词可重复使用。推荐先把字典转成 <code>set</code>，再按前缀长度递增填布尔表。每个切点 start 同时检查“前缀可达”和“当前完整片段属于字典”，这样状态正好对应词语拼接。空串对应空拼接，返回 True。设串长 n、字典总字符数 W，此切片版时间最坏 O(n³+W)，辅助空间 O(n+W)；每个 <code>s[start:end]</code> 都会复制字符并计算首次哈希，这部分耗时随片段长度增长。</p>
 <p><strong>为何穷尽：</strong> 每个非空合法拆分都有最后一个完整单词 <code>s[start:end]</code>，它之前的前缀必须已可达；枚举 start 恰好覆盖最后一个单词的全部位置。<code>leetcode</code> 从 <code>dp[0]=True</code> 出发，发现 <code>s[0:4]=leet</code> 后令 <code>dp[4]=True</code>；处理 end=8 时，用 <code>dp[4]</code> 和 <code>s[4:8]=code</code> 得到 <code>dp[8]=True</code>，对应 leet + code。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/word-break/">LC139 单词拆分 · 题目</a> · <a href="https://leetcode.cn/problems/word-break/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/word-break/solution/jiao-ni-yi-bu-bu-si-kao-dpcong-ji-yi-hua-chrs/">LC139 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">word_break</span>(s, word_dict):
     words = <span class="syntax-function">set</span>(word_dict)  <span class="syntax-comment"># 避免列表的逐项比较；切片与首次哈希仍需读字符。</span>
     <span class="syntax-comment"># dp[end] 表示前缀 s[:end] 能否完整拆词；空前缀 dp[0]=True。</span>
@@ -1907,6 +1947,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <tr><td><a id="quick-lc279"></a><a href="#lc279">LC279 完全平方数</a></td><td>把 <code>1,4,9,…</code> 当作可复用面额。<code>dp[0]=0</code>；对每个金额 x，枚举 <code>k²≤x</code>，令 <code>dp[x]=min(dp[x],dp[x-k²]+1)</code>，求所需最少个数。 **为何成立：**每个最优拆分都有最后一个平方数 k²；去掉它以后，剩余部分也必须取最少个数，否则可进一步缩短原方案。枚举全部 k² 就穷尽最后一项。</td><td><code>n=12 → 3</code>，即 <code>4+4+4</code>；<code>n=13 → 2</code>，即 <code>4+9</code>。 **过程：**算 dp[12] 时只枚举 1、4、9，候选为 <code>dp[11]+1=4</code>、<code>dp[8]+1=3</code>、<code>dp[3]+1=4</code>，取 3。</td><td>原题 n≥1，扩展 n=0 返回 0；非零初值可设 n+1 表示尚不可达。推荐金额 DP，时间 O(n√n)、辅助空间 O(n)。仅求最少个数且希望进一步提速时，可利用平方数定理：导入 <code>from math import isqrt</code>，先查 n 是否为平方数、再枚举是否为两平方数之和；都不满足时，连续除去因子 4，余数模 8 为 7 则答案为 4，否则为 3。按整数运算为常数计，时间 O(√n)、辅助空间 O(1)；选择此法前应理解上述定理条件。</td></tr></tbody></table></div>
 <p><strong>LC152：负数使最小值也成为下一步的候选。</strong> 推荐用 <code>current_max</code>、<code>current_min</code> 同时保存当前最大与最小乘积，先暂存为 <code>previous_max</code>、<code>previous_min</code>，再更新当前两值；这样乘以负数时，旧最小值也能转成新最大值。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/maximum-product-subarray/">LC152 乘积最大子数组 · 题目</a> · <a href="https://leetcode.cn/problems/maximum-product-subarray/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/maximum-product-subarray/solution/dong-tai-gui-hua-jian-ji-gao-xiao-python-i778/">LC152 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">max_product_subarray</span>(nums):
     <span class="syntax-comment"># current_max/min 是以当前位置结尾的最大/最小乘积；负数可能使它们互换作用。</span>
     current_max = current_min = result = nums[<span class="syntax-number">0</span>]
@@ -1938,6 +1979,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong><a href="#lc17">LC17 电话号码的字母组合</a></strong> 输入是只含 <code>2</code>–<code>9</code> 的数字字符串；空串返回 <code>[]</code>。按电话键盘给每个数字选一个字母，按原数字顺序组成全部字符串。例如 <code>&quot;23&quot; → [&quot;ad&quot;,&quot;ae&quot;,&quot;af&quot;,&quot;bd&quot;,&quot;be&quot;,&quot;bf&quot;,&quot;cd&quot;,&quot;ce&quot;,&quot;cf&quot;]</code>。</p>
 <p>这里的状态（State）是 <strong>已经处理到数字的第几个位置 <code>index</code></strong>。<code>path</code> 恰好为前 index 个数字各选了一个字母；下一层只枚举当前数字对应的字母。推荐按输入位置推进递归：每层恰好选当前数字的一个字母，下一层处理下一位。两个相同数字仍是两个位置，各自独立选择；这个位置状态已完整表达本题约束。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/letter-combinations-of-a-phone-number/">LC17 电话号码的字母组合 · 题目</a> · <a href="https://leetcode.cn/problems/letter-combinations-of-a-phone-number/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/letter-combinations-of-a-phone-number/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-3orv/">LC17 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">letter_combinations</span>(digits):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> digits:
         <span class="syntax-keyword">return</span> []
@@ -1976,6 +2018,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc46"></a></p>
 <p><strong>排列（Permutation）：</strong> 输入元素互不相同。推荐 <code>used</code> 标记当前路径已选下标，<code>path</code> 保存排列前缀；长度到 n 时，用 <code>path.copy()</code> 保存独立列表，使后续撤销操作只影响正在搜索的路径。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/permutations/">LC46 全排列 · 题目</a> · <a href="https://leetcode.cn/problems/permutations/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/permutations/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-jing-que-6hrh/">LC46 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">permute</span>(nums):
     result = []
     <span class="syntax-comment"># path 是当前排列前缀；选择顺序决定最终排列。</span>
@@ -2005,6 +2048,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc78"></a></p>
 <p><strong>子集（Subset）：</strong> <a href="#lc78">LC78 子集</a> 输入元素互不相同。推荐用 <code>start</code> 约束递增下标；每个节点都收集当前子集，下一层从 index+1 开始。这样每个子集按唯一顺序生成，根节点自然提供空集。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/subsets/">LC78 子集 · 题目</a> · <a href="https://leetcode.cn/problems/subsets/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/subsets/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-8tkl/">LC78 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">subsets</span>(nums):
     result = []
     path = []
@@ -2026,6 +2070,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc39"></a></p>
 <p><strong>组合总和（Combination Sum）：</strong> <a href="#lc39">LC39</a> 候选是互不相同的正整数，target≥0。推荐先用 <code>sorted</code> 创建升序候选副本，再按递增下标搜索；当当前数超过剩余量，后续数也都过大，因此用 <code>break</code> 结束本层枚举。这个剪枝的依据是候选有序且全部为正数。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/combination-sum/">LC39 组合总和 · 题目</a> · <a href="https://leetcode.cn/problems/combination-sum/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/combination-sum/solution/liang-chong-fang-fa-xuan-huo-bu-xuan-mei-mhf9/">LC39 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">combination_sum</span>(candidates, target):
     candidates = <span class="syntax-function">sorted</span>(candidates)
     result = []
@@ -2055,6 +2100,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc79"></a></p>
 <p><strong>网格路径（Grid Path）：</strong> <a href="#lc79">LC79 单词搜索</a> 输入是规则字符矩阵，同一条路径每格最多使用一次。推荐以“当前格 <code>row, col</code>、待匹配字符位置 <code>index</code>”作为状态，用 <code>None</code> 临时标记本路径已占格；选用字符表之外的标记，并在成功或失败返回前恢复原字符。约定空单词可匹配空路径。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/word-search/">LC79 单词搜索 · 题目</a> · <a href="https://leetcode.cn/problems/word-search/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/word-search/solution/liang-ge-you-hua-rang-dai-ma-ji-bai-jie-g3mmm/">LC79 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">word_exists</span>(board, word):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> word:
         <span class="syntax-keyword">return</span> <span class="syntax-literal">True</span>
@@ -2100,6 +2146,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc22"></a></p>
 <p><strong>括号生成（Generate Parentheses）：</strong> n≥0。推荐维护已经使用的左／右括号数量 <code>left/right</code>，仅在 <code>left&lt;n</code> 时添加左括号、<code>right&lt;left</code> 时添加右括号；每一步都保持合法前缀，剪掉以后无法修复的失配分支。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/generate-parentheses/">LC22 括号生成 · 题目</a> · <a href="https://leetcode.cn/problems/generate-parentheses/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/generate-parentheses/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-wcdw/">LC22 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">generate_parentheses</span>(n):
     result = []
     path = []
@@ -2128,6 +2175,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><a id="quick-lc131"></a></p>
 <p><strong>分割回文串（Palindrome Partitioning）：</strong> 推荐用 <code>start</code> 表示尚未切分部分的起点；枚举 <code>end</code>，用切片和反向切片判断这一段是否回文，通过后加入路径并递归。边界统一使用左闭右开 <code>[start,end)</code>，于是下一层直接从 end 开始，消费完整个字符串时保存答案。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/palindrome-partitioning/">LC131 分割回文串 · 题目</a> · <a href="https://leetcode.cn/problems/palindrome-partitioning/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/palindrome-partitioning/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-fues/">LC131 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">palindrome_partitions</span>(s):
     result = []
     path = []
@@ -2158,6 +2206,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <h4 id="hot100-n-皇后多种约束怎样共同剪枝">N 皇后：多种约束怎样共同剪枝</h4>
 <p><strong>N 皇后（N-Queens）：</strong> <a href="#lc51">LC51</a> 输入 n≥1，结果为所有棋盘。推荐逐行放一枚皇后，<code>path</code> 记录各行选中的列，<code>used_cols</code>、<code>used_down</code>、<code>used_up</code> 三个集合分别记录已占列、<code>row-col</code> 对角线和 <code>row+col</code> 对角线。集合查询直接表达三类冲突，便于检查剪枝依据。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/n-queens/">LC51 N 皇后 · 题目</a> · <a href="https://leetcode.cn/problems/n-queens/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/n-queens/solution/hui-su-tao-lu-miao-sha-nhuang-hou-shi-pi-mljv/">LC51 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">n_queens</span>(n):
     result = []
     <span class="syntax-comment"># path[row] 保存该行皇后的列号；每层递归只放一行，天然避免同行冲突。</span>
@@ -2205,6 +2254,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>异或抵消 · <a href="#lc136">LC136 只出现一次的数字</a>：</strong> 非空整数数组中恰好一个数只出现一次，其余均出现两次；<code>[4,1,2,1,2] → 4</code>。异或（XOR）满足 <code>x ^ x = 0</code>、<code>x ^ 0 = x</code>，推荐从 0 开始累计 <code>result ^= value</code>，利用这些性质把成对项消掉。固定字长整数模型下，时间 O(n)、辅助空间 O(1)，返回一个数。<code>^</code> 是 Python 的内置异或运算符，直接作用于整数。</p>
 <p><strong>过程：</strong> 按输入顺序累计异或，结果依次为 <code>4、5、7、6、4</code>。异或还满足交换律和结合律，可以把这个表达式重排成 <code>4 ^ (1^1) ^ (2^2)</code>；两对各消为 0，只剩 4。这也说明该规则与相同数字是否相邻无关。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/single-number/">LC136 只出现一次的数字 · 题目</a> · <a href="https://leetcode.cn/problems/single-number/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/single-number/solution/li-yong-yi-huo-de-xing-zhi-fu-ti-dan-pyt-oizc/">LC136 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">single_number</span>(nums):
     <span class="syntax-comment"># result 累计异或；0 是起点，相同值异或抵消，最后留下只出现一次的值。</span>
     result = <span class="syntax-number">0</span>
@@ -2218,6 +2268,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 <p><strong>两阶段为何成立：</strong> 快指针每轮比慢指针多走一步，进入同一环后必然追上。设从 0 到入口需要 a 步，环长为 b；相遇时慢指针总共走了 t 步，两者路程差也是 t，必须是 b 的倍数。把慢指针移回 0 后，两者各走 a 步：慢指针抵达入口，快指针相对入口的环内总路程是 <code>(t−a)+a=t</code>，也回到入口。</p>
 <p><strong>对应到例子：</strong> 第一阶段 slow/fast 的位置依次为 <code>(1,3)→(3,4)→(2,4)→(4,4)</code>，在 4 相遇；复位 slow=0 后，同步位置为 <code>(1,2)→(3,4)→(2,2)</code>，最终返回 2。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/find-the-duplicate-number/">LC287 寻找重复数 · 题目</a> · <a href="https://leetcode.cn/problems/find-the-duplicate-number/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/find-the-duplicate-number/solution/yong-ji-huan-shu-li-jie-zuo-fa-tong-142-tkoc2/">LC287 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">find_duplicate</span>(nums):
     <span class="syntax-comment"># 把下标视为节点、nums[index] 视为下一节点；slow/fast 从起点 0 出发。</span>
     slow = fast = <span class="syntax-number">0</span>
@@ -2296,6 +2347,7 @@ result = json.<span class="syntax-function">loads</span>(text)    <span class="s
 
 <p><strong>困难题 · <a href="#lc4">LC4 两个正序数组的中位数</a>：</strong> 两个输入数组分别非递减，至少一个非空；在较短数组上二分分割线。</p>
 <p><strong>例题入口：</strong> <a href="https://leetcode.cn/problems/median-of-two-sorted-arrays/">LC4 寻找两个正序数组的中位数 · 题目</a> · <a href="https://leetcode.cn/problems/median-of-two-sorted-arrays/solutions/">题解</a></p>
+<p><strong>灵茶山艾府原文：</strong> <a href="https://leetcode.cn/problems/median-of-two-sorted-arrays/solution/tu-jie-xun-xu-jian-jin-cong-shuang-zhi-z-p2gd/">LC4 题解</a></p>
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">median_sorted_arrays</span>(a, b):
     <span class="syntax-comment"># 在较短数组上二分，保证另一数组的分割位置有效</span>
     <span class="syntax-keyword">if</span> <span class="syntax-function">len</span>(a) &gt; <span class="syntax-function">len</span>(b):
@@ -3054,6 +3106,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>手算模板。</strong> <code>[0,1,0,3]</code> 的保留过程只写入 <code>1,3</code>，write 最后为 2；清零后缀得到 <code>[1,3,0,0]</code>。<code>nums[:write]</code> 是有效区，后面尚未整理时不要依赖其内容。</p>
 <p><a id="lc283"></a></p>
 <h3 id="hot100-lc283-移动零"><a href="https://leetcode.cn/problems/move-zeroes/">LC283</a> 移动零</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/move-zeroes/solution/kuai-man-zhi-zhen-wei-shi-yao-ke-yi-ba-s-1h8x/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-01 / 38。</strong> 按<a href="#plan-01">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>move_zeroes(nums)</code>。整数列表 nums → 返回 None，原地把非零项稳定前移、后缀置零；输出 nums。</p>
 <p><strong>题意与前提：</strong> 原地把零移到末尾，保持非零元素的相对顺序；返回 None。</p>
@@ -3064,19 +3117,16 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/move-zeroes/">LC283</a> 移动零。 <strong>轮次：第一轮必刷 · R1-01。</strong></p>
 <!-- code:core:283:move_zeroes -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">move_zeroes</span>(nums):
-    <span class="syntax-comment"># write 是下一个非零值的写入下标；从 0 开始，表示第一个非零值写到数组开头。</span>
-    <span class="syntax-comment"># 处理过程中 nums[:write] 已按原顺序保存读到的全部非零值。</span>
+    <span class="syntax-comment"># write 是下一个非零值的写入下标；nums[:write] 保存已读非零值，顺序不变。</span>
     write = <span class="syntax-number">0</span>
     <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums:
         <span class="syntax-keyword">if</span> value != <span class="syntax-number">0</span>:
-            <span class="syntax-comment"># 遇到非零值才写入；写入位置始终不超过已读位置，保留后面尚未读到的元素。</span>
+            <span class="syntax-comment"># 写入位置不超过当前读取位置，因此后面尚未读取的值仍然保留。</span>
             nums[write] = value
-            <span class="syntax-comment"># 这个位置已经写好，write 前进到下一个可写位置。</span>
             write += <span class="syntax-number">1</span>
-    <span class="syntax-comment"># 第一阶段结束，write 等于非零元素个数；此后它表示下一个要补零的位置。</span>
-    <span class="syntax-keyword">while</span> write &lt; <span class="syntax-function">len</span>(nums):
-        nums[write] = <span class="syntax-number">0</span>
-        write += <span class="syntax-number">1</span></code></pre>
+    <span class="syntax-comment"># write 此时等于非零值个数；从这个固定边界开始，把剩余位置补成 0。</span>
+    <span class="syntax-keyword">for</span> index <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(write, <span class="syntax-function">len</span>(nums)):
+        nums[index] = <span class="syntax-number">0</span></code></pre>
 <p><a id="walk-lc283"></a></p>
 <h4 id="hot100-具体推演写入前缀与清理后缀是两个阶段">具体推演：写入前缀与清理后缀是两个阶段</h4>
 <p>输入 <code>nums=[0,1,0,3]</code>。表中 <code>write</code> 是<strong>本行操作之后</strong> 的位置；非零扫描结束时才表示非零元素个数。</p>
@@ -3113,19 +3163,16 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">move_zeroes</span>(nums):
-    <span class="syntax-comment"># write 是下一个非零值的写入下标；从 0 开始，表示第一个非零值写到数组开头。</span>
-    <span class="syntax-comment"># 处理过程中 nums[:write] 已按原顺序保存读到的全部非零值。</span>
+    <span class="syntax-comment"># write 是下一个非零值的写入下标；nums[:write] 保存已读非零值，顺序不变。</span>
     write = <span class="syntax-number">0</span>
     <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums:
         <span class="syntax-keyword">if</span> value != <span class="syntax-number">0</span>:
-            <span class="syntax-comment"># 遇到非零值才写入；写入位置始终不超过已读位置，保留后面尚未读到的元素。</span>
+            <span class="syntax-comment"># 写入位置不超过当前读取位置，因此后面尚未读取的值仍然保留。</span>
             nums[write] = value
-            <span class="syntax-comment"># 这个位置已经写好，write 前进到下一个可写位置。</span>
             write += <span class="syntax-number">1</span>
-    <span class="syntax-comment"># 第一阶段结束，write 等于非零元素个数；此后它表示下一个要补零的位置。</span>
-    <span class="syntax-keyword">while</span> write &lt; <span class="syntax-function">len</span>(nums):
-        nums[write] = <span class="syntax-number">0</span>
-        write += <span class="syntax-number">1</span>
+    <span class="syntax-comment"># write 此时等于非零值个数；从这个固定边界开始，把剩余位置补成 0。</span>
+    <span class="syntax-keyword">for</span> index <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(write, <span class="syntax-function">len</span>(nums)):
+        nums[index] = <span class="syntax-number">0</span>
 
 
 <span class="syntax-keyword">def</span> <span class="syntax-function">main</span>():
@@ -3148,6 +3195,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-02">单元 02 结构与前置</a>，再读 <strong>R1-02</strong> <a href="https://leetcode.cn/problems/two-sum/">LC1</a> 两数之和（<a href="#lc1">讲解</a>）。</p>
 <p><a id="lc189"></a></p>
 <h3 id="hot100-lc189-轮转数组"><a href="https://leetcode.cn/problems/rotate-array/">LC189</a> 轮转数组</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/rotate-array/solution/tu-jie-yuan-di-zuo-fa-yi-tu-miao-dong-py-ryfv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-01 / 62。</strong> 按<a href="#plan-01">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>rotate_array(nums, k)</code>。列表 nums、非负位移 k → 返回 None，原地右旋；输出 nums。</p>
 <p><strong>题意与前提：</strong> 把非空数组原地向右轮转 k 步，k≥0 且可超过长度；返回 None。</p>
@@ -3190,6 +3238,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-02</strong> <a href="https://leetcode.cn/problems/product-of-array-except-self/">LC238</a> 除了自身以外数组的乘积（<a href="#lc238">讲解</a>）。</p>
 <p><a id="lc238"></a></p>
 <h3 id="hot100-lc238-除了自身以外数组的乘积"><a href="https://leetcode.cn/problems/product-of-array-except-self/">LC238</a> 除了自身以外数组的乘积</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/product-of-array-except-self/solution/qian-hou-zhui-fen-jie-fu-ti-dan-pythonja-86r1/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-02 / 62。</strong> 按<a href="#plan-01">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>product_except_self(nums)</code>。整数列表 nums → 每个位置之外元素的乘积列表；不修改输入。</p>
 <p><strong>题意与前提：</strong> 不使用除法，返回每个位置以外所有元素的乘积；允许零和负数。</p>
@@ -3226,6 +3275,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-03</strong> <a href="https://leetcode.cn/problems/sort-colors/">LC75</a> 颜色分类（<a href="#lc75">讲解</a>）。</p>
 <p><a id="lc75"></a></p>
 <h3 id="hot100-lc75-颜色分类"><a href="https://leetcode.cn/problems/sort-colors/">LC75</a> 颜色分类</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/sort-colors/solution/on-cha-ru-pai-xu-jian-ji-xie-fa-pythonja-zk60/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-03 / 62。</strong> 按<a href="#plan-01">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>sort_colors(nums)</code>。仅含 0/1/2 的 nums → 返回 None，原地分类排序；输出 nums。</p>
 <p><strong>题意与前提：</strong> 只含 0、1、2 的数组原地排序；返回 None，不调用通用排序作为主解。</p>
@@ -3267,6 +3317,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-02">单元 02 结构与前置</a>，再做 <strong>R2-04</strong> <a href="https://leetcode.cn/problems/longest-consecutive-sequence/">LC128</a> 最长连续序列（<a href="#lc128">讲解</a>）。</p>
 <p><a id="lc41"></a></p>
 <h3 id="hot100-lc41-缺失的第一个正数"><a href="https://leetcode.cn/problems/first-missing-positive/">LC41</a> 缺失的第一个正数</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/first-missing-positive/solution/huan-zuo-wei-tong-guo-li-zi-li-jie-suan-qa94e/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-47 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-01">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>first_missing_positive(nums)</code>。整数列表 nums → 最小缺失正整数；会原地重排 nums。</p>
 <p><strong>题意与前提：</strong> 从任意整数数组中找最小缺失正整数，要求 O(n) 时间、O(1) 辅助空间；答案在 1..n+1。</p>
@@ -3304,6 +3355,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-48</strong> <a href="https://leetcode.cn/problems/next-permutation/">LC31</a> 下一个排列（<a href="#lc31">讲解</a>）。</p>
 <p><a id="lc31"></a></p>
 <h3 id="hot100-lc31-下一个排列"><a href="https://leetcode.cn/problems/next-permutation/">LC31</a> 下一个排列</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/next-permutation/solution/jiao-ni-cong-ling-kai-shi-si-kao-zhe-ti-9qfrq/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-48 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-01">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>next_permutation(nums)</code>。排列 nums → 返回 None，原地下一个字典序排列；最大排列回到最小。</p>
 <p><strong>题意与前提：</strong> 原地得到字典序下一排列；允许重复值，没有更大排列时回到最小排列。</p>
@@ -3359,6 +3411,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>手算模板。</strong> <code>[2,7]</code>、target=9：看到 2 时查 7 未找到，登记 <code>{2:0}</code>；看到 7 时查到 2，返回 <code>[0,1]</code>。<code>[3,3]</code> 也正确，因为先查后存不会使用同一个下标两次。</p>
 <p><a id="lc1"></a></p>
 <h3 id="hot100-lc1-两数之和"><a href="https://leetcode.cn/problems/two-sum/">LC1</a> 两数之和</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/two-sum/solution/dong-hua-cong-liang-shu-zhi-he-zhong-wo-0yvmj/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-02 / 38。</strong> 按<a href="#plan-02">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>two_sum(nums, target)</code>。整数列表 nums＋目标 target → 两个原下标的列表；无解扩展为 []，不修改 nums。</p>
 <p><strong>题意与前提：</strong> 返回和为 target 的两个不同下标；允许重复值，原题保证恰有一组解。</p>
@@ -3446,6 +3499,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-03</strong> <a href="https://leetcode.cn/problems/group-anagrams/">LC49</a> 字母异位词分组（<a href="#lc49">讲解</a>）。</p>
 <p><a id="lc49"></a></p>
 <h3 id="hot100-lc49-字母异位词分组"><a href="https://leetcode.cn/problems/group-anagrams/">LC49</a> 字母异位词分组</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/group-anagrams/solution/ha-xi-biao-fen-zu-jian-ji-xie-fa-pythonj-1ukv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-03 / 38。</strong> 按<a href="#plan-02">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>group_anagrams(words)</code>。字符串列表 words → 按异位词分组的二维列表；不修改输入，分组顺序不限。</p>
 <p><strong>题意与前提：</strong> 按字符及频次相同分组；空字符串合法，外层和组内顺序不限。</p>
@@ -3482,6 +3536,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-03">单元 03 结构与前置</a>，再读 <strong>R1-04</strong> <a href="https://leetcode.cn/problems/container-with-most-water/">LC11</a> 盛最多水的容器（<a href="#lc11">讲解</a>）。</p>
 <p><a id="lc128"></a></p>
 <h3 id="hot100-lc128-最长连续序列"><a href="https://leetcode.cn/problems/longest-consecutive-sequence/">LC128</a> 最长连续序列</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-consecutive-sequence/solution/ha-xi-biao-on-zuo-fa-pythonjavacgojsrust-whop/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-04 / 62。</strong> 按<a href="#plan-02">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>longest_consecutive(nums)</code>。整数列表 nums → 最长数值连续段长度；不要求位置连续，不修改输入。</p>
 <p><strong>题意与前提：</strong> 求最长的数值连续序列长度，不要求原数组位置连续；数组可为空。</p>
@@ -3539,6 +3594,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>手算模板。</strong> 高度 <code>[1,2,1]</code>：两端面积 2，移动任一短边后宽度减小；最终结果仍为 2。LC42 需要额外维护左右最高挡板，是进阶状态，不能仅复用 LC11 的面积式。</p>
 <p><a id="lc11"></a></p>
 <h3 id="hot100-lc11-盛最多水的容器"><a href="https://leetcode.cn/problems/container-with-most-water/">LC11</a> 盛最多水的容器</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/container-with-most-water/solution/by-endlesscheng-f0xz/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-04 / 38。</strong> 按<a href="#plan-03">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>max_area(heights)</code>。非负高度列表 heights → 最大容积整数；不修改输入。</p>
 <p><strong>题意与前提：</strong> 至少两根非负高度竖线，选两根使容器面积最大；宽度是下标差。</p>
@@ -3632,6 +3688,8 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-05</strong> <a href="https://leetcode.cn/problems/longest-palindromic-substring/">LC5</a> 最长回文子串（<a href="#lc5">讲解</a>）。</p>
 <p><a id="lc5"></a></p>
 <h3 id="hot100-lc5-最长回文子串"><a href="https://leetcode.cn/problems/longest-palindromic-substring/">LC5</a> 最长回文子串</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-palindromic-substring/solution/mo-ban-on-manacher-suan-fa-pythonjavacgo-t6cx/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 本课把最佳答案的比较放在每个中心扩展结束后，只比较该中心的最长回文；有效区间是 <code>[left+1, right)</code>，长度为 <code>right-left-1</code>。</p>
 <p><strong>学习定位：第一轮必刷 · R1-05 / 38。</strong> 按<a href="#plan-03">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>longest_palindrome(s)</code>。字符串 s → 一个最长连续回文子串；多解可返回任一合法最优解。</p>
 <p><strong>题意与前提：</strong> 返回非空字符串的最长连续回文子串；若有多个最长解，接受任意一个。</p>
@@ -3642,16 +3700,17 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/longest-palindromic-substring/">LC5</a> 最长回文子串。 <strong>轮次：第一轮必刷 · R1-05。</strong></p>
 <!-- code:core:5:longest_palindrome -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">longest_palindrome</span>(s):
-    <span class="syntax-comment"># start、length 记录目前最长回文的起点和长度；空串时保留 0、0。</span>
     start = length = <span class="syntax-number">0</span>
     <span class="syntax-keyword">for</span> center <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(<span class="syntax-function">len</span>(s)):
-        <span class="syntax-comment"># 分别覆盖奇数长度和偶数长度回文。</span>
+        <span class="syntax-comment"># 同一个字符作奇数中心，相邻字符之间作偶数中心。</span>
         <span class="syntax-keyword">for</span> left, right <span class="syntax-keyword">in</span> [(center, center), (center, center + <span class="syntax-number">1</span>)]:
             <span class="syntax-keyword">while</span> left &gt;= <span class="syntax-number">0</span> <span class="syntax-keyword">and</span> right &lt; <span class="syntax-function">len</span>(s) <span class="syntax-keyword">and</span> s[left] == s[right]:
-                <span class="syntax-keyword">if</span> right - left + <span class="syntax-number">1</span> &gt; length:
-                    start, length = left, right - left + <span class="syntax-number">1</span>
                 left -= <span class="syntax-number">1</span>
                 right += <span class="syntax-number">1</span>
+            <span class="syntax-comment"># 停下时两端已越过有效回文；有效区间是 [left + 1, right)。</span>
+            candidate_length = right - left - <span class="syntax-number">1</span>
+            <span class="syntax-keyword">if</span> candidate_length &gt; length:
+                start, length = left + <span class="syntax-number">1</span>, candidate_length
     <span class="syntax-keyword">return</span> s[start:start + length]</code></pre>
 <p><a id="walk-lc5"></a></p>
 <h4 id="hot100-具体推演从两个-b-之间向外扩展">具体推演：从两个 b 之间向外扩展</h4>
@@ -3676,6 +3735,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-04">单元 04 结构与前置</a>，再读 <strong>R1-06</strong> <a href="https://leetcode.cn/problems/spiral-matrix/">LC54</a> 螺旋矩阵（<a href="#lc54">讲解</a>）。</p>
 <p><a id="lc15"></a></p>
 <h3 id="hot100-lc15-三数之和"><a href="https://leetcode.cn/problems/3sum/">LC15</a> 三数之和</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/3sum/solution/shuang-zhi-zhen-xiang-bu-ming-bai-yi-ge-pno55/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-05 / 62。</strong> 按<a href="#plan-03">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>three_sum(nums)</code>。整数列表 nums → 和为 0 的不同三元组列表；先复制排序，不修改原 nums。</p>
 <p><strong>题意与前提：</strong> 返回和为零的不重复值三元组；同一值可来自不同下标，不能重复使用同一下标。</p>
@@ -3727,6 +3787,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-04">单元 04 结构与前置</a>，再做 <strong>R2-06</strong> <a href="https://leetcode.cn/problems/rotate-image/">LC48</a> 旋转图像（<a href="#lc48">讲解</a>）。</p>
 <p><a id="lc42"></a></p>
 <h3 id="hot100-lc42-接雨水"><a href="https://leetcode.cn/problems/trapping-rain-water/">LC42</a> 接雨水</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/trapping-rain-water/solution/zuo-liao-nbian-huan-bu-hui-yi-ge-shi-pin-ukwm/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-49 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-03">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>trap(heights)</code>。非负高度列表 heights → 总蓄水量整数；不修改输入。</p>
 <p><strong>题意与前提：</strong> 非负柱状高度图，求总积水量；每一处水都必须由左右挡板共同限制。</p>
@@ -3787,6 +3848,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>手算模板。</strong> <code>[[1,2,3]]</code> 只走上边就结束，输出 <code>[1,2,3]</code>；不是再把底边倒着读一遍。</p>
 <p><a id="lc54"></a></p>
 <h3 id="hot100-lc54-螺旋矩阵"><a href="https://leetcode.cn/problems/spiral-matrix/">LC54</a> 螺旋矩阵</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/spiral-matrix/solution/liang-chong-fang-fa-jian-ji-gao-xiao-pyt-4wzk/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-06 / 38。</strong> 按<a href="#plan-04">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>spiral_order(matrix)</code>。矩形 matrix → 螺旋读取的一维列表；不修改输入。</p>
 <p><strong>题意与前提：</strong> 按顺时针螺旋顺序返回非空矩阵元素；单行和单列也必须只访问一次。</p>
@@ -3907,6 +3969,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-05">单元 05 结构与前置</a>，再读 <strong>R1-07</strong> <a href="https://leetcode.cn/problems/subarray-sum-equals-k/">LC560</a> 和为 K 的子数组（<a href="#lc560">讲解</a>）。</p>
 <p><a id="lc48"></a></p>
 <h3 id="hot100-lc48-旋转图像"><a href="https://leetcode.cn/problems/rotate-image/">LC48</a> 旋转图像</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/rotate-image/solution/shu-xue-ben-zhi-liang-ci-fan-zhuan-deng-aon4a/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-06 / 62。</strong> 按<a href="#plan-04">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>rotate_matrix(matrix)</code>。n×n 方阵 matrix → 返回 None，原地顺时针旋转 90°；输出 matrix。</p>
 <p><strong>题意与前提：</strong> 将 n×n 方阵原地顺时针旋转 90 度；返回 None。</p>
@@ -3941,6 +4004,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-07</strong> <a href="https://leetcode.cn/problems/set-matrix-zeroes/">LC73</a> 矩阵置零（<a href="#lc73">讲解</a>）。</p>
 <p><a id="lc73"></a></p>
 <h3 id="hot100-lc73-矩阵置零"><a href="https://leetcode.cn/problems/set-matrix-zeroes/">LC73</a> 矩阵置零</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/set-matrix-zeroes/solution/yi-bu-bu-you-hua-cong-omn-dao-o1-kong-ji-fdgt/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-07 / 62。</strong> 按<a href="#plan-04">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>set_zeroes(matrix)</code>。矩形 matrix → 返回 None，原地把原零所在行列清零；输出 matrix。</p>
 <p><strong>题意与前提：</strong> 把非空矩阵中原有零所在的整行、整列原地置零；不能让新写入的零继续扩散标记。</p>
@@ -3955,9 +4019,9 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
         <span class="syntax-keyword">return</span>
     rows, cols = <span class="syntax-function">len</span>(matrix), <span class="syntax-function">len</span>(matrix[<span class="syntax-number">0</span>])
     <span class="syntax-comment"># 首行首列要当标记区，先单独记住它们原本是否含零。</span>
-    <span class="syntax-comment"># any 在发现第一个零后即可停止；for 表达式按需产生布尔值。</span>
-    first_row_zero = <span class="syntax-function">any</span>(matrix[<span class="syntax-number">0</span>][col] == <span class="syntax-number">0</span> <span class="syntax-keyword">for</span> col <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(cols))
-    first_col_zero = <span class="syntax-function">any</span>(matrix[row][<span class="syntax-number">0</span>] == <span class="syntax-number">0</span> <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(rows))
+    <span class="syntax-comment"># 首行直接判断 0 是否存在；首列用 any 逐行检查第一个元素。</span>
+    first_row_zero = <span class="syntax-number">0</span> <span class="syntax-keyword">in</span> matrix[<span class="syntax-number">0</span>]
+    first_col_zero = <span class="syntax-function">any</span>(row[<span class="syntax-number">0</span>] == <span class="syntax-number">0</span> <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> matrix)
     <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(<span class="syntax-number">1</span>, rows):
         <span class="syntax-keyword">for</span> col <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(<span class="syntax-number">1</span>, cols):
             <span class="syntax-keyword">if</span> matrix[row][col] == <span class="syntax-number">0</span>:
@@ -3991,6 +4055,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-08</strong> <a href="https://leetcode.cn/problems/search-a-2d-matrix-ii/">LC240</a> 搜索二维矩阵 II（<a href="#lc240">讲解</a>）。</p>
 <p><a id="lc240"></a></p>
 <h3 id="hot100-lc240-搜索二维矩阵-ii"><a href="https://leetcode.cn/problems/search-a-2d-matrix-ii/">LC240</a> 搜索二维矩阵 II</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/search-a-2d-matrix-ii/solution/tu-jie-pai-chu-fa-yi-tu-miao-dong-python-kytg/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-08 / 62。</strong> 按<a href="#plan-04">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>search_matrix_ii(matrix, target)</code>。行列各自递增的矩阵 matrix、target → bool；不修改输入。</p>
 <p><strong>题意与前提：</strong> 每行、每列各自有序，判断 target 是否存在；拉平后不一定有序。</p>
@@ -4065,6 +4130,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>具体输入与边界推演：</strong> <a href="https://leetcode.cn/problems/subarray-sum-equals-k/">LC560</a> <a href="#walk-lc560">逐步状态</a>。本例 k 对应模板参数 target。</p>
 <p><a id="lc560"></a></p>
 <h3 id="hot100-lc560-和为-k-的子数组"><a href="https://leetcode.cn/problems/subarray-sum-equals-k/">LC560</a> 和为 K 的子数组</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/subarray-sum-equals-k/solution/qian-zhui-he-ha-xi-biao-cong-liang-ci-bi-4mwr/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-07 / 38。</strong> 按<a href="#plan-05">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>subarray_sum(nums, k)</code>。整数列表 nums、目标 k → 和为 k 的非空连续区间数量；允许负数。</p>
 <p><strong>题意与前提：</strong> 统计和恰为 k 的连续非空子数组个数；元素可以为负数、零或正数。</p>
@@ -4196,6 +4262,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>具体输入与边界推演：</strong> <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/">LC3</a> <a href="#walk-lc3">逐步状态</a>。同样维护合法窗口与集合。</p>
 <p><a id="lc3"></a></p>
 <h3 id="hot100-lc3-无重复字符的最长子串"><a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/">LC3</a> 无重复字符的最长子串</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-substring-without-repeating-characters/solution/xia-biao-zong-suan-cuo-qing-kan-zhe-by-e-iaks/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-08 / 38。</strong> 按<a href="#plan-06">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>length_of_longest_substring(s)</code>。字符串 s → 最长无重复连续子串长度。</p>
 <p><strong>题意与前提：</strong> 求不含重复字符的最长连续子串长度；空串答案为 0。</p>
@@ -4283,6 +4350,8 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-09</strong> <a href="https://leetcode.cn/problems/find-all-anagrams-in-a-string/">LC438</a> 找到字符串中所有字母异位词（<a href="#lc438">讲解</a>）。</p>
 <p><a id="lc438"></a></p>
 <h3 id="hot100-lc438-找到字符串中所有字母异位词"><a href="https://leetcode.cn/problems/find-all-anagrams-in-a-string/">LC438</a> 找到字符串中所有字母异位词</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-all-anagrams-in-a-string/solution/liang-chong-fang-fa-ding-chang-hua-chuan-14pd/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 本课保留 26 项频次数组，适合题面的英文小写字母，逐项比较在 Python 3.9 下含义明确。阅读原文的 Counter 比较版时，要留意零计数键的相等语义与 Python 版本；本课代码以当前运行版本验证为准。</p>
 <p><strong>学习定位：第一轮必刷 · R1-09 / 38。</strong> 按<a href="#plan-06">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>find_anagrams(s, pattern)</code>。小写字符串 s、pattern → 匹配窗口的起点下标列表；函数返回后输出这些下标。</p>
 <p><strong>题意与前提：</strong> 在小写字母字符串 s 中找出所有与非空 pattern 互为异位词的子串起点，重叠窗口也计入。</p>
@@ -4327,6 +4396,8 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-07">单元 07 结构与前置</a>，再读 <strong>R1-10</strong> <a href="https://leetcode.cn/problems/valid-parentheses/">LC20</a> 有效的括号（<a href="#lc20">讲解</a>）。</p>
 <p><a id="lc76"></a></p>
 <h3 id="hot100-lc76-最小覆盖子串"><a href="https://leetcode.cn/problems/minimum-window-substring/">LC76</a> 最小覆盖子串</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/minimum-window-substring/solution/liang-chong-fang-fa-cong-o52mn-dao-omnfu-3ezz/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 本课统一使用 <code>missing</code> 表示尚缺字符总数。每个字符都更新差额，正数才代表尚缺；无关字符从 0 变负、移出后回到 0，因此窗口进出可以采用同一规则。原文还有按达标种类计数的写法，可在掌握本版后比较。</p>
 <p><strong>学习定位：第二轮必刷 · R2-50 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-06">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>min_window(s, t)</code>。字符串 s、t → 覆盖 t 全部字符及频次的最短子串；无解返回空串。</p>
 <p><strong>题意与前提：</strong> 返回覆盖 t 全部字符及其次数的最短子串，无解返回空串；本组 s、t 非空。</p>
@@ -4344,27 +4415,22 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <span class="syntax-keyword">def</span> <span class="syntax-function">min_window</span>(s, t):
     <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> t:
         <span class="syntax-keyword">return</span> <span class="syntax-string">&#39;&#39;</span>
-    need = <span class="syntax-function">Counter</span>(t)  <span class="syntax-comment"># 一次统计目标频次，重复字符也计入需求。</span>
-    <span class="syntax-comment"># missing 计缺少的字符总数；need 可为负，表示有富余。</span>
-    missing = <span class="syntax-function">len</span>(t)
-    <span class="syntax-comment"># left 是当前窗口起点；best_left、best_length 保存最短合法窗口，初始长度比整串还长。</span>
+    <span class="syntax-comment"># need[char] = 目标次数 - 当前窗口次数；正数是缺额，负数是富余。</span>
+    need = <span class="syntax-function">Counter</span>(t)
+    missing = <span class="syntax-function">len</span>(t)  <span class="syntax-comment"># 尚缺的字符总个数；目标 AA 一开始缺 2 个。</span>
     left = best_left = <span class="syntax-number">0</span>
-    best_length = <span class="syntax-function">len</span>(s) + <span class="syntax-number">1</span>
+    best_length = <span class="syntax-function">len</span>(s) + <span class="syntax-number">1</span>  <span class="syntax-comment"># 大于任何可能答案，表示尚未找到覆盖窗口。</span>
     <span class="syntax-keyword">for</span> right, char <span class="syntax-keyword">in</span> <span class="syntax-function">enumerate</span>(s):
-        <span class="syntax-keyword">if</span> char <span class="syntax-keyword">in</span> need:
-            <span class="syntax-keyword">if</span> need[char] &gt; <span class="syntax-number">0</span>:
-                missing -= <span class="syntax-number">1</span>
-            need[char] -= <span class="syntax-number">1</span>
-        <span class="syntax-comment"># 窗口合法时先记录答案，再尝试收缩。</span>
+        <span class="syntax-keyword">if</span> need[char] &gt; <span class="syntax-number">0</span>:
+            missing -= <span class="syntax-number">1</span>  <span class="syntax-comment"># 只有填补缺额，才减少尚缺个数。</span>
+        need[char] -= <span class="syntax-number">1</span>    <span class="syntax-comment"># 每个移入字符都登记；无关字符从 0 减到负数。</span>
         <span class="syntax-keyword">while</span> missing == <span class="syntax-number">0</span>:
             <span class="syntax-keyword">if</span> right - left + <span class="syntax-number">1</span> &lt; best_length:
                 best_left, best_length = left, right - left + <span class="syntax-number">1</span>
             left_char = s[left]
-            <span class="syntax-keyword">if</span> left_char <span class="syntax-keyword">in</span> need:
-                <span class="syntax-comment"># 左端字符将离开窗口：归还一个需求；归还后变为正数，说明窗口开始缺字符。</span>
-                need[left_char] += <span class="syntax-number">1</span>
-                <span class="syntax-keyword">if</span> need[left_char] &gt; <span class="syntax-number">0</span>:
-                    missing += <span class="syntax-number">1</span>
+            need[left_char] += <span class="syntax-number">1</span>  <span class="syntax-comment"># 移出左端字符，归还一个需求。</span>
+            <span class="syntax-keyword">if</span> need[left_char] &gt; <span class="syntax-number">0</span>:
+                missing += <span class="syntax-number">1</span>     <span class="syntax-comment"># 从恰好满足变为缺少，窗口失去覆盖。</span>
             left += <span class="syntax-number">1</span>
     <span class="syntax-keyword">if</span> best_length &gt; <span class="syntax-function">len</span>(s):
         <span class="syntax-keyword">return</span> <span class="syntax-string">&#39;&#39;</span>
@@ -4373,7 +4439,7 @@ sys.stdout.<span class="syntax-function">write</span>(line + <span class="syntax
 <div class="table-scroll" tabindex="0" role="region" aria-label="LC76 最小覆盖子串"><table><thead><tr><th scope="col">输入</th><th scope="col">预期</th><th scope="col">暴露的错误</th></tr></thead><tbody><tr><td><code>s=&#39;a&#39;</code>；<code>t=&#39;aa&#39;</code></td><td><code>&#39;&#39;</code></td><td>集合覆盖不等于多重集合覆盖。</td></tr>
 <tr><td><code>s=&#39;aa&#39;</code>；<code>t=&#39;aa&#39;</code></td><td><code>&#39;aa&#39;</code></td><td>窗口恰好等于目标，不能缩掉仍必需的字符。</td></tr>
 <tr><td><code>s=&#39;ba&#39;</code>；<code>t=&#39;a&#39;</code></td><td><code>&#39;a&#39;</code></td><td>最优窗口在最后一个位置，长度可为 1。</td></tr></tbody></table></div>
-<p><strong>先查：</strong> 重复字符按个数计，如 AABC；need 允许负数表示盈余。空模式串单独处理。结果切片只在最后做。</p>
+<p><strong>先查：</strong> 重复字符按个数计，如 AABC；need 允许负数表示盈余。无关字符的目标次数为 0，移入后计数为负，移出时最多恢复到 0，因此也能用同一套加减逻辑。空模式串单独处理。结果切片只在最后做。</p>
 <details>
 <summary>备选对照：主解理解后再比较；性能或深度限制按本题说明处理</summary>
 
@@ -4416,6 +4482,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <span class="syntax-keyword">assert</span> queue.<span class="syntax-function">popleft</span>() == <span class="syntax-number">1</span>  <span class="syntax-comment"># 先放的先取。</span></code></pre>
 <p><a id="lc20"></a></p>
 <h3 id="hot100-lc20-有效的括号"><a href="https://leetcode.cn/problems/valid-parentheses/">LC20</a> 有效的括号</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/valid-parentheses/solution/gua-hao-xiao-xiao-le-san-chong-li-yong-z-2xb3/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-10 / 38。</strong> 按<a href="#plan-07">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>is_valid_parentheses(s)</code>。括号字符串 s → 是否有效的 bool；空串实现返回 True。</p>
 <p><strong>题意与前提：</strong> 判断括号串能否同种匹配且正确嵌套；剩余未匹配左括号也应判错。</p>
@@ -4508,6 +4575,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-11</strong> <a href="https://leetcode.cn/problems/min-stack/">LC155</a> 最小栈（<a href="#lc155">讲解</a>）。</p>
 <p><a id="lc155"></a></p>
 <h3 id="hot100-lc155-最小栈"><a href="https://leetcode.cn/problems/min-stack/">LC155</a> 最小栈</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/min-stack/solution/ben-zhi-shi-wei-hu-qian-zhui-zui-xiao-zh-x0g8/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-11 / 38。</strong> 按<a href="#plan-07">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>MinStack()</code>。MinStack() 创建状态；push/pop 改栈，top/getMin 返回值；查询与 pop 要求非空。</p>
 <p><strong>题意与前提：</strong> 设计支持 push/pop/top/getMin 的栈；查询和弹出只在非空时发生，重复最小值要保留。</p>
@@ -4550,6 +4618,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-08">单元 08 结构与前置</a>，再读 <strong>R1-12</strong> <a href="https://leetcode.cn/problems/daily-temperatures/">LC739</a> 每日温度（<a href="#lc739">讲解</a>）。</p>
 <p><a id="lc394"></a></p>
 <h3 id="hot100-lc394-字符串解码"><a href="https://leetcode.cn/problems/decode-string/">LC394</a> 字符串解码</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/decode-string/solution/di-gui-yong-zhan-mo-ni-di-gui-pythonjava-kcsv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-09 / 62。</strong> 按<a href="#plan-07">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>decode_string(s)</code>。合法编码字符串 s → 解码字符串；多位重复次数和嵌套要共同处理。</p>
 <p><strong>题意与前提：</strong> 解码合法的 k[片段] 字符串；重复次数可以多位，片段可以嵌套。</p>
@@ -4596,6 +4665,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-08">单元 08 结构与前置</a>，再做 <strong>R2-10</strong> <a href="https://leetcode.cn/problems/sliding-window-maximum/">LC239</a> 滑动窗口最大值（<a href="#lc239">讲解</a>）。</p>
 <p><a id="lc32"></a></p>
 <h3 id="hot100-lc32-最长有效括号"><a href="https://leetcode.cn/problems/longest-valid-parentheses/">LC32</a> 最长有效括号</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-valid-parentheses/solution/on-chai-zha-dan-tong-guo-li-zi-fa-ming-s-lb5s/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-51 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-07">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>longest_valid_parentheses(s)</code>。仅括号字符串 s → 最长连续合法括号子串长度；不是子序列长度。</p>
 <p><strong>题意与前提：</strong> 求最长连续合法括号子串长度，不是最多配对数；空串答案为 0。</p>
@@ -4671,6 +4741,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>具体输入与边界推演：</strong> <a href="https://leetcode.cn/problems/daily-temperatures/">LC739</a> <a href="#walk-lc739">逐步状态</a>。温度就是此模板的 nums；栈存下标。</p>
 <p><a id="lc739"></a></p>
 <h3 id="hot100-lc739-每日温度"><a href="https://leetcode.cn/problems/daily-temperatures/">LC739</a> 每日温度</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/daily-temperatures/solution/shi-pin-jiang-qing-chu-wei-shi-yao-yao-y-k0ks/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-12 / 38。</strong> 按<a href="#plan-08">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>daily_temperatures(temperatures)</code>。温度列表 temperatures → 每个位置等到更暖日的距离，无更暖日为 0。</p>
 <p><strong>题意与前提：</strong> 对每天返回到下一次严格更高温度的天数，无更高温度则为 0；相等不算更暖。</p>
@@ -4759,6 +4830,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-09">单元 09 结构与前置</a>，再读 <strong>R1-13</strong> <a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> 搜索插入位置（<a href="#lc35">讲解</a>）。</p>
 <p><a id="lc239"></a></p>
 <h3 id="hot100-lc239-滑动窗口最大值"><a href="https://leetcode.cn/problems/sliding-window-maximum/">LC239</a> 滑动窗口最大值</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/sliding-window-maximum/solution/shi-pin-yi-ge-shi-pin-miao-dong-dan-diao-ezj6/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-10 / 62。</strong> 按<a href="#plan-08">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>max_sliding_window(nums, k)</code>。列表 nums、合法窗口长度 k → 每个窗口的最大值列表；不修改输入。</p>
 <p><strong>题意与前提：</strong> 返回每个长度为 k 的窗口最大值，1≤k≤n，共 n-k+1 个答案。</p>
@@ -4801,6 +4873,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-09">单元 09 结构与前置</a>，再做 <strong>R2-11</strong> <a href="https://leetcode.cn/problems/search-a-2d-matrix/">LC74</a> 搜索二维矩阵（<a href="#lc74">讲解</a>）。</p>
 <p><a id="lc84"></a></p>
 <h3 id="hot100-lc84-柱状图中最大的矩形"><a href="https://leetcode.cn/problems/largest-rectangle-in-histogram/">LC84</a> 柱状图中最大的矩形</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/largest-rectangle-in-histogram/solution/dan-diao-zhan-fu-ti-dan-pythonjavacgojsr-89s7/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-52 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-08">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>largest_rectangle_area(heights)</code>。非负柱高列表 heights → 最大矩形面积；不修改输入。</p>
 <p><strong>题意与前提：</strong> 非负柱高组成直方图，求覆盖连续柱子的最大矩形面积；宽度按柱数。</p>
@@ -4941,6 +5014,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p>标准库对照安排在<a href="#third-bisect">第三轮：手写二分与库函数</a>。</p>
 <p><a id="lc35"></a></p>
 <h3 id="hot100-lc35-搜索插入位置"><a href="https://leetcode.cn/problems/search-insert-position/">LC35</a> 搜索插入位置</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/search-insert-position/solution/er-fen-cha-zhao-zong-shi-xie-bu-dui-yi-g-nq23/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-13 / 38。</strong> 按<a href="#plan-09">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>search_insert(nums, target)</code>。递增列表 nums、target → 第一个不小于 target 的位置，可等于 len(nums)。</p>
 <p><strong>题意与前提：</strong> 在有序数组中返回 target 的位置或保持有序的插入位置；原题元素互异，返回值可以等于 n。</p>
@@ -5036,6 +5110,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-14</strong> <a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> 在排序数组中查找元素的第一个和最后一个位置（<a href="#lc34">讲解</a>）。</p>
 <p><a id="lc34"></a></p>
 <h3 id="hot100-lc34-在排序数组中查找元素的第一个和最后一个位置"><a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">LC34</a> 在排序数组中查找元素的第一个和最后一个位置</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/solution/er-fen-cha-zhao-zong-shi-xie-bu-dui-yi-g-t9l9/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-14 / 38。</strong> 按<a href="#plan-09">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>search_range(nums, target)</code>。非递减列表 nums、target → [最左下标,最右下标]；无解为 [-1,-1]。</p>
 <p><strong>题意与前提：</strong> 非递减数组中返回 target 的首末下标，无解返回 [-1,-1]；允许空数组与重复值。</p>
@@ -5083,6 +5158,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-10">单元 10 结构与前置</a>，再读 <strong>R1-15</strong> <a href="https://leetcode.cn/problems/reverse-linked-list/">LC206</a> 反转链表（<a href="#lc206">讲解</a>）。</p>
 <p><a id="lc74"></a></p>
 <h3 id="hot100-lc74-搜索二维矩阵"><a href="https://leetcode.cn/problems/search-a-2d-matrix/">LC74</a> 搜索二维矩阵</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/search-a-2d-matrix/solution/liang-chong-fang-fa-er-fen-cha-zhao-pai-39d74/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-11 / 62。</strong> 按<a href="#plan-09">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>search_matrix(matrix, target)</code>。全局可展平成非递减序列的 matrix、target → bool；行列独立有序还不够。</p>
 <p><strong>题意与前提：</strong> 矩阵每行有序，且下一行首元素大于上一行末元素；判断 target 是否存在。</p>
@@ -5121,6 +5197,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-12</strong> <a href="https://leetcode.cn/problems/find-minimum-in-rotated-sorted-array/">LC153</a> 寻找旋转排序数组中的最小值（<a href="#lc153">讲解</a>）。</p>
 <p><a id="lc153"></a></p>
 <h3 id="hot100-lc153-寻找旋转排序数组中的最小值"><a href="https://leetcode.cn/problems/find-minimum-in-rotated-sorted-array/">LC153</a> 寻找旋转排序数组中的最小值</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-minimum-in-rotated-sorted-array/solution/by-endlesscheng-owgd/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-12 / 62。</strong> 按<a href="#plan-09">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>find_min_rotated(nums)</code>。非空、无重复的旋转递增数组 nums → 最小数值；不是下标。</p>
 <p><strong>题意与前提：</strong> 求旋转有序数组的最小值；数组非空且值互异，未旋转也合法。</p>
@@ -5156,6 +5233,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-13</strong> <a href="https://leetcode.cn/problems/search-in-rotated-sorted-array/">LC33</a> 搜索旋转排序数组（<a href="#lc33">讲解</a>）。</p>
 <p><a id="lc33"></a></p>
 <h3 id="hot100-lc33-搜索旋转排序数组"><a href="https://leetcode.cn/problems/search-in-rotated-sorted-array/">LC33</a> 搜索旋转排序数组</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/search-in-rotated-sorted-array/solution/by-endlesscheng-auuh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-13 / 62。</strong> 按<a href="#plan-09">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>search_rotated(nums, target)</code>。无重复的旋转递增数组 nums、target → 命中下标或 -1。</p>
 <p><strong>题意与前提：</strong> 严格递增数组旋转后查找 target，下标不存在则返回 -1；原题不含重复值。</p>
@@ -5199,6 +5277,7 @@ queue.<span class="syntax-function">append</span>(<span class="syntax-number">2<
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-10">单元 10 结构与前置</a>，再做 <strong>R2-14</strong> <a href="https://leetcode.cn/problems/add-two-numbers/">LC2</a> 两数相加（<a href="#lc2">讲解</a>）。</p>
 <p><a id="lc4"></a></p>
 <h3 id="hot100-lc4-寻找两个正序数组的中位数"><a href="https://leetcode.cn/problems/median-of-two-sorted-arrays/">LC4</a> 寻找两个正序数组的中位数</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/median-of-two-sorted-arrays/solution/tu-jie-xun-xu-jian-jin-cong-shuang-zhi-z-p2gd/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-53 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-09">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>find_median_sorted_arrays(nums1, nums2)</code>。两个非递减数组 nums1/nums2 → 中位数；不能同时为空，不修改数组。</p>
 <p><strong>题意与前提：</strong> 求两个有序数组合并后的中位数，至少一个非空；原题要求对数级时间。</p>
@@ -5305,6 +5384,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>具体输入与边界推演：</strong> <a href="https://leetcode.cn/problems/reverse-linked-list/">LC206</a> <a href="#walk-lc206">逐步状态</a>。逐轮查看 previous、current、next_node 的变化。</p>
 <p><a id="lc206"></a></p>
 <h3 id="hot100-lc206-反转链表"><a href="https://leetcode.cn/problems/reverse-linked-list/">LC206</a> 反转链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/reverse-linked-list/solution/you-xie-cuo-liao-yi-ge-shi-pin-jiang-tou-o5zy/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-15 / 38。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>reverse_list(head)</code>。无环链表头 head → 反转后的新头；复用节点并修改 next。</p>
 <p><strong>题意与前提：</strong> 反转单链表的 next 指针并返回新头；允许空链表，原头最终成为尾。</p>
@@ -5425,6 +5505,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-16</strong> <a href="https://leetcode.cn/problems/merge-two-sorted-lists/">LC21</a> 合并两个有序链表（<a href="#lc21">讲解</a>）。</p>
 <p><a id="lc21"></a></p>
 <h3 id="hot100-lc21-合并两个有序链表"><a href="https://leetcode.cn/problems/merge-two-sorted-lists/">LC21</a> 合并两个有序链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/merge-two-sorted-lists/solution/liang-chong-fang-fa-die-dai-di-gui-pytho-wf75/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-16 / 38。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>merge_two_lists(head_a, head_b)</code>。两个有序且不共享节点的链表头 → 合并后的新头；复用原节点、改变连接。</p>
 <p><strong>题意与前提：</strong> 复用节点合并两条有序、无环链表；链表可空，重复值都保留。</p>
@@ -5465,6 +5546,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-17</strong> <a href="https://leetcode.cn/problems/linked-list-cycle/">LC141</a> 环形链表（<a href="#lc141">讲解</a>）。</p>
 <p><a id="lc141"></a></p>
 <h3 id="hot100-lc141-环形链表"><a href="https://leetcode.cn/problems/linked-list-cycle/">LC141</a> 环形链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/linked-list-cycle/solution/mei-xiang-ming-bai-yi-ge-shi-pin-jiang-t-c4sw/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-17 / 38。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>has_cycle(head)</code>。链表头 head → 是否有环的 bool；不修改节点。</p>
 <p><strong>题意与前提：</strong> 判断链表是否有环；输入用值序列与 position 构造，-1 表示无环，空链合法。</p>
@@ -5499,6 +5581,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-11">单元 11 结构与前置</a>，再读 <strong>R1-18</strong> <a href="https://leetcode.cn/problems/sort-list/">LC148</a> 排序链表（<a href="#lc148">讲解</a>）。</p>
 <p><a id="lc2"></a></p>
 <h3 id="hot100-lc2-两数相加"><a href="https://leetcode.cn/problems/add-two-numbers/">LC2</a> 两数相加</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/add-two-numbers/solution/dong-hua-jian-ji-xie-fa-cong-di-gui-dao-oe0di/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-14 / 62。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>add_two_numbers(head_a, head_b)</code>。两个逆序存数字的链表头 → 新建的结果链头；不修改输入链。</p>
 <p><strong>题意与前提：</strong> 两个非负整数按十进制位逆序存于非空链表，返回表示两数之和的新链表。</p>
@@ -5543,6 +5626,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-15</strong> <a href="https://leetcode.cn/problems/remove-nth-node-from-end-of-list/">LC19</a> 删除链表的倒数第 N 个结点（<a href="#lc19">讲解</a>）。</p>
 <p><a id="lc19"></a></p>
 <h3 id="hot100-lc19-删除链表的倒数第-n-个结点"><a href="https://leetcode.cn/problems/remove-nth-node-from-end-of-list/">LC19</a> 删除链表的倒数第 N 个结点</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/remove-nth-node-from-end-of-list/solution/ru-he-shan-chu-jie-dian-liu-fen-zhong-ga-xpfs/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-15 / 62。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>remove_nth_from_end(head, n)</code>。链表头 head、合法倒数位置 n → 删除后的新头；可能删除原头。</p>
 <p><strong>题意与前提：</strong> 删除倒数第 n 个节点并返回新头，1≤n≤链长；可能删除头或唯一节点。</p>
@@ -5581,6 +5665,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-16</strong> <a href="https://leetcode.cn/problems/swap-nodes-in-pairs/">LC24</a> 两两交换链表中的节点（<a href="#lc24">讲解</a>）。</p>
 <p><a id="lc24"></a></p>
 <h3 id="hot100-lc24-两两交换链表中的节点"><a href="https://leetcode.cn/problems/swap-nodes-in-pairs/">LC24</a> 两两交换链表中的节点</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/swap-nodes-in-pairs/solution/tu-jie-die-dai-di-gui-yi-zhang-tu-miao-d-51ap/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-16 / 62。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>swap_pairs(head)</code>。链表头 head → 两两交换后的新头；交换连接，不是交换数值。</p>
 <p><strong>题意与前提：</strong> 每两个节点交换位置，不交换节点值；空链或末尾单个节点保持合法。</p>
@@ -5620,6 +5705,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-17</strong> <a href="https://leetcode.cn/problems/linked-list-cycle-ii/">LC142</a> 环形链表 II（<a href="#lc142">讲解</a>）。</p>
 <p><a id="lc142"></a></p>
 <h3 id="hot100-lc142-环形链表-ii"><a href="https://leetcode.cn/problems/linked-list-cycle-ii/">LC142</a> 环形链表 II</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/linked-list-cycle-ii/solution/mei-xiang-ming-bai-yi-ge-shi-pin-jiang-t-nvsq/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-17 / 62。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>detect_cycle(head)</code>。链表头 head → 环入口节点或 None；ACM 再转换为原节点下标。</p>
 <p><strong>题意与前提：</strong> 返回环入口节点，无环返回 None；测试用入口下标表达节点身份，无环记 -1。</p>
@@ -5659,6 +5745,8 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-18</strong> <a href="https://leetcode.cn/problems/intersection-of-two-linked-lists/">LC160</a> 相交链表（<a href="#lc160">讲解</a>）。</p>
 <p><a id="lc160"></a></p>
 <h3 id="hot100-lc160-相交链表"><a href="https://leetcode.cn/problems/intersection-of-two-linked-lists/">LC160</a> 相交链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/intersection-of-two-linked-lists/solution/tu-jie-yi-zhang-tu-miao-dong-xiang-jiao-m6tg1/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 条件表达式每次只更新一个指针的位置：有节点就沿 next 前进，到 None 后换到另一条链的头；两条路线的总长度相同。</p>
 <p><strong>学习定位：第二轮必刷 · R2-18 / 62。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>get_intersection_node(head_a, head_b)</code>。两个无环链表头 head_a/head_b → 共享节点对象或 None；不按数值判断相交。</p>
 <p><strong>题意与前提：</strong> 返回两条无环链表的第一个共享节点，不相交返回 None；相交按节点身份，不按值相等。</p>
@@ -5670,20 +5758,13 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>对应题目：</strong> <a href="https://leetcode.cn/problems/intersection-of-two-linked-lists/">LC160</a> 相交链表。 <strong>轮次：第二轮必刷 · R2-18。</strong></p>
 <!-- code:core:160:get_intersection_node -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">get_intersection_node</span>(head_a, head_b):
-    node_a = head_a
-    node_b = head_b
-    <span class="syntax-comment"># 比较同一个节点，而不是数值相等；各走完 A+B 后必对齐。</span>
+    node_a, node_b = head_a, head_b
+    <span class="syntax-comment"># 每步沿当前链前进；到达 None 后，下一步切到另一条链的头。</span>
+    <span class="syntax-comment"># 两条路线都走 A+B 的总长度，长度差被抵消；比较的是节点身份。</span>
     <span class="syntax-keyword">while</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-keyword">not</span> node_b:
-        <span class="syntax-keyword">if</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
-            node_a = head_b
-        <span class="syntax-keyword">else</span>:
-            node_a = node_a.next
-
-        <span class="syntax-keyword">if</span> node_b <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
-            node_b = head_a
-        <span class="syntax-keyword">else</span>:
-            node_b = node_b.next
-    <span class="syntax-comment"># 有交点时返回共同节点；无交点时两个指针最终同时到达 None。</span>
+        node_a = node_a.next <span class="syntax-keyword">if</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-keyword">not</span> <span class="syntax-literal">None</span> <span class="syntax-keyword">else</span> head_b
+        node_b = node_b.next <span class="syntax-keyword">if</span> node_b <span class="syntax-keyword">is</span> <span class="syntax-keyword">not</span> <span class="syntax-literal">None</span> <span class="syntax-keyword">else</span> head_a
+    <span class="syntax-comment"># 有交点时停在共同节点；无交点时两者最终都为 None。</span>
     <span class="syntax-keyword">return</span> node_a</code></pre>
 <p><strong>边界与排错：</strong></p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="LC160 相交链表"><table><thead><tr><th scope="col">输入</th><th scope="col">预期</th><th scope="col">暴露的错误</th></tr></thead><tbody><tr><td><code>prefix_a=[1]</code>；<code>prefix_b=[1]</code>；<code>shared=[]</code></td><td>共享尾首节点：<code>None</code></td><td>两条值相同但节点独立的链表不相交。</td></tr>
@@ -5700,6 +5781,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-19</strong> <a href="https://leetcode.cn/problems/palindrome-linked-list/">LC234</a> 回文链表（<a href="#lc234">讲解</a>）。</p>
 <p><a id="lc234"></a></p>
 <h3 id="hot100-lc234-回文链表"><a href="https://leetcode.cn/problems/palindrome-linked-list/">LC234</a> 回文链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/palindrome-linked-list/solution/o1-kong-jian-zuo-fa-xun-zhao-zhong-jian-rv0f3/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-19 / 62。</strong> 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>is_palindrome_list(head)</code>。无环链表头 head → bool；主解会临时反转后半段，返回前恢复原链。</p>
 <p><strong>题意与前提：</strong> 判断非空链表是否回文；本书原地主解在比较后恢复原链，返回布尔值。</p>
@@ -5754,6 +5836,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-12">单元 12 结构与前置</a>，再做 <strong>R2-20</strong> <a href="https://leetcode.cn/problems/invert-binary-tree/">LC226</a> 翻转二叉树（<a href="#lc226">讲解</a>）。</p>
 <p><a id="lc25"></a></p>
 <h3 id="hot100-lc25-k-个一组翻转链表"><a href="https://leetcode.cn/problems/reverse-nodes-in-k-group/">LC25</a> K 个一组翻转链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/reverse-nodes-in-k-group/solution/you-xie-cuo-liao-yi-ge-shi-pin-jiang-tou-plfs/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-54 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>reverse_k_group(head, k)</code>。链表头 head、组长 k → 每 k 个反转后的新头；不足 k 个保持原样。</p>
 <p><strong>题意与前提：</strong> 每 k 个节点翻转一组，1≤k≤链长；末尾不足 k 个的部分保持原序。</p>
@@ -5802,6 +5885,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-55</strong> <a href="https://leetcode.cn/problems/copy-list-with-random-pointer/">LC138</a> 随机链表的复制（<a href="#lc138">讲解</a>）。</p>
 <p><a id="lc138"></a></p>
 <h3 id="hot100-lc138-随机链表的复制"><a href="https://leetcode.cn/problems/copy-list-with-random-pointer/">LC138</a> 随机链表的复制</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/copy-list-with-random-pointer/solution/bu-yong-ha-xi-biao-de-zuo-fa-pythonjavac-nzdo/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-55 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>copy_random_list(head)</code>。含 random 引用的链表头 head → 深拷贝新头；新节点不能引用原节点。</p>
 <p><strong>题意与前提：</strong> 深拷贝含 next、random 指针的链表；输入是值序列与 random 目标下标，-1 表示 None。</p>
@@ -5840,6 +5924,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-56</strong> <a href="https://leetcode.cn/problems/lru-cache/">LC146</a> LRU 缓存（<a href="#lc146">讲解</a>）。</p>
 <p><a id="lc146"></a></p>
 <h3 id="hot100-lc146-lru-缓存"><a href="https://leetcode.cn/problems/lru-cache/">LC146</a> LRU 缓存</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/lru-cache/solution/tu-jie-yi-zhang-tu-miao-dong-lrupythonja-czgt/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-56 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-10">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>LRUCache(capacity)</code>。LRUCache(capacity) 创建状态；put(key,value) 无返回值，get(key) 返回值或 -1。</p>
 <p><strong>题意与前提：</strong> 设计固定容量 LRU，get/put 期望 O(1)；原题容量≥1，读取命中和更新旧键都刷新使用顺序。</p>
@@ -6010,6 +6095,7 @@ current = head.next          <span class="syntax-comment"># 只移动 current，
 <p>学完后，排序只是其他题的准备步骤时可以直接 <code>sorted(nums)</code> 或 <code>nums.sort()</code>。前者创建新列表，后者原地修改并返回 None；这只是功能与使用场景的对照，<strong>不表示 Python 内置排序就是上述教学归并实现</strong>。<a href="https://docs.python.org/3.9/howto/sorting.html" title="排序键与稳定排序">排序接口</a></p>
 <p><a id="lc148"></a></p>
 <h3 id="hot100-lc148-排序链表"><a href="https://leetcode.cn/problems/sort-list/">LC148</a> 排序链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/sort-list/solution/liang-chong-fang-fa-fen-zhi-die-dai-mo-k-caei/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-18 / 38。</strong> 按<a href="#plan-11">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>sort_list(head)</code>。链表头 head → 排序后的新头；复用节点，递归主解占 O(log n) 栈。</p>
 <p><strong>题意与前提：</strong> 链表按值升序排序，允许空链、负数与重复值；先掌握递归归并，常数辅助空间进阶用自底向上归并。</p>
@@ -6268,6 +6354,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>单位边界。</strong> 空树和单节点树的直径都是 0；三节点单链直径为 2。把候选答案改成 <code>left+right+1</code> 会统计节点数，单节点立即错误得到 1。深树完整入口另有迭代版，不能用提高递归限制代替结构解释。</p>
 <p><a id="lc104"></a></p>
 <h3 id="hot100-lc104-二叉树的最大深度"><a href="https://leetcode.cn/problems/maximum-depth-of-binary-tree/">LC104</a> 二叉树的最大深度</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/maximum-depth-of-binary-tree/solution/kan-wan-zhe-ge-shi-pin-rang-ni-dui-di-gu-44uz/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-19 / 38。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>max_depth(root)</code>。二叉树根 root → 最大深度，按节点数计；空树为 0。</p>
 <p><strong>题意与前提：</strong> 求根到叶最长路径的节点数；空树深度为 0。</p>
@@ -6301,6 +6388,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-20</strong> <a href="https://leetcode.cn/problems/binary-tree-inorder-traversal/">LC94</a> 二叉树的中序遍历（<a href="#lc94">讲解</a>）。</p>
 <p><a id="lc94"></a></p>
 <h3 id="hot100-lc94-二叉树的中序遍历"><a href="https://leetcode.cn/problems/binary-tree-inorder-traversal/">LC94</a> 二叉树的中序遍历</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/binary-tree-inorder-traversal/solution/tu-jie-morris-bian-li-xian-suo-er-cha-sh-cm2s/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-20 / 38。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>inorder_traversal(root)</code>。二叉树根 root → 中序值列表；不修改树。</p>
 <p><strong>题意与前提：</strong> 返回二叉树中序序列：左、根、右；空树返回空列表。</p>
@@ -6342,6 +6430,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-21</strong> <a href="https://leetcode.cn/problems/binary-tree-level-order-traversal/">LC102</a> 二叉树的层序遍历（<a href="#lc102">讲解</a>）。</p>
 <p><a id="lc102"></a></p>
 <h3 id="hot100-lc102-二叉树的层序遍历"><a href="https://leetcode.cn/problems/binary-tree-level-order-traversal/">LC102</a> 二叉树的层序遍历</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/binary-tree-level-order-traversal/solution/bfs-wei-shi-yao-yao-yong-dui-lie-yi-ge-s-xlpz/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-21 / 38。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>level_order(root)</code>。二叉树根 root → 每层一个列表的二维结果；不修改树。</p>
 <p><strong>题意与前提：</strong> 按层返回二维节点值列表，每层从左到右；空树返回空列表。</p>
@@ -6486,6 +6575,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-13">单元 13 结构与前置</a>，再读 <strong>R1-22</strong> <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/">LC215</a> 数组中的第 K 个最大元素（<a href="#lc215">讲解</a>）。</p>
 <p><a id="lc226"></a></p>
 <h3 id="hot100-lc226-翻转二叉树"><a href="https://leetcode.cn/problems/invert-binary-tree/">LC226</a> 翻转二叉树</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/invert-binary-tree/solution/shi-pin-shen-ru-li-jie-di-gui-pythonjava-zhqh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-20 / 62。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>invert_tree(root)</code>。二叉树根 root → 翻转后的根；原地交换左右孩子，空树返回 None。</p>
 <p><strong>题意与前提：</strong> 原地交换二叉树每个节点的左右子树；空树合法，返回根节点。</p>
@@ -6520,6 +6610,8 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-21</strong> <a href="https://leetcode.cn/problems/symmetric-tree/">LC101</a> 对称二叉树（<a href="#lc101">讲解</a>）。</p>
 <p><a id="lc101"></a></p>
 <h3 id="hot100-lc101-对称二叉树"><a href="https://leetcode.cn/problems/symmetric-tree/">LC101</a> 对称二叉树</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/symmetric-tree/solution/ru-he-ling-huo-yun-yong-di-gui-lai-kan-s-6dq5/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 镜像检查分为当前值、外侧子树、内侧子树三个条件；空节点统一用身份比较判断是否同时为空。</p>
 <p><strong>学习定位：第二轮必刷 · R2-21 / 62。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>is_symmetric(root)</code>。二叉树根 root → 是否镜像对称的 bool；不修改树。</p>
 <p><strong>题意与前提：</strong> 判断二叉树是否镜像对称；左右对应节点的值与结构都必须匹配。</p>
@@ -6531,19 +6623,14 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <!-- code:core:101:is_symmetric -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">is_symmetric</span>(root):
     <span class="syntax-keyword">def</span> <span class="syntax-function">mirror</span>(node_a, node_b):
-        <span class="syntax-keyword">if</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span> <span class="syntax-keyword">and</span> node_b <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">True</span>
+        <span class="syntax-comment"># 任一侧为空时，只有两侧同时为空才对称。</span>
         <span class="syntax-keyword">if</span> node_a <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span> <span class="syntax-keyword">or</span> node_b <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
-        <span class="syntax-keyword">if</span> node_a.val != node_b.val:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
-
-        <span class="syntax-comment"># 镜像比较外侧与外侧、内侧与内侧，不是同侧相比较。</span>
-        outside_equal = <span class="syntax-function">mirror</span>(node_a.left, node_b.right)
-        <span class="syntax-keyword">if</span> <span class="syntax-keyword">not</span> outside_equal:
-            <span class="syntax-keyword">return</span> <span class="syntax-literal">False</span>
-        <span class="syntax-keyword">return</span> <span class="syntax-function">mirror</span>(node_a.right, node_b.left)
-
+            <span class="syntax-keyword">return</span> node_a <span class="syntax-keyword">is</span> node_b
+        <span class="syntax-comment"># 镜像的三个条件：当前值相等、外侧对称、内侧对称。</span>
+        <span class="syntax-comment"># and 从左往右判断；某个条件失败便停止后续递归。</span>
+        <span class="syntax-keyword">return</span> (node_a.val == node_b.val
+                <span class="syntax-keyword">and</span> <span class="syntax-function">mirror</span>(node_a.left, node_b.right)
+                <span class="syntax-keyword">and</span> <span class="syntax-function">mirror</span>(node_a.right, node_b.left))
     <span class="syntax-keyword">if</span> root <span class="syntax-keyword">is</span> <span class="syntax-literal">None</span>:
         <span class="syntax-keyword">return</span> <span class="syntax-literal">True</span>
     <span class="syntax-keyword">return</span> <span class="syntax-function">mirror</span>(root.left, root.right)</code></pre>
@@ -6563,6 +6650,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-22</strong> <a href="https://leetcode.cn/problems/binary-tree-right-side-view/">LC199</a> 二叉树的右视图（<a href="#lc199">讲解</a>）。</p>
 <p><a id="lc199"></a></p>
 <h3 id="hot100-lc199-二叉树的右视图"><a href="https://leetcode.cn/problems/binary-tree-right-side-view/">LC199</a> 二叉树的右视图</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/binary-tree-right-side-view/solution/ru-he-ling-huo-yun-yong-di-gui-lai-kan-s-r1nc/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-22 / 62。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>right_side_view(root)</code>。二叉树根 root → 从右边看到的值列表；不修改树。</p>
 <p><strong>题意与前提：</strong> 返回二叉树每层最右侧可见节点值；空树返回空列表。</p>
@@ -6608,6 +6696,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-23</strong> <a href="https://leetcode.cn/problems/convert-sorted-array-to-binary-search-tree/">LC108</a> 将有序数组转换为二叉搜索树（<a href="#lc108">讲解</a>）。</p>
 <p><a id="lc108"></a></p>
 <h3 id="hot100-lc108-将有序数组转换为二叉搜索树"><a href="https://leetcode.cn/problems/convert-sorted-array-to-binary-search-tree/">LC108</a> 将有序数组转换为二叉搜索树</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/convert-sorted-array-to-binary-search-tree/solution/ru-men-di-gui-cong-er-cha-shu-kai-shi-py-inu6/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-23 / 62。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>sorted_array_to_bst(nums)</code>。严格递增数组 nums → 新建的高度平衡 BST 根；返回树不是值列表。</p>
 <p><strong>题意与前提：</strong> 将严格递增数组转成任意一棵高度平衡 BST；正确形状不唯一。</p>
@@ -6644,6 +6733,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-24</strong> <a href="https://leetcode.cn/problems/validate-binary-search-tree/">LC98</a> 验证二叉搜索树（<a href="#lc98">讲解</a>）。</p>
 <p><a id="lc98"></a></p>
 <h3 id="hot100-lc98-验证二叉搜索树"><a href="https://leetcode.cn/problems/validate-binary-search-tree/">LC98</a> 验证二叉搜索树</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/validate-binary-search-tree/solution/qian-xu-zhong-xu-hou-xu-san-chong-fang-f-yxvh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-24 / 62。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>is_valid_bst_inorder(root)</code>。二叉树根 root → 是否严格 BST 的 bool；重复值不合法。</p>
 <p><strong>题意与前提：</strong> 判断严格 BST 性质；每个节点要满足整条祖先链传下来的大小限制。</p>
@@ -6684,6 +6774,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-25</strong> <a href="https://leetcode.cn/problems/kth-smallest-element-in-a-bst/">LC230</a> 二叉搜索树中第 K 小的元素（<a href="#lc230">讲解</a>）。</p>
 <p><a id="lc230"></a></p>
 <h3 id="hot100-lc230-二叉搜索树中第-k-小的元素"><a href="https://leetcode.cn/problems/kth-smallest-element-in-a-bst/">LC230</a> 二叉搜索树中第 K 小的元素</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/kth-smallest-element-in-a-bst/solution/zhong-xu-bian-li-pythonjavaccgojsrust-by-wc02/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-25 / 62。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>kth_smallest(root, k)</code>。BST 根 root、合法排名 k → 第 k 小的数值；不是返回节点。</p>
 <p><strong>题意与前提：</strong> 合法 BST 中返回第 k 小的节点值，1≤k≤节点数。</p>
@@ -6722,6 +6813,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-26</strong> <a href="https://leetcode.cn/problems/diameter-of-binary-tree/">LC543</a> 二叉树的直径（<a href="#lc543">讲解</a>）。</p>
 <p><a id="lc543"></a></p>
 <h3 id="hot100-lc543-二叉树的直径"><a href="https://leetcode.cn/problems/diameter-of-binary-tree/">LC543</a> 二叉树的直径</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/diameter-of-binary-tree/solution/shi-pin-che-di-zhang-wo-zhi-jing-dpcong-taqma/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-26 / 62。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>diameter_of_binary_tree(root)</code>。二叉树根 root → 最长路径的边数；不要求经过根。</p>
 <p><strong>题意与前提：</strong> 求二叉树任意两节点间最长路径的边数，不是节点数。</p>
@@ -6761,6 +6853,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-27</strong> <a href="https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-tree/">LC236</a> 二叉树的最近公共祖先（<a href="#lc236">讲解</a>）。</p>
 <p><a id="lc236"></a></p>
 <h3 id="hot100-lc236-二叉树的最近公共祖先"><a href="https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-tree/">LC236</a> 二叉树的最近公共祖先</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-tree/solution/fen-lei-tao-lun-luan-ru-ma-yi-ge-shi-pin-2r95/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-27 / 62。</strong> 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>lowest_common_ancestor(root, p, q)</code>。root、树中已有节点 p/q → 最近公共祖先节点；不能用新建同值节点替代 p/q。</p>
 <p><strong>题意与前提：</strong> 在一般二叉树中返回 p、q 的最近公共祖先；本题保证两个目标存在且互异，比较节点身份。</p>
@@ -6798,6 +6891,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-13">单元 13 结构与前置</a>，再做 <strong>R2-28</strong> <a href="https://leetcode.cn/problems/top-k-frequent-elements/">LC347</a> 前 K 个高频元素（<a href="#lc347">讲解</a>）。</p>
 <p><a id="lc105"></a></p>
 <h3 id="hot100-lc105-从前序与中序遍历序列构造二叉树"><a href="https://leetcode.cn/problems/construct-binary-tree-from-preorder-and-inorder-traversal/">LC105</a> 从前序与中序遍历序列构造二叉树</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/construct-binary-tree-from-preorder-and-inorder-traversal/solution/tu-jie-cong-on2-dao-onpythonjavacgojsrus-aob8/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-57 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>build_tree_pre_in(preorder, inorder)</code>。互异值的 preorder、inorder → 新建二叉树根；两个序列来自同一棵树。</p>
 <p><strong>题意与前提：</strong> 从同一棵树的合法前序、中序序列重建树；节点值互异，本组输入非空。</p>
@@ -6840,6 +6934,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-58</strong> <a href="https://leetcode.cn/problems/flatten-binary-tree-to-linked-list/">LC114</a> 二叉树展开为链表（<a href="#lc114">讲解</a>）。</p>
 <p><a id="lc114"></a></p>
 <h3 id="hot100-lc114-二叉树展开为链表"><a href="https://leetcode.cn/problems/flatten-binary-tree-to-linked-list/">LC114</a> 二叉树展开为链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/flatten-binary-tree-to-linked-list/solution/liang-chong-fang-fa-tou-cha-fa-fen-zhi-p-h9bg/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-58 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>flatten_tree(root)</code>。二叉树根 root → 返回 None，原地按前序串到 right，所有 left 置空。</p>
 <p><strong>题意与前提：</strong> 原地按前序展开成右链，所有 left 都必须置为 None；不创建替代节点。</p>
@@ -6878,6 +6973,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-59</strong> <a href="https://leetcode.cn/problems/binary-tree-maximum-path-sum/">LC124</a> 二叉树中的最大路径和（<a href="#lc124">讲解</a>）。</p>
 <p><a id="lc124"></a></p>
 <h3 id="hot100-lc124-二叉树中的最大路径和"><a href="https://leetcode.cn/problems/binary-tree-maximum-path-sum/">LC124</a> 二叉树中的最大路径和</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/binary-tree-maximum-path-sum/solution/shi-pin-che-di-zhang-wo-zhi-jing-dpcong-n9s91/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-59 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>max_path_sum(root)</code>。非空二叉树根 root → 任意非空路径的最大值和；路径可连接两侧，不修改树。</p>
 <p><strong>题意与前提：</strong> 求树中不分叉、不重复经过节点的非空路径最大和；路径不必经过根。</p>
@@ -6919,6 +7015,7 @@ root.right = <span class="syntax-function">TreeNode</span>(<span class="syntax-n
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-60</strong> <a href="https://leetcode.cn/problems/path-sum-iii/">LC437</a> 路径总和 III（<a href="#lc437">讲解</a>）。</p>
 <p><a id="lc437"></a></p>
 <h3 id="hot100-lc437-路径总和-iii"><a href="https://leetcode.cn/problems/path-sum-iii/">LC437</a> 路径总和 III</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/path-sum-iii/solution/zuo-fa-he-560-ti-shi-yi-yang-de-pythonja-fmzo/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-60 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-12">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>path_sum_iii(root, target)</code>。二叉树根 root、target → 向下连续路径的数量；起点不必是根，不修改树。</p>
 <p><strong>题意与前提：</strong> 统计和为 target 的向下非空路径数；可从任意节点开始，空树答案为 0。</p>
@@ -7090,6 +7187,7 @@ heap = [<span class="syntax-number">4</span>, <span class="syntax-number">1</spa
 <p><strong>手算。</strong> <code>[3,1,5,2]</code>、k=2：先建 <code>[1,3]</code>，读 5 时替换 1 并下沉得到 <code>[3,5]</code>，读 2 时不替换。第 2 大为 3。</p>
 <p><a id="lc215"></a></p>
 <h3 id="hot100-lc215-数组中的第-k-个最大元素"><a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/">LC215</a> 数组中的第 K 个最大元素</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/kth-largest-element-in-an-array/solution/on-kuai-su-xuan-ze-suan-fa-pythonjavaccg-lh7c/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-22 / 38。</strong> 按<a href="#plan-13">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>find_kth_largest(nums, k)</code>。列表 nums、合法 k → 第 k 大的数值；重复值按元素数计，不修改输入。</p>
 <p><strong>题意与前提：</strong> 返回排序意义上的第 k 大，1≤k≤n；重复值参与排名，不是第 k 个不同值。</p>
@@ -7230,6 +7328,7 @@ heap = [<span class="syntax-number">4</span>, <span class="syntax-number">1</spa
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-14">单元 14 结构与前置</a>，再读 <strong>R1-23</strong> <a href="https://leetcode.cn/problems/implement-trie-prefix-tree/">LC208</a> 实现 Trie（前缀树）（<a href="#lc208">讲解</a>）。</p>
 <p><a id="lc347"></a></p>
 <h3 id="hot100-lc347-前-k-个高频元素"><a href="https://leetcode.cn/problems/top-k-frequent-elements/">LC347</a> 前 K 个高频元素</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/top-k-frequent-elements/solution/tong-pai-xu-on-xian-xing-zuo-fa-pythonja-oqq2/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-28 / 62。</strong> 按<a href="#plan-13">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>top_k_frequent(nums, k)</code>。列表 nums、k → 最高频的 k 个数，顺序不限；不修改输入。</p>
 <p><strong>题意与前提：</strong> 返回频次最高的 k 个不同元素，顺序不限；原题保证边界处答案集合唯一。</p>
@@ -7270,6 +7369,7 @@ heap = [<span class="syntax-number">4</span>, <span class="syntax-number">1</spa
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-29</strong> <a href="https://leetcode.cn/problems/merge-k-sorted-lists/">LC23</a> 合并 K 个升序链表（<a href="#lc23">讲解</a>）。</p>
 <p><a id="lc23"></a></p>
 <h3 id="hot100-lc23-合并-k-个升序链表"><a href="https://leetcode.cn/problems/merge-k-sorted-lists/">LC23</a> 合并 K 个升序链表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/merge-k-sorted-lists/solution/liang-chong-fang-fa-zui-xiao-dui-fen-zhi-zbzx/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-29 / 62。</strong> 按<a href="#plan-13">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>merge_k_lists(lists)</code>。多个有序且互不共享节点的链头列表 lists → 合并的新头；复用原节点。</p>
 <p><strong>题意与前提：</strong> 合并 k 条有序链表；集合及内部链表都可为空，重复值保留。</p>
@@ -7317,6 +7417,8 @@ heap = [<span class="syntax-number">4</span>, <span class="syntax-number">1</spa
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-15">单元 15 结构与前置</a>，再做 <strong>R2-30</strong> <a href="https://leetcode.cn/problems/rotting-oranges/">LC994</a> 腐烂的橘子（<a href="#lc994">讲解</a>）。</p>
 <p><a id="lc295"></a></p>
 <h3 id="hot100-lc295-数据流的中位数"><a href="https://leetcode.cn/problems/find-median-from-data-stream/">LC295</a> 数据流的中位数</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-median-from-data-stream/solution/ru-he-zi-ran-yin-ru-da-xiao-dui-jian-ji-4v22k/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> 本课使用负数表示最大堆，并分步展示“移入、转移、平衡”。原文若使用 <code>heappush_max</code> 等最大堆接口，应先核对运行版本；本课 Python 3.9 的实现沿用 <code>heapq</code> 最小堆接口。</p>
 <p><strong>学习定位：第二轮必刷 · R2-61 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-13">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>MedianFinder()</code>。MedianFinder() 创建状态；addNum 更新，findMedian 查询非空数据流的中位数。</p>
 <p><strong>题意与前提：</strong> 设计动态添加数值与查询中位数；允许负数、重复值，查询前至少有一个数。</p>
@@ -7379,6 +7481,7 @@ heap = [<span class="syntax-number">4</span>, <span class="syntax-number">1</spa
 <p><strong>手算模板。</strong> 插入 apple 后，search(app) 是 False，而 startsWith(app) 是 True；再插入 app 后，app 节点的 end 变为 True，不必重新建整条路径。</p>
 <p><a id="lc208"></a></p>
 <h3 id="hot100-lc208-实现-trie前缀树"><a href="https://leetcode.cn/problems/implement-trie-prefix-tree/">LC208</a> 实现 Trie（前缀树）</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/implement-trie-prefix-tree/solution/cong-er-cha-shu-dao-er-shi-liu-cha-shu-p-xsj4/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-23 / 38。</strong> 按<a href="#plan-14">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>Trie()</code>。Trie() 创建字典树；insert 无返回值，search/startsWith 返回 bool。</p>
 <p><strong>题意与前提：</strong> 设计 insert、完整单词 search 和前缀 startsWith；字符为小写英文字母。</p>
@@ -7593,6 +7696,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>具体输入与边界推演：</strong> <a href="https://leetcode.cn/problems/course-schedule/">LC207</a> <a href="#walk-lc207">逐步状态</a>。入度更新相同；通用模板返回顺序，课程题返回布尔值。</p>
 <p><a id="lc200"></a></p>
 <h3 id="hot100-lc200-岛屿数量"><a href="https://leetcode.cn/problems/number-of-islands/">LC200</a> 岛屿数量</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/number-of-islands/solution/ba-fang-wen-guo-de-ge-zi-cha-shang-qi-zi-9gs0/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-24 / 38。</strong> 按<a href="#plan-15">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>num_islands(grid)</code>。字符网格 grid，格子为 &quot;0&quot;/&quot;1&quot; → 岛屿数；主解会把已访问陆地改成 &quot;0&quot;。</p>
 <p><strong>题意与前提：</strong> 在非空字符网格中统计岛屿；只允许上下左右连通，不含对角线。</p>
@@ -7644,6 +7748,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-25</strong> <a href="https://leetcode.cn/problems/course-schedule/">LC207</a> 课程表（<a href="#lc207">讲解</a>）。</p>
 <p><a id="lc207"></a></p>
 <h3 id="hot100-lc207-课程表"><a href="https://leetcode.cn/problems/course-schedule/">LC207</a> 课程表</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/course-schedule/solution/san-se-biao-ji-fa-pythonjavacgojsrust-by-pll7/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-25 / 38。</strong> 按<a href="#plan-15">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>can_finish(num_courses, prerequisites)</code>。课程数 num_courses、[course,prerequisite] 列表 → 是否全部可完成的 bool。</p>
 <p><strong>题意与前提：</strong> 判断能否完成全部课程；编号从 0 开始，[a,b] 表示 b 必须先于 a。</p>
@@ -7761,6 +7866,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-16">单元 16 结构与前置</a>，再读 <strong>R1-26</strong> <a href="https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/">LC121</a> 买卖股票的最佳时机（<a href="#lc121">讲解</a>）。</p>
 <p><a id="lc994"></a></p>
 <h3 id="hot100-lc994-腐烂的橘子"><a href="https://leetcode.cn/problems/rotting-oranges/">LC994</a> 腐烂的橘子</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/rotting-oranges/solution/duo-yuan-bfsfu-ti-dan-pythonjavacgojsrus-yfmh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-30 / 62。</strong> 按<a href="#plan-15">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>oranges_rotting(grid)</code>。整数网格 grid，格子为 0/1/2 → 最少分钟或 -1；会把传播到的格子改成 2。</p>
 <p><strong>题意与前提：</strong> 多源腐烂橘子同时向四邻传播，求全部腐烂的最少分钟数；0 空地、1 新鲜、2 腐烂，无法完成返回 -1。</p>
@@ -7842,6 +7948,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>手算模板。</strong> <code>[3,2,1,0,4]</code> 的 farthest 最多为 3，到下标 4 前发现不可达；不能读取最后的 4 后反过来扩大覆盖。新题无法写出淘汰／交换／支配依据时，先考虑 DP 或搜索，不强套贪心。</p>
 <p><a id="lc121"></a></p>
 <h3 id="hot100-lc121-买卖股票的最佳时机"><a href="https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/">LC121</a> 买卖股票的最佳时机</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/solution/mei-ju-mai-chu-jie-ge-wei-hu-mai-ru-de-z-02ud/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-26 / 38。</strong> 按<a href="#plan-16">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>max_profit(prices)</code>。价格列表 prices → 至多一次交易的最大利润；可不交易，最低为 0。</p>
 <p><strong>题意与前提：</strong> 最多买卖一次，必须先买后卖，求最大利润；无利可图时可以不交易。</p>
@@ -7875,6 +7982,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-27</strong> <a href="https://leetcode.cn/problems/jump-game/">LC55</a> 跳跃游戏（<a href="#lc55">讲解</a>）。</p>
 <p><a id="lc55"></a></p>
 <h3 id="hot100-lc55-跳跃游戏"><a href="https://leetcode.cn/problems/jump-game/">LC55</a> 跳跃游戏</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/jump-game/solution/liang-chong-li-jie-fang-shi-wei-hu-zui-y-q67s/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-27 / 38。</strong> 按<a href="#plan-16">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>can_jump(nums)</code>。非负跳跃上限列表 nums → 能否到达末尾的 bool；不修改输入。</p>
 <p><strong>题意与前提：</strong> 原题的非空非负数组每项表示最大跳距，判断终点是否可达；单元素已到终点。本课为本题统一扩展空数组边界：空数组没有终点，返回 <code>False</code>，速览、主解、备选及完整入口采用同一约定。</p>
@@ -7964,6 +8072,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-28</strong> <a href="https://leetcode.cn/problems/merge-intervals/">LC56</a> 合并区间（<a href="#lc56">讲解</a>）。</p>
 <p><a id="lc56"></a></p>
 <h3 id="hot100-lc56-合并区间"><a href="https://leetcode.cn/problems/merge-intervals/">LC56</a> 合并区间</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/merge-intervals/solution/jian-dan-zuo-fa-yi-ji-wei-shi-yao-yao-zh-f2b3/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-28 / 38。</strong> 按<a href="#plan-16">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>merge_intervals(intervals)</code>。闭区间列表 intervals → 合并后的新二维列表；不改原区间。</p>
 <p><strong>题意与前提：</strong> 合并所有重叠闭区间；端点相接算重叠，零长度区间合法。</p>
@@ -7992,6 +8101,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-17">单元 17 结构与前置</a>，再读 <strong>R1-29</strong> <a href="https://leetcode.cn/problems/climbing-stairs/">LC70</a> 爬楼梯（<a href="#lc70">讲解</a>）。</p>
 <p><a id="lc45"></a></p>
 <h3 id="hot100-lc45-跳跃游戏-ii"><a href="https://leetcode.cn/problems/jump-game-ii/">LC45</a> 跳跃游戏 II</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/jump-game-ii/solution/tu-jie-yi-zhang-tu-miao-dong-tiao-yue-yo-h2d4/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-31 / 62。</strong> 按<a href="#plan-16">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>min_jumps(nums)</code>。非负跳跃上限列表 nums → 最少跳数；原题保证可达，实现扩展无解为 -1。</p>
 <p><strong>题意与前提：</strong> 在保证终点可达的跳跃数组中求最少跳数；不可达属于额外练习，不是原题前提。</p>
@@ -8030,6 +8140,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-32</strong> <a href="https://leetcode.cn/problems/partition-labels/">LC763</a> 划分字母区间（<a href="#lc763">讲解</a>）。</p>
 <p><a id="lc763"></a></p>
 <h3 id="hot100-lc763-划分字母区间"><a href="https://leetcode.cn/problems/partition-labels/">LC763</a> 划分字母区间</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/partition-labels/solution/ben-zhi-shi-he-bing-qu-jian-jian-ji-xie-ygsn8/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-32 / 62。</strong> 按<a href="#plan-16">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>partition_labels(s)</code>。字符串 s → 最多分段的长度列表，每个字符只出现于一段。</p>
 <p><strong>题意与前提：</strong> 将小写字母串尽量多分段，同一字符只能出现在一段中，返回各段长度。</p>
@@ -8067,6 +8178,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-33</strong> <a href="https://leetcode.cn/problems/majority-element/">LC169</a> 多数元素（<a href="#lc169">讲解</a>）。</p>
 <p><a id="lc169"></a></p>
 <h3 id="hot100-lc169-多数元素"><a href="https://leetcode.cn/problems/majority-element/">LC169</a> 多数元素</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/majority-element/solution/on-mo-er-tou-piao-fa-yan-jin-zheng-ming-ww1zv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-33 / 62。</strong> 按<a href="#plan-16">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>majority_element(nums)</code>。非空列表 nums → 出现次数超过一半的值；原题保证存在。</p>
 <p><strong>题意与前提：</strong> 非空数组保证有出现次数严格超过 n/2 的元素，返回该多数元素。</p>
@@ -8125,6 +8237,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>手算模板。</strong> 台阶 2、3、4 的方案数依次为 2、3、5；求方案内容而非数量时，还要存选择或前驱，不能只改输出格式。LC118 用上一行生成当前行，是二维列表上的同一种无环依赖。</p>
 <p><a id="lc70"></a></p>
 <h3 id="hot100-lc70-爬楼梯"><a href="https://leetcode.cn/problems/climbing-stairs/">LC70</a> 爬楼梯</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/climbing-stairs/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-7zm1/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-29 / 38。</strong> 按<a href="#plan-17">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>climb_stairs(n)</code>。台阶数 n → 每次一步或两步的方案数；实现以零阶一种方案初始化。</p>
 <p><strong>题意与前提：</strong> 每步走 1 或 2 阶，求到第 n 阶的方案数；原题 n≥1。</p>
@@ -8204,6 +8317,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-30</strong> <a href="https://leetcode.cn/problems/house-robber/">LC198</a> 打家劫舍（<a href="#lc198">讲解</a>）。</p>
 <p><a id="lc198"></a></p>
 <h3 id="hot100-lc198-打家劫舍"><a href="https://leetcode.cn/problems/house-robber/">LC198</a> 打家劫舍</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/house-robber/solution/ru-he-xiang-chu-zhuang-tai-ding-yi-he-zh-1wt1/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-30 / 38。</strong> 按<a href="#plan-17">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>rob(nums)</code>。非负金额列表 nums → 不选相邻项的最大总额；不修改输入。</p>
 <p><strong>题意与前提：</strong> 非负金额房屋不能同时选相邻两间，求最大金额；原题至少一间房。</p>
@@ -8239,6 +8353,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-31</strong> <a href="https://leetcode.cn/problems/maximum-subarray/">LC53</a> 最大子数组和（<a href="#lc53">讲解</a>）。</p>
 <p><a id="lc53"></a></p>
 <h3 id="hot100-lc53-最大子数组和"><a href="https://leetcode.cn/problems/maximum-subarray/">LC53</a> 最大子数组和</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/maximum-subarray/solution/qian-zhui-he-zuo-fa-ben-zhi-shi-mai-mai-abu71/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-31 / 38。</strong> 按<a href="#plan-17">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>max_sub_array(nums)</code>。非空整数列表 nums → 非空连续子数组的最大和；不修改输入。</p>
 <p><strong>题意与前提：</strong> 求非空数组中连续非空子数组的最大和；不能用空区间得到 0。</p>
@@ -8274,6 +8389,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-18">单元 18 结构与前置</a>，再读 <strong>R1-32</strong> <a href="https://leetcode.cn/problems/unique-paths/">LC62</a> 不同路径（<a href="#lc62">讲解</a>）。</p>
 <p><a id="lc118"></a></p>
 <h3 id="hot100-lc118-杨辉三角"><a href="https://leetcode.cn/problems/pascals-triangle/">LC118</a> 杨辉三角</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/pascals-triangle/solution/jian-dan-ti-jian-dan-zuo-pythonjavaccgoj-z596/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-34 / 62。</strong> 按<a href="#plan-17">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>generate_pascal(num_rows)</code>。行数 num_rows → 杨辉三角二维列表。</p>
 <p><strong>题意与前提：</strong> 生成杨辉三角前 num_rows 行，num_rows≥1；各行必须是独立列表。</p>
@@ -8307,6 +8423,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-35</strong> <a href="https://leetcode.cn/problems/maximum-product-subarray/">LC152</a> 乘积最大子数组（<a href="#lc152">讲解</a>）。</p>
 <p><a id="lc152"></a></p>
 <h3 id="hot100-lc152-乘积最大子数组"><a href="https://leetcode.cn/problems/maximum-product-subarray/">LC152</a> 乘积最大子数组</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/maximum-product-subarray/solution/dong-tai-gui-hua-jian-ji-gao-xiao-python-i778/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-35 / 62。</strong> 按<a href="#plan-17">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>max_product(nums)</code>。非空整数列表 nums → 非空连续子数组的最大乘积；不修改输入。</p>
 <p><strong>题意与前提：</strong> 求非空连续子数组的最大乘积；数组可有负数和零。</p>
@@ -8343,6 +8460,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-36</strong> <a href="https://leetcode.cn/problems/longest-increasing-subsequence/">LC300</a> 最长递增子序列（<a href="#lc300">讲解</a>）。</p>
 <p><a id="lc300"></a></p>
 <h3 id="hot100-lc300-最长递增子序列"><a href="https://leetcode.cn/problems/longest-increasing-subsequence/">LC300</a> 最长递增子序列</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-increasing-subsequence/solution/jiao-ni-yi-bu-bu-si-kao-dpfu-o1-kong-jia-4zma/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-36 / 62。</strong> 按<a href="#plan-17">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>length_of_lis_dp(nums)</code>。整数列表 nums → 严格递增子序列长度；可以跳过元素，不修改输入。</p>
 <p><strong>题意与前提：</strong> 求非空数组最长严格递增子序列长度；可跳过元素，但相等值不能延长。</p>
@@ -8399,6 +8517,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>空间优化的条件。</strong> 后续不需要历史格子才可滚动；要恢复具体路径或编辑步骤时，先保留完整表或额外前驱。完整表的空间成本与更清楚的状态对应关系是显式取舍。</p>
 <p><a id="lc62"></a></p>
 <h3 id="hot100-lc62-不同路径"><a href="https://leetcode.cn/problems/unique-paths/">LC62</a> 不同路径</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/unique-paths/solution/liang-chong-fang-fa-dong-tai-gui-hua-zu-o5k32/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-32 / 38。</strong> 按<a href="#plan-18">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>unique_paths_dp(rows, cols)</code>。正整数 rows、cols → 只向右／向下的路径数；不输出路径内容。</p>
 <p><strong>题意与前提：</strong> rows×cols 网格从左上到右下，只能向右或向下，求路径数；无障碍，尺寸均≥1。</p>
@@ -8480,6 +8599,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-33</strong> <a href="https://leetcode.cn/problems/longest-common-subsequence/">LC1143</a> 最长公共子序列（<a href="#lc1143">讲解</a>）。</p>
 <p><a id="lc1143"></a></p>
 <h3 id="hot100-lc1143-最长公共子序列"><a href="https://leetcode.cn/problems/longest-common-subsequence/">LC1143</a> 最长公共子序列</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/longest-common-subsequence/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-lbz5/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-33 / 38。</strong> 按<a href="#plan-18">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>longest_common_subsequence_dp(s, t)</code>。字符串 s、t → 最长公共子序列长度；不要求连续。</p>
 <p><strong>题意与前提：</strong> 返回两个字符串最长公共子序列的长度；可以不连续，但必须保留相对顺序。</p>
@@ -8528,6 +8648,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-19">单元 19 结构与前置</a>，再读 <strong>R1-34</strong> <a href="https://leetcode.cn/problems/partition-equal-subset-sum/">LC416</a> 分割等和子集（<a href="#lc416">讲解</a>）。</p>
 <p><a id="lc64"></a></p>
 <h3 id="hot100-lc64-最小路径和"><a href="https://leetcode.cn/problems/minimum-path-sum/">LC64</a> 最小路径和</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/minimum-path-sum/solution/jiao-ni-yi-bu-bu-si-kao-dpcong-ji-yi-hua-zfb2/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-37 / 62。</strong> 按<a href="#plan-18">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>min_path_sum_dp(grid)</code>。非负网格 grid → 最小路径和；二维主解不修改输入。</p>
 <p><strong>题意与前提：</strong> 非负网格从左上到右下，只能向右或向下，求最小路径和。</p>
@@ -8585,6 +8706,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-38</strong> <a href="https://leetcode.cn/problems/edit-distance/">LC72</a> 编辑距离（<a href="#lc72">讲解</a>）。</p>
 <p><a id="lc72"></a></p>
 <h3 id="hot100-lc72-编辑距离"><a href="https://leetcode.cn/problems/edit-distance/">LC72</a> 编辑距离</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/edit-distance/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-uo5q/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-38 / 62。</strong> 按<a href="#plan-18">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>edit_distance_dp(s, t)</code>。字符串 s、t → 单字符插入、删除、替换的最少次数，每种代价为 1。</p>
 <p><strong>题意与前提：</strong> 用插入、删除、替换把 s 改为 t，每次代价 1；字符串可为空。</p>
@@ -8677,6 +8799,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>别替换成未经证明的贪心。</strong> <code>coins=[1,3,4], amount=6</code> 应取 <code>3+3</code>，答案 2；每次优先取最大面额会取 <code>4+1+1</code>，得到 3。此模板要求正整数面额、非负目标，不接收负面额作为普通边界。</p>
 <p><a id="lc416"></a></p>
 <h3 id="hot100-lc416-分割等和子集"><a href="https://leetcode.cn/problems/partition-equal-subset-sum/">LC416</a> 分割等和子集</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/partition-equal-subset-sum/solution/0-1-bei-bao-cong-ji-yi-hua-sou-suo-dao-d-ev76/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-34 / 38。</strong> 按<a href="#plan-19">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>can_partition(nums)</code>。正整数列表 nums → 能否分成两组等和的 bool；每个元素只用一次。</p>
 <p><strong>题意与前提：</strong> 正整数数组能否分成和相等的两组；每个位置只能使用一次。</p>
@@ -8771,6 +8894,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-35</strong> <a href="https://leetcode.cn/problems/coin-change/">LC322</a> 零钱兑换（<a href="#lc322">讲解</a>）。</p>
 <p><a id="lc322"></a></p>
 <h3 id="hot100-lc322-零钱兑换"><a href="https://leetcode.cn/problems/coin-change/">LC322</a> 零钱兑换</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/coin-change/solution/jiao-ni-yi-bu-bu-si-kao-dong-tai-gui-hua-21m5/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-35 / 38。</strong> 按<a href="#plan-19">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>coin_change(coins, amount)</code>。正面额列表 coins、非负 amount → 无限使用下最少硬币数；无解为 -1。</p>
 <p><strong>题意与前提：</strong> 正面额硬币可无限使用，求组成 amount 的最少枚数；amount=0 返回 0，无解返回 -1。</p>
@@ -8808,6 +8932,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-20">单元 20 结构与前置</a>，再读 <strong>R1-36</strong> <a href="https://leetcode.cn/problems/subsets/">LC78</a> 子集（<a href="#lc78">讲解</a>）。</p>
 <p><a id="lc279"></a></p>
 <h3 id="hot100-lc279-完全平方数"><a href="https://leetcode.cn/problems/perfect-squares/">LC279</a> 完全平方数</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/perfect-squares/solution/dong-tai-gui-hua-cong-ji-yi-hua-sou-suo-3kz1g/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-39 / 62。</strong> 按<a href="#plan-19">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>num_squares(n)</code>。非负整数 n → 凑成 n 的最少完全平方数个数。</p>
 <p><strong>模板边界：</strong> 原题 n≥1；本实现额外支持 n=0，返回 0，表示空和。</p>
@@ -8849,6 +8974,8 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-40</strong> <a href="https://leetcode.cn/problems/word-break/">LC139</a> 单词拆分（<a href="#lc139">讲解</a>）。</p>
 <p><a id="lc139"></a></p>
 <h3 id="hot100-lc139-单词拆分"><a href="https://leetcode.cn/problems/word-break/">LC139</a> 单词拆分</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/word-break/solution/jiao-ni-yi-bu-bu-si-kao-dpcong-ji-yi-hua-chrs/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
+<p><strong>本课写法：</strong> <code>max(map(len, words), default=0)</code> 把逐词取长度和求最大值放在一起；空词表得到 0。后面的 DP 状态与转移仍逐步展开。</p>
 <p><strong>学习定位：第二轮必刷 · R2-40 / 62。</strong> 按<a href="#plan-19">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>word_break(s, word_dict)</code>。字符串 s、词典 word_dict → 是否可拆分的 bool；同一个词可复用。</p>
 <p><strong>题意与前提：</strong> 判断非空字符串能否由非空词典单词拼成；同一个单词可重复使用。</p>
@@ -8862,9 +8989,8 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <!-- code:core:139:word_break -->
 <pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">word_break</span>(s, word_dict):
     words = <span class="syntax-function">set</span>(word_dict)
-    max_word_length = <span class="syntax-number">0</span>
-    <span class="syntax-keyword">for</span> word <span class="syntax-keyword">in</span> words:
-        max_word_length = <span class="syntax-function">max</span>(max_word_length, <span class="syntax-function">len</span>(word))
+    <span class="syntax-comment"># 一次取最长词长；空词表的默认长度为 0。</span>
+    max_word_length = <span class="syntax-function">max</span>(<span class="syntax-function">map</span>(len, words), default=<span class="syntax-number">0</span>)
     <span class="syntax-comment"># dp[end] 表示 s[:end] 能否完整拆成词；空前缀可以拆，因此 dp[0] 为 True。</span>
     dp = [<span class="syntax-literal">False</span>] * (<span class="syntax-function">len</span>(s) + <span class="syntax-number">1</span>)
     dp[<span class="syntax-number">0</span>] = <span class="syntax-literal">True</span>
@@ -8935,6 +9061,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>具体输入与边界推演：</strong> <a href="https://leetcode.cn/problems/subsets/">LC78</a> <a href="#walk-lc78">逐步状态</a>。递归与撤销相同；path[:] 与 path.copy() 都保存浅副本。</p>
 <p><a id="lc78"></a></p>
 <h3 id="hot100-lc78-子集"><a href="https://leetcode.cn/problems/subsets/">LC78</a> 子集</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/subsets/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-8tkl/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-36 / 38。</strong> 按<a href="#plan-20">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>subsets(nums)</code>。互异元素列表 nums → 全部子集二维列表；包含空集，不修改输入。</p>
 <p><strong>题意与前提：</strong> 返回互异元素的所有子集，必须包括空集；元素不可重复选取。</p>
@@ -9037,6 +9164,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，<strong>R1-37</strong> <a href="https://leetcode.cn/problems/permutations/">LC46</a> 全排列（<a href="#lc46">讲解</a>）。</p>
 <p><a id="lc46"></a></p>
 <h3 id="hot100-lc46-全排列"><a href="https://leetcode.cn/problems/permutations/">LC46</a> 全排列</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/permutations/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-jing-que-6hrh/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-37 / 38。</strong> 按<a href="#plan-20">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>接口：</strong><code>permute(nums)</code>。互异元素列表 nums → 全排列二维列表；不修改输入，空列表扩展得到一个空排列。</p>
 <p><strong>题意与前提：</strong> 返回互异元素的所有排列；排列内部顺序有意义，答案外层顺序不限。</p>
@@ -9088,6 +9216,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 读完本题参考实现、边界与输入输出说明后，先读<a href="#stage-21">单元 21 结构与前置</a>，再读 <strong>R1-38</strong> <a href="https://leetcode.cn/problems/single-number/">LC136</a> 只出现一次的数字（<a href="#lc136">讲解</a>）。</p>
 <p><a id="lc17"></a></p>
 <h3 id="hot100-lc17-电话号码的字母组合"><a href="https://leetcode.cn/problems/letter-combinations-of-a-phone-number/">LC17</a> 电话号码的字母组合</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/letter-combinations-of-a-phone-number/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-3orv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-41 / 62。</strong> 按<a href="#plan-20">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>letter_combinations(digits)</code>。仅含 2..9 的数字字符串 digits → 字母组合字符串列表；空输入返回 []。</p>
 <p><strong>题意与前提：</strong> 返回电话数字对应的所有字母组合；数字限 2..9，空输入返回 [] 而不是 [&#39;&#39;]。</p>
@@ -9145,6 +9274,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-42</strong> <a href="https://leetcode.cn/problems/combination-sum/">LC39</a> 组合总和（<a href="#lc39">讲解</a>）。</p>
 <p><a id="lc39"></a></p>
 <h3 id="hot100-lc39-组合总和"><a href="https://leetcode.cn/problems/combination-sum/">LC39</a> 组合总和</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/combination-sum/solution/liang-chong-fang-fa-xuan-huo-bu-xuan-mei-mhf9/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-42 / 62。</strong> 按<a href="#plan-20">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>combination_sum(candidates, target)</code>。正整数候选 candidates、target → 可重复选取的不同组合列表；不修改输入。</p>
 <p><strong>题意与前提：</strong> 互异正整数候选可以重复使用，返回和为 target 的不同组合；顺序不同不算新组合。</p>
@@ -9191,6 +9321,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-43</strong> <a href="https://leetcode.cn/problems/generate-parentheses/">LC22</a> 括号生成（<a href="#lc22">讲解</a>）。</p>
 <p><a id="lc22"></a></p>
 <h3 id="hot100-lc22-括号生成"><a href="https://leetcode.cn/problems/generate-parentheses/">LC22</a> 括号生成</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/generate-parentheses/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-wcdw/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-43 / 62。</strong> 按<a href="#plan-20">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>generate_parenthesis(n)</code>。非负对数 n → 全部合法括号字符串列表。</p>
 <p><strong>题意与前提：</strong> 原题返回 n 对括号的全部合法序列，n≥1；任何前缀都不能右括号多于左括号。本模板额外支持 n=0，返回 <code>[&#39;&#39;]</code>，表示一个空括号串方案。</p>
@@ -9236,6 +9367,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-44</strong> <a href="https://leetcode.cn/problems/word-search/">LC79</a> 单词搜索（<a href="#lc79">讲解</a>）。</p>
 <p><a id="lc79"></a></p>
 <h3 id="hot100-lc79-单词搜索"><a href="https://leetcode.cn/problems/word-search/">LC79</a> 单词搜索</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/word-search/solution/liang-ge-you-hua-rang-dai-ma-ji-bai-jie-g3mmm/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-44 / 62。</strong> 按<a href="#plan-20">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>word_exists(board, word)</code>。字符网格 board、非空 word → 是否存在合法路径的 bool；返回前恢复访问标记。</p>
 <p><strong>题意与前提：</strong> 非空矩形字符网格中沿四邻路径匹配非空单词；一条路径不能重复使用格子。</p>
@@ -9292,6 +9424,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，<strong>R2-45</strong> <a href="https://leetcode.cn/problems/palindrome-partitioning/">LC131</a> 分割回文串（<a href="#lc131">讲解</a>）。</p>
 <p><a id="lc131"></a></p>
 <h3 id="hot100-lc131-分割回文串"><a href="https://leetcode.cn/problems/palindrome-partitioning/">LC131</a> 分割回文串</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/palindrome-partitioning/solution/hui-su-bu-hui-xie-tao-lu-zai-ci-pythonja-fues/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-45 / 62。</strong> 按<a href="#plan-20">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>partition_palindromes(s)</code>。字符串 s → 全部回文切分方案，每个方案是字符串列表。</p>
 <p><strong>题意与前提：</strong> 把非空字符串切成回文子串，返回所有完整分割方案。</p>
@@ -9340,6 +9473,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 完成本题边界与输入输出检查后，先读<a href="#stage-21">单元 21 结构与前置</a>，再做 <strong>R2-46</strong> <a href="https://leetcode.cn/problems/find-the-duplicate-number/">LC287</a> 寻找重复数（<a href="#lc287">讲解</a>）。</p>
 <p><a id="lc51"></a></p>
 <h3 id="hot100-lc51-n-皇后"><a href="https://leetcode.cn/problems/n-queens/">LC51</a> N 皇后</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/n-queens/solution/hui-su-tao-lu-miao-sha-nhuang-hou-shi-pi-mljv/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-62 / 62。</strong> 第二轮综合收尾；不是第三轮补充题。 按<a href="#plan-20">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>solve_n_queens(n)</code>。棋盘大小 n → 全部解；每个解为 n 个字符串，Q 表示皇后。</p>
 <p><strong>题意与前提：</strong> 在 n×n 棋盘放 n 个互不攻击的皇后，n≥1；无解返回空列表。</p>
@@ -9411,6 +9545,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>手算模板。</strong> <code>[4,1,2,1,2]</code> 的相同元素两两抵消，最终留下 4。这里的 XOR 抵消和 LC169 的多数投票抵消不是同一个前提。</p>
 <p><a id="lc136"></a></p>
 <h3 id="hot100-lc136-只出现一次的数字"><a href="https://leetcode.cn/problems/single-number/">LC136</a> 只出现一次的数字</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/single-number/solution/li-yong-yi-huo-de-xing-zhi-fu-ti-dan-pyt-oizc/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第一轮必刷 · R1-38 / 38。</strong> 按<a href="#plan-21">本单元分段</a>阅读，轮内顺序见<a href="#round-1">第 1 轮清单</a>。</p>
 <p><strong>本章完整模板题。接口：</strong> <code>single_number(nums)</code>。整数列表 nums → 唯一单独出现的值；其余值必须恰好出现两次。</p>
 <p><strong>题意与前提：</strong> 非空数组中恰有一个数出现一次，其余每个数恰好出现两次，找出单次元素。</p>
@@ -9492,6 +9627,7 @@ graph = <span class="syntax-function">build_graph</span>(<span class="syntax-num
 <p><strong>下一步：</strong> 进入 <strong>R2-01</strong> <a href="https://leetcode.cn/problems/rotate-array/">LC189</a> 轮转数组（<a href="#lc189">讲解</a>），开始第二轮；补充题按第三轮路线阅读。</p>
 <p><a id="lc287"></a></p>
 <h3 id="hot100-lc287-寻找重复数"><a href="https://leetcode.cn/problems/find-the-duplicate-number/">LC287</a> 寻找重复数</h3>
+<p><strong>原文参考：</strong> <a href="https://leetcode.cn/problems/find-the-duplicate-number/solution/yong-ji-huan-shu-li-jie-zuo-fa-tong-142-tkoc2/">灵茶山艾府 · 本题题解</a>。本课按 Python 3.9 与统一变量约定组织参考实现。</p>
 <p><strong>学习定位：第二轮必刷 · R2-46 / 62。</strong> 按<a href="#plan-21">本单元分段</a>阅读，轮内顺序见<a href="#round-2">第 2 轮清单</a>。</p>
 <p><strong>接口：</strong><code>find_duplicate(nums)</code>。长度 n+1、值域 1..n 且只有一种重复值的 nums → 重复值；不修改输入。</p>
 <p><strong>题意与前提：</strong> n+1 个数都在 [1,n]，恰有一个值重复且可能出现多次；要求不改数组、O(1) 辅助空间。</p>
