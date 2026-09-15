@@ -187,6 +187,265 @@ seen.<span class="syntax-function">remove</span>(<span class="syntax-number">10<
 <li><code>set</code>：<code>add</code> 增加，<code>discard</code> 删除，<code>in</code> 判断是否存在。</li>
 </ul>
 <p>语法依据：<a href="https://docs.python.org/3.9/tutorial/datastructures.html">Python 3.9 数据结构教程</a>。</p>
+<p><a id="program-python-toolbox"></a></p>
+<h3 id="hot100-python-常用结构与函数按需速查">Python 常用结构与函数：按需速查</h3>
+<p><strong>阅读方式：</strong> 这一节是练习时的查阅页。先看用途，遇到写法忘记时再展开细节；三小时速览优先保持算法主线。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Python 常用结构与函数：按需速查"><table><thead><tr><th scope="col">现在要做什么</th><th scope="col">直接跳转</th></tr></thead><tbody><tr><td>保存坐标、成对返回结果</td><td><a href="#toolbox-tuple">元组与解包</a></td></tr>
+<tr><td>拆分、拼接、截取字符串</td><td><a href="#toolbox-string">字符串</a></td></tr>
+<tr><td>创建 DP 表、复制二维数组</td><td><a href="#toolbox-matrix">二维列表</a></td></tr>
+<tr><td>按次数、下标或两组数据遍历</td><td><a href="#toolbox-iteration">range、enumerate、zip</a></td></tr>
+<tr><td>按指定规则排序</td><td><a href="#toolbox-sort">sorted、key、lambda</a></td></tr>
+<tr><td>转换、筛选、汇总数据</td><td><a href="#toolbox-functions">推导式与常用函数</a></td></tr>
+<tr><td>定义函数、返回结果、修改参数</td><td><a href="#toolbox-call">函数写法</a></td></tr></tbody></table></div>
+<p><a id="toolbox-tuple"></a></p>
+<h3 id="hot100-①-tuple-与解包保存一组固定搭配的数据">① tuple 与解包：保存一组固定搭配的数据</h3>
+<p><strong>用途：</strong> 坐标 <code>(row, col)</code>、区间端点、函数返回多个结果。</p>
+<!-- code:program-template:toolbox-tuple -->
+<pre><code class="language-python">position = (<span class="syntax-number">2</span>, <span class="syntax-number">3</span>)
+row, col = position         <span class="syntax-comment"># 解包：按顺序取出两个元素。</span>
+visited = {position}        <span class="syntax-comment"># 整数元组可以放进集合，也可以作字典键。</span>
+
+<span class="syntax-function">print</span>(row, col)
+<span class="syntax-function">print</span>(position[<span class="syntax-number">0</span>])
+<span class="syntax-function">print</span>((<span class="syntax-number">2</span>, <span class="syntax-number">3</span>) <span class="syntax-keyword">in</span> visited)
+
+left, right = <span class="syntax-number">10</span>, <span class="syntax-number">20</span>
+left, right = right, left   <span class="syntax-comment"># 交换两个变量。</span>
+<span class="syntax-function">print</span>(left, right)</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">2 3
+2
+True
+20 10</code></pre>
+<details>
+<summary>展开：元组、解包与 * 的区别</summary>
+
+<ul>
+<li>元组支持下标和切片；创建后不能替换、增加或删除其中的位置。</li>
+<li>一个元素的元组写 <code>(3,)</code>；空元组写 <code>()</code>。</li>
+<li>元组能否作为键，取决于其中每个元素是否可哈希。</li>
+<li><code>a, b = values</code>：要求恰好有两个元素。</li>
+<li><code>first, *rest = values</code>：首项交给 first，其余收进列表 rest；要求至少一个元素。</li>
+<li><code>print(*nums)</code>：把列表展开成多个参数，默认用空格分隔输出。</li>
+</ul>
+</details>
+
+<p><a id="toolbox-string"></a></p>
+<h3 id="hot100-②-str拆分清理拼接与切片">② str：拆分、清理、拼接与切片</h3>
+<p><strong>用途：</strong> 读输入、处理单词、构造字符串答案。</p>
+<!-- code:program-template:toolbox-string -->
+<pre><code class="language-python">text = <span class="syntax-string">&quot;  eat tea  \n&quot;</span>
+words = text.<span class="syntax-function">split</span>()        <span class="syntax-comment"># 按连续空白拆分，得到单词列表。</span>
+clean = text.<span class="syntax-function">strip</span>()        <span class="syntax-comment"># 去掉两端空白，保留中间内容。</span>
+answer = <span class="syntax-string">&quot;-&quot;</span>.<span class="syntax-function">join</span>(words)    <span class="syntax-comment"># 用 - 连接多个字符串。</span>
+
+<span class="syntax-function">print</span>(words)
+<span class="syntax-function">print</span>(clean)
+<span class="syntax-function">print</span>(answer)
+<span class="syntax-function">print</span>(answer[:<span class="syntax-number">3</span>])           <span class="syntax-comment"># 切片左闭右开，取前三个字符。</span>
+<span class="syntax-function">print</span>(answer[::-<span class="syntax-number">1</span>])         <span class="syntax-comment"># 步长为 -1，得到逆序字符串。</span></code></pre>
+<p>输出：</p>
+<pre><code class="language-text">[&#39;eat&#39;, &#39;tea&#39;]
+eat tea
+eat-tea
+eat
+aet-tae</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="② str：拆分、清理、拼接与切片"><table><thead><tr><th scope="col">目的</th><th scope="col">写法</th><th scope="col">结果或含义</th></tr></thead><tbody><tr><td>判断包含</td><td><code>&quot;ea&quot; in &quot;eat&quot;</code></td><td>True</td></tr>
+<tr><td>查询位置</td><td><code>&quot;eat&quot;.find(&quot;a&quot;)</code></td><td>1；找不到返回 -1</td></tr>
+<tr><td>判断前缀 / 后缀</td><td><code>s.startswith(&quot;ab&quot;)</code> / <code>s.endswith(&quot;yz&quot;)</code></td><td>返回布尔值</td></tr>
+<tr><td>替换</td><td><code>&quot;aba&quot;.replace(&quot;a&quot;, &quot;x&quot;)</code></td><td><code>&quot;xbx&quot;</code></td></tr>
+<tr><td>大小写转换</td><td><code>&quot;Ab&quot;.lower()</code> / <code>&quot;Ab&quot;.upper()</code></td><td><code>&quot;ab&quot;</code> / <code>&quot;AB&quot;</code></td></tr>
+<tr><td>统计出现次数</td><td><code>&quot;banana&quot;.count(&quot;a&quot;)</code></td><td>3</td></tr>
+<tr><td>字符与编码互转</td><td><code>ord(&quot;a&quot;)</code> / <code>chr(97)</code></td><td>97 / <code>&quot;a&quot;</code></td></tr></tbody></table></div>
+<details>
+<summary>展开：字符串常见边界</summary>
+
+<ul>
+<li>字符串不可变；修改某一位时先 <code>chars = list(s)</code>，修改后 <code>&quot;&quot;.join(chars)</code>。</li>
+<li><code>split()</code> 合并连续空白；<code>split(&quot; &quot;)</code> 按单个空格拆分，可能产生空字符串。</li>
+<li><code>strip()</code> 去掉两端所有空白；只清除行尾换行可用 <code>rstrip(&quot;\n&quot;)</code>。</li>
+<li><code>join</code> 的元素必须是字符串；整数数组可写 <code>&quot; &quot;.join(map(str, nums))</code>。</li>
+<li><code>s[a:b]</code> 取下标 a 到 b−1；省略端点表示从开头或到末尾。</li>
+<li>切片端点可以越界；单个下标必须有效。</li>
+<li>构造长答案时先把片段放进列表，最后 <code>join</code>，避免循环反复复制整个字符串。</li>
+<li>每次字符串查找和复制都要考虑长度；它们通常不是 O(1)。</li>
+</ul>
+</details>
+
+<p><a id="toolbox-matrix"></a></p>
+<h3 id="hot100-③-二维列表每一行都单独创建">③ 二维列表：每一行都单独创建</h3>
+<p><strong>用途：</strong> 网格、邻接矩阵、二维 DP 状态表。</p>
+<!-- code:program-template:toolbox-matrix -->
+<pre><code class="language-python">rows, cols = <span class="syntax-number">2</span>, <span class="syntax-number">3</span>
+matrix = [[<span class="syntax-number">0</span>] * cols <span class="syntax-keyword">for</span> _ <span class="syntax-keyword">in</span> <span class="syntax-function">range</span>(rows)]  <span class="syntax-comment"># 每次创建一条独立的行。</span>
+matrix[<span class="syntax-number">0</span>][<span class="syntax-number">1</span>] = <span class="syntax-number">7</span>                          <span class="syntax-comment"># 第 0 行、第 1 列。</span>
+
+copy = [row[:] <span class="syntax-keyword">for</span> row <span class="syntax-keyword">in</span> matrix]         <span class="syntax-comment"># 二维数值表：逐行复制。</span>
+copy[<span class="syntax-number">0</span>][<span class="syntax-number">1</span>] = <span class="syntax-number">9</span>
+
+<span class="syntax-function">print</span>(matrix)
+<span class="syntax-function">print</span>(copy)</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">[[0, 7, 0], [0, 0, 0]]
+[[0, 9, 0], [0, 0, 0]]</code></pre>
+<details>
+<summary>展开：共享引用与初始化边界</summary>
+
+<ul>
+<li>一维计数表：<code>counts = [0] * 26</code>。</li>
+<li>二维初始化：<code>[[0] * cols for _ in range(rows)]</code>。</li>
+<li><code>[[0] * cols] * rows</code> 会重复引用同一行，修改一行会影响其他行。</li>
+<li><code>other = matrix</code>：两个变量指向同一个列表。</li>
+<li><code>matrix.copy()</code>：只复制外层，内部行仍共享。</li>
+<li><code>[row[:] for row in matrix]</code>：复制外层和每一行，适用于这里的二维数值表。</li>
+<li>若行内还存放可变对象，更深层对象仍可能共享。</li>
+<li>读取 <code>matrix[0]</code> 前，先确认至少有一行。</li>
+</ul>
+</details>
+
+<p><a id="toolbox-iteration"></a></p>
+<h3 id="hot100-④-rangeenumeratezip选合适的遍历方式">④ range、enumerate、zip：选合适的遍历方式</h3>
+<p><strong>选择：</strong> 重复次数用 <code>range</code>；同时要下标和值用 <code>enumerate</code>；成对取值用 <code>zip</code>。</p>
+<!-- code:program-template:toolbox-iteration -->
+<pre><code class="language-python">nums = [<span class="syntax-number">10</span>, <span class="syntax-number">20</span>, <span class="syntax-number">30</span>]
+<span class="syntax-function">print</span>(<span class="syntax-function">list</span>(<span class="syntax-function">range</span>(<span class="syntax-number">3</span>)))         <span class="syntax-comment"># 0、1、2，终点 3 不包含。</span>
+<span class="syntax-function">print</span>(<span class="syntax-function">list</span>(<span class="syntax-function">range</span>(<span class="syntax-number">2</span>, -<span class="syntax-number">1</span>, -<span class="syntax-number">1</span>))) <span class="syntax-comment"># 从 2 到 0，逐次减 1。</span>
+
+<span class="syntax-keyword">for</span> index, value <span class="syntax-keyword">in</span> <span class="syntax-function">enumerate</span>(nums):
+    <span class="syntax-function">print</span>(index, value)
+
+<span class="syntax-keyword">for</span> left, right <span class="syntax-keyword">in</span> <span class="syntax-function">zip</span>([<span class="syntax-number">1</span>, <span class="syntax-number">2</span>], [<span class="syntax-number">10</span>, <span class="syntax-number">20</span>]):
+    <span class="syntax-function">print</span>(left + right)</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">[0, 1, 2]
+[2, 1, 0]
+0 10
+1 20
+2 30
+11
+22</code></pre>
+<details>
+<summary>展开：终点、长度与反向遍历</summary>
+
+<ul>
+<li><code>range(start, stop, step)</code>：包含 start，排除 stop；step 可正可负，不能为 0。</li>
+<li><code>range(n)</code>：从 0 到 n−1；n 为 0 时循环执行零次。</li>
+<li><code>enumerate(nums, start=1)</code>：计数从 1 开始，适合输出序号。</li>
+<li>Python 3.9 的 <code>zip(a, b)</code> 在较短序列结束时停止。</li>
+<li><code>for value in reversed(nums):</code>：按逆序遍历，原列表保持不变。</li>
+<li><code>zip</code>、<code>enumerate</code> 和 <code>map</code> 返回的迭代器会被消耗；要反复使用结果可转成列表。</li>
+</ul>
+</details>
+
+<p><a id="toolbox-sort"></a></p>
+<h3 id="hot100-⑤-排序与-key先说明比较哪一项">⑤ 排序与 key：先说明比较哪一项</h3>
+<p><strong>用途：</strong> 区间排序、按长度排序、按多个条件比较。</p>
+<!-- code:program-template:toolbox-sort -->
+<pre><code class="language-python">intervals = [[<span class="syntax-number">3</span>, <span class="syntax-number">4</span>], [<span class="syntax-number">1</span>, <span class="syntax-number">5</span>], [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>]]
+ordered = <span class="syntax-function">sorted</span>(intervals, key=<span class="syntax-keyword">lambda</span> interval: (interval[<span class="syntax-number">0</span>], interval[<span class="syntax-number">1</span>]))
+<span class="syntax-comment"># 先比较左端点；左端点相同，再比较右端点。</span>
+
+<span class="syntax-function">print</span>(ordered)
+<span class="syntax-function">print</span>(<span class="syntax-function">sorted</span>([<span class="syntax-number">3</span>, <span class="syntax-number">1</span>, <span class="syntax-number">2</span>], reverse=<span class="syntax-literal">True</span>))  <span class="syntax-comment"># 从大到小。</span>
+<span class="syntax-function">print</span>(<span class="syntax-function">sorted</span>([<span class="syntax-string">&quot;tea&quot;</span>, <span class="syntax-string">&quot;a&quot;</span>, <span class="syntax-string">&quot;to&quot;</span>], key=len))  <span class="syntax-comment"># 按长度，从短到长。</span></code></pre>
+<p>输出：</p>
+<pre><code class="language-text">[[1, 2], [1, 5], [3, 4]]
+[3, 2, 1]
+[&#39;a&#39;, &#39;to&#39;, &#39;tea&#39;]</code></pre>
+<details>
+<summary>展开：lambda、稳定排序与原地排序</summary>
+
+<ul>
+<li><code>lambda interval: interval[0]</code>：接收 interval，返回它的第 0 项。</li>
+<li><code>key</code> 接收“提取比较依据”的函数；排序依据函数的返回值。</li>
+<li><code>(left, right)</code> 作为比较键时，先比第一项，相同再比第二项。</li>
+<li><code>key=lambda item: (item[0], -item[1])</code>：第一项升序，相同时第二项降序，适用于数值。</li>
+<li>Python 排序稳定：比较键相同时保留原来的相对顺序。</li>
+<li><code>sorted(data)</code> 返回新列表；<code>data.sort()</code> 修改原列表，返回 None。</li>
+<li>常见排序时间 O(n log n)；构建复杂比较键的成本另计。</li>
+</ul>
+</details>
+
+<p><a id="toolbox-functions"></a></p>
+<h3 id="hot100-⑥-转换筛选与汇总常用函数直接套用">⑥ 转换、筛选与汇总：常用函数直接套用</h3>
+<p><strong>用途：</strong> 把输入转成数字、筛选元素、计算汇总结果。</p>
+<!-- code:program-template:toolbox-functions -->
+<pre><code class="language-python">nums = <span class="syntax-function">list</span>(<span class="syntax-function">map</span>(int, <span class="syntax-string">&quot;3 -1 2&quot;</span>.<span class="syntax-function">split</span>()))  <span class="syntax-comment"># 把每一段文本转成整数。</span>
+positive = [value <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums <span class="syntax-keyword">if</span> value &gt; <span class="syntax-number">0</span>]  <span class="syntax-comment"># 保留正数。</span>
+squares = [value * value <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums]       <span class="syntax-comment"># 每个元素计算一次。</span>
+
+<span class="syntax-function">print</span>(nums)
+<span class="syntax-function">print</span>(positive)
+<span class="syntax-function">print</span>(squares)
+<span class="syntax-function">print</span>(<span class="syntax-function">sum</span>(nums), <span class="syntax-function">min</span>(nums), <span class="syntax-function">max</span>(nums))
+<span class="syntax-function">print</span>(<span class="syntax-function">any</span>(value &lt; <span class="syntax-number">0</span> <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums))  <span class="syntax-comment"># 至少一个元素为负数。</span>
+<span class="syntax-function">print</span>(<span class="syntax-function">all</span>(value &gt; <span class="syntax-number">0</span> <span class="syntax-keyword">for</span> value <span class="syntax-keyword">in</span> nums))  <span class="syntax-comment"># 所有元素都为正数。</span></code></pre>
+<p>输出：</p>
+<pre><code class="language-text">[3, -1, 2]
+[3, 2]
+[9, 1, 4]
+4 -1 3
+True
+False</code></pre>
+<div class="table-scroll" tabindex="0" role="region" aria-label="⑥ 转换、筛选与汇总：常用函数直接套用"><table><thead><tr><th scope="col">目的</th><th scope="col">写法</th><th scope="col">结果或含义</th></tr></thead><tbody><tr><td>转成整数 / 字符串</td><td><code>int(&quot;12&quot;)</code> / <code>str(12)</code></td><td>12 / <code>&quot;12&quot;</code></td></tr>
+<tr><td>绝对值</td><td><code>abs(-3)</code></td><td>3</td></tr>
+<tr><td>商和余数</td><td><code>divmod(17, 5)</code></td><td><code>(3, 2)</code></td></tr>
+<tr><td>向下取整除法 / 余数</td><td><code>17 // 5</code> / <code>17 % 5</code></td><td>3 / 2</td></tr>
+<tr><td>正整数向上取整除法</td><td><code>(n + d - 1) // d</code></td><td>适用于 n ≥ 0、d &gt; 0</td></tr>
+<tr><td>长度</td><td><code>len(nums)</code></td><td>元素数量</td></tr>
+<tr><td>默认最小值</td><td><code>min(nums, default=0)</code></td><td>空序列时返回 0，备用值按题意选择</td></tr>
+<tr><td>建立值到下标的字典</td><td><code>{value: index for index, value in enumerate(nums)}</code></td><td>重复值保留最后一次下标</td></tr></tbody></table></div>
+<details>
+<summary>展开：空序列、map、推导式与除法</summary>
+
+<ul>
+<li><code>map(int, parts)</code>：对每个元素调用 int；外层 <code>list(...)</code> 收集结果。</li>
+<li>推导式顺序：<code>[要生成的值 for 变量 in 数据 if 保留条件]</code>。</li>
+<li><code>sum([])</code> 为 0；<code>any([])</code> 为 False；<code>all([])</code> 为 True。</li>
+<li><code>min([])</code>、<code>max([])</code> 会报错；可能为空时按题意判断或设置 default。</li>
+<li><code>any</code> 遇到真就停止；<code>all</code> 遇到假就停止。</li>
+<li><code>//</code> 向负无穷取整，例如 <code>-3 // 2</code> 为 -2。</li>
+<li><code>a / b</code> 得到浮点数；整数题需要整除时用 <code>//</code>，并保证除数非零。</li>
+<li>简单转换或筛选可放一行；复杂状态更新仍分步写清楚。</li>
+</ul>
+</details>
+
+<p><a id="toolbox-call"></a></p>
+<h3 id="hot100-⑦-def-与-return明确函数返回什么修改什么">⑦ def 与 return：明确函数返回什么、修改什么</h3>
+<p><strong>用途：</strong> 解题函数负责计算，<code>main()</code> 调用函数并输出结果。</p>
+<!-- code:program-template:toolbox-call -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">find_bounds</span>(nums):
+    <span class="syntax-keyword">return</span> <span class="syntax-function">min</span>(nums), <span class="syntax-function">max</span>(nums)  <span class="syntax-comment"># 返回一个元组，包含两个结果。</span>
+
+<span class="syntax-keyword">def</span> <span class="syntax-function">add_value</span>(nums, value):
+    nums.<span class="syntax-function">append</span>(value)          <span class="syntax-comment"># 直接修改调用方传入的列表。</span>
+
+nums = [<span class="syntax-number">3</span>, <span class="syntax-number">1</span>, <span class="syntax-number">2</span>]
+smallest, largest = <span class="syntax-function">find_bounds</span>(nums)
+<span class="syntax-function">add_value</span>(nums, <span class="syntax-number">4</span>)
+
+<span class="syntax-function">print</span>(smallest, largest)
+<span class="syntax-function">print</span>(nums)</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">1 3
+[3, 1, 2, 4]</code></pre>
+<details>
+<summary>展开：返回值、可变参数与递归函数</summary>
+
+<ul>
+<li><code>return result</code>：把结果交给调用处，并立即结束当前函数。</li>
+<li>执行到末尾也没有 return 时，函数返回 None。</li>
+<li><code>print(result)</code> 只负责输出；调用方要继续使用结果时用 return。</li>
+<li><code>nums.append(...)</code>、<code>nums[i] = ...</code> 会修改共享的列表对象。</li>
+<li>函数内部 <code>nums = [...]</code> 是让局部变量指向新列表，调用方原列表保持原样。</li>
+<li>可变默认参数建议写 <code>None</code>，再在函数内部创建新列表，避免多次调用共享同一个默认列表。</li>
+<li>嵌套递归要重新赋值外层局部变量时用 <code>nonlocal</code>；对外层列表调用 append 可直接操作。</li>
+<li>上面的 find_bounds 假定 nums 非空；真实题目按题面条件确定边界。</li>
+</ul>
+</details>
+
+<p><strong>和算法结构衔接：</strong> 栈用 list，队列用 deque；堆用 heapq；链表和树用节点对象，图常用邻接表。节点构造和遍历在对应核心题型中结合完整例题展开。</p>
+<p>语法依据：<a href="https://docs.python.org/3.9/tutorial/datastructures.html">Python 数据结构</a> · <a href="https://docs.python.org/3.9/library/functions.html">内置函数</a> · <a href="https://docs.python.org/3.9/tutorial/controlflow.html#defining-functions">函数定义</a>。</p>
 <p><a id="program-libraries"></a></p>
 <h3 id="hot100-常用标准库先选工具再写-import">常用标准库：先选工具，再写 import</h3>
 <p>先看自己要维护什么，再选下面的工具。每段示例都可以单独运行，代码顶部就是这段代码需要的导入。</p>
