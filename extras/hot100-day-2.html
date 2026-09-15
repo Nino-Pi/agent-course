@@ -194,6 +194,7 @@ seen.<span class="syntax-function">remove</span>(<span class="syntax-number">10<
 <tr><td>拆分、拼接、截取字符串</td><td><a href="#toolbox-string">字符串</a></td></tr>
 <tr><td>创建 DP 表、复制二维数组</td><td><a href="#toolbox-matrix">二维列表</a></td></tr>
 <tr><td>按次数、下标或两组数据遍历</td><td><a href="#toolbox-iteration">range、enumerate、zip</a></td></tr>
+<tr><td>写一个临时的小函数</td><td><a href="#toolbox-lambda">lambda 语法与示例</a></td></tr>
 <tr><td>按指定规则排序</td><td><a href="#toolbox-sort">sorted、key、lambda</a></td></tr>
 <tr><td>转换、筛选、汇总数据</td><td><a href="#toolbox-functions">推导式与常用函数</a></td></tr>
 <tr><td>定义函数、返回结果、修改参数</td><td><a href="#toolbox-call">函数写法</a></td></tr></tbody></table></div>
@@ -334,6 +335,75 @@ copy[<span class="syntax-number">0</span>][<span class="syntax-number">1</span>]
 <li>Python 3.9 的 <code>zip(a, b)</code> 在较短序列结束时停止。</li>
 <li><code>for value in reversed(nums):</code>：按逆序遍历，原列表保持不变。</li>
 <li><code>zip</code>、<code>enumerate</code> 和 <code>map</code> 返回的迭代器会被消耗；要反复使用结果可转成列表。</li>
+</ul>
+</details>
+
+<p><a id="toolbox-lambda"></a></p>
+<h3 id="hot100-lambda把简单的计算规则写成一个函数">lambda：把简单的计算规则写成一个函数</h3>
+<p><strong>用途：</strong> 临时定义一个小函数，最常见的是传给排序的 <code>key</code>。</p>
+<p><strong>基本语法：</strong> <code>lambda 参数: 返回值表达式</code></p>
+<ul>
+<li><code>lambda</code>：创建函数。</li>
+<li>冒号前：接收什么参数。</li>
+<li>冒号后：计算什么结果；表达式的值会自动返回。</li>
+</ul>
+<p><strong>和 def 对照：这两个函数做同一件事</strong></p>
+<!-- code:program-template:lambda-def -->
+<pre><code class="language-python"><span class="syntax-keyword">def</span> <span class="syntax-function">get_start</span>(interval):
+    <span class="syntax-keyword">return</span> interval[<span class="syntax-number">0</span>]
+
+get_start_short = <span class="syntax-keyword">lambda</span> interval: interval[<span class="syntax-number">0</span>]
+<span class="syntax-comment"># interval 是参数，interval[0] 是返回值。</span>
+
+<span class="syntax-function">print</span>(<span class="syntax-function">get_start</span>([<span class="syntax-number">2</span>, <span class="syntax-number">5</span>]))
+<span class="syntax-function">print</span>(<span class="syntax-function">get_start_short</span>([<span class="syntax-number">2</span>, <span class="syntax-number">5</span>]))</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">2
+2</code></pre>
+<p><strong>推荐用法：在 key 的位置直接写 lambda</strong></p>
+<!-- code:program-template:lambda-sort -->
+<pre><code class="language-python">intervals = [[<span class="syntax-number">3</span>, <span class="syntax-number">4</span>], [<span class="syntax-number">1</span>, <span class="syntax-number">2</span>], [<span class="syntax-number">1</span>, <span class="syntax-number">5</span>]]
+
+by_start = <span class="syntax-function">sorted</span>(intervals, key=<span class="syntax-keyword">lambda</span> interval: interval[<span class="syntax-number">0</span>])
+<span class="syntax-comment"># sorted 把每个区间交给 lambda，用返回的左端点比较大小。</span>
+<span class="syntax-comment"># 返回结果仍然是完整区间。</span>
+
+by_two_keys = <span class="syntax-function">sorted</span>(intervals, key=<span class="syntax-keyword">lambda</span> interval: (interval[<span class="syntax-number">0</span>], -interval[<span class="syntax-number">1</span>]))
+<span class="syntax-comment"># 先按左端点升序；左端点相同，按右端点降序。</span>
+
+<span class="syntax-function">print</span>(by_start)
+<span class="syntax-function">print</span>(by_two_keys)</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">[[1, 2], [1, 5], [3, 4]]
+[[1, 5], [1, 2], [3, 4]]</code></pre>
+<p><strong>按左端点排序时：</strong> <code>[1, 5]</code> 和 <code>[1, 2]</code> 的比较键都是 1，保留原来的相对顺序。按两个条件排序时，第二项的负号明确指定右端点降序；输入顺序改变也遵循这个规则。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="lambda：把简单的计算规则写成一个函数"><table><thead><tr><th scope="col">想按什么规则排</th><th scope="col">key 写法</th></tr></thead><tbody><tr><td>按数值对的第二项升序</td><td><code>key=lambda item: item[1]</code></td></tr>
+<tr><td>第一项升序，相同再按第二项升序</td><td><code>key=lambda item: (item[0], item[1])</code></td></tr>
+<tr><td>第一项升序，相同再按第二项降序</td><td><code>key=lambda item: (item[0], -item[1])</code></td></tr>
+<tr><td>按字符串长度</td><td><code>key=len</code>，直接传已有函数</td></tr></tbody></table></div>
+<p><strong>多个参数、条件表达式也可以写</strong></p>
+<!-- code:program-template:lambda-arguments -->
+<pre><code class="language-python">add = <span class="syntax-keyword">lambda</span> left, right: left + right  <span class="syntax-comment"># 两个参数用逗号分隔。</span>
+label = <span class="syntax-keyword">lambda</span> value: <span class="syntax-string">&quot;正数&quot;</span> <span class="syntax-keyword">if</span> value &gt; <span class="syntax-number">0</span> <span class="syntax-keyword">else</span> <span class="syntax-string">&quot;非正数&quot;</span>
+<span class="syntax-comment"># 条件表达式：条件成立返回前面的值，否则返回 else 后面的值。</span>
+
+<span class="syntax-function">print</span>(<span class="syntax-function">add</span>(<span class="syntax-number">2</span>, <span class="syntax-number">3</span>))
+<span class="syntax-function">print</span>(<span class="syntax-function">label</span>(-<span class="syntax-number">1</span>))</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">5
+非正数</code></pre>
+<details>
+<summary>展开：什么时候选 lambda，什么时候选 def？</summary>
+
+<ul>
+<li>临时传入一个简单规则，例如排序 key：用 lambda。</li>
+<li>多处复用、需要分步计算或循环：用 def，函数名说明用途。</li>
+<li><code>lambda</code> 的函数体是一个表达式，自动返回它的值。</li>
+<li><code>key=lambda item: item[1]</code> 传入的是函数；排序时由 sorted 调用。</li>
+<li><code>key=get_start</code> 同样是传入函数；<code>get_start(interval)</code> 则是立即调用。</li>
+<li><code>lambda</code> 可以返回元组，例如 <code>(item[0], item[1])</code>。</li>
+<li><code>reverse=True</code> 会反转整体比较顺序；只让某个数值条件降序时，可对该项取负。</li>
+<li>示例中的函数赋值用于对照语法；实际排序推荐直接在 key 处写规则。</li>
 </ul>
 </details>
 
