@@ -28,7 +28,7 @@
 @media print{.extra-card{break-inside:avoid}.extra-guide-article details{border:0;background:transparent;padding:0}}
 
 /* Reading routes belong to the introduction and scroll away with the article. */
-.guide-route-nav{position:static;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 28px;padding:7px;background:#fff;border:1px solid #e7cbd3;border-radius:12px}
+.guide-route-nav{position:static;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 28px;padding:7px;background:#fff;border:1px solid #e7cbd3;border-radius:12px}
 .guide-route-nav a{display:flex;align-items:center;justify-content:center;min-height:44px;padding:8px 6px;border-radius:7px;color:#783549;background:#fff7f9;font-size:13px;font-weight:650;line-height:1.5;text-align:center;text-decoration:none}
 .guide-route-nav a[aria-current="location"]{background:#ab1034;color:#fff}
 .guide-route-nav a:hover{background:#f8dde5;color:#80223e}

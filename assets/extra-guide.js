@@ -40,6 +40,20 @@
     button.addEventListener('click', () => setExpanded(module, button.getAttribute('aria-expanded') !== 'true'));
   });
 
+  function focusOutlineRoute(id) {
+    outlineNav?.querySelectorAll('[data-guide-route]').forEach(group => {
+      group.open = group.dataset.guideRoute === id;
+    });
+  }
+
+  // A route change focuses its directory; manual expansion remains available.
+  routeNav?.addEventListener('click', event => {
+    const link = event.target.closest('a[href]');
+    if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const id = decodeURIComponent(link.hash.slice(1));
+    focusOutlineRoute(id);
+  });
+
   function syncLocation() {
     const top = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
     let current = null;
@@ -124,6 +138,10 @@
   });
 
   const initial = revealTarget(location.hash);
+  if (initial && routes.length) {
+    const route = routes.filter(entry => entry.target && (entry.target === initial.target || (entry.target.compareDocumentPosition(initial.target) & Node.DOCUMENT_POSITION_FOLLOWING))).at(-1);
+    if (route) focusOutlineRoute(route.target.id);
+  }
   const initializeLocation = () => {
     measureClearance();
     // A deep link may have been positioned before the site header was measured.
